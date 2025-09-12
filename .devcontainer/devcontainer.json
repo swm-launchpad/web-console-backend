@@ -16,7 +16,7 @@
 
 //  "workspaceMount": "source=workspace-data,target=/workspace/web-console-backend,type=volume",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/web-console-backend,type=bind",
-  "workspaceFolder": "/workspace/web-console-backend",
+  "workspaceFolder": "/workspace",
 
   "customizations": {
     "vscode": {
