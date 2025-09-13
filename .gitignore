@@ -1,1 +1,31 @@
 .claude
+
+# macOS
+.DS_Store
+*.DS_Store
+
+# Environment
+.env
+.env.local
+
+# Binary
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+main
+
+# Dependencies
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+*.tmp
