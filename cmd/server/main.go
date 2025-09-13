@@ -2,13 +2,11 @@ package main
 
 import (
 	"log"
-
-	"github.com/swm-launchpad/web-console-backend/internal/di"
 )
 
 func main() {
 	// Initialize application with dependency injection
-	app, err := di.InitializeApp()
+	app, err := InitializeApp()
 	if err != nil {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}

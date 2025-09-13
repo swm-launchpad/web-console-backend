@@ -1,13 +1,12 @@
 //go:build wireinject
 // +build wireinject
 
-package di
+package main
 
 import (
 	"database/sql"
 
 	"github.com/google/wire"
-	"github.com/swm-launchpad/web-console-backend/internal/interfaces/http/router"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/db"
 )
@@ -16,7 +15,7 @@ func InitializeApp() (*App, error) {
 	wire.Build(
 		config.Load,
 		provideDatabase,
-		router.New,
+		NewRouter,
 		NewApp,
 	)
 	return nil, nil

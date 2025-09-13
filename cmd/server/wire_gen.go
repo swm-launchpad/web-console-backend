@@ -4,11 +4,10 @@
 //go:build !wireinject
 // +build !wireinject
 
-package di
+package main
 
 import (
 	"database/sql"
-	"github.com/swm-launchpad/web-console-backend/internal/interfaces/http/router"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/db"
 )
@@ -24,7 +23,7 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	routerRouter := router.New(configConfig, db)
+	routerRouter := NewRouter(configConfig, db)
 	app := NewApp(configConfig, db, routerRouter)
 	return app, nil
 }

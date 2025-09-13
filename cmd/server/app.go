@@ -1,4 +1,4 @@
-package di
+package main
 
 import (
 	"context"
@@ -11,18 +11,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/swm-launchpad/web-console-backend/internal/interfaces/http/router"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
 )
 
 type App struct {
 	Config   *config.Config
 	Database *sql.DB
-	Router   *router.Router
+	Router   *Router
 	server   *http.Server
 }
 
-func NewApp(cfg *config.Config, database *sql.DB, r *router.Router) *App {
+func NewApp(cfg *config.Config, database *sql.DB, r *Router) *App {
 	return &App{
 		Config:   cfg,
 		Database: database,

@@ -1,12 +1,11 @@
-package router
+package main
 
 import (
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swm-launchpad/web-console-backend/internal/interfaces/http/handler"
-	"github.com/swm-launchpad/web-console-backend/internal/interfaces/http/middleware"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
+	"github.com/swm-launchpad/web-console-backend/internal/shared/middleware"
 )
 
 type Router struct {
@@ -15,7 +14,7 @@ type Router struct {
 	db     *sql.DB
 }
 
-func New(cfg *config.Config, database *sql.DB) *Router {
+func NewRouter(cfg *config.Config, database *sql.DB) *Router {
 	// Set Gin mode
 	gin.SetMode(cfg.Server.GinMode)
 	
@@ -35,7 +34,7 @@ func New(cfg *config.Config, database *sql.DB) *Router {
 
 func (r *Router) Setup() {
 	// Initialize handlers
-	healthHandler := handler.NewHealthHandler(r.db)
+	healthHandler := NewHealthHandler(r.db)
 	
 	// Setup routes
 	r.engine.GET("/", healthHandler.Root)
