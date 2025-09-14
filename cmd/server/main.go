@@ -1,17 +1,18 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"log"
 )
 
 func main() {
-	r := gin.Default()
+	// Initialize application with dependency injection
+	app, err := InitializeApp()
+	if err != nil {
+		log.Fatalf("Failed to initialize application: %v", err)
+	}
 	
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "Hello World",
-		})
-	})
-	
-	r.Run(":8080")
+	// Start the application
+	if err := app.Start(); err != nil {
+		log.Fatalf("Failed to start application: %v", err)
+	}
 }
