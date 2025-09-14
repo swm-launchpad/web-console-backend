@@ -11,7 +11,7 @@ sql:
         emit_interface: true
         emit_empty_slices: true
         emit_exported_queries: false
-        emit_result_struct_pointers: true
+        emit_result_struct_pointers: false
         overrides:
           - db_type: "char(36)"
             go_type: "string"

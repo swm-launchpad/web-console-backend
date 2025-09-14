@@ -23,8 +23,8 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	routerRouter := NewRouter(configConfig, db)
-	app := NewApp(configConfig, db, routerRouter)
+	router := NewRouter(configConfig, db)
+	app := NewApp(configConfig, db, router)
 	return app, nil
 }
 
