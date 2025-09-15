@@ -20,11 +20,11 @@ func NewAuthService(jwtService *jwt.Service, passwordService *password.Service) 
 	}
 }
 
-func (s *AuthService) GenerateToken(ctx context.Context, userID string) (string, error) {
+func (s *AuthService) GenerateToken(ctx context.Context, userID uint) (string, error) {
 	return s.jwtService.GenerateToken(ctx, userID)
 }
 
-func (s *AuthService) ValidateToken(ctx context.Context, token string) (string, error) {
+func (s *AuthService) ValidateToken(ctx context.Context, token string) (uint, error) {
 	return s.jwtService.ValidateToken(ctx, token)
 }
 

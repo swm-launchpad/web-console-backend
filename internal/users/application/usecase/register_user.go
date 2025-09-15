@@ -18,7 +18,7 @@ type RegisterUserInput struct {
 }
 
 type RegisterUserOutput struct {
-	UserID string
+	UserID uint
 	Token  string
 }
 

@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -27,13 +28,14 @@ func NewService(secret string) *Service {
 	}
 }
 
-func (s *Service) GenerateToken(ctx context.Context, userID string) (string, error) {
+func (s *Service) GenerateToken(ctx context.Context, userID uint) (string, error) {
 	now := time.Now()
+	userIDStr := strconv.FormatUint(uint64(userID), 10)
 	claims := Claims{
-		UserID: userID,
+		UserID: userIDStr,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
-			Subject:   userID,
+			Subject:   userIDStr,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(s.tokenDuration)),
 			NotBefore: jwt.NewNumericDate(now),
@@ -49,7 +51,7 @@ func (s *Service) GenerateToken(ctx context.Context, userID string) (string, err
 	return tokenString, nil
 }
 
-func (s *Service) ValidateToken(ctx context.Context, tokenString string) (string, error) {
+func (s *Service) ValidateToken(ctx context.Context, tokenString string) (uint, error) {
 	claims := &Claims{}
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
@@ -61,16 +63,22 @@ func (s *Service) ValidateToken(ctx context.Context, tokenString string) (string
 
 	if err != nil {
 		if err == jwt.ErrTokenExpired {
-			return "", authErrors.ErrTokenExpired
+			return 0, authErrors.ErrTokenExpired
 		}
-		return "", authErrors.ErrInvalidToken
+		return 0, authErrors.ErrInvalidToken
 	}
 
 	if !token.Valid {
-		return "", authErrors.ErrInvalidToken
+		return 0, authErrors.ErrInvalidToken
 	}
 
-	return claims.UserID, nil
+	// Convert string UserID back to uint
+	userID, err := strconv.ParseUint(claims.UserID, 10, 32)
+	if err != nil {
+		return 0, authErrors.ErrInvalidToken
+	}
+
+	return uint(userID), nil
 }
 
 func (s *Service) SetTokenDuration(duration time.Duration) {

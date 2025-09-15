@@ -9,20 +9,18 @@ import (
 )
 
 type GetUserInput struct {
-	UserID string
+	UserID uint
 }
 
 type GetUserOutput struct {
-	UserID          string
-	Username        string
-	Email           string
-	Name            string
-	ProfileImageURL string
-	Department      string
-	Role            string
-	Status          string
-	LastLoginAt     *time.Time
-	CreatedAt       time.Time
+	UserID       uint
+	Username     string
+	Email        string
+	Name         string
+	Phone        string
+	Organization string
+	Status       string
+	CreatedAt    time.Time
 }
 
 type GetUserUseCase struct {
@@ -37,7 +35,7 @@ func NewGetUserUseCase(userRepo repository.UserRepository) *GetUserUseCase {
 
 func (uc *GetUserUseCase) Execute(ctx context.Context, input GetUserInput) (*GetUserOutput, error) {
 	// Validate input
-	if input.UserID == "" {
+	if input.UserID == 0 {
 		return nil, errors.New("user ID is required")
 	}
 
@@ -49,11 +47,10 @@ func (uc *GetUserUseCase) Execute(ctx context.Context, input GetUserInput) (*Get
 
 	// Map domain model to output
 	output := &GetUserOutput{
-		UserID:      user.UserID,
-		Username:    user.Username,
-		Status:      string(user.Status),
-		LastLoginAt: user.LastLoginAt,
-		CreatedAt:   user.CreatedAt,
+		UserID:    user.UserID,
+		Username:  user.Username,
+		Status:    string(user.Status),
+		CreatedAt: user.CreatedAt,
 	}
 
 	// Map optional fields
@@ -63,14 +60,11 @@ func (uc *GetUserUseCase) Execute(ctx context.Context, input GetUserInput) (*Get
 	if user.Name != nil {
 		output.Name = *user.Name
 	}
-	if user.ProfileImageURL != nil {
-		output.ProfileImageURL = *user.ProfileImageURL
+	if user.Phone != nil {
+		output.Phone = *user.Phone
 	}
-	if user.Department != nil {
-		output.Department = *user.Department
-	}
-	if user.Role != nil {
-		output.Role = *user.Role
+	if user.Organization != nil {
+		output.Organization = *user.Organization
 	}
 
 	return output, nil

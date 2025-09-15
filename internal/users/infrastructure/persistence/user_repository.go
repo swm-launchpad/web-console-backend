@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
 )
@@ -22,32 +21,22 @@ func NewUserRepository(db *sql.DB) repository.UserRepository {
 }
 
 func (r *userRepository) Create(ctx context.Context, user *model.User) error {
-	if user.UserID == "" {
-		user.UserID = uuid.New().String()
-	}
-
 	query := `
 		INSERT INTO USERS (
-			user_id, username, password_hash, password_updated_at,
-			name, email, profile_image_url, department, role,
-			last_login_at, password_reset_token, token_expires_at,
+			username, password_hash, password_updated_at,
+			name, email, phone, organization,
 			status, is_deleted, deleted_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	_, err := r.db.ExecContext(ctx, query,
-		user.UserID,
+	result, err := r.db.ExecContext(ctx, query,
 		user.Username,
 		user.PasswordHash,
 		user.PasswordUpdatedAt,
 		user.Name,
 		user.Email,
-		user.ProfileImageURL,
-		user.Department,
-		user.Role,
-		user.LastLoginAt,
-		user.PasswordResetToken,
-		user.TokenExpiresAt,
+		user.Phone,
+		user.Organization,
 		user.Status,
 		user.IsDeleted,
 		user.DeletedAt,
@@ -63,6 +52,13 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 		return err
 	}
 
+	// Get the auto-generated ID
+	lastID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+	user.UserID = uint(lastID)
+
 	return nil
 }
 
@@ -70,8 +66,7 @@ func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 	query := `
 		UPDATE USERS SET
 			password_hash = ?, password_updated_at = ?, name = ?,
-			email = ?, profile_image_url = ?, department = ?, role = ?,
-			last_login_at = ?, password_reset_token = ?, token_expires_at = ?,
+			email = ?, phone = ?, organization = ?,
 			status = ?, is_deleted = ?, deleted_at = ?, updated_at = ?
 		WHERE user_id = ?
 	`
@@ -81,12 +76,8 @@ func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 		user.PasswordUpdatedAt,
 		user.Name,
 		user.Email,
-		user.ProfileImageURL,
-		user.Department,
-		user.Role,
-		user.LastLoginAt,
-		user.PasswordResetToken,
-		user.TokenExpiresAt,
+		user.Phone,
+		user.Organization,
 		user.Status,
 		user.IsDeleted,
 		user.DeletedAt,
@@ -110,12 +101,11 @@ func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 	return nil
 }
 
-func (r *userRepository) FindByID(ctx context.Context, userID string) (*model.User, error) {
+func (r *userRepository) FindByID(ctx context.Context, userID uint) (*model.User, error) {
 	query := `
 		SELECT
 			user_id, username, password_hash, password_updated_at,
-			name, email, profile_image_url, department, role,
-			last_login_at, password_reset_token, token_expires_at,
+			name, email, phone, organization,
 			status, is_deleted, deleted_at, created_at, updated_at
 		FROM USERS
 		WHERE user_id = ? AND is_deleted = FALSE
@@ -129,12 +119,8 @@ func (r *userRepository) FindByID(ctx context.Context, userID string) (*model.Us
 		&user.PasswordUpdatedAt,
 		&user.Name,
 		&user.Email,
-		&user.ProfileImageURL,
-		&user.Department,
-		&user.Role,
-		&user.LastLoginAt,
-		&user.PasswordResetToken,
-		&user.TokenExpiresAt,
+		&user.Phone,
+		&user.Organization,
 		&user.Status,
 		&user.IsDeleted,
 		&user.DeletedAt,
@@ -156,8 +142,7 @@ func (r *userRepository) FindByUsername(ctx context.Context, username string) (*
 	query := `
 		SELECT
 			user_id, username, password_hash, password_updated_at,
-			name, email, profile_image_url, department, role,
-			last_login_at, password_reset_token, token_expires_at,
+			name, email, phone, organization,
 			status, is_deleted, deleted_at, created_at, updated_at
 		FROM USERS
 		WHERE username = ? AND is_deleted = FALSE
@@ -171,12 +156,8 @@ func (r *userRepository) FindByUsername(ctx context.Context, username string) (*
 		&user.PasswordUpdatedAt,
 		&user.Name,
 		&user.Email,
-		&user.ProfileImageURL,
-		&user.Department,
-		&user.Role,
-		&user.LastLoginAt,
-		&user.PasswordResetToken,
-		&user.TokenExpiresAt,
+		&user.Phone,
+		&user.Organization,
 		&user.Status,
 		&user.IsDeleted,
 		&user.DeletedAt,
@@ -198,8 +179,7 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*model.
 	query := `
 		SELECT
 			user_id, username, password_hash, password_updated_at,
-			name, email, profile_image_url, department, role,
-			last_login_at, password_reset_token, token_expires_at,
+			name, email, phone, organization,
 			status, is_deleted, deleted_at, created_at, updated_at
 		FROM USERS
 		WHERE email = ? AND is_deleted = FALSE
@@ -213,12 +193,8 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*model.
 		&user.PasswordUpdatedAt,
 		&user.Name,
 		&user.Email,
-		&user.ProfileImageURL,
-		&user.Department,
-		&user.Role,
-		&user.LastLoginAt,
-		&user.PasswordResetToken,
-		&user.TokenExpiresAt,
+		&user.Phone,
+		&user.Organization,
 		&user.Status,
 		&user.IsDeleted,
 		&user.DeletedAt,
@@ -236,7 +212,7 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*model.
 	return user, nil
 }
 
-func (r *userRepository) Delete(ctx context.Context, userID string) error {
+func (r *userRepository) Delete(ctx context.Context, userID uint) error {
 	query := `
 		UPDATE USERS SET
 			is_deleted = TRUE,

@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
@@ -20,16 +21,14 @@ func NewUserHandler(getUserUseCase *usecase.GetUserUseCase) *UserHandler {
 
 // UserResponse represents the response for user profile
 type UserResponse struct {
-	UserID          string `json:"user_id"`
-	Username        string `json:"username"`
-	Email           string `json:"email,omitempty"`
-	Name            string `json:"name,omitempty"`
-	ProfileImageURL string `json:"profile_image_url,omitempty"`
-	Department      string `json:"department,omitempty"`
-	Role            string `json:"role,omitempty"`
-	Status          string `json:"status"`
-	LastLoginAt     string `json:"last_login_at,omitempty"`
-	CreatedAt       string `json:"created_at"`
+	UserID       uint   `json:"user_id"`
+	Username     string `json:"username"`
+	Email        string `json:"email,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Phone        string `json:"phone,omitempty"`
+	Organization string `json:"organization,omitempty"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"created_at"`
 }
 
 // GetCurrentUser handles fetching the current authenticated user's profile
@@ -44,7 +43,7 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	}
 
 	input := usecase.GetUserInput{
-		UserID: userID.(string),
+		UserID: userID.(uint),
 	}
 
 	output, err := h.getUserUseCase.Execute(c.Request.Context(), input)
@@ -63,19 +62,14 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	}
 
 	response := UserResponse{
-		UserID:          output.UserID,
-		Username:        output.Username,
-		Email:           output.Email,
-		Name:            output.Name,
-		ProfileImageURL: output.ProfileImageURL,
-		Department:      output.Department,
-		Role:            output.Role,
-		Status:          output.Status,
-		CreatedAt:       output.CreatedAt.Format("2006-01-02T15:04:05Z"),
-	}
-
-	if output.LastLoginAt != nil {
-		response.LastLoginAt = output.LastLoginAt.Format("2006-01-02T15:04:05Z")
+		UserID:       output.UserID,
+		Username:     output.Username,
+		Email:        output.Email,
+		Name:         output.Name,
+		Phone:        output.Phone,
+		Organization: output.Organization,
+		Status:       output.Status,
+		CreatedAt:    output.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -83,16 +77,24 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 
 // GetUserByID handles fetching a user profile by ID
 func (h *UserHandler) GetUserByID(c *gin.Context) {
-	userID := c.Param("id")
-	if userID == "" {
+	userIDStr := c.Param("id")
+	if userIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "User ID is required",
 		})
 		return
 	}
 
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid user ID format",
+		})
+		return
+	}
+
 	input := usecase.GetUserInput{
-		UserID: userID,
+		UserID: uint(userID),
 	}
 
 	output, err := h.getUserUseCase.Execute(c.Request.Context(), input)
@@ -111,19 +113,14 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 	}
 
 	response := UserResponse{
-		UserID:          output.UserID,
-		Username:        output.Username,
-		Email:           output.Email,
-		Name:            output.Name,
-		ProfileImageURL: output.ProfileImageURL,
-		Department:      output.Department,
-		Role:            output.Role,
-		Status:          output.Status,
-		CreatedAt:       output.CreatedAt.Format("2006-01-02T15:04:05Z"),
-	}
-
-	if output.LastLoginAt != nil {
-		response.LastLoginAt = output.LastLoginAt.Format("2006-01-02T15:04:05Z")
+		UserID:       output.UserID,
+		Username:     output.Username,
+		Email:        output.Email,
+		Name:         output.Name,
+		Phone:        output.Phone,
+		Organization: output.Organization,
+		Status:       output.Status,
+		CreatedAt:    output.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	c.JSON(http.StatusOK, response)

@@ -16,7 +16,7 @@ DROP TABLE IF EXISTS `PROJECTS`;
 DROP TABLE IF EXISTS `USERS`;
 
 CREATE TABLE `USERS` (
-    `user_id` CHAR(36) NOT NULL,
+    `user_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `username` VARCHAR(100) NOT NULL,
     `password_hash` VARCHAR(255) NOT NULL,
     `password_updated_at` TIMESTAMP NULL DEFAULT NULL,
@@ -35,7 +35,7 @@ CREATE TABLE `USERS` (
 );
 
 CREATE TABLE `PROJECTS` (
-    `project_id` CHAR(36) NOT NULL,
+    `project_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(255) NOT NULL,
     `slug` VARCHAR(255) NOT NULL,
     `fqdn` VARCHAR(255) NULL,
@@ -54,7 +54,7 @@ CREATE TABLE `PROJECTS` (
 );
 
 CREATE TABLE `TEMPLATES` (
-    `template_id` CHAR(36) NOT NULL,
+    `template_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `name` VARCHAR(255) NOT NULL,
     `template_body` LONGTEXT NULL,
     `template_config` JSON NULL,
@@ -65,22 +65,22 @@ CREATE TABLE `TEMPLATES` (
 );
 
 CREATE TABLE `VOLUMES` (
-    `volume_id` CHAR(36) NOT NULL,
-    `project_id` CHAR(36) NOT NULL,
+    `volume_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `project_id` INT UNSIGNED NOT NULL,
     `name` VARCHAR(255) NOT NULL,
     `capacity` INT UNSIGNED NOT NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`volume_id`),
     INDEX `idx_volumes_project_id` (`project_id`),
-    CONSTRAINT `fk_volumes_project` FOREIGN KEY (`project_id`) 
+    CONSTRAINT `fk_volumes_project` FOREIGN KEY (`project_id`)
         REFERENCES `PROJECTS` (`project_id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE `CONTAINERS` (
-    `container_id` CHAR(36) NOT NULL,
-    `project_id` CHAR(36) NOT NULL,
-    `template_id` CHAR(36) NULL,
+    `container_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `project_id` INT UNSIGNED NOT NULL,
+    `template_id` INT UNSIGNED NULL,
     `name` VARCHAR(255) NOT NULL,
     `slug` VARCHAR(255) NOT NULL,
     `fqdn` VARCHAR(255) NULL,
@@ -103,28 +103,28 @@ CREATE TABLE `CONTAINERS` (
     PRIMARY KEY (`container_id`),
     UNIQUE KEY `uk_containers_project_slug` (`project_id`, `slug`),
     INDEX `idx_containers_template_id` (`template_id`),
-    CONSTRAINT `fk_containers_project` FOREIGN KEY (`project_id`) 
+    CONSTRAINT `fk_containers_project` FOREIGN KEY (`project_id`)
         REFERENCES `PROJECTS` (`project_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `fk_containers_template` FOREIGN KEY (`template_id`) 
+    CONSTRAINT `fk_containers_template` FOREIGN KEY (`template_id`)
         REFERENCES `TEMPLATES` (`template_id`) ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 CREATE TABLE `ENV_VARS` (
-    `env_var_id` CHAR(36) NOT NULL,
-    `container_id` CHAR(36) NOT NULL,
+    `env_var_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `container_id` INT UNSIGNED NOT NULL,
     `key` VARCHAR(255) NOT NULL,
     `value` TEXT NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`env_var_id`),
     UNIQUE KEY `uk_env_vars_container_key` (`container_id`, `key`),
-    CONSTRAINT `fk_env_vars_container` FOREIGN KEY (`container_id`) 
+    CONSTRAINT `fk_env_vars_container` FOREIGN KEY (`container_id`)
         REFERENCES `CONTAINERS` (`container_id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE `DEPLOYMENTS` (
-    `deployment_id` CHAR(36) NOT NULL,
-    `project_id` CHAR(36) NOT NULL,
+    `deployment_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `project_id` INT UNSIGNED NOT NULL,
     `status` ENUM('pending', 'running', 'success', 'failed', 'cancelled') NOT NULL DEFAULT 'pending',
     `summary` TEXT NULL,
     `tekton_ref` VARCHAR(255) NULL,
@@ -133,13 +133,13 @@ CREATE TABLE `DEPLOYMENTS` (
     `finished_at` TIMESTAMP NULL DEFAULT NULL,
     PRIMARY KEY (`deployment_id`),
     INDEX `idx_deployments_project_id` (`project_id`),
-    CONSTRAINT `fk_deployments_project` FOREIGN KEY (`project_id`) 
+    CONSTRAINT `fk_deployments_project` FOREIGN KEY (`project_id`)
         REFERENCES `PROJECTS` (`project_id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE `NETWORKS` (
-    `network_id` CHAR(36) NOT NULL,
-    `container_id` CHAR(36) NOT NULL,
+    `network_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `container_id` INT UNSIGNED NOT NULL,
     `external_ip` VARCHAR(45) NULL,
     `external_port` SMALLINT UNSIGNED NULL,
     `internal_port` SMALLINT UNSIGNED NULL,
@@ -148,13 +148,13 @@ CREATE TABLE `NETWORKS` (
     `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`network_id`),
     INDEX `idx_networks_container_id` (`container_id`),
-    CONSTRAINT `fk_networks_container` FOREIGN KEY (`container_id`) 
+    CONSTRAINT `fk_networks_container` FOREIGN KEY (`container_id`)
         REFERENCES `CONTAINERS` (`container_id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE `BUILD_HISTORY` (
-    `build_history_id` CHAR(36) NOT NULL,
-    `container_id` CHAR(36) NOT NULL,
+    `build_history_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `container_id` INT UNSIGNED NOT NULL,
     `status` ENUM('pending', 'running', 'success', 'failed', 'cancelled') NOT NULL DEFAULT 'pending',
     `summary` TEXT NULL,
     `tekton_ref` VARCHAR(255) NULL,
@@ -165,40 +165,40 @@ CREATE TABLE `BUILD_HISTORY` (
     PRIMARY KEY (`build_history_id`),
     INDEX `idx_build_history_container_id` (`container_id`),
     INDEX `idx_build_history_container_created` (`container_id`, `created_at` DESC),
-    CONSTRAINT `fk_build_history_container` FOREIGN KEY (`container_id`) 
+    CONSTRAINT `fk_build_history_container` FOREIGN KEY (`container_id`)
         REFERENCES `CONTAINERS` (`container_id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE `SECRETS` (
-    `secret_id` CHAR(36) NOT NULL,
-    `container_id` CHAR(36) NOT NULL,
+    `secret_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `container_id` INT UNSIGNED NOT NULL,
     `key` VARCHAR(255) NOT NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`secret_id`),
     UNIQUE KEY `uk_secrets_container_key` (`container_id`, `key`),
-    CONSTRAINT `fk_secrets_container` FOREIGN KEY (`container_id`) 
+    CONSTRAINT `fk_secrets_container` FOREIGN KEY (`container_id`)
         REFERENCES `CONTAINERS` (`container_id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE `MOUNTS` (
-    `container_id` CHAR(36) NOT NULL,
-    `volume_id` CHAR(36) NOT NULL,
+    `container_id` INT UNSIGNED NOT NULL,
+    `volume_id` INT UNSIGNED NOT NULL,
     `mount_path` VARCHAR(255) NOT NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`container_id`, `volume_id`),
     INDEX `idx_mounts_volume_id` (`volume_id`),
-    CONSTRAINT `fk_mounts_container` FOREIGN KEY (`container_id`) 
+    CONSTRAINT `fk_mounts_container` FOREIGN KEY (`container_id`)
         REFERENCES `CONTAINERS` (`container_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `fk_mounts_volume` FOREIGN KEY (`volume_id`) 
+    CONSTRAINT `fk_mounts_volume` FOREIGN KEY (`volume_id`)
         REFERENCES `VOLUMES` (`volume_id`) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE `PROJECT_USER` (
-    `project_user_id` CHAR(36) NOT NULL,
-    `project_id` CHAR(36) NOT NULL,
-    `user_id` CHAR(36) NOT NULL,
+    `project_user_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `project_id` INT UNSIGNED NOT NULL,
+    `user_id` INT UNSIGNED NOT NULL,
     `role` ENUM('owner', 'member', 'guest') NOT NULL DEFAULT 'guest',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -207,8 +207,8 @@ CREATE TABLE `PROJECT_USER` (
     PRIMARY KEY (`project_user_id`),
     UNIQUE KEY `uk_project_user` (`project_id`, `user_id`),
     INDEX `idx_project_user_user_id` (`user_id`),
-    CONSTRAINT `fk_project_user_project` FOREIGN KEY (`project_id`) 
+    CONSTRAINT `fk_project_user_project` FOREIGN KEY (`project_id`)
         REFERENCES `PROJECTS` (`project_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT `fk_project_user_user` FOREIGN KEY (`user_id`) 
+    CONSTRAINT `fk_project_user_user` FOREIGN KEY (`user_id`)
         REFERENCES `USERS` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 );

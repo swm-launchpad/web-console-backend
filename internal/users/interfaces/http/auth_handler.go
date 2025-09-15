@@ -32,7 +32,7 @@ type RegisterRequest struct {
 
 // RegisterResponse represents the response for user registration
 type RegisterResponse struct {
-	UserID  string `json:"user_id"`
+	UserID  uint   `json:"user_id"`
 	Token   string `json:"token"`
 	Message string `json:"message"`
 }
@@ -85,7 +85,7 @@ type LoginRequest struct {
 
 // LoginResponse represents the response for user login
 type LoginResponse struct {
-	UserID   string `json:"user_id"`
+	UserID   uint   `json:"user_id"`
 	Token    string `json:"token"`
 	Username string `json:"username"`
 	Email    string `json:"email,omitempty"`

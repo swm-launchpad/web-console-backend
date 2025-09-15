@@ -15,23 +15,19 @@ const (
 )
 
 type User struct {
-	UserID             string
-	Username           string
-	PasswordHash       string
-	PasswordUpdatedAt  *time.Time
-	Name               *string
-	Email              *string
-	ProfileImageURL    *string
-	Department         *string
-	Role               *string
-	LastLoginAt        *time.Time
-	PasswordResetToken *string
-	TokenExpiresAt     *time.Time
-	Status             UserStatus
-	IsDeleted          bool
-	DeletedAt          *time.Time
-	CreatedAt          time.Time
-	UpdatedAt          *time.Time
+	UserID            uint
+	Username          string
+	PasswordHash      string
+	PasswordUpdatedAt *time.Time
+	Name              *string
+	Email             *string
+	Phone             *string
+	Organization      *string
+	Status            UserStatus
+	IsDeleted         bool
+	DeletedAt         *time.Time
+	CreatedAt         time.Time
+	UpdatedAt         *time.Time
 }
 
 func NewUser(username, email string) (*User, error) {
@@ -71,11 +67,5 @@ func (u *User) UpdatePassword(passwordHash string) {
 	u.PasswordHash = passwordHash
 	now := time.Now()
 	u.PasswordUpdatedAt = &now
-	u.UpdatedAt = &now
-}
-
-func (u *User) RecordLogin() {
-	now := time.Now()
-	u.LastLoginAt = &now
 	u.UpdatedAt = &now
 }

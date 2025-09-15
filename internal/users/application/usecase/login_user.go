@@ -15,7 +15,7 @@ type LoginUserInput struct {
 }
 
 type LoginUserOutput struct {
-	UserID   string
+	UserID   uint
 	Token    string
 	Username string
 	Email    string
@@ -63,13 +63,6 @@ func (uc *LoginUserUseCase) Execute(ctx context.Context, input LoginUserInput) (
 	// Verify password
 	if err := uc.authService.VerifyPassword(user.PasswordHash, input.Password); err != nil {
 		return nil, authErrors.ErrInvalidCredentials
-	}
-
-	// Update last login time
-	user.RecordLogin()
-	if err := uc.userRepo.Update(ctx, user); err != nil {
-		// Log error but don't fail login
-		// In production, this should be logged properly
 	}
 
 	// Generate JWT token
