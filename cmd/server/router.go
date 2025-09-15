@@ -6,15 +6,25 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/middleware"
+	userHTTP "github.com/swm-launchpad/web-console-backend/internal/users/interfaces/http"
 )
 
 type Router struct {
-	engine *gin.Engine
-	config *config.Config
-	db     *sql.DB
+	engine         *gin.Engine
+	config         *config.Config
+	db             *sql.DB
+	authHandler    *userHTTP.AuthHandler
+	userHandler    *userHTTP.UserHandler
+	authMiddleware *middleware.AuthMiddleware
 }
 
-func NewRouter(cfg *config.Config, database *sql.DB) *Router {
+func NewRouter(
+	cfg *config.Config,
+	database *sql.DB,
+	authHandler *userHTTP.AuthHandler,
+	userHandler *userHTTP.UserHandler,
+	authMiddleware *middleware.AuthMiddleware,
+) *Router {
 	// Set Gin mode
 	gin.SetMode(cfg.Server.GinMode)
 
@@ -26,9 +36,12 @@ func NewRouter(cfg *config.Config, database *sql.DB) *Router {
 	r.Use(middleware.CORS(&cfg.CORS))
 
 	return &Router{
-		engine: r,
-		config: cfg,
-		db:     database,
+		engine:         r,
+		config:         cfg,
+		db:             database,
+		authHandler:    authHandler,
+		userHandler:    userHandler,
+		authMiddleware: authMiddleware,
 	}
 }
 
@@ -40,7 +53,24 @@ func (r *Router) Setup() {
 	r.engine.GET("/", healthHandler.Root)
 	r.engine.GET("/health", healthHandler.Health)
 
-	// API v1 routes will be added when needed
+	// API v1 routes
+	v1 := r.engine.Group("/api/v1")
+	{
+		// Auth routes (public)
+		auth := v1.Group("/auth")
+		{
+			auth.POST("/register", r.authHandler.Register)
+			auth.POST("/login", r.authHandler.Login)
+		}
+
+		// User routes (protected)
+		users := v1.Group("/users")
+		users.Use(r.authMiddleware.RequireAuth())
+		{
+			users.GET("/me", r.userHandler.GetCurrentUser)
+			users.GET("/:id", r.userHandler.GetUserByID)
+		}
+	}
 }
 
 func (r *Router) Engine() *gin.Engine {

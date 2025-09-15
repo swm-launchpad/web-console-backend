@@ -8,8 +8,15 @@ package main
 
 import (
 	"database/sql"
+	"github.com/swm-launchpad/web-console-backend/internal/auth"
+	"github.com/swm-launchpad/web-console-backend/internal/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/db"
+	"github.com/swm-launchpad/web-console-backend/internal/shared/middleware"
+	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
+	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence"
+	"github.com/swm-launchpad/web-console-backend/internal/users/interfaces/http"
 )
 
 // Injectors from wire.go:
@@ -23,7 +30,17 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	router := NewRouter(configConfig, db)
+	userRepository := persistence.NewUserRepository(db)
+	service := provideJWTService(configConfig)
+	passwordService := password.NewService()
+	authService := auth.NewAuthService(service, passwordService)
+	registerUserUseCase := usecase.NewRegisterUserUseCase(userRepository, authService)
+	loginUserUseCase := usecase.NewLoginUserUseCase(userRepository, authService)
+	authHandler := http.NewAuthHandler(registerUserUseCase, loginUserUseCase)
+	getUserUseCase := usecase.NewGetUserUseCase(userRepository)
+	userHandler := http.NewUserHandler(getUserUseCase)
+	authMiddleware := middleware.NewAuthMiddleware(service)
+	router := NewRouter(configConfig, db, authHandler, userHandler, authMiddleware)
 	app := NewApp(configConfig, db, router)
 	return app, nil
 }
@@ -32,4 +49,8 @@ func InitializeApp() (*App, error) {
 
 func provideDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db.NewConnection(&cfg.Database)
+}
+
+func provideJWTService(cfg *config.Config) *jwt.Service {
+	return jwt.NewService(cfg.JWT.Secret)
 }
