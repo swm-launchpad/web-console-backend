@@ -30,3 +30,7 @@ vendor/
 # Temporary files
 tmp/
 *.tmp
+
+# Test coverage
+coverage.out
+coverage.html
