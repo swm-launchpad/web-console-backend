@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/swm-launchpad/web-console-backend/internal/infrastructure/persistence/sqlc"
+	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
 )

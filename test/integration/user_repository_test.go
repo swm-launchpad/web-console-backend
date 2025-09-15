@@ -260,7 +260,7 @@ func TestUserRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 		defer tx.Rollback() // Always rollback at the end
 
-		// Create repository with transaction (now supported via sqlc DBTX)
+		// Create repository with transaction
 		txRepo := persistence.NewUserRepository(tx)
 
 		email := "txtest@example.com"

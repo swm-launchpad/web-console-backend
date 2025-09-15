@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/swm-launchpad/web-console-backend/internal/infrastructure/persistence/sqlc"
+	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
 )
 
