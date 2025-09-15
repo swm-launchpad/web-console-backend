@@ -10,6 +10,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/auth/password"
+	sqlcgen "github.com/swm-launchpad/web-console-backend/internal/infrastructure/persistence/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/db"
 	"github.com/swm-launchpad/web-console-backend/internal/shared/middleware"
@@ -23,6 +24,7 @@ func InitializeApp() (*App, error) {
 		// Config
 		config.Load,
 		provideDatabase,
+		wire.Bind(new(sqlcgen.DBTX), new(*sql.DB)),
 
 		// Auth infrastructure
 		provideJWTService,

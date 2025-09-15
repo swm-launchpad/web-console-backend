@@ -6,44 +6,38 @@ import (
 	"errors"
 	"time"
 
+	"github.com/swm-launchpad/web-console-backend/internal/infrastructure/persistence/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
 )
 
 type userRepository struct {
-	db *sql.DB
+	queries *sqlc.Queries
 }
 
-func NewUserRepository(db *sql.DB) repository.UserRepository {
+func NewUserRepository(db sqlc.DBTX) repository.UserRepository {
 	return &userRepository{
-		db: db,
+		queries: sqlc.New(db),
 	}
 }
 
 func (r *userRepository) Create(ctx context.Context, user *model.User) error {
-	query := `
-		INSERT INTO USERS (
-			username, password_hash, password_updated_at,
-			name, email, phone, organization,
-			status, is_deleted, deleted_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
+	params := sqlc.CreateUserParams{
+		Username:          user.Username,
+		PasswordHash:      user.PasswordHash,
+		PasswordUpdatedAt: toNullTime(user.PasswordUpdatedAt),
+		Name:              toNullString(user.Name),
+		Email:             ptrToString(user.Email),
+		Phone:             toNullString(user.Phone),
+		Organization:      toNullString(user.Organization),
+		Status:            sqlc.UsersStatus(user.Status),
+		IsDeleted:         user.IsDeleted,
+		DeletedAt:         toNullTime(user.DeletedAt),
+		CreatedAt:         user.CreatedAt,
+		UpdatedAt:         toNullTime(user.UpdatedAt),
+	}
 
-	result, err := r.db.ExecContext(ctx, query,
-		user.Username,
-		user.PasswordHash,
-		user.PasswordUpdatedAt,
-		user.Name,
-		user.Email,
-		user.Phone,
-		user.Organization,
-		user.Status,
-		user.IsDeleted,
-		user.DeletedAt,
-		user.CreatedAt,
-		user.UpdatedAt,
-	)
-
+	result, err := r.queries.CreateUser(ctx, params)
 	if err != nil {
 		// Check for duplicate username or email
 		if isDuplicateError(err) {
@@ -63,28 +57,21 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 }
 
 func (r *userRepository) Update(ctx context.Context, user *model.User) error {
-	query := `
-		UPDATE USERS SET
-			password_hash = ?, password_updated_at = ?, name = ?,
-			email = ?, phone = ?, organization = ?,
-			status = ?, is_deleted = ?, deleted_at = ?, updated_at = ?
-		WHERE user_id = ?
-	`
+	params := sqlc.UpdateUserParams{
+		PasswordHash:      user.PasswordHash,
+		PasswordUpdatedAt: toNullTime(user.PasswordUpdatedAt),
+		Name:              toNullString(user.Name),
+		Email:             ptrToString(user.Email),
+		Phone:             toNullString(user.Phone),
+		Organization:      toNullString(user.Organization),
+		Status:            sqlc.UsersStatus(user.Status),
+		IsDeleted:         user.IsDeleted,
+		DeletedAt:         toNullTime(user.DeletedAt),
+		UpdatedAt:         toNullTime(user.UpdatedAt),
+		UserID:            uint32(user.UserID),
+	}
 
-	result, err := r.db.ExecContext(ctx, query,
-		user.PasswordHash,
-		user.PasswordUpdatedAt,
-		user.Name,
-		user.Email,
-		user.Phone,
-		user.Organization,
-		user.Status,
-		user.IsDeleted,
-		user.DeletedAt,
-		user.UpdatedAt,
-		user.UserID,
-	)
-
+	result, err := r.queries.UpdateUser(ctx, params)
 	if err != nil {
 		return err
 	}
@@ -102,32 +89,7 @@ func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 }
 
 func (r *userRepository) FindByID(ctx context.Context, userID uint) (*model.User, error) {
-	query := `
-		SELECT
-			user_id, username, password_hash, password_updated_at,
-			name, email, phone, organization,
-			status, is_deleted, deleted_at, created_at, updated_at
-		FROM USERS
-		WHERE user_id = ? AND is_deleted = FALSE
-	`
-
-	user := &model.User{}
-	err := r.db.QueryRowContext(ctx, query, userID).Scan(
-		&user.UserID,
-		&user.Username,
-		&user.PasswordHash,
-		&user.PasswordUpdatedAt,
-		&user.Name,
-		&user.Email,
-		&user.Phone,
-		&user.Organization,
-		&user.Status,
-		&user.IsDeleted,
-		&user.DeletedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-
+	sqlcUser, err := r.queries.GetUserByID(ctx, uint32(userID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrUserNotFound
@@ -135,36 +97,25 @@ func (r *userRepository) FindByID(ctx context.Context, userID uint) (*model.User
 		return nil, err
 	}
 
-	return user, nil
+	return toDomainUser(
+		uint(sqlcUser.UserID),
+		sqlcUser.Username,
+		sqlcUser.PasswordHash,
+		sqlcUser.PasswordUpdatedAt,
+		sqlcUser.Name,
+		sqlcUser.Email,
+		sqlcUser.Phone,
+		sqlcUser.Organization,
+		sqlc.UsersStatus(sqlcUser.Status),
+		sqlcUser.IsDeleted,
+		sqlcUser.DeletedAt,
+		sqlcUser.CreatedAt,
+		sqlcUser.UpdatedAt,
+	), nil
 }
 
 func (r *userRepository) FindByUsername(ctx context.Context, username string) (*model.User, error) {
-	query := `
-		SELECT
-			user_id, username, password_hash, password_updated_at,
-			name, email, phone, organization,
-			status, is_deleted, deleted_at, created_at, updated_at
-		FROM USERS
-		WHERE username = ? AND is_deleted = FALSE
-	`
-
-	user := &model.User{}
-	err := r.db.QueryRowContext(ctx, query, username).Scan(
-		&user.UserID,
-		&user.Username,
-		&user.PasswordHash,
-		&user.PasswordUpdatedAt,
-		&user.Name,
-		&user.Email,
-		&user.Phone,
-		&user.Organization,
-		&user.Status,
-		&user.IsDeleted,
-		&user.DeletedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-
+	sqlcUser, err := r.queries.GetUserByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrUserNotFound
@@ -172,36 +123,25 @@ func (r *userRepository) FindByUsername(ctx context.Context, username string) (*
 		return nil, err
 	}
 
-	return user, nil
+	return toDomainUser(
+		uint(sqlcUser.UserID),
+		sqlcUser.Username,
+		sqlcUser.PasswordHash,
+		sqlcUser.PasswordUpdatedAt,
+		sqlcUser.Name,
+		sqlcUser.Email,
+		sqlcUser.Phone,
+		sqlcUser.Organization,
+		sqlc.UsersStatus(sqlcUser.Status),
+		sqlcUser.IsDeleted,
+		sqlcUser.DeletedAt,
+		sqlcUser.CreatedAt,
+		sqlcUser.UpdatedAt,
+	), nil
 }
 
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*model.User, error) {
-	query := `
-		SELECT
-			user_id, username, password_hash, password_updated_at,
-			name, email, phone, organization,
-			status, is_deleted, deleted_at, created_at, updated_at
-		FROM USERS
-		WHERE email = ? AND is_deleted = FALSE
-	`
-
-	user := &model.User{}
-	err := r.db.QueryRowContext(ctx, query, email).Scan(
-		&user.UserID,
-		&user.Username,
-		&user.PasswordHash,
-		&user.PasswordUpdatedAt,
-		&user.Name,
-		&user.Email,
-		&user.Phone,
-		&user.Organization,
-		&user.Status,
-		&user.IsDeleted,
-		&user.DeletedAt,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-
+	sqlcUser, err := r.queries.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrUserNotFound
@@ -209,20 +149,32 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*model.
 		return nil, err
 	}
 
-	return user, nil
+	return toDomainUser(
+		uint(sqlcUser.UserID),
+		sqlcUser.Username,
+		sqlcUser.PasswordHash,
+		sqlcUser.PasswordUpdatedAt,
+		sqlcUser.Name,
+		sqlcUser.Email,
+		sqlcUser.Phone,
+		sqlcUser.Organization,
+		sqlc.UsersStatus(sqlcUser.Status),
+		sqlcUser.IsDeleted,
+		sqlcUser.DeletedAt,
+		sqlcUser.CreatedAt,
+		sqlcUser.UpdatedAt,
+	), nil
 }
 
 func (r *userRepository) Delete(ctx context.Context, userID uint) error {
-	query := `
-		UPDATE USERS SET
-			is_deleted = TRUE,
-			deleted_at = ?,
-			updated_at = ?
-		WHERE user_id = ?
-	`
-
 	now := time.Now()
-	result, err := r.db.ExecContext(ctx, query, now, now, userID)
+	params := sqlc.DeleteUserParams{
+		DeletedAt: sql.NullTime{Time: now, Valid: true},
+		UpdatedAt: sql.NullTime{Time: now, Valid: true},
+		UserID:    uint32(userID),
+	}
+
+	result, err := r.queries.DeleteUser(ctx, params)
 	if err != nil {
 		return err
 	}
@@ -240,27 +192,86 @@ func (r *userRepository) Delete(ctx context.Context, userID uint) error {
 }
 
 func (r *userRepository) ExistsByUsername(ctx context.Context, username string) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM USERS WHERE username = ? AND is_deleted = FALSE)`
-
-	var exists bool
-	err := r.db.QueryRowContext(ctx, query, username).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-
-	return exists, nil
+	return r.queries.ExistsByUsername(ctx, username)
 }
 
 func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM USERS WHERE email = ? AND is_deleted = FALSE)`
+	return r.queries.ExistsByEmail(ctx, email)
+}
 
-	var exists bool
-	err := r.db.QueryRowContext(ctx, query, email).Scan(&exists)
-	if err != nil {
-		return false, err
+// Helper function for converting between domain and sqlc models
+func toDomainUser(
+	userID uint,
+	username string,
+	passwordHash string,
+	passwordUpdatedAt sql.NullTime,
+	name sql.NullString,
+	email string,
+	phone sql.NullString,
+	organization sql.NullString,
+	status sqlc.UsersStatus,
+	isDeleted bool,
+	deletedAt sql.NullTime,
+	createdAt time.Time,
+	updatedAt sql.NullTime,
+) *model.User {
+	return &model.User{
+		UserID:            userID,
+		Username:          username,
+		PasswordHash:      passwordHash,
+		PasswordUpdatedAt: fromNullTime(passwordUpdatedAt),
+		Name:              fromNullString(name),
+		Email:             stringToPtr(email),
+		Phone:             fromNullString(phone),
+		Organization:      fromNullString(organization),
+		Status:            model.UserStatus(status),
+		IsDeleted:         isDeleted,
+		DeletedAt:         fromNullTime(deletedAt),
+		CreatedAt:         createdAt,
+		UpdatedAt:         fromNullTime(updatedAt),
 	}
+}
 
-	return exists, nil
+func toNullString(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: *s, Valid: true}
+}
+
+func fromNullString(ns sql.NullString) *string {
+	if !ns.Valid {
+		return nil
+	}
+	return &ns.String
+}
+
+func toNullTime(t *time.Time) sql.NullTime {
+	if t == nil {
+		return sql.NullTime{}
+	}
+	return sql.NullTime{Time: *t, Valid: true}
+}
+
+func fromNullTime(nt sql.NullTime) *time.Time {
+	if !nt.Valid {
+		return nil
+	}
+	return &nt.Time
+}
+
+func ptrToString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func stringToPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func isDuplicateError(err error) bool {

@@ -255,15 +255,42 @@ func TestUserRepository_Integration(t *testing.T) {
 	})
 
 	t.Run("Transaction Rollback", func(t *testing.T) {
-		// Skip: Repository doesn't support transaction interface yet
-		t.Skip("Skipping transaction test - repository needs interface update to support both *sql.DB and *sql.Tx")
+		// Given
+		tx, err := testDB.DB.BeginTx(ctx, nil)
+		require.NoError(t, err)
+		defer tx.Rollback() // Always rollback at the end
 
-		// TODO: Update repository to accept interface that both *sql.DB and *sql.Tx implement
-		// This test would verify transaction rollback behavior:
-		// 1. Start transaction
-		// 2. Create user in transaction
-		// 3. Rollback transaction
-		// 4. Verify user doesn't exist in database
+		// Create repository with transaction (now supported via sqlc DBTX)
+		txRepo := persistence.NewUserRepository(tx)
+
+		email := "txtest@example.com"
+		user := &model.User{
+			Username:     "txuser",
+			PasswordHash: "$2a$10$hashedpassword",
+			Email:        &email,
+			Status:       model.UserStatusActive,
+			IsDeleted:    false,
+			CreatedAt:    time.Now(),
+		}
+
+		// When - Create user in transaction
+		err = txRepo.Create(ctx, user)
+		require.NoError(t, err)
+
+		// Verify user exists in transaction
+		foundInTx, err := txRepo.FindByUsername(ctx, "txuser")
+		require.NoError(t, err)
+		assert.NotNil(t, foundInTx)
+		assert.Equal(t, "txuser", foundInTx.Username)
+
+		// Rollback transaction
+		err = tx.Rollback()
+		require.NoError(t, err)
+
+		// Then - Verify user doesn't exist after rollback
+		foundAfterRollback, err := userRepo.FindByUsername(ctx, "txuser")
+		assert.Equal(t, repository.ErrUserNotFound, err)
+		assert.Nil(t, foundAfterRollback)
 	})
 
 	t.Run("Duplicate Username Error", func(t *testing.T) {
