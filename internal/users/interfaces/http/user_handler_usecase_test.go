@@ -34,7 +34,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		user := &model.User{
 			UserID:       userID,
 			Username:     "currentuser",
-			Email:        stringPtrHelper("current@example.com"),
+			Email:        "current@example.com",
 			Name:         stringPtrHelper("Current User"),
 			Phone:        stringPtrHelper("123-456-7890"),
 			Organization: stringPtrHelper("Test Org"),
@@ -88,7 +88,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		user := &model.User{
 			UserID:       userID,
 			Username:     "minimaluser",
-			Email:        nil, // Empty optional field
+			Email:        "minimal@example.com",
 			Name:         nil, // Empty optional field
 			Phone:        nil, // Empty optional field
 			Organization: nil, // Empty optional field
@@ -120,7 +120,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 		assert.Equal(t, userID, response.UserID)
 		assert.Equal(t, "minimaluser", response.Username)
-		assert.Empty(t, response.Email)
+		assert.Equal(t, "minimal@example.com", response.Email)
 		assert.Empty(t, response.Name)
 		assert.Empty(t, response.Phone)
 		assert.Empty(t, response.Organization)
@@ -238,7 +238,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		user := &model.User{
 			UserID:       userID,
 			Username:     "targetuser",
-			Email:        stringPtrHelper("target@example.com"),
+			Email:        "target@example.com",
 			Name:         stringPtrHelper("Target User"),
 			Phone:        stringPtrHelper("987-654-3210"),
 			Organization: stringPtrHelper("Another Org"),
@@ -297,7 +297,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 				user := &model.User{
 					UserID:    tc.userID,
 					Username:  "testuser",
-					Email:     stringPtrHelper("test@example.com"),
+					Email:     "test@example.com",
 					Name:      stringPtrHelper("Test User"),
 					Status:    model.UserStatusActive,
 					CreatedAt: time.Now(),

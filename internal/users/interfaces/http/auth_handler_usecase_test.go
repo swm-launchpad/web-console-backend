@@ -45,7 +45,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		mockRepo.On("Create", mock.Anything, mock.MatchedBy(func(user *model.User) bool {
 			return user.Username == reqBody.Username &&
 				user.PasswordHash == hashedPassword &&
-				user.Email != nil && *user.Email == reqBody.Email &&
+				user.Email == reqBody.Email &&
 				user.Name != nil && *user.Name == reqBody.Name &&
 				user.Status == model.UserStatusActive
 		})).Return(nil).Run(func(args mock.Arguments) {
@@ -273,7 +273,7 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 			UserID:       456,
 			Username:     "testuser",
 			PasswordHash: hashedPassword,
-			Email:        stringPtr("test@example.com"),
+			Email:        "test@example.com",
 			Name:         stringPtr("Test User"),
 			Status:       model.UserStatusActive,
 		}

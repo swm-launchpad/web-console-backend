@@ -23,7 +23,7 @@ func NewUserHandler(getUserUseCase *usecase.GetUserUseCase) *UserHandler {
 type UserResponse struct {
 	UserID       uint   `json:"user_id"`
 	Username     string `json:"username"`
-	Email        string `json:"email,omitempty"`
+	Email        string `json:"email"`
 	Name         string `json:"name,omitempty"`
 	Phone        string `json:"phone,omitempty"`
 	Organization string `json:"organization,omitempty"`

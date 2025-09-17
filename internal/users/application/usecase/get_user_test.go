@@ -31,7 +31,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		user := &model.User{
 			UserID:       userID,
 			Username:     "testuser",
-			Email:        &email,
+			Email:        email,
 			Name:         &name,
 			Phone:        &phone,
 			Organization: &organization,
@@ -77,7 +77,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		user := &model.User{
 			UserID:       userID,
 			Username:     "minimaluser",
-			Email:        nil,
+			Email:        "minimal@example.com",
 			Name:         nil,
 			Phone:        nil,
 			Organization: nil,
@@ -102,7 +102,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, "minimaluser", output.Username)
-		assert.Empty(t, output.Email)
+		assert.Equal(t, "minimal@example.com", output.Email)
 		assert.Empty(t, output.Name)
 		assert.Empty(t, output.Phone)
 		assert.Empty(t, output.Organization)
@@ -131,6 +131,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 			user := &model.User{
 				UserID:    userID,
 				Username:  "statususer",
+				Email:     "status@example.com",
 				Status:    status,
 				IsDeleted: false,
 				CreatedAt: now,
@@ -278,7 +279,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		user := &model.User{
 			UserID:       userID,
 			Username:     "fulluser",
-			Email:        &email,
+			Email:        email,
 			Name:         &name,
 			Phone:        &phone,
 			Organization: &organization,
@@ -324,7 +325,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		user := &model.User{
 			UserID:       userID,
 			Username:     "emptyfields",
-			Email:        &emptyStr, // 빈 문자열
+			Email:        "empty@example.com",
 			Name:         &emptyStr, // 빈 문자열
 			Phone:        nil,        // nil
 			Organization: nil,        // nil
@@ -349,7 +350,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, "emptyfields", output.Username)
-		assert.Empty(t, output.Email) // 빈 문자열
+		assert.Equal(t, "empty@example.com", output.Email)
 		assert.Empty(t, output.Name)  // 빈 문자열
 		assert.Empty(t, output.Phone)
 		assert.Empty(t, output.Organization)

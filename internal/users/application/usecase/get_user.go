@@ -49,14 +49,12 @@ func (uc *GetUserUseCase) Execute(ctx context.Context, input GetUserInput) (*Get
 	output := &GetUserOutput{
 		UserID:    user.UserID,
 		Username:  user.Username,
+		Email:     user.Email,
 		Status:    string(user.Status),
 		CreatedAt: user.CreatedAt,
 	}
 
 	// Map optional fields
-	if user.Email != nil {
-		output.Email = *user.Email
-	}
 	if user.Name != nil {
 		output.Name = *user.Name
 	}

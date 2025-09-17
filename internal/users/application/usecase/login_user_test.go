@@ -36,7 +36,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 			UserID:       1,
 			Username:     input.Username,
 			PasswordHash: hashedPassword,
-			Email:        &email,
+			Email:        email,
 			Name:         &name,
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
@@ -85,7 +85,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 			UserID:       2,
 			Username:     input.Username,
 			PasswordHash: hashedPassword,
-			Email:        nil, // No email
+			Email:        "minimal@example.com",
 			Name:         nil, // No name
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
@@ -109,7 +109,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, uint(2), output.UserID)
 		assert.Equal(t, token, output.Token)
 		assert.Equal(t, input.Username, output.Username)
-		assert.Empty(t, output.Email)
+		assert.Equal(t, "minimal@example.com", output.Email)
 		assert.Empty(t, output.Name)
 
 		mockRepo.AssertExpectations(t)

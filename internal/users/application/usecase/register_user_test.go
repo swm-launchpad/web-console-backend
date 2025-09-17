@@ -40,7 +40,7 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockRepo.On("Create", ctx, mock.MatchedBy(func(user *model.User) bool {
 			return user.Username == input.Username &&
 				user.PasswordHash == hashedPassword &&
-				user.Email != nil && *user.Email == input.Email &&
+				user.Email == input.Email &&
 				user.Name != nil && *user.Name == input.Name &&
 				user.Status == model.UserStatusActive
 		})).Return(nil).Run(func(args mock.Arguments) {
@@ -87,7 +87,7 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockRepo.On("Create", ctx, mock.MatchedBy(func(user *model.User) bool {
 			return user.Username == input.Username &&
 				user.PasswordHash == hashedPassword &&
-				user.Email != nil && *user.Email == input.Email &&
+				user.Email == input.Email &&
 				(user.Name == nil || *user.Name == "") &&
 				user.Status == model.UserStatusActive
 		})).Return(nil).Run(func(args mock.Arguments) {

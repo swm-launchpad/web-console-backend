@@ -357,13 +357,14 @@ func TestJSONResponseFormats(t *testing.T) {
 		err = json.Unmarshal(jsonData, &parsed)
 		require.NoError(t, err)
 
-		// omitempty 필드들은 JSON에 포함되지 않아야 함
 		_, hasEmail := parsed["email"]
+		assert.True(t, hasEmail)
+
+		// omitempty 필드들은 JSON에 포함되지 않아야 함
 		_, hasName := parsed["name"]
 		_, hasPhone := parsed["phone"]
 		_, hasOrg := parsed["organization"]
 
-		assert.False(t, hasEmail)
 		assert.False(t, hasName)
 		assert.False(t, hasPhone)
 		assert.False(t, hasOrg)
@@ -371,6 +372,7 @@ func TestJSONResponseFormats(t *testing.T) {
 		// 필수 필드들은 항상 포함되어야 함
 		assert.NotNil(t, parsed["user_id"])
 		assert.NotNil(t, parsed["username"])
+		assert.NotNil(t, parsed["email"])
 		assert.NotNil(t, parsed["status"])
 		assert.NotNil(t, parsed["created_at"])
 	})

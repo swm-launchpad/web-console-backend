@@ -20,7 +20,7 @@ type User struct {
 	PasswordHash      string
 	PasswordUpdatedAt *time.Time
 	Name              *string
-	Email             *string
+	Email             string
 	Phone             *string
 	Organization      *string
 	Status            UserStatus
@@ -41,7 +41,7 @@ func NewUser(username, email string) (*User, error) {
 	now := time.Now()
 	return &User{
 		Username:  username,
-		Email:     &email,
+		Email:     email,
 		Status:    UserStatusPending,
 		IsDeleted: false,
 		CreatedAt: now,

@@ -76,11 +76,9 @@ func (uc *LoginUserUseCase) Execute(ctx context.Context, input LoginUserInput) (
 		UserID:   user.UserID,
 		Token:    token,
 		Username: user.Username,
+		Email:    user.Email,
 	}
 
-	if user.Email != nil {
-		output.Email = *user.Email
-	}
 	if user.Name != nil {
 		output.Name = *user.Name
 	}
