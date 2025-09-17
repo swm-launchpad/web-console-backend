@@ -2,7 +2,7 @@ package password
 
 import (
 	"golang.org/x/crypto/bcrypt"
-	authErrors "github.com/swm-launchpad/web-console-backend/internal/auth/errors"
+	authErrors "github.com/swm-launchpad/web-console-backend/internal/common/auth/errors"
 )
 
 type Service struct {

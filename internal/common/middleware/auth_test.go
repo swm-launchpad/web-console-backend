@@ -12,7 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	jwtService "github.com/swm-launchpad/web-console-backend/internal/auth/jwt"
+	jwtService "github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 )
 
 func setupTestRouter() *gin.Engine {

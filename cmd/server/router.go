@@ -4,8 +4,8 @@ import (
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
-	"github.com/swm-launchpad/web-console-backend/internal/shared/middleware"
+	"github.com/swm-launchpad/web-console-backend/internal/common/config"
+	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/users/interfaces/http"
 )
 

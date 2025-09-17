@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	authErrors "github.com/swm-launchpad/web-console-backend/internal/auth/errors"
+	authErrors "github.com/swm-launchpad/web-console-backend/internal/common/auth/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/service"
 )

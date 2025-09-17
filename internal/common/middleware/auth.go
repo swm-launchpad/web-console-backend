@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swm-launchpad/web-console-backend/internal/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 )
 
 type AuthMiddleware struct {

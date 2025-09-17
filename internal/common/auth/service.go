@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 
-	"github.com/swm-launchpad/web-console-backend/internal/auth/jwt"
-	"github.com/swm-launchpad/web-console-backend/internal/auth/password"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/service"
 )
 

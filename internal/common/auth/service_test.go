@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/swm-launchpad/web-console-backend/internal/auth/jwt"
-	"github.com/swm-launchpad/web-console-backend/internal/auth/password"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 )
 
 func TestAuthService_GenerateToken(t *testing.T) {

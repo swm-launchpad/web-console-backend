@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	authErrors "github.com/swm-launchpad/web-console-backend/internal/auth/errors"
+	authErrors "github.com/swm-launchpad/web-console-backend/internal/common/auth/errors"
 )
 
 type Claims struct {

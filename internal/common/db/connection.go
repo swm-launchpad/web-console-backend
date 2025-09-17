@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
+	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 )
 
 func NewConnection(cfg *config.DatabaseConfig) (*sql.DB, error) {

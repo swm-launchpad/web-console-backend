@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swm-launchpad/web-console-backend/internal/auth/jwt"
-	"github.com/swm-launchpad/web-console-backend/internal/auth/password"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
 	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence"
 	userhttp "github.com/swm-launchpad/web-console-backend/internal/users/interfaces/http"

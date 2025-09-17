@@ -8,12 +8,12 @@ package main
 
 import (
 	"database/sql"
-	"github.com/swm-launchpad/web-console-backend/internal/auth"
-	"github.com/swm-launchpad/web-console-backend/internal/auth/jwt"
-	"github.com/swm-launchpad/web-console-backend/internal/auth/password"
-	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
-	"github.com/swm-launchpad/web-console-backend/internal/shared/db"
-	"github.com/swm-launchpad/web-console-backend/internal/shared/middleware"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
+	"github.com/swm-launchpad/web-console-backend/internal/common/config"
+	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
 	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence"
 	"github.com/swm-launchpad/web-console-backend/internal/users/interfaces/http"
