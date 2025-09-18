@@ -17,14 +17,14 @@ type Router struct {
 func NewRouter(cfg *config.Config, database *sql.DB) *Router {
 	// Set Gin mode
 	gin.SetMode(cfg.Server.GinMode)
-	
+
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
-	
+
 	// Apply CORS middleware
 	r.Use(middleware.CORS(&cfg.CORS))
-	
+
 	return &Router{
 		engine: r,
 		config: cfg,
@@ -35,11 +35,11 @@ func NewRouter(cfg *config.Config, database *sql.DB) *Router {
 func (r *Router) Setup() {
 	// Initialize handlers
 	healthHandler := NewHealthHandler(r.db)
-	
+
 	// Setup routes
 	r.engine.GET("/", healthHandler.Root)
 	r.engine.GET("/health", healthHandler.Health)
-	
+
 	// API v1 routes will be added when needed
 }
 
