@@ -2,9 +2,9 @@ package main
 
 import (
 	"database/sql"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 )
 
 type HealthHandler struct {
@@ -20,21 +20,21 @@ func NewHealthHandler(database *sql.DB) *HealthHandler {
 func (h *HealthHandler) Health(c *gin.Context) {
 	// Check database connection
 	if err := h.db.Ping(); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "unhealthy",
-			"error":  "Database connection failed",
+		response.ErrorWithDetails(c, 503, response.ErrCodeDatabaseError, "Service unhealthy", map[string]interface{}{
+			"status":   "unhealthy",
+			"database": "disconnected",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	response.OK(c, gin.H{
 		"status":   "healthy",
 		"database": "connected",
 	})
 }
 
 func (h *HealthHandler) Root(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
+	response.OK(c, gin.H{
 		"message": "Web Console API",
 		"version": "1.0.0",
 	})

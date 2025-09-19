@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	domainerrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/error"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
@@ -57,9 +57,11 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Equal(t, float64(1), response["user_id"])
-		assert.Equal(t, "jwt_token", response["token"])
-		assert.Equal(t, "User registered successfully", response["message"])
+		assert.True(t, response["success"].(bool))
+		data := response["data"].(map[string]interface{})
+		assert.Equal(t, float64(1), data["user_id"])
+		assert.Equal(t, "jwt_token", data["token"])
+		assert.Equal(t, "User registered successfully", data["message"])
 
 		mockAuthService.AssertExpectations(t)
 	})
@@ -96,8 +98,10 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Equal(t, float64(2), response["user_id"])
-		assert.Equal(t, "jwt_token", response["token"])
+		assert.True(t, response["success"].(bool))
+		data := response["data"].(map[string]interface{})
+		assert.Equal(t, float64(2), data["user_id"])
+		assert.Equal(t, "jwt_token", data["token"])
 
 		mockAuthService.AssertExpectations(t)
 	})
@@ -109,7 +113,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 
 		name := "Test User"
 		mockAuthService.On("RegisterUser", mock.Anything, "existinguser", "password123", "test@example.com", &name).
-			Return((*model.User)(nil), "", errors.New("username already exists"))
+			Return((*model.User)(nil), "", domainerrors.ErrUsernameExists)
 
 		router := gin.New()
 		router.POST("/auth/register", handler.Register)
@@ -122,10 +126,13 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 
 		assert.Equal(t, http.StatusConflict, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Contains(t, response["error"], "already exists")
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "USER_002", errorData["code"])
+		assert.Contains(t, errorData["message"], "already exists")
 
 		mockAuthService.AssertExpectations(t)
 	})
@@ -137,7 +144,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 
 		name := "Test User"
 		mockAuthService.On("RegisterUser", mock.Anything, "testuser", "password123", "existing@example.com", &name).
-			Return((*model.User)(nil), "", errors.New("email already exists"))
+			Return((*model.User)(nil), "", domainerrors.ErrEmailExists)
 
 		router := gin.New()
 		router.POST("/auth/register", handler.Register)
@@ -150,10 +157,13 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 
 		assert.Equal(t, http.StatusConflict, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Contains(t, response["error"], "already exists")
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "USER_002", errorData["code"])
+		assert.Contains(t, errorData["message"], "already exists")
 
 		mockAuthService.AssertExpectations(t)
 	})
@@ -174,10 +184,13 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Contains(t, response["error"], "Invalid request format")
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "VAL_001", errorData["code"])
+		assert.Equal(t, "Validation failed", errorData["message"])
 
 		mockAuthService.AssertNotCalled(t, "RegisterUser", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
@@ -217,12 +230,14 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Equal(t, float64(1), response["user_id"])
-		assert.Equal(t, "jwt_token", response["token"])
-		assert.Equal(t, "testuser", response["username"])
-		assert.Equal(t, "test@example.com", response["email"])
-		assert.Equal(t, "Test User", response["name"])
-		assert.Equal(t, "Login successful", response["message"])
+		assert.True(t, response["success"].(bool))
+		data := response["data"].(map[string]interface{})
+		assert.Equal(t, float64(1), data["user_id"])
+		assert.Equal(t, "jwt_token", data["token"])
+		assert.Equal(t, "testuser", data["username"])
+		assert.Equal(t, "test@example.com", data["email"])
+		assert.Equal(t, "Test User", data["name"])
+		assert.Equal(t, "Login successful", data["message"])
 
 		mockAuthService.AssertExpectations(t)
 	})
@@ -246,10 +261,13 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Contains(t, response["error"], "invalid credentials")
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "AUTH_001", errorData["code"])
+		assert.Contains(t, errorData["message"], "Invalid username or password")
 
 		mockAuthService.AssertExpectations(t)
 	})
@@ -270,10 +288,13 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
-		assert.Contains(t, response["error"], "Invalid request format")
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "VAL_001", errorData["code"])
+		assert.Equal(t, "Validation failed", errorData["message"])
 
 		mockAuthService.AssertNotCalled(t, "AuthenticateUser")
 	})

@@ -89,18 +89,22 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response GetCurrentUserResponse
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Equal(t, userID, response.UserID)
-		assert.Equal(t, "currentuser", response.Username)
-		assert.Equal(t, "current@example.com", response.Email)
-		assert.Equal(t, "Current User", response.Name)
-		assert.Equal(t, "123-456-7890", response.Phone)
-		assert.Equal(t, "Test Org", response.Organization)
-		assert.Equal(t, "active", response.Status)
-		assert.Equal(t, createdAt.Format("2006-01-02T15:04:05Z"), response.CreatedAt)
+		// Check response structure
+		assert.True(t, response["success"].(bool))
+		data := response["data"].(map[string]interface{})
+
+		assert.Equal(t, float64(userID), data["user_id"])
+		assert.Equal(t, "currentuser", data["username"])
+		assert.Equal(t, "current@example.com", data["email"])
+		assert.Equal(t, "Current User", data["name"])
+		assert.Equal(t, "123-456-7890", data["phone"])
+		assert.Equal(t, "Test Org", data["organization"])
+		assert.Equal(t, "active", data["status"])
+		assert.Equal(t, createdAt.Format("2006-01-02T15:04:05Z"), data["created_at"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -130,11 +134,15 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusNotFound, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Contains(t, response["error"], "User not found")
+		// Check error response structure
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "USER_001", errorData["code"])
+		assert.Equal(t, "User not found", errorData["message"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -164,11 +172,15 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Contains(t, response["error"], "Failed to fetch user profile")
+		// Check error response structure
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "SYS_001", errorData["code"])
+		assert.Equal(t, "An internal error occurred", errorData["message"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -210,17 +222,23 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response GetCurrentUserResponse
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Equal(t, userID, response.UserID)
-		assert.Equal(t, "minimaluser", response.Username)
-		assert.Equal(t, "minimal@example.com", response.Email)
-		assert.Empty(t, response.Name)
-		assert.Empty(t, response.Phone)
-		assert.Empty(t, response.Organization)
-		assert.Equal(t, "pending", response.Status)
+		// Check response structure
+		assert.True(t, response["success"].(bool))
+		data := response["data"].(map[string]interface{})
+
+		assert.Equal(t, float64(userID), data["user_id"])
+		assert.Equal(t, "minimaluser", data["username"])
+		assert.Equal(t, "minimal@example.com", data["email"])
+		// Optional fields should be omitted when empty (due to json omitempty tag)
+		assert.Nil(t, data["name"])
+		assert.Nil(t, data["phone"])
+		assert.Nil(t, data["organization"])
+		assert.Equal(t, "pending", data["status"])
+		assert.Equal(t, createdAt.Format("2006-01-02T15:04:05Z"), data["created_at"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -250,11 +268,15 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Contains(t, response["error"], "Failed to fetch user profile")
+		// Check error response structure
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "SYS_001", errorData["code"])
+		assert.Equal(t, "An internal error occurred", errorData["message"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -276,11 +298,15 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Contains(t, response["error"], "User not authenticated")
+		// Check error response structure
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "AUTH_004", errorData["code"])
+		assert.Equal(t, "User not authenticated", errorData["message"])
 
 		// mockService should not be called
 		mockService.AssertNotCalled(t, "GetUserByID")
@@ -325,18 +351,22 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response GetUserByIDResponse
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Equal(t, userID, response.UserID)
-		assert.Equal(t, "searchuser", response.Username)
-		assert.Equal(t, "search@example.com", response.Email)
-		assert.Equal(t, "Search User", response.Name)
-		assert.Equal(t, "987-654-3210", response.Phone)
-		assert.Equal(t, "Search Corp", response.Organization)
-		assert.Equal(t, "active", response.Status)
-		assert.Equal(t, createdAt.Format("2006-01-02T15:04:05Z"), response.CreatedAt)
+		// Check response structure
+		assert.True(t, response["success"].(bool))
+		data := response["data"].(map[string]interface{})
+
+		assert.Equal(t, float64(userID), data["user_id"])
+		assert.Equal(t, "searchuser", data["username"])
+		assert.Equal(t, "search@example.com", data["email"])
+		assert.Equal(t, "Search User", data["name"])
+		assert.Equal(t, "987-654-3210", data["phone"])
+		assert.Equal(t, "Search Corp", data["organization"])
+		assert.Equal(t, "active", data["status"])
+		assert.Equal(t, createdAt.Format("2006-01-02T15:04:05Z"), data["created_at"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -358,11 +388,15 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Contains(t, response["error"], "Invalid user ID format")
+		// Check error response structure
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "VAL_002", errorData["code"])
+		assert.Equal(t, "Invalid user ID format", errorData["message"])
 
 		// mockService should not be called
 		mockService.AssertNotCalled(t, "GetUserByID")
@@ -390,11 +424,15 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusNotFound, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Contains(t, response["error"], "User not found")
+		// Check error response structure
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "USER_001", errorData["code"])
+		assert.Equal(t, "User not found", errorData["message"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -421,11 +459,15 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Assert
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
-		var response map[string]string
+		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 
-		assert.Contains(t, response["error"], "Failed to fetch user profile")
+		// Check error response structure
+		assert.False(t, response["success"].(bool))
+		errorData := response["error"].(map[string]interface{})
+		assert.Equal(t, "SYS_001", errorData["code"])
+		assert.Equal(t, "An internal error occurred", errorData["message"])
 
 		mockService.AssertExpectations(t)
 	})

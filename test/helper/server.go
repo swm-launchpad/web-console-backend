@@ -150,8 +150,10 @@ func (ts *TestServer) RegisterUser(t *testing.T, username, password, email strin
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
-	userID := uint(response["user_id"].(float64))
-	token := response["token"].(string)
+	// Extract data from new response format
+	data := response["data"].(map[string]interface{})
+	userID := uint(data["user_id"].(float64))
+	token := data["token"].(string)
 
 	return userID, token
 }
@@ -176,8 +178,10 @@ func (ts *TestServer) LoginUser(t *testing.T, username, password string) (uint, 
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
-	userID := uint(response["user_id"].(float64))
-	token := response["token"].(string)
+	// Extract data from new response format
+	data := response["data"].(map[string]interface{})
+	userID := uint(data["user_id"].(float64))
+	token := data["token"].(string)
 
 	return userID, token
 }

@@ -33,13 +33,17 @@ func TestUserFlow_E2E(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &registerResp)
 		require.NoError(t, err)
 
-		// 회원가입 응답 검증
-		assert.NotEmpty(t, registerResp["user_id"])
-		assert.NotEmpty(t, registerResp["token"])
-		assert.Equal(t, "User registered successfully", registerResp["message"])
+		// 응답 구조 검증
+		assert.True(t, registerResp["success"].(bool))
+		registerData := registerResp["data"].(map[string]interface{})
 
-		userID := uint(registerResp["user_id"].(float64))
-		registerToken := registerResp["token"].(string)
+		// 회원가입 응답 검증
+		assert.NotEmpty(t, registerData["user_id"])
+		assert.NotEmpty(t, registerData["token"])
+		assert.Equal(t, "User registered successfully", registerData["message"])
+
+		userID := uint(registerData["user_id"].(float64))
+		registerToken := registerData["token"].(string)
 
 		// Step 2: 로그인
 		loginReq := map[string]string{
@@ -54,15 +58,19 @@ func TestUserFlow_E2E(t *testing.T) {
 		err = json.Unmarshal(w.Body.Bytes(), &loginResp)
 		require.NoError(t, err)
 
-		// 로그인 응답 검증
-		assert.Equal(t, float64(userID), loginResp["user_id"])
-		assert.Equal(t, "e2euser", loginResp["username"])
-		assert.Equal(t, "e2e@example.com", loginResp["email"])
-		assert.Equal(t, "E2E Test User", loginResp["name"])
-		assert.NotEmpty(t, loginResp["token"])
-		assert.Equal(t, "Login successful", loginResp["message"])
+		// 응답 구조 검증
+		assert.True(t, loginResp["success"].(bool))
+		loginData := loginResp["data"].(map[string]interface{})
 
-		loginToken := loginResp["token"].(string)
+		// 로그인 응답 검증
+		assert.Equal(t, float64(userID), loginData["user_id"])
+		assert.Equal(t, "e2euser", loginData["username"])
+		assert.Equal(t, "e2e@example.com", loginData["email"])
+		assert.Equal(t, "E2E Test User", loginData["name"])
+		assert.NotEmpty(t, loginData["token"])
+		assert.Equal(t, "Login successful", loginData["message"])
+
+		loginToken := loginData["token"].(string)
 
 		// Step 3: 프로필 조회 (인증된 요청)
 		w = server.MakeAuthenticatedRequest("GET", "/users/me", nil, userID)
@@ -72,13 +80,17 @@ func TestUserFlow_E2E(t *testing.T) {
 		err = json.Unmarshal(w.Body.Bytes(), &profileResp)
 		require.NoError(t, err)
 
+		// 응답 구조 검증
+		assert.True(t, profileResp["success"].(bool))
+		profileData := profileResp["data"].(map[string]interface{})
+
 		// 프로필 응답 검증
-		assert.Equal(t, float64(userID), profileResp["user_id"])
-		assert.Equal(t, "e2euser", profileResp["username"])
-		assert.Equal(t, "e2e@example.com", profileResp["email"])
-		assert.Equal(t, "E2E Test User", profileResp["name"])
-		assert.Equal(t, "active", profileResp["status"])
-		assert.NotEmpty(t, profileResp["created_at"])
+		assert.Equal(t, float64(userID), profileData["user_id"])
+		assert.Equal(t, "e2euser", profileData["username"])
+		assert.Equal(t, "e2e@example.com", profileData["email"])
+		assert.Equal(t, "E2E Test User", profileData["name"])
+		assert.Equal(t, "active", profileData["status"])
+		assert.NotEmpty(t, profileData["created_at"])
 
 		// 토큰이 다른지 확인 (각 엔드포인트가 새 토큰 생성)
 		assert.NotEmpty(t, registerToken)
@@ -108,7 +120,10 @@ func TestUserFlow_E2E(t *testing.T) {
 		var errorResp map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &errorResp)
 		require.NoError(t, err)
-		assert.Equal(t, "invalid credentials", errorResp["error"])
+		assert.False(t, errorResp["success"].(bool))
+		errorData := errorResp["error"].(map[string]interface{})
+		assert.Equal(t, "AUTH_001", errorData["code"])
+		assert.Equal(t, "Invalid username or password", errorData["message"])
 	})
 
 	t.Run("중복된 username으로 회원가입 실패", func(t *testing.T) {
@@ -135,7 +150,10 @@ func TestUserFlow_E2E(t *testing.T) {
 		var errorResp map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &errorResp)
 		require.NoError(t, err)
-		assert.Contains(t, errorResp["error"], "already exists")
+		assert.False(t, errorResp["success"].(bool))
+		errorData := errorResp["error"].(map[string]interface{})
+		assert.Equal(t, "USER_002", errorData["code"])
+		assert.Contains(t, errorData["message"], "already exists")
 	})
 
 	t.Run("중복된 email로 회원가입 실패", func(t *testing.T) {
@@ -162,7 +180,10 @@ func TestUserFlow_E2E(t *testing.T) {
 		var errorResp map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &errorResp)
 		require.NoError(t, err)
-		assert.Contains(t, errorResp["error"], "already exists")
+		assert.False(t, errorResp["success"].(bool))
+		errorData := errorResp["error"].(map[string]interface{})
+		assert.Equal(t, "USER_002", errorData["code"])
+		assert.Contains(t, errorData["message"], "already exists")
 	})
 
 	t.Run("인증 없이 프로필 조회 실패", func(t *testing.T) {
@@ -172,7 +193,10 @@ func TestUserFlow_E2E(t *testing.T) {
 		var errorResp map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &errorResp)
 		require.NoError(t, err)
-		assert.Equal(t, "User not authenticated", errorResp["error"])
+		assert.False(t, errorResp["success"].(bool))
+		errorData := errorResp["error"].(map[string]interface{})
+		assert.Equal(t, "AUTH_004", errorData["code"])
+		assert.Equal(t, "User not authenticated", errorData["message"])
 	})
 
 	t.Run("ID로 다른 사용자 조회", func(t *testing.T) {
@@ -187,9 +211,13 @@ func TestUserFlow_E2E(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &userResp)
 		require.NoError(t, err)
 
-		assert.Equal(t, float64(userID), userResp["user_id"])
-		assert.Equal(t, "viewuser", userResp["username"])
-		assert.Equal(t, "view@example.com", userResp["email"])
+		// 응답 구조 검증
+		assert.True(t, userResp["success"].(bool))
+		userData := userResp["data"].(map[string]interface{})
+
+		assert.Equal(t, float64(userID), userData["user_id"])
+		assert.Equal(t, "viewuser", userData["username"])
+		assert.Equal(t, "view@example.com", userData["email"])
 	})
 
 	t.Run("존재하지 않는 사용자 조회", func(t *testing.T) {
@@ -199,7 +227,10 @@ func TestUserFlow_E2E(t *testing.T) {
 		var errorResp map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &errorResp)
 		require.NoError(t, err)
-		assert.Equal(t, "User not found", errorResp["error"])
+		assert.False(t, errorResp["success"].(bool))
+		errorData := errorResp["error"].(map[string]interface{})
+		assert.Equal(t, "USER_001", errorData["code"])
+		assert.Equal(t, "User not found", errorData["message"])
 	})
 
 	t.Run("잘못된 요청 형식 처리", func(t *testing.T) {

@@ -1,13 +1,12 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
+	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
-	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 type UserHandler struct {
@@ -37,9 +36,7 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	// Get user ID from context (set by auth middleware)
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "User not authenticated",
-		})
+		response.Unauthorized(c, response.ErrCodeUnauthorized, "User not authenticated")
 		return
 	}
 
@@ -49,20 +46,11 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 
 	output, err := h.getUserUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		if err == repository.ErrUserNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "User not found",
-			})
-			return
-		}
-
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to fetch user profile",
-		})
+		response.HandleError(c, err)
 		return
 	}
 
-	response := UserResponse{
+	resp := UserResponse{
 		UserID:       output.UserID,
 		Username:     output.Username,
 		Email:        output.Email,
@@ -73,24 +61,20 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		CreatedAt:    output.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
-	c.JSON(http.StatusOK, response)
+	response.OK(c, resp)
 }
 
 // GetUserByID handles fetching a user profile by ID
 func (h *UserHandler) GetUserByID(c *gin.Context) {
 	userIDStr := c.Param("id")
 	if userIDStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "User ID is required",
-		})
+		response.BadRequest(c, response.ErrCodeMissingField, "User ID is required")
 		return
 	}
 
 	userID, err := strconv.ParseUint(userIDStr, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid user ID format",
-		})
+		response.BadRequest(c, response.ErrCodeInvalidFormat, "Invalid user ID format")
 		return
 	}
 
@@ -100,20 +84,11 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 
 	output, err := h.getUserUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		if err == repository.ErrUserNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"error": "User not found",
-			})
-			return
-		}
-
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to fetch user profile",
-		})
+		response.HandleError(c, err)
 		return
 	}
 
-	response := UserResponse{
+	resp := UserResponse{
 		UserID:       output.UserID,
 		Username:     output.Username,
 		Email:        output.Email,
@@ -124,5 +99,5 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 		CreatedAt:    output.CreatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
-	c.JSON(http.StatusOK, response)
+	response.OK(c, resp)
 }

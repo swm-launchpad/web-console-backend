@@ -1,12 +1,12 @@
 package middleware
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 )
 
 type AuthMiddleware struct {
@@ -25,40 +25,28 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		// Get token from Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Authorization header is required",
-			})
-			c.Abort()
+			response.Unauthorized(c, response.ErrCodeMissingAuthHeader, "Authorization header is required")
 			return
 		}
 
 		// Check if the header starts with "Bearer "
 		const bearerPrefix = "Bearer "
 		if !strings.HasPrefix(authHeader, bearerPrefix) {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid authorization header format",
-			})
-			c.Abort()
+			response.Unauthorized(c, response.ErrCodeInvalidAuthFormat, "Invalid authorization header format")
 			return
 		}
 
 		// Extract the token
 		token := authHeader[len(bearerPrefix):]
 		if token == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Token is required",
-			})
-			c.Abort()
+			response.Unauthorized(c, response.ErrCodeMissingToken, "Token is required")
 			return
 		}
 
 		// Validate the token
 		userID, err := m.jwtUtil.ValidateToken(c.Request.Context(), token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid or expired token",
-			})
-			c.Abort()
+			response.HandleError(c, err)
 			return
 		}
 
