@@ -23,7 +23,7 @@ func SetupTestDB(t *testing.T) *TestDB {
 	t.Helper()
 
 	// Load environment variables
-	godotenv.Load(".env.test")
+	_ = godotenv.Load(".env.test")
 
 	// Read environment variables
 	host := getEnv("DB_HOST", "localhost")
@@ -44,12 +44,12 @@ func SetupTestDB(t *testing.T) *TestDB {
 	// Create test database
 	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s", dbName))
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatalf("Failed to create test database: %v", err)
 	}
 
 	// Connect to the newly created database
-	db.Close()
+	_ = db.Close()
 	dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true", user, password, host, port, dbName)
 	db, err = sql.Open("mysql", dsn)
 	if err != nil {
@@ -58,7 +58,7 @@ func SetupTestDB(t *testing.T) *TestDB {
 
 	// Test connection
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		t.Fatalf("Failed to ping test database: %v", err)
 	}
 
@@ -79,7 +79,7 @@ func SetupTestDB(t *testing.T) *TestDB {
 // Migrate applies schema to test database
 func (tdb *TestDB) Migrate() error {
 	// Read schema file
-	schemaPath := filepath.Join("..", "..", "migrations", "000001_initial_schema.up.sql")
+	schemaPath := filepath.Join("..", "..", "migration", "000001_initial_schema.up.sql")
 	schema, err := os.ReadFile(schemaPath)
 	if err != nil {
 		return fmt.Errorf("failed to read schema file: %w", err)
@@ -125,8 +125,8 @@ func (tdb *TestDB) TruncateAllTables() error {
 func (tdb *TestDB) Cleanup() {
 	if tdb.DB != nil {
 		// Drop database
-		tdb.DB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s", tdb.Name))
-		tdb.DB.Close()
+		_, _ = tdb.DB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s", tdb.Name))
+		_ = tdb.DB.Close()
 	}
 }
 

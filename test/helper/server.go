@@ -12,9 +12,9 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
-	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
-	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence"
-	userhttp "github.com/swm-launchpad/web-console-backend/internal/users/interfaces/http"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application/usecase"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/persistence"
+	userhttp "github.com/swm-launchpad/web-console-backend/internal/user/interface/http"
 )
 
 // TestServer는 테스트용 HTTP 서버를 제공합니다

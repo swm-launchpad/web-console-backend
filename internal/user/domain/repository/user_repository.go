@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 )
 
 var (

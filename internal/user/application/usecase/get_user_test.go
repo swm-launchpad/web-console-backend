@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/swm-launchpad/web-console-backend/internal/users/application/mocks"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 func TestGetUserUseCase_Execute(t *testing.T) {

@@ -7,9 +7,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
-	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/persistence"
 	"github.com/swm-launchpad/web-console-backend/test/helper"
 )
 
@@ -253,7 +253,7 @@ func TestUserRepository_Integration(t *testing.T) {
 		// Given
 		tx, err := testDB.DB.BeginTx(ctx, nil)
 		require.NoError(t, err)
-		defer tx.Rollback() // Always rollback at the end
+		defer func() { _ = tx.Rollback() }() // Always rollback at the end
 
 		// Create repository with transaction
 		txRepo := persistence.NewUserRepository(tx)

@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
-	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application/usecase"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 type UserHandler struct {

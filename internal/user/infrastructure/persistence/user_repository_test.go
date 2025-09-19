@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
-	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/persistence/sqlc"
 )
 
 func TestToDomainUser(t *testing.T) {

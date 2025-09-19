@@ -7,7 +7,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 type LoginUserInput struct {

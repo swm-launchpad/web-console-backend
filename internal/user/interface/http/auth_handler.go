@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application/usecase"
 )
 
 type AuthHandler struct {

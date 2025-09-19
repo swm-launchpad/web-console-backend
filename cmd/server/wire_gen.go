@@ -13,9 +13,9 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
-	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
-	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence"
-	"github.com/swm-launchpad/web-console-backend/internal/users/interfaces/http"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application/usecase"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/persistence"
+	"github.com/swm-launchpad/web-console-backend/internal/user/interface/http"
 )
 
 // Injectors from wire.go:

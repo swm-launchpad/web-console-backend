@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 type GetUserInput struct {

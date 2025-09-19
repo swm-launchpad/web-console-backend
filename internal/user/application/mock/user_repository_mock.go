@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 )
 
 type MockUserRepository struct {
