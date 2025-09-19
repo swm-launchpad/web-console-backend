@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
 )
@@ -34,7 +35,7 @@ type UserResponse struct {
 // GetCurrentUser handles fetching the current authenticated user's profile
 func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	// Get user ID from context (set by auth middleware)
-	userID, exists := c.Get("userID")
+	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "User not authenticated",

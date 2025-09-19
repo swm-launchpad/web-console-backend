@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/users/application/mocks"
 	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
@@ -48,7 +49,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Act
 		router := gin.New()
 		router.GET("/users/me", func(c *gin.Context) {
-			c.Set("userID", userID) // Simulate authenticated user
+			c.Set(auth.ContextKeyUserID, userID) // Simulate authenticated user
 			handler.GetCurrentUser(c)
 		})
 
@@ -102,7 +103,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Act
 		router := gin.New()
 		router.GET("/users/me", func(c *gin.Context) {
-			c.Set("userID", userID)
+			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetCurrentUser(c)
 		})
 
@@ -144,7 +145,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Act
 		router := gin.New()
 		router.GET("/users/me", func(c *gin.Context) {
-			c.Set("userID", userID)
+			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetCurrentUser(c)
 		})
 
@@ -179,7 +180,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Act
 		router := gin.New()
 		router.GET("/users/me", func(c *gin.Context) {
-			c.Set("userID", userID)
+			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetCurrentUser(c)
 		})
 
@@ -209,7 +210,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Act
 		router := gin.New()
 		router.GET("/users/me", func(c *gin.Context) {
-			c.Set("userID", "invalid-type") // Wrong type for userID
+			c.Set(auth.ContextKeyUserID, "invalid-type") // Wrong type for userID
 			handler.GetCurrentUser(c)
 		})
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 )
 
@@ -62,8 +63,8 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		}
 
 		// Set user ID in context for use in handlers
-		c.Set("userID", userID)
-		c.Set("authenticated", true)
+		c.Set(auth.ContextKeyUserID, userID)
+		c.Set(auth.ContextKeyAuth, true)
 
 		// Continue to the next handler
 		c.Next()
@@ -77,7 +78,7 @@ func (m *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			// No token provided, continue without authentication
-			c.Set("authenticated", false)
+			c.Set(auth.ContextKeyAuth, false)
 			c.Next()
 			return
 		}
@@ -86,7 +87,7 @@ func (m *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 		const bearerPrefix = "Bearer "
 		if !strings.HasPrefix(authHeader, bearerPrefix) {
 			// Invalid format, continue without authentication
-			c.Set("authenticated", false)
+			c.Set(auth.ContextKeyAuth, false)
 			c.Next()
 			return
 		}
@@ -95,7 +96,7 @@ func (m *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 		token := authHeader[len(bearerPrefix):]
 		if token == "" {
 			// No token after Bearer, continue without authentication
-			c.Set("authenticated", false)
+			c.Set(auth.ContextKeyAuth, false)
 			c.Next()
 			return
 		}
@@ -104,14 +105,14 @@ func (m *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 		userID, err := m.jwtService.ValidateToken(c.Request.Context(), token)
 		if err != nil {
 			// Invalid token, continue without authentication
-			c.Set("authenticated", false)
+			c.Set(auth.ContextKeyAuth, false)
 			c.Next()
 			return
 		}
 
 		// Set user ID in context for use in handlers
-		c.Set("userID", userID)
-		c.Set("authenticated", true)
+		c.Set(auth.ContextKeyUserID, userID)
+		c.Set(auth.ContextKeyAuth, true)
 
 		// Continue to the next handler
 		c.Next()

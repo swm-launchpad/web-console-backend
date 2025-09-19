@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
@@ -94,7 +95,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 			if authHeader := c.GetHeader("X-User-ID"); authHeader != "" {
 				var userID uint
 				if _, err := fmt.Sscanf(authHeader, "%d", &userID); err == nil {
-					c.Set("userID", userID)
+					c.Set(auth.ContextKeyUserID, userID)
 				}
 			}
 			userHandler.GetCurrentUser(c)
