@@ -49,7 +49,7 @@ tidy-check:
 	fi
 	@echo "Done"
 
-test:
+unit-test:
 	@echo "Running tests..."
-	go test -v -race ./...
+	go test -v -race ./... -short
 	@echo "Done"

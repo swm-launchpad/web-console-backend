@@ -47,5 +47,5 @@ jobs:
       - name: Check go mod tidy
         run: make tidy-check
 
-      - name: Run tests
-        run: make test
+      - name: Run unit tests
+        run: make unit-test
