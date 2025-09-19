@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
 )
 
 type userRepository struct {
@@ -282,4 +282,3 @@ func isDuplicateError(err error) bool {
 	}
 	return false
 }
-

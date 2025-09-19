@@ -9,13 +9,13 @@ import (
 	"github.com/google/wire"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
-	userssqlc "github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
-	userHTTP "github.com/swm-launchpad/web-console-backend/internal/users/interfaces/http"
 	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence"
+	userssqlc "github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
+	userHTTP "github.com/swm-launchpad/web-console-backend/internal/users/interfaces/http"
 )
 
 func InitializeApp() (*App, error) {

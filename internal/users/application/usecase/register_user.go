@@ -128,4 +128,3 @@ func (uc *RegisterUserUseCase) validateInput(input RegisterUserInput) error {
 	}
 	return nil
 }
-

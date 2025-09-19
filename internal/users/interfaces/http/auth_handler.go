@@ -136,4 +136,3 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Message:  "Login successful",
 	})
 }
-

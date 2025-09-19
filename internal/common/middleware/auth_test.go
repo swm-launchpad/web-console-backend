@@ -124,7 +124,7 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 
 		// Create an expired token
 		claims := jwt.MapClaims{
-			"user_id": float64(123), // JWT numbers are float64
+			"user_id": float64(123),                          // JWT numbers are float64
 			"exp":     time.Now().Add(-1 * time.Hour).Unix(), // Expired 1 hour ago
 		}
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

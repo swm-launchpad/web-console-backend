@@ -1,8 +1,8 @@
 package password
 
 import (
-	"golang.org/x/crypto/bcrypt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type PasswordUtil struct {

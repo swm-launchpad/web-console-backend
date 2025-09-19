@@ -270,12 +270,12 @@ func TestPasswordSecurity_E2E(t *testing.T) {
 
 	t.Run("약한 비밀번호 거부", func(t *testing.T) {
 		weakPasswords := []string{
-			"1234567",  // 7자 - 너무 짧음
-			"short",    // 5자 - 너무 짧음
-			"pass",     // 4자 - 너무 짧음
-			"123",      // 3자 - 너무 짧음
-			"",         // 빈 문자열
-			"a",        // 1자
+			"1234567", // 7자 - 너무 짧음
+			"short",   // 5자 - 너무 짧음
+			"pass",    // 4자 - 너무 짧음
+			"123",     // 3자 - 너무 짧음
+			"",        // 빈 문자열
+			"a",       // 1자
 		}
 
 		for i, password := range weakPasswords {
@@ -292,13 +292,13 @@ func TestPasswordSecurity_E2E(t *testing.T) {
 
 	t.Run("허용되는 비밀번호", func(t *testing.T) {
 		acceptablePasswords := []string{
-			"12345678",       // 8자 - 숫자만
-			"abcdefgh",       // 8자 - 문자만
-			"password",       // 8자 - 일반 단어
-			"MyP@ssw0rd!",    // 복잡한 비밀번호
-			"Str0ng&Secure",  // 복잡한 비밀번호
-			"C0mpl3x#Pass",   // 복잡한 비밀번호
-			"Test123!@#",     // 복잡한 비밀번호
+			"12345678",                      // 8자 - 숫자만
+			"abcdefgh",                      // 8자 - 문자만
+			"password",                      // 8자 - 일반 단어
+			"MyP@ssw0rd!",                   // 복잡한 비밀번호
+			"Str0ng&Secure",                 // 복잡한 비밀번호
+			"C0mpl3x#Pass",                  // 복잡한 비밀번호
+			"Test123!@#",                    // 복잡한 비밀번호
 			"verylongpasswordwithmanychars", // 긴 비밀번호
 		}
 

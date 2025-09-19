@@ -23,7 +23,6 @@ type TestServer struct {
 	DB     *TestDB
 }
 
-
 // SetupTestServer는 테스트용 서버를 설정합니다
 func SetupTestServer(t *testing.T) *TestServer {
 	t.Helper()

@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
+	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
 )
 
 func TestToDomainUser(t *testing.T) {
@@ -67,9 +67,9 @@ func TestToDomainUser(t *testing.T) {
 			uint(456),
 			"nulluser",
 			"hashedpwd",
-			sql.NullTime{}, // NULL
+			sql.NullTime{},   // NULL
 			sql.NullString{}, // NULL
-			"", // empty email becomes nil
+			"",               // empty email becomes nil
 			sql.NullString{}, // NULL
 			sql.NullString{}, // NULL
 			sqlc.UsersStatusInactive,

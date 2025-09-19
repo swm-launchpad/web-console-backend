@@ -91,9 +91,9 @@ func TestPasswordUtil_HashPassword(t *testing.T) {
 
 	t.Run("실패: 짧은 비밀번호", func(t *testing.T) {
 		passwords := []string{
-			"",       // 빈 문자열
-			"1",      // 1자
-			"1234",   // 4자
+			"",        // 빈 문자열
+			"1",       // 1자
+			"1234",    // 4자
 			"1234567", // 7자
 		}
 

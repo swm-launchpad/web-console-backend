@@ -315,14 +315,14 @@ func TestJSONResponseFormats(t *testing.T) {
 	t.Run("omitempty 태그 동작 확인", func(t *testing.T) {
 		// 빈 필드를 가진 응답
 		response := UserResponse{
-			UserID:   123,
-			Username: "testuser",
-			Email:    "", // omitempty
-			Name:     "", // omitempty
-			Phone:    "", // omitempty
+			UserID:       123,
+			Username:     "testuser",
+			Email:        "", // omitempty
+			Name:         "", // omitempty
+			Phone:        "", // omitempty
 			Organization: "", // omitempty
-			Status:   "active",
-			CreatedAt: time.Now().Format("2006-01-02T15:04:05Z"),
+			Status:       "active",
+			CreatedAt:    time.Now().Format("2006-01-02T15:04:05Z"),
 		}
 
 		jsonData, err := json.Marshal(response)

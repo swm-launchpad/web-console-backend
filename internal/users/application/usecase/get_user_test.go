@@ -327,8 +327,8 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 			Username:     "emptyfields",
 			Email:        "empty@example.com",
 			Name:         &emptyStr, // 빈 문자열
-			Phone:        nil,        // nil
-			Organization: nil,        // nil
+			Phone:        nil,       // nil
+			Organization: nil,       // nil
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
 			CreatedAt:    now,
@@ -351,7 +351,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, "emptyfields", output.Username)
 		assert.Equal(t, "empty@example.com", output.Email)
-		assert.Empty(t, output.Name)  // 빈 문자열
+		assert.Empty(t, output.Name) // 빈 문자열
 		assert.Empty(t, output.Phone)
 		assert.Empty(t, output.Organization)
 
