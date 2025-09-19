@@ -19,15 +19,15 @@ type Config struct {
 }
 
 type DatabaseConfig struct {
-	Host               string
-	Port               int
-	User               string
-	Password           string
-	Name               string
-	MaxOpenConns       int
-	MaxIdleConns       int
-	ConnMaxLifetime    time.Duration
-	ConnMaxIdleTime    time.Duration
+	Host            string
+	Port            int
+	User            string
+	Password        string
+	Name            string
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 }
 
 type ServerConfig struct {
@@ -128,7 +128,7 @@ func (c *Config) Validate() error {
 	if c.JWT.Secret == "" {
 		return errors.New("JWT_SECRET is required")
 	}
-	
+
 	return nil
 }
 

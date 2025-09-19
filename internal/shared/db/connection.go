@@ -23,7 +23,7 @@ func NewConnection(cfg *config.DatabaseConfig) (*sql.DB, error) {
 
 	// Verify connection
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 

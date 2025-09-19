@@ -16,21 +16,38 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server
 
 # Final stage
-FROM alpine:latest
+FROM alpine:3.20
 
-# Install ca-certificates for HTTPS
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates for HTTPS calls and wget for healthcheck
+RUN apk --no-cache add ca-certificates tzdata wget
 
-WORKDIR /root/
+# Create non-root user
+RUN adduser -D -s /bin/sh appuser
 
-# Copy the binary from builder
+# Set working directory
+WORKDIR /app
+
+# Copy binary from builder stage
 COPY --from=builder /app/main .
+
+# Copy migrations for database setup
+COPY --from=builder /app/migrations ./migrations
+
+# Change ownership to appuser
+RUN chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Expose port
 EXPOSE 8080
 
-# Run the application
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Command to run
 CMD ["./main"]
