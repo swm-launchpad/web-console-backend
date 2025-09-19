@@ -16,7 +16,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
-	userssqlc "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
 )
 
 func InitializeApp() (*App, error) {
@@ -24,6 +24,7 @@ func InitializeApp() (*App, error) {
 		// Config
 		config.Load,
 		provideDatabase,
+		provideTxManager,
 		wire.Bind(new(userssqlc.DBTX), new(*sql.DB)),
 
 		// Auth infrastructure
@@ -58,6 +59,10 @@ func InitializeApp() (*App, error) {
 
 func provideDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db.NewConnection(&cfg.Database)
+}
+
+func provideTxManager(database *sql.DB) db.TxManager {
+	return db.NewTxManager(database)
 }
 
 func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {

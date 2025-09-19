@@ -12,16 +12,14 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
-	usermock "github.com/swm-launchpad/web-console-backend/internal/user/mock"
 )
-
 
 func TestAuthService_RegisterUser(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("성공: 유효한 입력으로 사용자 등록", func(t *testing.T) {
 		// Arrange
-		mockUserService := new(usermock.UserService)
+		mockUserService := new(MockUserService)
 		jwtUtil := jwt.NewJWTUtil("test-secret")
 		passwordUtil := password.NewPasswordUtil()
 
@@ -62,7 +60,7 @@ func TestAuthService_RegisterUser(t *testing.T) {
 	t.Run("실패: username 유효성 검증 실패", func(t *testing.T) {
 		// Arrange
 		service := NewAuthService(
-			new(usermock.UserService),
+			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
 		)
@@ -80,7 +78,7 @@ func TestAuthService_RegisterUser(t *testing.T) {
 	t.Run("실패: 짧은 username", func(t *testing.T) {
 		// Arrange
 		service := NewAuthService(
-			new(usermock.UserService),
+			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
 		)
@@ -98,7 +96,7 @@ func TestAuthService_RegisterUser(t *testing.T) {
 	t.Run("실패: 약한 비밀번호", func(t *testing.T) {
 		// Arrange
 		service := NewAuthService(
-			new(usermock.UserService),
+			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
 		)
@@ -116,7 +114,7 @@ func TestAuthService_RegisterUser(t *testing.T) {
 	t.Run("실패: 잘못된 이메일 형식", func(t *testing.T) {
 		// Arrange
 		service := NewAuthService(
-			new(usermock.UserService),
+			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
 		)
@@ -133,7 +131,7 @@ func TestAuthService_RegisterUser(t *testing.T) {
 
 	t.Run("실패: username 이미 존재", func(t *testing.T) {
 		// Arrange
-		mockUserService := new(usermock.UserService)
+		mockUserService := new(MockUserService)
 		service := NewAuthService(
 			mockUserService,
 			jwt.NewJWTUtil("test-secret"),
@@ -157,7 +155,7 @@ func TestAuthService_RegisterUser(t *testing.T) {
 
 	t.Run("실패: email 이미 존재", func(t *testing.T) {
 		// Arrange
-		mockUserService := new(usermock.UserService)
+		mockUserService := new(MockUserService)
 		service := NewAuthService(
 			mockUserService,
 			jwt.NewJWTUtil("test-secret"),
@@ -188,7 +186,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 
 	t.Run("성공: 유효한 자격증명으로 로그인", func(t *testing.T) {
 		// Arrange
-		mockUserService := new(usermock.UserService)
+		mockUserService := new(MockUserService)
 		jwtUtil := jwt.NewJWTUtil("test-secret")
 		passwordUtil := password.NewPasswordUtil()
 
@@ -226,7 +224,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 	t.Run("실패: 빈 username", func(t *testing.T) {
 		// Arrange
 		service := NewAuthService(
-			new(usermock.UserService),
+			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
 		)
@@ -244,7 +242,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 	t.Run("실패: 빈 password", func(t *testing.T) {
 		// Arrange
 		service := NewAuthService(
-			new(usermock.UserService),
+			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
 		)
@@ -261,7 +259,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
-		mockUserService := new(usermock.UserService)
+		mockUserService := new(MockUserService)
 		service := NewAuthService(
 			mockUserService,
 			jwt.NewJWTUtil("test-secret"),
@@ -285,7 +283,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 
 	t.Run("실패: 비활성 사용자", func(t *testing.T) {
 		// Arrange
-		mockUserService := new(usermock.UserService)
+		mockUserService := new(MockUserService)
 		service := NewAuthService(
 			mockUserService,
 			jwt.NewJWTUtil("test-secret"),
@@ -316,7 +314,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 
 	t.Run("실패: 잘못된 비밀번호", func(t *testing.T) {
 		// Arrange
-		mockUserService := new(usermock.UserService)
+		mockUserService := new(MockUserService)
 		passwordUtil := password.NewPasswordUtil()
 		service := NewAuthService(
 			mockUserService,

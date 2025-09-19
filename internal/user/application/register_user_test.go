@@ -6,19 +6,20 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
-	usermock "github.com/swm-launchpad/web-console-backend/internal/user/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
-
 
 func TestRegisterUserUseCase_Execute(t *testing.T) {
 	ctx := context.Background()
+	txManager := db.NewStubTxManager()
 
 	t.Run("성공: 유효한 입력으로 사용자 등록", func(t *testing.T) {
-		// Arrange
-		mockAuthService := new(usermock.AuthService)
-		uc := NewRegisterUserUseCase(mockAuthService)
+		mockAuthService := new(service.MockAuthService)
+		uc := NewRegisterUserUseCase(mockAuthService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -37,13 +38,12 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		}
 		expectedToken := "jwt_token"
 
-		mockAuthService.On("RegisterUser", ctx, input.Username, input.Password, input.Email, &name).
+		mockAuthService.
+			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, &name).
 			Return(expectedUser, expectedToken, nil)
 
-		// Act
 		output, err := uc.Execute(ctx, input)
 
-		// Assert
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, uint(1), output.UserID)
@@ -53,9 +53,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("성공: name 없이 사용자 등록", func(t *testing.T) {
-		// Arrange
-		mockAuthService := new(usermock.AuthService)
-		uc := NewRegisterUserUseCase(mockAuthService)
+		mockAuthService := new(service.MockAuthService)
+		uc := NewRegisterUserUseCase(mockAuthService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -73,13 +72,12 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		}
 		expectedToken := "jwt_token"
 
-		mockAuthService.On("RegisterUser", ctx, input.Username, input.Password, input.Email, (*string)(nil)).
+		mockAuthService.
+			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
 			Return(expectedUser, expectedToken, nil)
 
-		// Act
 		output, err := uc.Execute(ctx, input)
 
-		// Assert
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, uint(2), output.UserID)
@@ -89,9 +87,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("실패: 유효성 검증 실패", func(t *testing.T) {
-		// Arrange
-		mockAuthService := new(usermock.AuthService)
-		uc := NewRegisterUserUseCase(mockAuthService)
+		mockAuthService := new(service.MockAuthService)
+		uc := NewRegisterUserUseCase(mockAuthService, txManager)
 
 		input := RegisterUserInput{
 			Username: "",
@@ -100,13 +97,12 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Name:     "",
 		}
 
-		mockAuthService.On("RegisterUser", ctx, input.Username, input.Password, input.Email, (*string)(nil)).
+		mockAuthService.
+			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
 			Return((*model.User)(nil), "", errors.New("username is required"))
 
-		// Act
 		output, err := uc.Execute(ctx, input)
 
-		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, output)
 		assert.Contains(t, err.Error(), "username is required")
@@ -115,9 +111,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("실패: username 이미 존재", func(t *testing.T) {
-		// Arrange
-		mockAuthService := new(usermock.AuthService)
-		uc := NewRegisterUserUseCase(mockAuthService)
+		mockAuthService := new(service.MockAuthService)
+		uc := NewRegisterUserUseCase(mockAuthService, txManager)
 
 		input := RegisterUserInput{
 			Username: "existinguser",
@@ -126,13 +121,12 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Name:     "",
 		}
 
-		mockAuthService.On("RegisterUser", ctx, input.Username, input.Password, input.Email, (*string)(nil)).
+		mockAuthService.
+			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
 			Return((*model.User)(nil), "", errors.New("username already exists"))
 
-		// Act
 		output, err := uc.Execute(ctx, input)
 
-		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, output)
 		assert.Contains(t, err.Error(), "username already exists")
@@ -141,9 +135,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("실패: email 이미 존재", func(t *testing.T) {
-		// Arrange
-		mockAuthService := new(usermock.AuthService)
-		uc := NewRegisterUserUseCase(mockAuthService)
+		mockAuthService := new(service.MockAuthService)
+		uc := NewRegisterUserUseCase(mockAuthService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -152,13 +145,12 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Name:     "",
 		}
 
-		mockAuthService.On("RegisterUser", ctx, input.Username, input.Password, input.Email, (*string)(nil)).
+		mockAuthService.
+			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
 			Return((*model.User)(nil), "", errors.New("email already exists"))
 
-		// Act
 		output, err := uc.Execute(ctx, input)
 
-		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, output)
 		assert.Contains(t, err.Error(), "email already exists")
@@ -167,9 +159,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("실패: 약한 비밀번호", func(t *testing.T) {
-		// Arrange
-		mockAuthService := new(usermock.AuthService)
-		uc := NewRegisterUserUseCase(mockAuthService)
+		mockAuthService := new(service.MockAuthService)
+		uc := NewRegisterUserUseCase(mockAuthService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -178,13 +169,12 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Name:     "",
 		}
 
-		mockAuthService.On("RegisterUser", ctx, input.Username, input.Password, input.Email, (*string)(nil)).
+		mockAuthService.
+			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
 			Return((*model.User)(nil), "", errors.New("password is too weak"))
 
-		// Act
 		output, err := uc.Execute(ctx, input)
 
-		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, output)
 		assert.Contains(t, err.Error(), "password is too weak")
@@ -193,9 +183,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("실패: 잘못된 이메일 형식", func(t *testing.T) {
-		// Arrange
-		mockAuthService := new(usermock.AuthService)
-		uc := NewRegisterUserUseCase(mockAuthService)
+		mockAuthService := new(service.MockAuthService)
+		uc := NewRegisterUserUseCase(mockAuthService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -204,13 +193,12 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Name:     "",
 		}
 
-		mockAuthService.On("RegisterUser", ctx, input.Username, input.Password, input.Email, (*string)(nil)).
+		mockAuthService.
+			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
 			Return((*model.User)(nil), "", errors.New("invalid email format"))
 
-		// Act
 		output, err := uc.Execute(ctx, input)
 
-		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, output)
 		assert.Contains(t, err.Error(), "invalid email format")
@@ -219,9 +207,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 	})
 
 	t.Run("실패: 토큰 생성 실패", func(t *testing.T) {
-		// Arrange
-		mockAuthService := new(usermock.AuthService)
-		uc := NewRegisterUserUseCase(mockAuthService)
+		mockAuthService := new(service.MockAuthService)
+		uc := NewRegisterUserUseCase(mockAuthService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -230,13 +217,12 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Name:     "",
 		}
 
-		mockAuthService.On("RegisterUser", ctx, input.Username, input.Password, input.Email, (*string)(nil)).
+		mockAuthService.
+			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
 			Return((*model.User)(nil), "", errors.New("token generation failed"))
 
-		// Act
 		output, err := uc.Execute(ctx, input)
 
-		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, output)
 		assert.Contains(t, err.Error(), "token generation failed")

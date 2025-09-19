@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
-	usermock "github.com/swm-launchpad/web-console-backend/internal/user/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
 func TestLoginUserUseCase_Execute(t *testing.T) {
@@ -16,7 +16,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 유효한 자격증명으로 로그인", func(t *testing.T) {
 		// Arrange
-		mockAuthService := new(usermock.AuthService)
+		mockAuthService := new(service.MockAuthService)
 		uc := NewLoginUserUseCase(mockAuthService)
 
 		input := LoginUserInput{
@@ -54,7 +54,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: name이 없는 사용자 로그인", func(t *testing.T) {
 		// Arrange
-		mockAuthService := new(usermock.AuthService)
+		mockAuthService := new(service.MockAuthService)
 		uc := NewLoginUserUseCase(mockAuthService)
 
 		input := LoginUserInput{
@@ -91,7 +91,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 빈 username", func(t *testing.T) {
 		// Arrange
-		mockAuthService := new(usermock.AuthService)
+		mockAuthService := new(service.MockAuthService)
 		uc := NewLoginUserUseCase(mockAuthService)
 
 		input := LoginUserInput{
@@ -115,7 +115,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 빈 password", func(t *testing.T) {
 		// Arrange
-		mockAuthService := new(usermock.AuthService)
+		mockAuthService := new(service.MockAuthService)
 		uc := NewLoginUserUseCase(mockAuthService)
 
 		input := LoginUserInput{
@@ -139,7 +139,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 존재하지 않는 사용자", func(t *testing.T) {
 		// Arrange
-		mockAuthService := new(usermock.AuthService)
+		mockAuthService := new(service.MockAuthService)
 		uc := NewLoginUserUseCase(mockAuthService)
 
 		input := LoginUserInput{
@@ -163,7 +163,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 잘못된 비밀번호", func(t *testing.T) {
 		// Arrange
-		mockAuthService := new(usermock.AuthService)
+		mockAuthService := new(service.MockAuthService)
 		uc := NewLoginUserUseCase(mockAuthService)
 
 		input := LoginUserInput{
@@ -187,7 +187,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 비활성 사용자", func(t *testing.T) {
 		// Arrange
-		mockAuthService := new(usermock.AuthService)
+		mockAuthService := new(service.MockAuthService)
 		uc := NewLoginUserUseCase(mockAuthService)
 
 		input := LoginUserInput{
@@ -211,7 +211,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 토큰 생성 실패", func(t *testing.T) {
 		// Arrange
-		mockAuthService := new(usermock.AuthService)
+		mockAuthService := new(service.MockAuthService)
 		uc := NewLoginUserUseCase(mockAuthService)
 
 		input := LoginUserInput{
@@ -235,7 +235,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 다양한 상태의 사용자", func(t *testing.T) {
 		// Arrange
-		mockAuthService := new(usermock.AuthService)
+		mockAuthService := new(service.MockAuthService)
 		uc := NewLoginUserUseCase(mockAuthService)
 
 		input := LoginUserInput{

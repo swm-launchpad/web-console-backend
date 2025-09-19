@@ -11,16 +11,14 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
-	usermock "github.com/swm-launchpad/web-console-backend/internal/user/mock"
 )
-
 
 func TestGetUserUseCase_Execute(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("성공: 사용자 조회", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(1)
@@ -70,7 +68,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 선택적 필드가 없는 사용자 조회", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(2)
@@ -124,7 +122,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 		for _, status := range statuses {
 			// Arrange
-			mockService := new(usermock.UserService)
+			mockService := new(service.MockUserService)
 			uc := NewGetUserUseCase(mockService)
 
 			userID := uint(3)
@@ -161,7 +159,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: userID가 0", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		input := GetUserInput{
@@ -184,7 +182,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 존재하지 않는 사용자", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(999)
@@ -208,7 +206,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 데이터베이스 오류", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(1)
@@ -232,7 +230,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 삭제된 사용자도 조회 가능", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(4)
@@ -272,7 +270,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 모든 선택적 필드가 채워진 사용자", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(5)
@@ -321,7 +319,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 빈 문자열 선택적 필드", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(6)
@@ -370,7 +368,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 
 	t.Run("최대 userID 값", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		maxUserID := ^uint(0) // 최대 uint 값
@@ -406,7 +404,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 
 	t.Run("매우 긴 username 가진 사용자", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(7)
@@ -446,7 +444,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 
 	t.Run("UpdatedAt이 nil인 사용자", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(8)

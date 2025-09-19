@@ -26,23 +26,24 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := provideDatabase(configConfig)
+	database, err := provideDatabase(configConfig)
 	if err != nil {
 		return nil, err
 	}
-	userRepository := infrastructure.NewUserRepository(db)
+	txManager := provideTxManager(database)
+	userRepository := infrastructure.NewUserRepository(database)
 	userService := service.NewUserService(userRepository)
 	jwtUtil := provideJWTUtil(configConfig)
 	passwordUtil := password.NewPasswordUtil()
 	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
-	registerUserUseCase := application.NewRegisterUserUseCase(authService)
+	registerUserUseCase := application.NewRegisterUserUseCase(authService, txManager)
 	loginUserUseCase := application.NewLoginUserUseCase(authService)
 	authHandler := handler.NewAuthHandler(registerUserUseCase, loginUserUseCase)
 	getUserUseCase := application.NewGetUserUseCase(userService)
 	userHandler := handler.NewUserHandler(getUserUseCase)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
-	router := NewRouter(configConfig, db, authHandler, userHandler, authMiddleware)
-	app := NewApp(configConfig, db, router)
+	router := NewRouter(configConfig, database, authHandler, userHandler, authMiddleware)
+	app := NewApp(configConfig, database, router)
 	return app, nil
 }
 
@@ -50,6 +51,10 @@ func InitializeApp() (*App, error) {
 
 func provideDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db.NewConnection(&cfg.Database)
+}
+
+func provideTxManager(database *sql.DB) db.TxManager {
+	return db.NewTxManager(database)
 }
 
 func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {

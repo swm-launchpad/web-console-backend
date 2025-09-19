@@ -117,23 +117,23 @@ func TestToNullString(t *testing.T) {
 	})
 }
 
-func TestFromNullString(t *testing.T) {
+func TestNullStringToPtr(t *testing.T) {
 	t.Run("Valid가 false인 경우", func(t *testing.T) {
 		ns := sql.NullString{String: "ignored", Valid: false}
-		result := fromNullString(ns)
+		result := nullStringToPtr(ns)
 		assert.Nil(t, result)
 	})
 
 	t.Run("Valid가 true인 경우", func(t *testing.T) {
 		ns := sql.NullString{String: "test value", Valid: true}
-		result := fromNullString(ns)
+		result := nullStringToPtr(ns)
 		require.NotNil(t, result)
 		assert.Equal(t, "test value", *result)
 	})
 
 	t.Run("빈 문자열이지만 Valid가 true인 경우", func(t *testing.T) {
 		ns := sql.NullString{String: "", Valid: true}
-		result := fromNullString(ns)
+		result := nullStringToPtr(ns)
 		require.NotNil(t, result)
 		assert.Equal(t, "", *result)
 	})
@@ -154,51 +154,19 @@ func TestToNullTime(t *testing.T) {
 	})
 }
 
-func TestFromNullTime(t *testing.T) {
+func TestNullTimeToPtr(t *testing.T) {
 	t.Run("Valid가 false인 경우", func(t *testing.T) {
 		nt := sql.NullTime{Time: time.Now(), Valid: false}
-		result := fromNullTime(nt)
+		result := nullTimeToPtr(nt)
 		assert.Nil(t, result)
 	})
 
 	t.Run("Valid가 true인 경우", func(t *testing.T) {
 		now := time.Now()
 		nt := sql.NullTime{Time: now, Valid: true}
-		result := fromNullTime(nt)
+		result := nullTimeToPtr(nt)
 		require.NotNil(t, result)
 		assert.Equal(t, now, *result)
-	})
-}
-
-func TestPtrToString(t *testing.T) {
-	t.Run("nil 포인터인 경우", func(t *testing.T) {
-		result := ptrToString(nil)
-		assert.Empty(t, result)
-	})
-
-	t.Run("값이 있는 포인터인 경우", func(t *testing.T) {
-		str := "test value"
-		result := ptrToString(&str)
-		assert.Equal(t, "test value", result)
-	})
-
-	t.Run("빈 문자열 포인터인 경우", func(t *testing.T) {
-		str := ""
-		result := ptrToString(&str)
-		assert.Equal(t, "", result)
-	})
-}
-
-func TestStringToPtr(t *testing.T) {
-	t.Run("빈 문자열인 경우", func(t *testing.T) {
-		result := stringToPtr("")
-		assert.Nil(t, result)
-	})
-
-	t.Run("값이 있는 문자열인 경우", func(t *testing.T) {
-		result := stringToPtr("test value")
-		require.NotNil(t, result)
-		assert.Equal(t, "test value", *result)
 	})
 }
 
@@ -214,8 +182,8 @@ func TestIsDuplicateError(t *testing.T) {
 		assert.True(t, result)
 	})
 
-	t.Run("1062 에러 코드를 포함하는 에러", func(t *testing.T) {
-		err := errors.New("MySQL Error 1062")
+	t.Run("UNIQUE constraint 에러", func(t *testing.T) {
+		err := errors.New("UNIQUE constraint failed: users.username")
 		result := isDuplicateError(err)
 		assert.True(t, result)
 	})
@@ -237,31 +205,17 @@ func TestHelperFunctionsIntegration(t *testing.T) {
 	t.Run("toNullString과 fromNullString 왕복 변환", func(t *testing.T) {
 		original := "test string"
 		nullStr := toNullString(&original)
-		result := fromNullString(nullStr)
+		result := nullStringToPtr(nullStr)
 		require.NotNil(t, result)
 		assert.Equal(t, original, *result)
 	})
 
-	t.Run("toNullTime과 fromNullTime 왕복 변환", func(t *testing.T) {
+	t.Run("toNullTime과 nullTimeToPtr 왕복 변환", func(t *testing.T) {
 		original := time.Now()
 		nullTime := toNullTime(&original)
-		result := fromNullTime(nullTime)
+		result := nullTimeToPtr(nullTime)
 		require.NotNil(t, result)
 		assert.Equal(t, original, *result)
 	})
 
-	t.Run("ptrToString과 stringToPtr 상호 작용", func(t *testing.T) {
-		// 비어있지 않은 문자열
-		str := "test"
-		ptr := stringToPtr(str)
-		require.NotNil(t, ptr)
-		result := ptrToString(ptr)
-		assert.Equal(t, str, result)
-
-		// 빈 문자열 -> nil 포인터 -> 빈 문자열
-		emptyPtr := stringToPtr("")
-		assert.Nil(t, emptyPtr)
-		emptyResult := ptrToString(emptyPtr)
-		assert.Equal(t, "", emptyResult)
-	})
 }

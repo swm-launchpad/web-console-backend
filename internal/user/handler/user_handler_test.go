@@ -17,7 +17,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
-	usermock "github.com/swm-launchpad/web-console-backend/internal/user/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
 // stringPtr returns a pointer to the given string
@@ -48,14 +48,13 @@ type GetUserByIDResponse struct {
 	CreatedAt    string `json:"created_at"`
 }
 
-
 func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx := context.Background()
 
 	t.Run("성공: 인증된 사용자 프로필 조회", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 
@@ -108,7 +107,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 
@@ -142,7 +141,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 데이터베이스 오류", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 
@@ -176,7 +175,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("성공: 선택적 필드가 nil인 경우", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 
@@ -228,7 +227,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("실패: userID가 0인 경우", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 
@@ -262,7 +261,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("실패: userID가 context에 없는 경우", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 
@@ -294,7 +293,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 
 	t.Run("성공: ID로 사용자 조회", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 
@@ -344,7 +343,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 잘못된 ID 형식", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 
@@ -371,7 +370,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 
@@ -402,7 +401,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 데이터베이스 오류", func(t *testing.T) {
 		// Arrange
-		mockService := new(usermock.UserService)
+		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
 		handler := NewUserHandler(getUserUseCase)
 

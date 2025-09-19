@@ -27,12 +27,12 @@ var (
 
 // Validation errors - input validation and data integrity errors
 var (
-	ErrUsernameRequired  = errors.New("username is required")
-	ErrPasswordRequired  = errors.New("password is required")
-	ErrEmailRequired     = errors.New("email is required")
-	ErrUsernameTooShort  = errors.New("username must be at least 3 characters long")
-	ErrInvalidUserID     = errors.New("invalid user ID")
-	ErrPasswordEmpty     = errors.New("password cannot be empty")
+	ErrUsernameRequired = errors.New("username is required")
+	ErrPasswordRequired = errors.New("password is required")
+	ErrEmailRequired    = errors.New("email is required")
+	ErrUsernameTooShort = errors.New("username must be at least 3 characters long")
+	ErrInvalidUserID    = errors.New("invalid user ID")
+	ErrPasswordEmpty    = errors.New("password cannot be empty")
 )
 
 // Duplicate errors - errors for unique constraint violations

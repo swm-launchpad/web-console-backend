@@ -12,6 +12,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
+	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userhttp "github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -32,19 +33,20 @@ func SetupTestServer(t *testing.T) *TestServer {
 	gin.SetMode(gin.TestMode)
 
 	// 테스트 DB 설정
-	db := SetupTestDB(t)
+	testDB := SetupTestDB(t)
 
 	// 의존성 초기화
-	userRepo := infrastructure.NewUserRepository(db.DB)
+	userRepo := infrastructure.NewUserRepository(testDB.DB)
 	jwtUtil := jwt.NewJWTUtil("test-secret")
 	passwordUtil := password.NewPasswordUtil()
+	txManager := db.NewTxManager(testDB.DB)
 
 	// Service 초기화
 	userService := service.NewUserService(userRepo)
 	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
 
 	// UseCase 초기화
-	registerUseCase := application.NewRegisterUserUseCase(authService)
+	registerUseCase := application.NewRegisterUserUseCase(authService, txManager)
 	loginUseCase := application.NewLoginUserUseCase(authService)
 	getUserUseCase := application.NewGetUserUseCase(userService)
 
@@ -81,7 +83,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 
 	return &TestServer{
 		Router: router,
-		DB:     db,
+		DB:     testDB,
 	}
 }
 

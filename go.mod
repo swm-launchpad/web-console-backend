@@ -3,6 +3,7 @@ module github.com/swm-launchpad/web-console-backend
 go 1.25.1
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-sql-driver/mysql v1.8.1
