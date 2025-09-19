@@ -2,7 +2,6 @@ package helper
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -24,27 +23,6 @@ type TestServer struct {
 	DB     *TestDB
 }
 
-// testAuthService는 테스트용 AuthService 구현입니다
-type testAuthService struct {
-	jwtService      *jwt.Service
-	passwordService *password.Service
-}
-
-func (a *testAuthService) GenerateToken(ctx context.Context, userID uint) (string, error) {
-	return a.jwtService.GenerateToken(ctx, userID)
-}
-
-func (a *testAuthService) ValidateToken(ctx context.Context, token string) (uint, error) {
-	return a.jwtService.ValidateToken(ctx, token)
-}
-
-func (a *testAuthService) HashPassword(password string) (string, error) {
-	return a.passwordService.HashPassword(password)
-}
-
-func (a *testAuthService) VerifyPassword(password, hash string) error {
-	return a.passwordService.VerifyPassword(password, hash)
-}
 
 // SetupTestServer는 테스트용 서버를 설정합니다
 func SetupTestServer(t *testing.T) *TestServer {
@@ -58,18 +36,12 @@ func SetupTestServer(t *testing.T) *TestServer {
 
 	// 의존성 초기화
 	userRepo := persistence.NewUserRepository(db.DB)
-	jwtService := jwt.NewService("test-secret")
-	passwordService := password.NewService()
-
-	// AuthService 인터페이스를 구현하는 구조체
-	authService := &testAuthService{
-		jwtService:      jwtService,
-		passwordService: passwordService,
-	}
+	jwtUtil := jwt.NewJWTUtil("test-secret")
+	passwordUtil := password.NewPasswordUtil()
 
 	// UseCase 초기화
-	registerUseCase := usecase.NewRegisterUserUseCase(userRepo, authService)
-	loginUseCase := usecase.NewLoginUserUseCase(userRepo, authService)
+	registerUseCase := usecase.NewRegisterUserUseCase(userRepo, jwtUtil, passwordUtil)
+	loginUseCase := usecase.NewLoginUserUseCase(userRepo, jwtUtil, passwordUtil)
 	getUserUseCase := usecase.NewGetUserUseCase(userRepo)
 
 	// Handler 초기화

@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
@@ -122,17 +123,9 @@ func (uc *RegisterUserUseCase) validateInput(input RegisterUserInput) error {
 		return errors.New("email is required")
 	}
 	// Basic email validation
-	if !contains(input.Email, "@") || !contains(input.Email, ".") {
+	if !strings.Contains(input.Email, "@") || !strings.Contains(input.Email, ".") {
 		return errors.New("invalid email format")
 	}
 	return nil
 }
 
-func contains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

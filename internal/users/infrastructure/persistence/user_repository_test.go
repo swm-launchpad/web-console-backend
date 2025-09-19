@@ -233,37 +233,6 @@ func TestIsDuplicateError(t *testing.T) {
 	})
 }
 
-func TestContains(t *testing.T) {
-	t.Run("문자열이 부분 문자열을 포함하는 경우", func(t *testing.T) {
-		assert.True(t, contains("hello world", "world"))
-		assert.True(t, contains("hello world", "hello"))
-		assert.True(t, contains("hello world", "o w"))
-	})
-
-	t.Run("문자열이 부분 문자열을 포함하지 않는 경우", func(t *testing.T) {
-		assert.False(t, contains("hello world", "foo"))
-		assert.False(t, contains("hello", "hello world"))
-	})
-
-	t.Run("빈 문자열 케이스", func(t *testing.T) {
-		assert.True(t, contains("hello", ""))     // 빈 부분 문자열은 항상 포함
-		assert.False(t, contains("", "hello"))    // 빈 문자열은 비어있지 않은 부분 문자열을 포함하지 않음
-		assert.True(t, contains("", ""))          // 빈 문자열은 빈 부분 문자열을 포함
-	})
-
-	t.Run("같은 문자열", func(t *testing.T) {
-		assert.True(t, contains("test", "test"))
-	})
-
-	t.Run("시작 부분 매칭", func(t *testing.T) {
-		assert.True(t, contains("prefix_test", "prefix"))
-	})
-
-	t.Run("끝 부분 매칭", func(t *testing.T) {
-		assert.True(t, contains("test_suffix", "suffix"))
-	})
-}
-
 func TestHelperFunctionsIntegration(t *testing.T) {
 	t.Run("toNullString과 fromNullString 왕복 변환", func(t *testing.T) {
 		original := "test string"

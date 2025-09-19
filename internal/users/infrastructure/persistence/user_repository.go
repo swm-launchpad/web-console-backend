@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/users/infrastructure/persistence/sqlc"
@@ -277,11 +278,8 @@ func stringToPtr(s string) *string {
 func isDuplicateError(err error) bool {
 	// MySQL duplicate entry error code is 1062
 	if err != nil && err.Error() != "" {
-		return contains(err.Error(), "Duplicate entry") || contains(err.Error(), "1062")
+		return strings.Contains(err.Error(), "Duplicate entry") || strings.Contains(err.Error(), "1062")
 	}
 	return false
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && len(substr) > 0 && s[0:len(substr)] == substr || contains(s[1:], substr))
-}

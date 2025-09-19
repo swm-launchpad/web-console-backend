@@ -289,31 +289,6 @@ func TestUserHandler_RequestValidation(t *testing.T) {
 	})
 }
 
-func TestContainsFunction(t *testing.T) {
-	testCases := []struct {
-		name     string
-		s        string
-		substr   string
-		expected bool
-	}{
-		{"포함된 경우", "hello world", "world", true},
-		{"포함되지 않은 경우", "hello world", "foo", false},
-		{"빈 문자열", "", "test", false},
-		{"빈 서브스트링", "test", "", true},
-		{"같은 문자열", "test", "test", true},
-		{"시작 부분", "test string", "test", true},
-		{"끝 부분", "test string", "string", true},
-		{"대소문자 구분", "Hello", "hello", false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := contains(tc.s, tc.substr)
-			assert.Equal(t, tc.expected, result)
-		})
-	}
-}
-
 func TestJSONResponseFormats(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

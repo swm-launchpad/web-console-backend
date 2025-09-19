@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/users/application/usecase"
@@ -58,9 +59,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	if err != nil {
 		// Determine appropriate status code based on error
 		statusCode := http.StatusInternalServerError
-		if contains(err.Error(), "already exists") {
+		if strings.Contains(err.Error(), "already exists") {
 			statusCode = http.StatusConflict
-		} else if contains(err.Error(), "required") || contains(err.Error(), "invalid") || contains(err.Error(), "weak") {
+		} else if strings.Contains(err.Error(), "required") || strings.Contains(err.Error(), "invalid") || strings.Contains(err.Error(), "weak") {
 			statusCode = http.StatusBadRequest
 		}
 
@@ -112,11 +113,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err != nil {
 		// Determine appropriate status code based on error
 		statusCode := http.StatusInternalServerError
-		if contains(err.Error(), "invalid credentials") || contains(err.Error(), "not found") {
+		if strings.Contains(err.Error(), "invalid credentials") || strings.Contains(err.Error(), "not found") {
 			statusCode = http.StatusUnauthorized
-		} else if contains(err.Error(), "not active") {
+		} else if strings.Contains(err.Error(), "not active") {
 			statusCode = http.StatusForbidden
-		} else if contains(err.Error(), "required") {
+		} else if strings.Contains(err.Error(), "required") {
 			statusCode = http.StatusBadRequest
 		}
 
@@ -136,11 +137,3 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-func contains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
