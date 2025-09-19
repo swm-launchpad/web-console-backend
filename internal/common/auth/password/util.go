@@ -2,25 +2,25 @@ package password
 
 import (
 	"golang.org/x/crypto/bcrypt"
-	authErrors "github.com/swm-launchpad/web-console-backend/internal/common/auth/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 )
 
-type Service struct {
+type PasswordUtil struct {
 	cost int
 }
 
-func NewService() *Service {
-	return &Service{
+func NewPasswordUtil() *PasswordUtil {
+	return &PasswordUtil{
 		cost: bcrypt.DefaultCost,
 	}
 }
 
-func (s *Service) HashPassword(password string) (string, error) {
+func (u *PasswordUtil) HashPassword(password string) (string, error) {
 	if len(password) < 8 {
-		return "", authErrors.ErrPasswordTooWeak
+		return "", auth.ErrPasswordTooWeak
 	}
 
-	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), s.cost)
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), u.cost)
 	if err != nil {
 		return "", err
 	}
@@ -28,11 +28,11 @@ func (s *Service) HashPassword(password string) (string, error) {
 	return string(hashedBytes), nil
 }
 
-func (s *Service) VerifyPassword(hashedPassword, password string) error {
+func (u *PasswordUtil) VerifyPassword(hashedPassword, password string) error {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	if err != nil {
 		if err == bcrypt.ErrMismatchedHashAndPassword {
-			return authErrors.ErrPasswordMismatch
+			return auth.ErrPasswordMismatch
 		}
 		return err
 	}
@@ -40,9 +40,9 @@ func (s *Service) VerifyPassword(hashedPassword, password string) error {
 	return nil
 }
 
-func (s *Service) ValidatePasswordStrength(password string) error {
+func (u *PasswordUtil) ValidatePasswordStrength(password string) error {
 	if len(password) < 8 {
-		return authErrors.ErrPasswordTooWeak
+		return auth.ErrPasswordTooWeak
 	}
 
 	// Additional validation rules can be added here

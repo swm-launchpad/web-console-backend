@@ -21,7 +21,7 @@ func setupTestRouter() *gin.Engine {
 }
 
 func TestAuthMiddleware_RequireAuth(t *testing.T) {
-	jwtSvc := jwtService.NewService("test-secret-key-for-testing")
+	jwtSvc := jwtService.NewJWTUtil("test-secret-key-for-testing")
 	middleware := NewAuthMiddleware(jwtSvc)
 
 	t.Run("인증 헤더가 없는 경우", func(t *testing.T) {
@@ -216,7 +216,7 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 }
 
 func TestAuthMiddleware_OptionalAuth(t *testing.T) {
-	jwtSvc := jwtService.NewService("test-secret-key-for-testing")
+	jwtSvc := jwtService.NewJWTUtil("test-secret-key-for-testing")
 	middleware := NewAuthMiddleware(jwtSvc)
 
 	t.Run("토큰이 없는 경우 - 인증되지 않은 상태로 진행", func(t *testing.T) {
@@ -359,7 +359,7 @@ func TestAuthMiddleware_OptionalAuth(t *testing.T) {
 }
 
 func TestAuthMiddleware_Integration(t *testing.T) {
-	jwtSvc := jwtService.NewService("test-secret-key-for-testing")
+	jwtSvc := jwtService.NewJWTUtil("test-secret-key-for-testing")
 	middleware := NewAuthMiddleware(jwtSvc)
 
 	t.Run("미들웨어 체인 테스트 - RequireAuth가 요청을 차단", func(t *testing.T) {

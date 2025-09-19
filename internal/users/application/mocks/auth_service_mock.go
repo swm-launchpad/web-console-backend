@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// Deprecated: Use MockJWTUtil and MockPasswordUtil instead
 type MockAuthService struct {
 	mock.Mock
 }

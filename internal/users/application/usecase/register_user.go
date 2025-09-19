@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 
-	authErrors "github.com/swm-launchpad/web-console-backend/internal/common/auth/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/service"
 )
 
 type RegisterUserInput struct {
@@ -23,17 +24,20 @@ type RegisterUserOutput struct {
 }
 
 type RegisterUserUseCase struct {
-	userRepo    repository.UserRepository
-	authService service.AuthService
+	userRepo     repository.UserRepository
+	jwtUtil      *jwt.JWTUtil
+	passwordUtil *password.PasswordUtil
 }
 
 func NewRegisterUserUseCase(
 	userRepo repository.UserRepository,
-	authService service.AuthService,
+	jwtUtil *jwt.JWTUtil,
+	passwordUtil *password.PasswordUtil,
 ) *RegisterUserUseCase {
 	return &RegisterUserUseCase{
-		userRepo:    userRepo,
-		authService: authService,
+		userRepo:     userRepo,
+		jwtUtil:      jwtUtil,
+		passwordUtil: passwordUtil,
 	}
 }
 
@@ -73,7 +77,7 @@ func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserIn
 	}
 
 	// Hash password
-	hashedPassword, err := uc.authService.HashPassword(input.Password)
+	hashedPassword, err := uc.passwordUtil.HashPassword(input.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -90,9 +94,9 @@ func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserIn
 	}
 
 	// Generate JWT token
-	token, err := uc.authService.GenerateToken(ctx, user.UserID)
+	token, err := uc.jwtUtil.GenerateToken(ctx, user.UserID)
 	if err != nil {
-		return nil, authErrors.ErrTokenGenerationFailed
+		return nil, auth.ErrTokenGenerationFailed
 	}
 
 	return &RegisterUserOutput{
@@ -112,7 +116,7 @@ func (uc *RegisterUserUseCase) validateInput(input RegisterUserInput) error {
 		return errors.New("password is required")
 	}
 	if len(input.Password) < 8 {
-		return authErrors.ErrPasswordTooWeak
+		return auth.ErrPasswordTooWeak
 	}
 	if input.Email == "" {
 		return errors.New("email is required")

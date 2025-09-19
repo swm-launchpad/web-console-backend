@@ -9,21 +9,21 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func TestNewService(t *testing.T) {
-	t.Run("성공: Password 서비스 생성", func(t *testing.T) {
-		service := NewService()
+func TestNewPasswordUtil(t *testing.T) {
+	t.Run("성공: Password 유틸 생성", func(t *testing.T) {
+		util := NewPasswordUtil()
 
-		assert.NotNil(t, service)
+		assert.NotNil(t, util)
 	})
 }
 
-func TestService_HashPassword(t *testing.T) {
-	service := NewService()
+func TestPasswordUtil_HashPassword(t *testing.T) {
+	util := NewPasswordUtil()
 
 	t.Run("성공: 일반 비밀번호 해싱", func(t *testing.T) {
 		password := "MySecretPassword123!"
 
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, hash)
@@ -35,8 +35,8 @@ func TestService_HashPassword(t *testing.T) {
 	t.Run("성공: 동일한 비밀번호도 다른 해시 생성", func(t *testing.T) {
 		password := "SamePassword123"
 
-		hash1, err1 := service.HashPassword(password)
-		hash2, err2 := service.HashPassword(password)
+		hash1, err1 := util.HashPassword(password)
+		hash2, err2 := util.HashPassword(password)
 
 		require.NoError(t, err1)
 		require.NoError(t, err2)
@@ -46,7 +46,7 @@ func TestService_HashPassword(t *testing.T) {
 	t.Run("성공: 최소 길이 비밀번호 해싱", func(t *testing.T) {
 		password := "12345678" // 정확히 8자
 
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, hash)
@@ -55,7 +55,7 @@ func TestService_HashPassword(t *testing.T) {
 	t.Run("성공: 72바이트 이내 긴 비밀번호 해싱", func(t *testing.T) {
 		password := strings.Repeat("a", 69) + "A1" // 71자 (72바이트 이내)
 
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, hash)
@@ -64,7 +64,7 @@ func TestService_HashPassword(t *testing.T) {
 	t.Run("실패: 72바이트 초과 비밀번호", func(t *testing.T) {
 		password := strings.Repeat("a", 73) // 73자 (bcrypt 제한 초과)
 
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 
 		assert.Error(t, err)
 		assert.Empty(t, hash)
@@ -74,7 +74,7 @@ func TestService_HashPassword(t *testing.T) {
 	t.Run("성공: 특수문자 포함 비밀번호", func(t *testing.T) {
 		password := "P@$$w0rd!#%&*()[]{}|"
 
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, hash)
@@ -83,7 +83,7 @@ func TestService_HashPassword(t *testing.T) {
 	t.Run("성공: 유니코드 문자 포함 비밀번호", func(t *testing.T) {
 		password := "Pass123!한글😀"
 
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, hash)
@@ -98,7 +98,7 @@ func TestService_HashPassword(t *testing.T) {
 		}
 
 		for _, password := range passwords {
-			hash, err := service.HashPassword(password)
+			hash, err := util.HashPassword(password)
 
 			assert.Error(t, err, "Password: %s", password)
 			assert.Empty(t, hash)
@@ -116,7 +116,7 @@ func TestService_HashPassword(t *testing.T) {
 		}
 
 		for _, password := range simplePasswords {
-			hash, err := service.HashPassword(password)
+			hash, err := util.HashPassword(password)
 
 			assert.NoError(t, err, "Password: %s", password)
 			assert.NotEmpty(t, hash)
@@ -124,35 +124,35 @@ func TestService_HashPassword(t *testing.T) {
 	})
 }
 
-func TestService_VerifyPassword(t *testing.T) {
-	service := NewService()
+func TestPasswordUtil_VerifyPassword(t *testing.T) {
+	util := NewPasswordUtil()
 
 	t.Run("성공: 올바른 비밀번호 검증", func(t *testing.T) {
 		password := "MySecretPassword123!"
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 		require.NoError(t, err)
 
-		err = service.VerifyPassword(hash, password)
+		err = util.VerifyPassword(hash, password)
 
 		assert.NoError(t, err)
 	})
 
 	t.Run("성공: 특수문자 포함 비밀번호 검증", func(t *testing.T) {
 		password := "P@$$w0rd!#%&*()"
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 		require.NoError(t, err)
 
-		err = service.VerifyPassword(hash, password)
+		err = util.VerifyPassword(hash, password)
 
 		assert.NoError(t, err)
 	})
 
 	t.Run("성공: 유니코드 포함 비밀번호 검증", func(t *testing.T) {
 		password := "Pass123!한글😀"
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 		require.NoError(t, err)
 
-		err = service.VerifyPassword(hash, password)
+		err = util.VerifyPassword(hash, password)
 
 		assert.NoError(t, err)
 	})
@@ -160,10 +160,10 @@ func TestService_VerifyPassword(t *testing.T) {
 	t.Run("실패: 잘못된 비밀번호", func(t *testing.T) {
 		password := "MySecretPassword123!"
 		wrongPassword := "WrongPassword123!"
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 		require.NoError(t, err)
 
-		err = service.VerifyPassword(hash, wrongPassword)
+		err = util.VerifyPassword(hash, wrongPassword)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "password does not match")
@@ -171,10 +171,10 @@ func TestService_VerifyPassword(t *testing.T) {
 
 	t.Run("실패: 빈 비밀번호로 검증", func(t *testing.T) {
 		password := "MySecretPassword123!"
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 		require.NoError(t, err)
 
-		err = service.VerifyPassword(hash, "")
+		err = util.VerifyPassword(hash, "")
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "password does not match")
@@ -183,7 +183,7 @@ func TestService_VerifyPassword(t *testing.T) {
 	t.Run("실패: 빈 해시로 검증", func(t *testing.T) {
 		password := "MySecretPassword123!"
 
-		err := service.VerifyPassword("", password)
+		err := util.VerifyPassword("", password)
 
 		assert.Error(t, err)
 	})
@@ -198,7 +198,7 @@ func TestService_VerifyPassword(t *testing.T) {
 		}
 
 		for _, hash := range invalidHashes {
-			err := service.VerifyPassword(hash, password)
+			err := util.VerifyPassword(hash, password)
 
 			assert.Error(t, err, "Hash: %s", hash)
 		}
@@ -209,7 +209,7 @@ func TestService_VerifyPassword(t *testing.T) {
 		// MD5 해시 예시
 		md5Hash := "5f4dcc3b5aa765d61d8327deb882cf99"
 
-		err := service.VerifyPassword(md5Hash, password)
+		err := util.VerifyPassword(md5Hash, password)
 
 		assert.Error(t, err)
 	})
@@ -217,10 +217,10 @@ func TestService_VerifyPassword(t *testing.T) {
 	t.Run("실패: 대소문자 구분", func(t *testing.T) {
 		password := "MySecretPassword123!"
 		wrongCase := "mysecretpassword123!"
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 		require.NoError(t, err)
 
-		err = service.VerifyPassword(hash, wrongCase)
+		err = util.VerifyPassword(hash, wrongCase)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "password does not match")
@@ -229,10 +229,10 @@ func TestService_VerifyPassword(t *testing.T) {
 	t.Run("실패: 공백 차이", func(t *testing.T) {
 		password := "MySecretPassword123!"
 		withSpace := "MySecretPassword123! "
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 		require.NoError(t, err)
 
-		err = service.VerifyPassword(hash, withSpace)
+		err = util.VerifyPassword(hash, withSpace)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "password does not match")
@@ -240,13 +240,13 @@ func TestService_VerifyPassword(t *testing.T) {
 }
 
 func TestBcryptCompatibility(t *testing.T) {
-	service := NewService()
+	util := NewPasswordUtil()
 
 	t.Run("bcrypt 라이브러리와 호환성", func(t *testing.T) {
 		password := "TestPassword123!"
 
 		// 서비스로 해시 생성
-		hash, err := service.HashPassword(password)
+		hash, err := util.HashPassword(password)
 		require.NoError(t, err)
 
 		// bcrypt 라이브러리로 직접 검증
@@ -262,7 +262,7 @@ func TestBcryptCompatibility(t *testing.T) {
 		require.NoError(t, err)
 
 		// 서비스로 검증
-		err = service.VerifyPassword(string(bcryptHash), password)
+		err = util.VerifyPassword(string(bcryptHash), password)
 		assert.NoError(t, err)
 	})
 }

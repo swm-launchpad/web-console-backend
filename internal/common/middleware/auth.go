@@ -10,12 +10,12 @@ import (
 )
 
 type AuthMiddleware struct {
-	jwtService *jwt.Service
+	jwtUtil *jwt.JWTUtil
 }
 
-func NewAuthMiddleware(jwtService *jwt.Service) *AuthMiddleware {
+func NewAuthMiddleware(jwtUtil *jwt.JWTUtil) *AuthMiddleware {
 	return &AuthMiddleware{
-		jwtService: jwtService,
+		jwtUtil: jwtUtil,
 	}
 }
 
@@ -53,7 +53,7 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		}
 
 		// Validate the token
-		userID, err := m.jwtService.ValidateToken(c.Request.Context(), token)
+		userID, err := m.jwtUtil.ValidateToken(c.Request.Context(), token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "Invalid or expired token",
@@ -102,7 +102,7 @@ func (m *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 		}
 
 		// Validate the token
-		userID, err := m.jwtService.ValidateToken(c.Request.Context(), token)
+		userID, err := m.jwtUtil.ValidateToken(c.Request.Context(), token)
 		if err != nil {
 			// Invalid token, continue without authentication
 			c.Set(auth.ContextKeyAuth, false)

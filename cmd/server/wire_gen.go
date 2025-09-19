@@ -8,7 +8,6 @@ package main
 
 import (
 	"database/sql"
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
@@ -31,15 +30,14 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	userRepository := persistence.NewUserRepository(db)
-	service := provideJWTService(configConfig)
-	passwordService := password.NewService()
-	authService := auth.NewAuthService(service, passwordService)
-	registerUserUseCase := usecase.NewRegisterUserUseCase(userRepository, authService)
-	loginUserUseCase := usecase.NewLoginUserUseCase(userRepository, authService)
+	jwtUtil := provideJWTUtil(configConfig)
+	passwordUtil := password.NewPasswordUtil()
+	registerUserUseCase := usecase.NewRegisterUserUseCase(userRepository, jwtUtil, passwordUtil)
+	loginUserUseCase := usecase.NewLoginUserUseCase(userRepository, jwtUtil, passwordUtil)
 	authHandler := http.NewAuthHandler(registerUserUseCase, loginUserUseCase)
 	getUserUseCase := usecase.NewGetUserUseCase(userRepository)
 	userHandler := http.NewUserHandler(getUserUseCase)
-	authMiddleware := middleware.NewAuthMiddleware(service)
+	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	router := NewRouter(configConfig, db, authHandler, userHandler, authMiddleware)
 	app := NewApp(configConfig, db, router)
 	return app, nil
@@ -51,6 +49,6 @@ func provideDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db.NewConnection(&cfg.Database)
 }
 
-func provideJWTService(cfg *config.Config) *jwt.Service {
-	return jwt.NewService(cfg.JWT.Secret)
+func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
+	return jwt.NewJWTUtil(cfg.JWT.Secret)
 }

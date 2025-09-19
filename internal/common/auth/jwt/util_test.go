@@ -11,33 +11,33 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewService(t *testing.T) {
-	t.Run("성공: JWT 서비스 생성", func(t *testing.T) {
+func TestNewJWTUtil(t *testing.T) {
+	t.Run("성공: JWT 유틸 생성", func(t *testing.T) {
 		secret := "test-secret-key"
 
-		service := NewService(secret)
+		util := NewJWTUtil(secret)
 
-		assert.NotNil(t, service)
+		assert.NotNil(t, util)
 	})
 
 	t.Run("빈 시크릿 키로도 생성 가능", func(t *testing.T) {
 		secret := ""
 
-		service := NewService(secret)
+		util := NewJWTUtil(secret)
 
-		assert.NotNil(t, service)
+		assert.NotNil(t, util)
 	})
 }
 
-func TestService_GenerateToken(t *testing.T) {
+func TestJWTUtil_GenerateToken(t *testing.T) {
 	ctx := context.Background()
 	secret := "test-secret-key-for-testing"
-	service := NewService(secret)
+	util := NewJWTUtil(secret)
 
 	t.Run("성공: 토큰 생성", func(t *testing.T) {
 		userID := uint(123)
 
-		token, err := service.GenerateToken(ctx, userID)
+		token, err := util.GenerateToken(ctx, userID)
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, token)
@@ -48,8 +48,8 @@ func TestService_GenerateToken(t *testing.T) {
 		userID1 := uint(123)
 		userID2 := uint(456)
 
-		token1, err1 := service.GenerateToken(ctx, userID1)
-		token2, err2 := service.GenerateToken(ctx, userID2)
+		token1, err1 := util.GenerateToken(ctx, userID1)
+		token2, err2 := util.GenerateToken(ctx, userID2)
 
 		require.NoError(t, err1)
 		require.NoError(t, err2)
@@ -59,7 +59,7 @@ func TestService_GenerateToken(t *testing.T) {
 	t.Run("성공: userID 0으로 토큰 생성", func(t *testing.T) {
 		userID := uint(0)
 
-		token, err := service.GenerateToken(ctx, userID)
+		token, err := util.GenerateToken(ctx, userID)
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, token)
@@ -68,24 +68,24 @@ func TestService_GenerateToken(t *testing.T) {
 	t.Run("성공: 최대 userID로 토큰 생성", func(t *testing.T) {
 		userID := uint(^uint(0))
 
-		token, err := service.GenerateToken(ctx, userID)
+		token, err := util.GenerateToken(ctx, userID)
 
 		require.NoError(t, err)
 		assert.NotEmpty(t, token)
 	})
 }
 
-func TestService_ValidateToken(t *testing.T) {
+func TestJWTUtil_ValidateToken(t *testing.T) {
 	ctx := context.Background()
 	secret := "test-secret-key-for-validation"
-	service := NewService(secret)
+	util := NewJWTUtil(secret)
 
 	t.Run("성공: 유효한 토큰 검증", func(t *testing.T) {
 		userID := uint(123)
-		token, err := service.GenerateToken(ctx, userID)
+		token, err := util.GenerateToken(ctx, userID)
 		require.NoError(t, err)
 
-		validatedUserID, err := service.ValidateToken(ctx, token)
+		validatedUserID, err := util.ValidateToken(ctx, token)
 
 		require.NoError(t, err)
 		assert.Equal(t, userID, validatedUserID)
@@ -93,10 +93,10 @@ func TestService_ValidateToken(t *testing.T) {
 
 	t.Run("성공: userID 0 토큰 검증", func(t *testing.T) {
 		userID := uint(0)
-		token, err := service.GenerateToken(ctx, userID)
+		token, err := util.GenerateToken(ctx, userID)
 		require.NoError(t, err)
 
-		validatedUserID, err := service.ValidateToken(ctx, token)
+		validatedUserID, err := util.ValidateToken(ctx, token)
 
 		require.NoError(t, err)
 		assert.Equal(t, userID, validatedUserID)
@@ -106,12 +106,12 @@ func TestService_ValidateToken(t *testing.T) {
 		userID := uint(123)
 
 		// 다른 시크릿 키로 토큰 생성
-		wrongService := NewService("wrong-secret")
-		token, err := wrongService.GenerateToken(ctx, userID)
+		wrongUtil := NewJWTUtil("wrong-secret")
+		token, err := wrongUtil.GenerateToken(ctx, userID)
 		require.NoError(t, err)
 
 		// 원래 서비스로 검증 시도
-		validatedUserID, err := service.ValidateToken(ctx, token)
+		validatedUserID, err := util.ValidateToken(ctx, token)
 
 		assert.Error(t, err)
 		assert.Equal(t, uint(0), validatedUserID)
@@ -129,7 +129,7 @@ func TestService_ValidateToken(t *testing.T) {
 		token, err := jwtToken.SignedString([]byte(secret))
 		require.NoError(t, err)
 
-		validatedUserID, err := service.ValidateToken(ctx, token)
+		validatedUserID, err := util.ValidateToken(ctx, token)
 
 		assert.Error(t, err)
 		assert.Equal(t, uint(0), validatedUserID)
@@ -147,7 +147,7 @@ func TestService_ValidateToken(t *testing.T) {
 		}
 
 		for _, token := range invalidTokens {
-			validatedUserID, err := service.ValidateToken(ctx, token)
+			validatedUserID, err := util.ValidateToken(ctx, token)
 
 			assert.Error(t, err, "Token: %s", token)
 			assert.Equal(t, uint(0), validatedUserID)
@@ -157,17 +157,19 @@ func TestService_ValidateToken(t *testing.T) {
 
 	t.Run("실패: 변조된 토큰", func(t *testing.T) {
 		userID := uint(123)
-		token, err := service.GenerateToken(ctx, userID)
+		token, err := util.GenerateToken(ctx, userID)
 		require.NoError(t, err)
 
 		// 토큰 변조 (마지막 문자 변경)
 		tamperedToken := token[:len(token)-1] + "X"
 
-		validatedUserID, err := service.ValidateToken(ctx, tamperedToken)
+		validatedUserID, err := util.ValidateToken(ctx, tamperedToken)
 
 		assert.Error(t, err)
 		assert.Equal(t, uint(0), validatedUserID)
-		assert.Contains(t, err.Error(), "invalid token")
+		if err != nil {
+			assert.Contains(t, err.Error(), "invalid token")
+		}
 	})
 
 	t.Run("실패: UserID claim이 없는 토큰", func(t *testing.T) {
@@ -179,7 +181,7 @@ func TestService_ValidateToken(t *testing.T) {
 		token, err := jwtToken.SignedString([]byte(secret))
 		require.NoError(t, err)
 
-		validatedUserID, err := service.ValidateToken(ctx, token)
+		validatedUserID, err := util.ValidateToken(ctx, token)
 
 		assert.Error(t, err)
 		assert.Equal(t, uint(0), validatedUserID)
@@ -196,7 +198,7 @@ func TestService_ValidateToken(t *testing.T) {
 		token, err := jwtToken.SignedString([]byte(secret))
 		require.NoError(t, err)
 
-		validatedUserID, err := service.ValidateToken(ctx, token)
+		validatedUserID, err := util.ValidateToken(ctx, token)
 
 		assert.Error(t, err)
 		assert.Equal(t, uint(0), validatedUserID)
@@ -212,7 +214,7 @@ func TestService_ValidateToken(t *testing.T) {
 		token, err := jwtToken.SignedString([]byte(secret))
 		require.NoError(t, err)
 
-		validatedUserID, err := service.ValidateToken(ctx, token)
+		validatedUserID, err := util.ValidateToken(ctx, token)
 
 		assert.Error(t, err)
 		assert.Equal(t, uint(0), validatedUserID)

@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 
-	authErrors "github.com/swm-launchpad/web-console-backend/internal/common/auth/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/users/domain/repository"
-	"github.com/swm-launchpad/web-console-backend/internal/users/domain/service"
 )
 
 type LoginUserInput struct {
@@ -23,17 +24,20 @@ type LoginUserOutput struct {
 }
 
 type LoginUserUseCase struct {
-	userRepo    repository.UserRepository
-	authService service.AuthService
+	userRepo     repository.UserRepository
+	jwtUtil      *jwt.JWTUtil
+	passwordUtil *password.PasswordUtil
 }
 
 func NewLoginUserUseCase(
 	userRepo repository.UserRepository,
-	authService service.AuthService,
+	jwtUtil *jwt.JWTUtil,
+	passwordUtil *password.PasswordUtil,
 ) *LoginUserUseCase {
 	return &LoginUserUseCase{
-		userRepo:    userRepo,
-		authService: authService,
+		userRepo:     userRepo,
+		jwtUtil:      jwtUtil,
+		passwordUtil: passwordUtil,
 	}
 }
 
@@ -50,25 +54,25 @@ func (uc *LoginUserUseCase) Execute(ctx context.Context, input LoginUserInput) (
 	user, err := uc.userRepo.FindByUsername(ctx, input.Username)
 	if err != nil {
 		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, authErrors.ErrInvalidCredentials
+			return nil, auth.ErrInvalidCredentials
 		}
 		return nil, err
 	}
 
 	// Check if user is active
 	if !user.IsActive() {
-		return nil, authErrors.ErrUserNotActive
+		return nil, auth.ErrUserNotActive
 	}
 
 	// Verify password
-	if err := uc.authService.VerifyPassword(user.PasswordHash, input.Password); err != nil {
-		return nil, authErrors.ErrInvalidCredentials
+	if err := uc.passwordUtil.VerifyPassword(user.PasswordHash, input.Password); err != nil {
+		return nil, auth.ErrInvalidCredentials
 	}
 
 	// Generate JWT token
-	token, err := uc.authService.GenerateToken(ctx, user.UserID)
+	token, err := uc.jwtUtil.GenerateToken(ctx, user.UserID)
 	if err != nil {
-		return nil, authErrors.ErrTokenGenerationFailed
+		return nil, auth.ErrTokenGenerationFailed
 	}
 
 	// Prepare output
