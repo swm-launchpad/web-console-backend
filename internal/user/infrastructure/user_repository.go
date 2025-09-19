@@ -1,4 +1,4 @@
-package persistence
+package infrastructure
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
-	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/persistence/sqlc"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
 )
 
 type userRepository struct {

@@ -1,4 +1,4 @@
-package http
+package handler
 
 import (
 	"net/http"
@@ -6,15 +6,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
-	"github.com/swm-launchpad/web-console-backend/internal/user/application/usecase"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 type UserHandler struct {
-	getUserUseCase *usecase.GetUserUseCase
+	getUserUseCase *application.GetUserUseCase
 }
 
-func NewUserHandler(getUserUseCase *usecase.GetUserUseCase) *UserHandler {
+func NewUserHandler(getUserUseCase *application.GetUserUseCase) *UserHandler {
 	return &UserHandler{
 		getUserUseCase: getUserUseCase,
 	}
@@ -43,7 +43,7 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	input := usecase.GetUserInput{
+	input := application.GetUserInput{
 		UserID: userID.(uint),
 	}
 
@@ -94,7 +94,7 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 		return
 	}
 
-	input := usecase.GetUserInput{
+	input := application.GetUserInput{
 		UserID: uint(userID),
 	}
 

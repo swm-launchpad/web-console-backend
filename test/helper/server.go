@@ -12,9 +12,9 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
-	"github.com/swm-launchpad/web-console-backend/internal/user/application/usecase"
-	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/persistence"
-	userhttp "github.com/swm-launchpad/web-console-backend/internal/user/interface/http"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	userhttp "github.com/swm-launchpad/web-console-backend/internal/user/handler"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
 
 // TestServer는 테스트용 HTTP 서버를 제공합니다
@@ -34,14 +34,14 @@ func SetupTestServer(t *testing.T) *TestServer {
 	db := SetupTestDB(t)
 
 	// 의존성 초기화
-	userRepo := persistence.NewUserRepository(db.DB)
+	userRepo := infrastructure.NewUserRepository(db.DB)
 	jwtUtil := jwt.NewJWTUtil("test-secret")
 	passwordUtil := password.NewPasswordUtil()
 
 	// UseCase 초기화
-	registerUseCase := usecase.NewRegisterUserUseCase(userRepo, jwtUtil, passwordUtil)
-	loginUseCase := usecase.NewLoginUserUseCase(userRepo, jwtUtil, passwordUtil)
-	getUserUseCase := usecase.NewGetUserUseCase(userRepo)
+	registerUseCase := application.NewRegisterUserUseCase(userRepo, jwtUtil, passwordUtil)
+	loginUseCase := application.NewLoginUserUseCase(userRepo, jwtUtil, passwordUtil)
+	getUserUseCase := application.NewGetUserUseCase(userRepo)
 
 	// Handler 초기화
 	authHandler := userhttp.NewAuthHandler(registerUseCase, loginUseCase)

@@ -12,10 +12,10 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
-	"github.com/swm-launchpad/web-console-backend/internal/user/application/usecase"
-	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/persistence"
-	userssqlc "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/persistence/sqlc"
-	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/interface/http"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
+	userssqlc "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
 )
 
 func InitializeApp() (*App, error) {
@@ -30,12 +30,12 @@ func InitializeApp() (*App, error) {
 		password.NewPasswordUtil,
 
 		// User domain
-		persistence.NewUserRepository,
+		infrastructure.NewUserRepository,
 
 		// User use cases
-		usecase.NewRegisterUserUseCase,
-		usecase.NewLoginUserUseCase,
-		usecase.NewGetUserUseCase,
+		application.NewRegisterUserUseCase,
+		application.NewLoginUserUseCase,
+		application.NewGetUserUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,

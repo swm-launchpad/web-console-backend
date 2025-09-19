@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
-	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/interface/http"
+	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
 )
 
 type Router struct {

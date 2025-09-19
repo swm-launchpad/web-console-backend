@@ -1,4 +1,4 @@
-package http
+package handler
 
 import (
 	"encoding/json"
@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
-	"github.com/swm-launchpad/web-console-backend/internal/user/application/mock"
-	"github.com/swm-launchpad/web-console-backend/internal/user/application/usecase"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
 
 func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
@@ -25,8 +25,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("성공: 인증된 사용자 프로필 조회", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.MockUserRepository)
-		getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+		mockRepo := new(infrastructure.MockUserRepository)
+		getUserUseCase := application.NewGetUserUseCase(mockRepo)
 		handler := NewUserHandler(getUserUseCase)
 
 		userID := uint(123)
@@ -79,8 +79,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("성공: 선택적 필드가 비어있는 경우", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.MockUserRepository)
-		getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+		mockRepo := new(infrastructure.MockUserRepository)
+		getUserUseCase := application.NewGetUserUseCase(mockRepo)
 		handler := NewUserHandler(getUserUseCase)
 
 		userID := uint(456)
@@ -133,8 +133,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.MockUserRepository)
-		getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+		mockRepo := new(infrastructure.MockUserRepository)
+		getUserUseCase := application.NewGetUserUseCase(mockRepo)
 		handler := NewUserHandler(getUserUseCase)
 
 		userID := uint(999)
@@ -168,8 +168,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 데이터베이스 오류", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.MockUserRepository)
-		getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+		mockRepo := new(infrastructure.MockUserRepository)
+		getUserUseCase := application.NewGetUserUseCase(mockRepo)
 		handler := NewUserHandler(getUserUseCase)
 
 		userID := uint(123)
@@ -203,8 +203,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 타입 어설션 실패", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.MockUserRepository)
-		getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+		mockRepo := new(infrastructure.MockUserRepository)
+		getUserUseCase := application.NewGetUserUseCase(mockRepo)
 		handler := NewUserHandler(getUserUseCase)
 
 		// Act
@@ -229,8 +229,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 
 	t.Run("성공: ID로 사용자 조회", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.MockUserRepository)
-		getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+		mockRepo := new(infrastructure.MockUserRepository)
+		getUserUseCase := application.NewGetUserUseCase(mockRepo)
 		handler := NewUserHandler(getUserUseCase)
 
 		userID := uint(789)
@@ -291,8 +291,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				// Arrange
-				mockRepo := new(mocks.MockUserRepository)
-				getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+				mockRepo := new(infrastructure.MockUserRepository)
+				getUserUseCase := application.NewGetUserUseCase(mockRepo)
 				handler := NewUserHandler(getUserUseCase)
 
 				user := &model.User{
@@ -332,8 +332,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.MockUserRepository)
-		getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+		mockRepo := new(infrastructure.MockUserRepository)
+		getUserUseCase := application.NewGetUserUseCase(mockRepo)
 		handler := NewUserHandler(getUserUseCase)
 
 		userID := uint(404)
@@ -364,8 +364,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 데이터베이스 접근 오류", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.MockUserRepository)
-		getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+		mockRepo := new(infrastructure.MockUserRepository)
+		getUserUseCase := application.NewGetUserUseCase(mockRepo)
 		handler := NewUserHandler(getUserUseCase)
 
 		userID := uint(500)
@@ -396,8 +396,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 내부 서버 오류", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(mocks.MockUserRepository)
-		getUserUseCase := usecase.NewGetUserUseCase(mockRepo)
+		mockRepo := new(infrastructure.MockUserRepository)
+		getUserUseCase := application.NewGetUserUseCase(mockRepo)
 		handler := NewUserHandler(getUserUseCase)
 
 		userID := uint(100)

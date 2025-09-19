@@ -1,21 +1,21 @@
-package http
+package handler
 
 import (
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swm-launchpad/web-console-backend/internal/user/application/usecase"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 )
 
 type AuthHandler struct {
-	registerUseCase *usecase.RegisterUserUseCase
-	loginUseCase    *usecase.LoginUserUseCase
+	registerUseCase *application.RegisterUserUseCase
+	loginUseCase    *application.LoginUserUseCase
 }
 
 func NewAuthHandler(
-	registerUseCase *usecase.RegisterUserUseCase,
-	loginUseCase *usecase.LoginUserUseCase,
+	registerUseCase *application.RegisterUserUseCase,
+	loginUseCase *application.LoginUserUseCase,
 ) *AuthHandler {
 	return &AuthHandler{
 		registerUseCase: registerUseCase,
@@ -48,7 +48,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	input := usecase.RegisterUserInput{
+	input := application.RegisterUserInput{
 		Username: req.Username,
 		Password: req.Password,
 		Email:    req.Email,
@@ -104,7 +104,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	input := usecase.LoginUserInput{
+	input := application.LoginUserInput{
 		Username: req.Username,
 		Password: req.Password,
 	}
