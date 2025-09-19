@@ -13,6 +13,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userhttp "github.com/swm-launchpad/web-console-backend/internal/user/handler"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
@@ -38,10 +39,14 @@ func SetupTestServer(t *testing.T) *TestServer {
 	jwtUtil := jwt.NewJWTUtil("test-secret")
 	passwordUtil := password.NewPasswordUtil()
 
+	// Service 초기화
+	userService := service.NewUserService(userRepo)
+	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
+
 	// UseCase 초기화
-	registerUseCase := application.NewRegisterUserUseCase(userRepo, jwtUtil, passwordUtil)
-	loginUseCase := application.NewLoginUserUseCase(userRepo, jwtUtil, passwordUtil)
-	getUserUseCase := application.NewGetUserUseCase(userRepo)
+	registerUseCase := application.NewRegisterUserUseCase(authService)
+	loginUseCase := application.NewLoginUserUseCase(authService)
+	getUserUseCase := application.NewGetUserUseCase(userService)
 
 	// Handler 초기화
 	authHandler := userhttp.NewAuthHandler(registerUseCase, loginUseCase)

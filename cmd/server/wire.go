@@ -13,6 +13,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 	userssqlc "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
@@ -29,8 +30,12 @@ func InitializeApp() (*App, error) {
 		provideJWTUtil,
 		password.NewPasswordUtil,
 
-		// User domain
+		// User infrastructure
 		infrastructure.NewUserRepository,
+
+		// User domain services
+		service.NewUserService,
+		service.NewAuthService,
 
 		// User use cases
 		application.NewRegisterUserUseCase,

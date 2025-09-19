@@ -2,14 +2,14 @@ package repository
 
 import (
 	"context"
-	"errors"
 
+	domainerrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/error"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 )
 
 var (
-	ErrUserNotFound      = errors.New("user not found")
-	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrUserNotFound      = domainerrors.ErrUserNotFound
+	ErrUserAlreadyExists = domainerrors.ErrUserAlreadyExists
 )
 
 type UserRepository interface {

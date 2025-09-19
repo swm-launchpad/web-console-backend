@@ -1,8 +1,9 @@
 package model
 
 import (
-	"errors"
 	"time"
+
+	domainerrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/error"
 )
 
 type UserStatus string
@@ -32,10 +33,10 @@ type User struct {
 
 func NewUser(username, email string) (*User, error) {
 	if username == "" {
-		return nil, errors.New("username is required")
+		return nil, domainerrors.ErrUsernameRequired
 	}
 	if email == "" {
-		return nil, errors.New("email is required")
+		return nil, domainerrors.ErrEmailRequired
 	}
 
 	now := time.Now()
@@ -55,7 +56,7 @@ func (u *User) IsActive() bool {
 
 func (u *User) Activate() error {
 	if u.IsDeleted {
-		return errors.New("cannot activate deleted user")
+		return domainerrors.ErrCannotDeleteUser
 	}
 	u.Status = UserStatusActive
 	now := time.Now()

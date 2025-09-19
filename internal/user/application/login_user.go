@@ -2,12 +2,8 @@ package application
 
 import (
 	"context"
-	"errors"
 
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
-	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
 type LoginUserInput struct {
@@ -24,55 +20,20 @@ type LoginUserOutput struct {
 }
 
 type LoginUserUseCase struct {
-	userRepo     repository.UserRepository
-	jwtUtil      *jwt.JWTUtil
-	passwordUtil *password.PasswordUtil
+	authService service.AuthService
 }
 
-func NewLoginUserUseCase(
-	userRepo repository.UserRepository,
-	jwtUtil *jwt.JWTUtil,
-	passwordUtil *password.PasswordUtil,
-) *LoginUserUseCase {
+func NewLoginUserUseCase(authService service.AuthService) *LoginUserUseCase {
 	return &LoginUserUseCase{
-		userRepo:     userRepo,
-		jwtUtil:      jwtUtil,
-		passwordUtil: passwordUtil,
+		authService: authService,
 	}
 }
 
 func (uc *LoginUserUseCase) Execute(ctx context.Context, input LoginUserInput) (*LoginUserOutput, error) {
-	// Validate input
-	if input.Username == "" {
-		return nil, errors.New("username is required")
-	}
-	if input.Password == "" {
-		return nil, errors.New("password is required")
-	}
-
-	// Find user by username
-	user, err := uc.userRepo.FindByUsername(ctx, input.Username)
+	// Authenticate user through AuthenticationService
+	user, token, err := uc.authService.AuthenticateUser(ctx, input.Username, input.Password)
 	if err != nil {
-		if errors.Is(err, repository.ErrUserNotFound) {
-			return nil, auth.ErrInvalidCredentials
-		}
 		return nil, err
-	}
-
-	// Check if user is active
-	if !user.IsActive() {
-		return nil, auth.ErrUserNotActive
-	}
-
-	// Verify password
-	if err := uc.passwordUtil.VerifyPassword(user.PasswordHash, input.Password); err != nil {
-		return nil, auth.ErrInvalidCredentials
-	}
-
-	// Generate JWT token
-	token, err := uc.jwtUtil.GenerateToken(ctx, user.UserID)
-	if err != nil {
-		return nil, auth.ErrTokenGenerationFailed
 	}
 
 	// Prepare output

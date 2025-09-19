@@ -10,16 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
-	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
+	usermock "github.com/swm-launchpad/web-console-backend/internal/user/mock"
 )
+
 
 func TestGetUserUseCase_Execute(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("성공: 사용자 조회", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(1)
 		email := "test@example.com"
@@ -46,7 +48,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, userID).Return(user, nil)
+		mockService.On("GetUserByID", ctx, userID).Return(user, nil)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -63,13 +65,13 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, "active", output.Status)
 		assert.Equal(t, now, output.CreatedAt)
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 
 	t.Run("성공: 선택적 필드가 없는 사용자 조회", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(2)
 		now := time.Now()
@@ -92,7 +94,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, userID).Return(user, nil)
+		mockService.On("GetUserByID", ctx, userID).Return(user, nil)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -109,7 +111,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, "pending", output.Status)
 		assert.Equal(t, now, output.CreatedAt)
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 
 	t.Run("성공: 다양한 상태의 사용자 조회", func(t *testing.T) {
@@ -122,8 +124,8 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 		for _, status := range statuses {
 			// Arrange
-			mockRepo := new(infrastructure.MockUserRepository)
-			uc := NewGetUserUseCase(mockRepo)
+			mockService := new(usermock.UserService)
+			uc := NewGetUserUseCase(mockService)
 
 			userID := uint(3)
 			now := time.Now()
@@ -143,7 +145,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 			}
 
 			// Set expectations
-			mockRepo.On("FindByID", ctx, userID).Return(user, nil)
+			mockService.On("GetUserByID", ctx, userID).Return(user, nil)
 
 			// Act
 			output, err := uc.Execute(ctx, input)
@@ -153,18 +155,21 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 			assert.NotNil(t, output)
 			assert.Equal(t, string(status), output.Status)
 
-			mockRepo.AssertExpectations(t)
+			mockService.AssertExpectations(t)
 		}
 	})
 
 	t.Run("실패: userID가 0", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		input := GetUserInput{
 			UserID: 0,
 		}
+
+		// Service.GetUserByID returns error for invalid data
+		mockService.On("GetUserByID", ctx, uint(0)).Return((*model.User)(nil), service.ErrInvalidUserData)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -172,15 +177,15 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, output)
-		assert.Contains(t, err.Error(), "user ID is required")
+		assert.Equal(t, service.ErrInvalidUserData, err)
 
-		mockRepo.AssertNotCalled(t, "FindByID")
+		mockService.AssertExpectations(t)
 	})
 
 	t.Run("실패: 존재하지 않는 사용자", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(999)
 		input := GetUserInput{
@@ -188,7 +193,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, userID).Return((*model.User)(nil), repository.ErrUserNotFound)
+		mockService.On("GetUserByID", ctx, userID).Return((*model.User)(nil), repository.ErrUserNotFound)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -198,13 +203,13 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Nil(t, output)
 		assert.Equal(t, repository.ErrUserNotFound, err)
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 
 	t.Run("실패: 데이터베이스 오류", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(1)
 		input := GetUserInput{
@@ -212,7 +217,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, userID).Return((*model.User)(nil), errors.New("database connection error"))
+		mockService.On("GetUserByID", ctx, userID).Return((*model.User)(nil), errors.New("database connection error"))
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -222,13 +227,13 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Nil(t, output)
 		assert.Contains(t, err.Error(), "database connection error")
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 
 	t.Run("성공: 삭제된 사용자도 조회 가능", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(4)
 		now := time.Now()
@@ -237,6 +242,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		user := &model.User{
 			UserID:    userID,
 			Username:  "deleteduser",
+			Email:     "deleted@example.com",
 			Status:    model.UserStatusActive,
 			IsDeleted: true,
 			DeletedAt: &deletedAt,
@@ -249,7 +255,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, userID).Return(user, nil)
+		mockService.On("GetUserByID", ctx, userID).Return(user, nil)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -261,13 +267,13 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, "deleteduser", output.Username)
 		assert.Equal(t, "active", output.Status) // 삭제되었어도 상태는 유지
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 
 	t.Run("성공: 모든 선택적 필드가 채워진 사용자", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(5)
 		email := "full@example.com"
@@ -294,7 +300,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, userID).Return(user, nil)
+		mockService.On("GetUserByID", ctx, userID).Return(user, nil)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -310,13 +316,13 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, organization, output.Organization)
 		assert.Equal(t, "active", output.Status)
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 
 	t.Run("성공: 빈 문자열 선택적 필드", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(6)
 		emptyStr := ""
@@ -340,7 +346,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, userID).Return(user, nil)
+		mockService.On("GetUserByID", ctx, userID).Return(user, nil)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -355,7 +361,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Empty(t, output.Phone)
 		assert.Empty(t, output.Organization)
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 }
 
@@ -364,8 +370,8 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 
 	t.Run("최대 userID 값", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		maxUserID := ^uint(0) // 최대 uint 값
 		now := time.Now()
@@ -373,6 +379,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		user := &model.User{
 			UserID:    maxUserID,
 			Username:  "maxuser",
+			Email:     "max@example.com",
 			Status:    model.UserStatusActive,
 			IsDeleted: false,
 			CreatedAt: now,
@@ -384,7 +391,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, maxUserID).Return(user, nil)
+		mockService.On("GetUserByID", ctx, maxUserID).Return(user, nil)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -394,13 +401,13 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, maxUserID, output.UserID)
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 
 	t.Run("매우 긴 username 가진 사용자", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(7)
 		longUsername := ""
@@ -412,6 +419,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		user := &model.User{
 			UserID:    userID,
 			Username:  longUsername,
+			Email:     "long@example.com",
 			Status:    model.UserStatusActive,
 			IsDeleted: false,
 			CreatedAt: now,
@@ -423,7 +431,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, userID).Return(user, nil)
+		mockService.On("GetUserByID", ctx, userID).Return(user, nil)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -433,13 +441,13 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, longUsername, output.Username)
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 
 	t.Run("UpdatedAt이 nil인 사용자", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		uc := NewGetUserUseCase(mockRepo)
+		mockService := new(usermock.UserService)
+		uc := NewGetUserUseCase(mockService)
 
 		userID := uint(8)
 		now := time.Now()
@@ -447,6 +455,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		user := &model.User{
 			UserID:    userID,
 			Username:  "noupdateuser",
+			Email:     "noupdate@example.com",
 			Status:    model.UserStatusActive,
 			IsDeleted: false,
 			CreatedAt: now,
@@ -458,7 +467,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		}
 
 		// Set expectations
-		mockRepo.On("FindByID", ctx, userID).Return(user, nil)
+		mockService.On("GetUserByID", ctx, userID).Return(user, nil)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -468,6 +477,6 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, userID, output.UserID)
 
-		mockRepo.AssertExpectations(t)
+		mockService.AssertExpectations(t)
 	})
 }

@@ -2,14 +2,8 @@ package application
 
 import (
 	"context"
-	"errors"
-	"strings"
 
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
-	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
-	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
 type RegisterUserInput struct {
@@ -25,106 +19,29 @@ type RegisterUserOutput struct {
 }
 
 type RegisterUserUseCase struct {
-	userRepo     repository.UserRepository
-	jwtUtil      *jwt.JWTUtil
-	passwordUtil *password.PasswordUtil
+	authService service.AuthService
 }
 
-func NewRegisterUserUseCase(
-	userRepo repository.UserRepository,
-	jwtUtil *jwt.JWTUtil,
-	passwordUtil *password.PasswordUtil,
-) *RegisterUserUseCase {
+func NewRegisterUserUseCase(authService service.AuthService) *RegisterUserUseCase {
 	return &RegisterUserUseCase{
-		userRepo:     userRepo,
-		jwtUtil:      jwtUtil,
-		passwordUtil: passwordUtil,
+		authService: authService,
 	}
 }
 
 func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserInput) (*RegisterUserOutput, error) {
-	// Validate input
-	if err := uc.validateInput(input); err != nil {
-		return nil, err
-	}
-
-	// Check if username already exists
-	exists, err := uc.userRepo.ExistsByUsername(ctx, input.Username)
-	if err != nil {
-		return nil, err
-	}
-	if exists {
-		return nil, errors.New("username already exists")
-	}
-
-	// Check if email already exists
-	exists, err = uc.userRepo.ExistsByEmail(ctx, input.Email)
-	if err != nil {
-		return nil, err
-	}
-	if exists {
-		return nil, errors.New("email already exists")
-	}
-
-	// Create new user
-	user, err := model.NewUser(input.Username, input.Email)
-	if err != nil {
-		return nil, err
-	}
-
-	// Set additional fields
+	var name *string
 	if input.Name != "" {
-		user.Name = &input.Name
+		name = &input.Name
 	}
 
-	// Hash password
-	hashedPassword, err := uc.passwordUtil.HashPassword(input.Password)
+	// Register user through AuthenticationService
+	user, token, err := uc.authService.RegisterUser(ctx, input.Username, input.Password, input.Email, name)
 	if err != nil {
 		return nil, err
-	}
-	user.UpdatePassword(hashedPassword)
-
-	// Activate user immediately (no email verification for now)
-	if err := user.Activate(); err != nil {
-		return nil, err
-	}
-
-	// Save user to repository
-	if err := uc.userRepo.Create(ctx, user); err != nil {
-		return nil, err
-	}
-
-	// Generate JWT token
-	token, err := uc.jwtUtil.GenerateToken(ctx, user.UserID)
-	if err != nil {
-		return nil, auth.ErrTokenGenerationFailed
 	}
 
 	return &RegisterUserOutput{
 		UserID: user.UserID,
 		Token:  token,
 	}, nil
-}
-
-func (uc *RegisterUserUseCase) validateInput(input RegisterUserInput) error {
-	if input.Username == "" {
-		return errors.New("username is required")
-	}
-	if len(input.Username) < 3 {
-		return errors.New("username must be at least 3 characters long")
-	}
-	if input.Password == "" {
-		return errors.New("password is required")
-	}
-	if len(input.Password) < 8 {
-		return auth.ErrPasswordTooWeak
-	}
-	if input.Email == "" {
-		return errors.New("email is required")
-	}
-	// Basic email validation
-	if !strings.Contains(input.Email, "@") || !strings.Contains(input.Email, ".") {
-		return errors.New("invalid email format")
-	}
-	return nil
 }

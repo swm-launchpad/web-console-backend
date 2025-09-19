@@ -2,10 +2,9 @@ package application
 
 import (
 	"context"
-	"errors"
 	"time"
 
-	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
 type GetUserInput struct {
@@ -24,23 +23,18 @@ type GetUserOutput struct {
 }
 
 type GetUserUseCase struct {
-	userRepo repository.UserRepository
+	userService service.UserService
 }
 
-func NewGetUserUseCase(userRepo repository.UserRepository) *GetUserUseCase {
+func NewGetUserUseCase(userService service.UserService) *GetUserUseCase {
 	return &GetUserUseCase{
-		userRepo: userRepo,
+		userService: userService,
 	}
 }
 
 func (uc *GetUserUseCase) Execute(ctx context.Context, input GetUserInput) (*GetUserOutput, error) {
-	// Validate input
-	if input.UserID == 0 {
-		return nil, errors.New("user ID is required")
-	}
-
-	// Find user by ID
-	user, err := uc.userRepo.FindByID(ctx, input.UserID)
+	// Get user through UserService
+	user, err := uc.userService.GetUserByID(ctx, input.UserID)
 	if err != nil {
 		return nil, err
 	}

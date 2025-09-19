@@ -14,6 +14,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
@@ -30,12 +31,14 @@ func InitializeApp() (*App, error) {
 		return nil, err
 	}
 	userRepository := infrastructure.NewUserRepository(db)
+	userService := service.NewUserService(userRepository)
 	jwtUtil := provideJWTUtil(configConfig)
 	passwordUtil := password.NewPasswordUtil()
-	registerUserUseCase := application.NewRegisterUserUseCase(userRepository, jwtUtil, passwordUtil)
-	loginUserUseCase := application.NewLoginUserUseCase(userRepository, jwtUtil, passwordUtil)
+	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
+	registerUserUseCase := application.NewRegisterUserUseCase(authService)
+	loginUserUseCase := application.NewLoginUserUseCase(authService)
 	authHandler := handler.NewAuthHandler(registerUserUseCase, loginUserUseCase)
-	getUserUseCase := application.NewGetUserUseCase(userRepository)
+	getUserUseCase := application.NewGetUserUseCase(userService)
 	userHandler := handler.NewUserHandler(getUserUseCase)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	router := NewRouter(configConfig, db, authHandler, userHandler, authMiddleware)
