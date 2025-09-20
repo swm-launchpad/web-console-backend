@@ -160,16 +160,20 @@ func TestJWTUtil_ValidateToken(t *testing.T) {
 		token, err := util.GenerateToken(ctx, userID)
 		require.NoError(t, err)
 
-		// 토큰 변조 (마지막 문자 변경)
-		tamperedToken := token[:len(token)-1] + "X"
+		// JWT 토큰의 서명 부분을 완전히 다른 값으로 교체
+		parts := strings.Split(token, ".")
+		require.Equal(t, 3, len(parts), "JWT should have 3 parts")
+
+		// 서명과 같은 길이의 잘못된 서명 생성
+		signature := parts[2]
+		tamperedSignature := strings.Repeat("X", len(signature))
+		tamperedToken := parts[0] + "." + parts[1] + "." + tamperedSignature
 
 		validatedUserID, err := util.ValidateToken(ctx, tamperedToken)
 
-		assert.Error(t, err)
+		assert.Error(t, err, "Tampered token should fail validation")
 		assert.Equal(t, uint(0), validatedUserID)
-		if err != nil {
-			assert.Contains(t, err.Error(), "invalid token")
-		}
+		assert.Contains(t, err.Error(), "invalid token")
 	})
 
 	t.Run("실패: UserID claim이 없는 토큰", func(t *testing.T) {
