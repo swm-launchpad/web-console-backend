@@ -15,7 +15,7 @@ var (
 	ErrInvalidUserData    = errors.New("invalid user data")
 	ErrUserNotActive      = errors.New("user is not active")
 	ErrCannotActivateUser = errors.New("cannot activate user")
-	ErrCannotDeleteUser   = errors.New("cannot activate deleted user") // TODO: Fix message - should be "cannot activate deleted user"
+	ErrCannotDeleteUser   = errors.New("cannot delete user")
 )
 
 // Authentication errors - errors related to user authentication and security
