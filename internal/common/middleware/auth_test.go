@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -12,9 +13,24 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	jwtService "github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 )
+
+// TestMain sets up the test environment
+func TestMain(m *testing.M) {
+	// Register auth errors for testing
+	response.RegisterError(auth.ErrInvalidToken, auth.CodeInvalidToken, http.StatusUnauthorized, "Invalid or expired token")
+	response.RegisterError(auth.ErrTokenExpired, auth.CodeTokenExpired, http.StatusUnauthorized, "Token has expired")
+	response.RegisterError(auth.ErrMissingAuthHeader, auth.CodeMissingAuthHeader, http.StatusUnauthorized, "Authorization header is required")
+	response.RegisterError(auth.ErrInvalidAuthFormat, auth.CodeInvalidAuthFormat, http.StatusUnauthorized, "Invalid authorization header format")
+	response.RegisterError(auth.ErrMissingToken, auth.CodeMissingToken, http.StatusUnauthorized, "Token is required")
+
+	// Run tests
+	code := m.Run()
+	os.Exit(code)
+}
 
 // testErrorResponse represents the error response structure for testing
 type testErrorResponse struct {
@@ -54,7 +70,7 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
-		assert.Equal(t, response.ErrCodeMissingAuthHeader, errResp.Error.Code)
+		assert.Equal(t, auth.CodeMissingAuthHeader, errResp.Error.Code)
 		assert.Equal(t, "Authorization header is required", errResp.Error.Message)
 	})
 
@@ -79,7 +95,7 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
-		assert.Equal(t, response.ErrCodeInvalidAuthFormat, errResp.Error.Code)
+		assert.Equal(t, auth.CodeInvalidAuthFormat, errResp.Error.Code)
 		assert.Equal(t, "Invalid authorization header format", errResp.Error.Message)
 	})
 
@@ -104,7 +120,7 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
-		assert.Equal(t, response.ErrCodeMissingToken, errResp.Error.Code)
+		assert.Equal(t, auth.CodeMissingToken, errResp.Error.Code)
 		assert.Equal(t, "Token is required", errResp.Error.Message)
 	})
 
@@ -129,7 +145,7 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
-		assert.Equal(t, response.ErrCodeInvalidToken, errResp.Error.Code)
+		assert.Equal(t, auth.CodeInvalidToken, errResp.Error.Code)
 		assert.Equal(t, "Invalid or expired token", errResp.Error.Message)
 	})
 
@@ -163,7 +179,7 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		err = json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
-		assert.Equal(t, response.ErrCodeInvalidToken, errResp.Error.Code)
+		assert.Equal(t, auth.CodeInvalidToken, errResp.Error.Code)
 		assert.Equal(t, "Invalid or expired token", errResp.Error.Message)
 	})
 
@@ -197,7 +213,7 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		err = json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
-		assert.Equal(t, response.ErrCodeInvalidToken, errResp.Error.Code)
+		assert.Equal(t, auth.CodeInvalidToken, errResp.Error.Code)
 		assert.Equal(t, "Invalid or expired token", errResp.Error.Message)
 	})
 

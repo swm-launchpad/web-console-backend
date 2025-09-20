@@ -40,3 +40,29 @@ var (
 	ErrUsernameExists = errors.New("username already exists")
 	ErrEmailExists    = errors.New("email already exists")
 )
+
+// Error codes for user domain
+const (
+	// User errors (USER_XXX)
+	CodeUserNotFound              = "USER_001"
+	CodeUserAlreadyExists         = "USER_002"
+	CodeInvalidUserID             = "USER_003"
+	CodeUserNotActive             = "USER_004"
+	CodeInvalidUserData           = "USER_005"
+	CodeCannotActivateDeletedUser = "USER_006"
+	CodeCannotDeleteUser          = "USER_007"
+
+	// Authentication errors - removed (use common/auth codes instead)
+	CodeInvalidCredentials = "UAUTH_001" // User-specific auth error
+	CodeWeakPassword       = "UAUTH_002" // User-specific auth error
+
+	// Validation errors (UVAL_XXX) - user domain specific
+	CodeUsernameRequired = "UVAL_001"
+	CodePasswordRequired = "UVAL_002"
+	CodeEmailRequired    = "UVAL_003"
+	CodeUsernameTooShort = "UVAL_004"
+	CodeInvalidEmail     = "UVAL_005"
+	CodeUsernameExists   = "UVAL_006"
+	CodeEmailExists      = "UVAL_007"
+	CodePasswordEmpty    = "UVAL_008"
+)

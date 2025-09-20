@@ -395,7 +395,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Check error response structure
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "VAL_002", errorData["code"])
+		assert.Equal(t, "COM_002", errorData["code"])
 		assert.Equal(t, "Invalid user ID format", errorData["message"])
 
 		// mockService should not be called

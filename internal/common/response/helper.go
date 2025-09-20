@@ -78,7 +78,7 @@ func ValidationError(c *gin.Context, fields map[string]interface{}) {
 	ErrorWithDetails(
 		c,
 		http.StatusBadRequest,
-		ErrCodeValidationFailed,
+		CodeValidationFailed,
 		"Validation failed",
 		fields,
 	)

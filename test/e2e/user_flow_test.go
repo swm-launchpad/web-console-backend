@@ -122,7 +122,7 @@ func TestUserFlow_E2E(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, errorResp["success"].(bool))
 		errorData := errorResp["error"].(map[string]interface{})
-		assert.Equal(t, "AUTH_001", errorData["code"])
+		assert.Equal(t, "UAUTH_001", errorData["code"])
 		assert.Equal(t, "Invalid username or password", errorData["message"])
 	})
 
@@ -152,7 +152,7 @@ func TestUserFlow_E2E(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, errorResp["success"].(bool))
 		errorData := errorResp["error"].(map[string]interface{})
-		assert.Equal(t, "USER_002", errorData["code"])
+		assert.Equal(t, "UVAL_006", errorData["code"]) // Username exists
 		assert.Contains(t, errorData["message"], "already exists")
 	})
 
@@ -182,7 +182,7 @@ func TestUserFlow_E2E(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, errorResp["success"].(bool))
 		errorData := errorResp["error"].(map[string]interface{})
-		assert.Equal(t, "USER_002", errorData["code"])
+		assert.Equal(t, "UVAL_007", errorData["code"]) // Email exists
 		assert.Contains(t, errorData["message"], "already exists")
 	})
 
