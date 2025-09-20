@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
 
 func TestUserService_CreateUser(t *testing.T) {
@@ -18,7 +19,7 @@ func TestUserService_CreateUser(t *testing.T) {
 
 	t.Run("성공: 유효한 사용자 생성", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		username := "testuser"
@@ -52,7 +53,7 @@ func TestUserService_CreateUser(t *testing.T) {
 
 	t.Run("성공: name 없이 사용자 생성", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		username := "testuser2"
@@ -78,7 +79,7 @@ func TestUserService_CreateUser(t *testing.T) {
 
 	t.Run("실패: 빈 username", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		// Act
@@ -94,7 +95,7 @@ func TestUserService_CreateUser(t *testing.T) {
 
 	t.Run("실패: 빈 email", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		// Act
@@ -110,7 +111,7 @@ func TestUserService_CreateUser(t *testing.T) {
 
 	t.Run("실패: repository 에러", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		username := "testuser"
@@ -132,7 +133,7 @@ func TestUserService_CreateUser(t *testing.T) {
 
 	t.Run("실패: 이미 존재하는 사용자", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		username := "existing"
@@ -158,7 +159,7 @@ func TestUserService_GetUserByID(t *testing.T) {
 
 	t.Run("성공: 유효한 ID로 사용자 조회", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		userID := uint(1)
@@ -183,7 +184,7 @@ func TestUserService_GetUserByID(t *testing.T) {
 
 	t.Run("실패: userID가 0", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		// Act
@@ -199,7 +200,7 @@ func TestUserService_GetUserByID(t *testing.T) {
 
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		userID := uint(999)
@@ -223,7 +224,7 @@ func TestUserService_GetUserByUsername(t *testing.T) {
 
 	t.Run("성공: 유효한 username으로 사용자 조회", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		username := "testuser"
@@ -248,7 +249,7 @@ func TestUserService_GetUserByUsername(t *testing.T) {
 
 	t.Run("실패: 빈 username", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		// Act
@@ -268,7 +269,7 @@ func TestUserService_GetUserByEmail(t *testing.T) {
 
 	t.Run("성공: 유효한 email로 사용자 조회", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		email := "test@example.com"
@@ -293,7 +294,7 @@ func TestUserService_GetUserByEmail(t *testing.T) {
 
 	t.Run("실패: 빈 email", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		// Act
@@ -313,7 +314,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 
 	t.Run("성공: 유효한 사용자 업데이트", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		user := &model.User{
@@ -338,7 +339,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 
 	t.Run("실패: nil user", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		// Act
@@ -353,7 +354,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 
 	t.Run("실패: userID가 0", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		user := &model.User{
@@ -378,7 +379,7 @@ func TestUserService_ActivateUser(t *testing.T) {
 
 	t.Run("성공: 사용자 활성화", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		userID := uint(1)
@@ -408,7 +409,7 @@ func TestUserService_ActivateUser(t *testing.T) {
 
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		userID := uint(999)
@@ -427,7 +428,7 @@ func TestUserService_ActivateUser(t *testing.T) {
 
 	t.Run("실패: 삭제된 사용자", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		userID := uint(1)
@@ -455,7 +456,7 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 
 	t.Run("성공: 활성 사용자", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		user := &model.User{
@@ -474,7 +475,7 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 
 	t.Run("실패: nil user", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		// Act
@@ -487,7 +488,7 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 
 	t.Run("실패: 비활성 사용자", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		user := &model.User{
@@ -507,7 +508,7 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 
 	t.Run("실패: 삭제된 사용자", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		user := &model.User{
@@ -531,7 +532,7 @@ func TestUserService_UpdatePassword(t *testing.T) {
 
 	t.Run("성공: 비밀번호 업데이트", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		userID := uint(1)
@@ -558,7 +559,7 @@ func TestUserService_UpdatePassword(t *testing.T) {
 
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		userID := uint(999)
@@ -581,7 +582,7 @@ func TestUserService_CheckUsernameAvailability(t *testing.T) {
 
 	t.Run("성공: username 사용 가능", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		username := "newuser"
@@ -599,7 +600,7 @@ func TestUserService_CheckUsernameAvailability(t *testing.T) {
 
 	t.Run("실패: 빈 username", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		// Act
@@ -614,7 +615,7 @@ func TestUserService_CheckUsernameAvailability(t *testing.T) {
 
 	t.Run("실패: username 이미 존재", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		username := "existinguser"
@@ -633,7 +634,7 @@ func TestUserService_CheckUsernameAvailability(t *testing.T) {
 
 	t.Run("실패: repository 에러", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		username := "testuser"
@@ -656,7 +657,7 @@ func TestUserService_CheckEmailAvailability(t *testing.T) {
 
 	t.Run("성공: email 사용 가능", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		email := "new@example.com"
@@ -674,7 +675,7 @@ func TestUserService_CheckEmailAvailability(t *testing.T) {
 
 	t.Run("실패: 빈 email", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		// Act
@@ -689,7 +690,7 @@ func TestUserService_CheckEmailAvailability(t *testing.T) {
 
 	t.Run("실패: email 이미 존재", func(t *testing.T) {
 		// Arrange
-		mockRepo := new(repository.MockUserRepository)
+		mockRepo := new(infrastructure.MockUserRepository)
 		service := NewUserService(mockRepo)
 
 		email := "existing@example.com"
