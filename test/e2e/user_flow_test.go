@@ -12,6 +12,9 @@ import (
 )
 
 func TestUserFlow_E2E(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping E2E test in short mode")
+	}
 
 	// 테스트 서버 설정
 	server := helper.SetupTestServer(t)
@@ -295,6 +298,9 @@ func TestUserFlow_E2E(t *testing.T) {
 }
 
 func TestPasswordSecurity_E2E(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping E2E test in short mode")
+	}
 
 	server := helper.SetupTestServer(t)
 	defer server.Cleanup()

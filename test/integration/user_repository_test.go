@@ -14,6 +14,9 @@ import (
 )
 
 func TestUserRepository_Integration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
 
 	// 테스트 DB 설정
 	testDB := helper.SetupTestDB(t)
