@@ -2,20 +2,20 @@ package service
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
-	domainerrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/error"
+	cerrors "github.com/swm-launchpad/web-console-backend/internal/common/errors"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 )
 
 var (
-	ErrInvalidCredentials = domainerrors.ErrInvalidCredentials
-	ErrWeakPassword       = domainerrors.ErrWeakPassword
-	ErrInvalidEmail       = domainerrors.ErrInvalidEmail
+	ErrInvalidCredentials = usererrors.ErrInvalidCredentials
+	ErrWeakPassword       = usererrors.ErrWeakPassword
+	ErrInvalidEmail       = usererrors.ErrInvalidEmail
 )
 
 // AuthService defines the interface for authentication-related business logic
@@ -66,17 +66,17 @@ func NewAuthService(
 func (s *authService) RegisterUser(ctx context.Context, username, plainPassword, email string, name *string) (*model.User, string, error) {
 	// Validate input
 	if err := s.ValidateRegistrationInput(username, plainPassword, email); err != nil {
-		return nil, "", err
+		return nil, "", cerrors.E(cerrors.Invalid, "AuthService.RegisterUser", err, nil)
 	}
 
 	// Check username availability
 	if err := s.userService.CheckUsernameAvailability(ctx, username); err != nil {
-		return nil, "", err
+		return nil, "", cerrors.E(cerrors.Conflict, "AuthService.RegisterUser", err, nil)
 	}
 
 	// Check email availability
 	if err := s.userService.CheckEmailAvailability(ctx, email); err != nil {
-		return nil, "", err
+		return nil, "", cerrors.E(cerrors.Conflict, "AuthService.RegisterUser", err, nil)
 	}
 
 	// Hash password
@@ -94,7 +94,7 @@ func (s *authService) RegisterUser(ctx context.Context, username, plainPassword,
 	// Generate token
 	token, err := s.GenerateToken(ctx, user.UserID)
 	if err != nil {
-		return nil, "", auth.ErrTokenGenerationFailed
+		return nil, "", cerrors.E(cerrors.Internal, "AuthService.RegisterUser", auth.ErrTokenGenerationFailed, nil)
 	}
 
 	return user, token, nil
@@ -104,32 +104,29 @@ func (s *authService) RegisterUser(ctx context.Context, username, plainPassword,
 func (s *authService) AuthenticateUser(ctx context.Context, username, plainPassword string) (*model.User, string, error) {
 	// Validate input
 	if err := s.ValidateLoginInput(username, plainPassword); err != nil {
-		return nil, "", err
+		return nil, "", cerrors.E(cerrors.Invalid, "AuthService.AuthenticateUser", err, nil)
 	}
 
 	// Get user by username
 	user, err := s.userService.GetUserByUsername(ctx, username)
 	if err != nil {
-		return nil, "", ErrInvalidCredentials
+		return nil, "", cerrors.E(cerrors.Unauthorized, "AuthService.AuthenticateUser", ErrInvalidCredentials, nil)
 	}
 
 	// Validate user credentials (check if active)
 	if err := s.userService.ValidateUserCredentials(ctx, user); err != nil {
-		if errors.Is(err, ErrUserNotActive) {
-			return nil, "", auth.ErrUserNotActive
-		}
-		return nil, "", err
+		return nil, "", cerrors.E(cerrors.Forbidden, "AuthService.AuthenticateUser", err, nil)
 	}
 
 	// Verify password
 	if err := s.VerifyPassword(user.PasswordHash, plainPassword); err != nil {
-		return nil, "", ErrInvalidCredentials
+		return nil, "", cerrors.E(cerrors.Unauthorized, "AuthService.AuthenticateUser", ErrInvalidCredentials, nil)
 	}
 
 	// Generate token
 	token, err := s.GenerateToken(ctx, user.UserID)
 	if err != nil {
-		return nil, "", auth.ErrTokenGenerationFailed
+		return nil, "", cerrors.E(cerrors.Internal, "AuthService.RegisterUser", auth.ErrTokenGenerationFailed, nil)
 	}
 
 	return user, token, nil
@@ -139,15 +136,15 @@ func (s *authService) AuthenticateUser(ctx context.Context, username, plainPassw
 func (s *authService) ValidateRegistrationInput(username, plainPassword, email string) error {
 	// Validate username
 	if username == "" {
-		return domainerrors.ErrUsernameRequired
+		return usererrors.ErrUsernameRequired
 	}
 	if len(username) < 3 {
-		return domainerrors.ErrUsernameTooShort
+		return usererrors.ErrUsernameTooShort
 	}
 
 	// Validate password
 	if plainPassword == "" {
-		return domainerrors.ErrPasswordRequired
+		return usererrors.ErrPasswordRequired
 	}
 	if len(plainPassword) < 8 {
 		return ErrWeakPassword
@@ -155,7 +152,7 @@ func (s *authService) ValidateRegistrationInput(username, plainPassword, email s
 
 	// Validate email
 	if email == "" {
-		return domainerrors.ErrEmailRequired
+		return usererrors.ErrEmailRequired
 	}
 	// Basic email validation
 	if !strings.Contains(email, "@") || !strings.Contains(email, ".") {
@@ -168,10 +165,10 @@ func (s *authService) ValidateRegistrationInput(username, plainPassword, email s
 // ValidateLoginInput validates user login input
 func (s *authService) ValidateLoginInput(username, plainPassword string) error {
 	if username == "" {
-		return domainerrors.ErrUsernameRequired
+		return usererrors.ErrUsernameRequired
 	}
 	if plainPassword == "" {
-		return domainerrors.ErrPasswordRequired
+		return usererrors.ErrPasswordRequired
 	}
 	return nil
 }
@@ -179,7 +176,7 @@ func (s *authService) ValidateLoginInput(username, plainPassword string) error {
 // GenerateToken generates a JWT token for the user
 func (s *authService) GenerateToken(ctx context.Context, userID uint) (string, error) {
 	if userID == 0 {
-		return "", domainerrors.ErrInvalidUserID
+		return "", usererrors.ErrInvalidUserID
 	}
 	return s.jwtUtil.GenerateToken(ctx, userID)
 }
@@ -187,7 +184,7 @@ func (s *authService) GenerateToken(ctx context.Context, userID uint) (string, e
 // HashPassword hashes a plain text password
 func (s *authService) HashPassword(plainPassword string) (string, error) {
 	if plainPassword == "" {
-		return "", domainerrors.ErrPasswordEmpty
+		return "", usererrors.ErrPasswordEmpty
 	}
 	return s.passwordUtil.HashPassword(plainPassword)
 }

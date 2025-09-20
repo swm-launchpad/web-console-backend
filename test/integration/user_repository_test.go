@@ -2,13 +2,14 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
-	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/test/helper"
 )
@@ -178,12 +179,12 @@ func TestUserRepository_Integration(t *testing.T) {
 
 		// Verify soft delete - deleted user should not be found
 		deletedUser, err := userRepo.FindByID(ctx, user.UserID)
-		assert.Equal(t, repository.ErrUserNotFound, err)
+		assert.True(t, errors.Is(err, usererrors.ErrUserNotFound))
 		assert.Nil(t, deletedUser)
 
 		// Verify deleted user is not found by username either
 		deletedUser, err = userRepo.FindByUsername(ctx, "deleteuser")
-		assert.Equal(t, repository.ErrUserNotFound, err)
+		assert.True(t, errors.Is(err, usererrors.ErrUserNotFound))
 		assert.Nil(t, deletedUser)
 	})
 
@@ -286,7 +287,7 @@ func TestUserRepository_Integration(t *testing.T) {
 
 		// Then - Verify user doesn't exist after rollback
 		foundAfterRollback, err := userRepo.FindByUsername(ctx, "txuser")
-		assert.Equal(t, repository.ErrUserNotFound, err)
+		assert.True(t, errors.Is(err, usererrors.ErrUserNotFound))
 		assert.Nil(t, foundAfterRollback)
 	})
 
@@ -320,7 +321,7 @@ func TestUserRepository_Integration(t *testing.T) {
 
 		// Then
 		assert.Error(t, err)
-		assert.Equal(t, repository.ErrUserAlreadyExists, err)
+		assert.True(t, errors.Is(err, usererrors.ErrUserAlreadyExists))
 	})
 
 	t.Run("Update Non-existent User", func(t *testing.T) {
@@ -338,6 +339,6 @@ func TestUserRepository_Integration(t *testing.T) {
 
 		// Then
 		assert.Error(t, err)
-		assert.Equal(t, repository.ErrUserNotFound, err)
+		assert.True(t, errors.Is(err, usererrors.ErrUserNotFound))
 	})
 }

@@ -1,6 +1,7 @@
+# AI tools
 .claude
 
-# macOS
+# OS specific
 .DS_Store
 *.DS_Store
 
@@ -9,7 +10,7 @@
 .env.local
 .env.test
 
-# Binary
+# Binary files
 *.exe
 *.dll
 *.so
@@ -17,6 +18,8 @@
 *.test
 *.out
 main
+/server
+cmd/server/server
 
 # Dependencies
 vendor/
@@ -34,4 +37,3 @@ tmp/
 # Test coverage
 coverage.out
 coverage.html
-cmd/server/server

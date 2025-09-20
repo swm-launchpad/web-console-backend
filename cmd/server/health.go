@@ -20,7 +20,7 @@ func NewHealthHandler(database *sql.DB) *HealthHandler {
 func (h *HealthHandler) Health(c *gin.Context) {
 	// Check database connection
 	if err := h.db.Ping(); err != nil {
-		response.ErrorWithDetails(c, 503, response.ErrCodeDatabaseError, "Service unhealthy", map[string]interface{}{
+		response.ErrorWithDetails(c, 503, "DATABASE_ERROR", "Service unhealthy", map[string]interface{}{
 			"status":   "unhealthy",
 			"database": "disconnected",
 		})

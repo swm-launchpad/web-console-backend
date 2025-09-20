@@ -78,7 +78,7 @@ func ValidationError(c *gin.Context, fields map[string]interface{}) {
 	ErrorWithDetails(
 		c,
 		http.StatusBadRequest,
-		CodeValidationFailed,
+		"VALIDATION_FAILED",
 		"Validation failed",
 		fields,
 	)
@@ -86,12 +86,18 @@ func ValidationError(c *gin.Context, fields map[string]interface{}) {
 
 // HandleError translates a domain error and sends appropriate response
 func HandleError(c *gin.Context, err error) {
-	status, code, message := TranslateError(err)
+	status, code, message := TranslateError(err, nil)
+	Error(c, status, code, message)
+}
+
+// HandleErrorWithMapper translates a domain error using a custom error mapper
+func HandleErrorWithMapper(c *gin.Context, err error, errorMapper func(error) (string, bool)) {
+	status, code, message := TranslateError(err, errorMapper)
 	Error(c, status, code, message)
 }
 
 // HandleErrorWithMessage translates a domain error but uses a custom message
 func HandleErrorWithMessage(c *gin.Context, err error, customMessage string) {
-	status, code, _ := TranslateError(err)
+	status, code, _ := TranslateError(err, nil)
 	Error(c, status, code, customMessage)
 }

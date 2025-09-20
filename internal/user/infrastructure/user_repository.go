@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	cerrors "github.com/swm-launchpad/web-console-backend/internal/common/errors"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
@@ -43,9 +45,9 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 	if err != nil {
 		// Check for duplicate username or email
 		if isDuplicateError(err) {
-			return repository.ErrUserAlreadyExists
+			return cerrors.E(cerrors.Conflict, "UserRepo.Create", usererrors.ErrUserAlreadyExists, nil)
 		}
-		return err
+		return cerrors.E(cerrors.Unavailable, "UserRepo.Create", err, nil)
 	}
 
 	// Get the auto-generated ID
@@ -75,16 +77,16 @@ func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 
 	result, err := r.queriesWithContext(ctx).UpdateUser(ctx, params)
 	if err != nil {
-		return err
+		return cerrors.E(cerrors.Unavailable, "UserRepo.Update", err, nil)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return cerrors.E(cerrors.Internal, "UserRepo.Update", err, nil)
 	}
 
 	if rowsAffected == 0 {
-		return repository.ErrUserNotFound
+		return cerrors.E(cerrors.NotFound, "UserRepo.Update", usererrors.ErrUserNotFound, nil)
 	}
 
 	return nil
@@ -94,9 +96,9 @@ func (r *userRepository) FindByID(ctx context.Context, userID uint) (*model.User
 	sqlcUser, err := r.queriesWithContext(ctx).GetUserByID(ctx, uint32(userID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, repository.ErrUserNotFound
+			return nil, cerrors.E(cerrors.NotFound, "UserRepo.FindByID", usererrors.ErrUserNotFound, nil)
 		}
-		return nil, err
+		return nil, cerrors.E(cerrors.Unavailable, "UserRepo.FindByID", err, nil)
 	}
 
 	return toDomainUser(
@@ -120,9 +122,9 @@ func (r *userRepository) FindByUsername(ctx context.Context, username string) (*
 	sqlcUser, err := r.queriesWithContext(ctx).GetUserByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, repository.ErrUserNotFound
+			return nil, cerrors.E(cerrors.NotFound, "UserRepo.FindByUsername", usererrors.ErrUserNotFound, nil)
 		}
-		return nil, err
+		return nil, cerrors.E(cerrors.Unavailable, "UserRepo.FindByUsername", err, nil)
 	}
 
 	return toDomainUser(
@@ -146,9 +148,9 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*model.
 	sqlcUser, err := r.queriesWithContext(ctx).GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, repository.ErrUserNotFound
+			return nil, cerrors.E(cerrors.NotFound, "UserRepo.FindByEmail", usererrors.ErrUserNotFound, nil)
 		}
-		return nil, err
+		return nil, cerrors.E(cerrors.Unavailable, "UserRepo.FindByEmail", err, nil)
 	}
 
 	return toDomainUser(
@@ -178,16 +180,16 @@ func (r *userRepository) Delete(ctx context.Context, userID uint) error {
 
 	result, err := r.queriesWithContext(ctx).DeleteUser(ctx, params)
 	if err != nil {
-		return err
+		return cerrors.E(cerrors.Unavailable, "UserRepo.Delete", err, nil)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return err
+		return cerrors.E(cerrors.Internal, "UserRepo.Delete", err, nil)
 	}
 
 	if rowsAffected == 0 {
-		return repository.ErrUserNotFound
+		return cerrors.E(cerrors.NotFound, "UserRepo.Delete", usererrors.ErrUserNotFound, nil)
 	}
 
 	return nil

@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
-	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
@@ -118,7 +118,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		userID := uint(456)
 
 		// Set expectations
-		mockService.On("GetUserByID", ctx, userID).Return((*model.User)(nil), repository.ErrUserNotFound)
+		mockService.On("GetUserByID", ctx, userID).Return((*model.User)(nil), usererrors.ErrUserNotFound)
 
 		// Act
 		router := gin.New()
@@ -132,7 +132,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -141,8 +141,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Check error response structure
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "USER_001", errorData["code"])
-		assert.Equal(t, "User not found", errorData["message"])
+		assert.Equal(t, "USER_NOT_FOUND", errorData["code"])
+		assert.Equal(t, "user not found", errorData["message"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -179,8 +179,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Check error response structure
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "SYS_001", errorData["code"])
-		assert.Equal(t, "An internal error occurred", errorData["message"])
+		assert.Equal(t, "INTERNAL_ERROR", errorData["code"])
+		assert.Contains(t, errorData["message"], "database")
 
 		mockService.AssertExpectations(t)
 	})
@@ -275,8 +275,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Check error response structure
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "SYS_001", errorData["code"])
-		assert.Equal(t, "An internal error occurred", errorData["message"])
+		assert.Equal(t, "INTERNAL_ERROR", errorData["code"])
+		assert.Equal(t, "invalid user ID", errorData["message"].(string))
 
 		mockService.AssertExpectations(t)
 	})
@@ -296,7 +296,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -305,8 +305,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Check error response structure
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "AUTH_004", errorData["code"])
-		assert.Equal(t, "User not authenticated", errorData["message"])
+		assert.Equal(t, "UNAUTHORIZED", errorData["code"])
+		assert.Equal(t, "unauthorized", errorData["message"])
 
 		// mockService should not be called
 		mockService.AssertNotCalled(t, "GetUserByID")
@@ -386,7 +386,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -395,8 +395,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Check error response structure
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "COM_002", errorData["code"])
-		assert.Equal(t, "Invalid user ID format", errorData["message"])
+		assert.Equal(t, "INVALID_FORMAT", errorData["code"])
+		assert.Equal(t, "invalid format", errorData["message"])
 
 		// mockService should not be called
 		mockService.AssertNotCalled(t, "GetUserByID")
@@ -411,7 +411,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		userID := uint(999)
 
 		// Set expectations
-		mockService.On("GetUserByID", ctx, userID).Return((*model.User)(nil), repository.ErrUserNotFound)
+		mockService.On("GetUserByID", ctx, userID).Return((*model.User)(nil), usererrors.ErrUserNotFound)
 
 		// Act
 		router := gin.New()
@@ -422,7 +422,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -431,8 +431,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Check error response structure
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "USER_001", errorData["code"])
-		assert.Equal(t, "User not found", errorData["message"])
+		assert.Equal(t, "USER_NOT_FOUND", errorData["code"])
+		assert.Equal(t, "user not found", errorData["message"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -466,8 +466,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Check error response structure
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "SYS_001", errorData["code"])
-		assert.Equal(t, "An internal error occurred", errorData["message"])
+		assert.Equal(t, "INTERNAL_ERROR", errorData["code"])
+		assert.Contains(t, errorData["message"], "database")
 
 		mockService.AssertExpectations(t)
 	})

@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
-	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
@@ -191,7 +191,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		}
 
 		// Set expectations
-		mockService.On("GetUserByID", ctx, userID).Return((*model.User)(nil), repository.ErrUserNotFound)
+		mockService.On("GetUserByID", ctx, userID).Return((*model.User)(nil), usererrors.ErrUserNotFound)
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -199,7 +199,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, output)
-		assert.Equal(t, repository.ErrUserNotFound, err)
+		assert.Equal(t, usererrors.ErrUserNotFound, err)
 
 		mockService.AssertExpectations(t)
 	})

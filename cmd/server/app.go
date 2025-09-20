@@ -30,10 +30,6 @@ func NewApp(cfg *config.Config, database *sql.DB, r *Router) *App {
 }
 
 func (a *App) Start() error {
-	// Initialize error registry
-	initializeErrorRegistry()
-	log.Println("Error registry initialized")
-
 	// Setup routes
 	a.Router.Setup()
 

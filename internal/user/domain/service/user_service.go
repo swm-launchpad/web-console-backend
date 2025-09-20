@@ -2,17 +2,16 @@ package service
 
 import (
 	"context"
-	"errors"
 	"time"
 
-	domainerrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/error"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 var (
-	ErrInvalidUserData = domainerrors.ErrInvalidUserData
-	ErrUserNotActive   = domainerrors.ErrUserNotActive
+	ErrInvalidUserData = usererrors.ErrInvalidUserData
+	ErrUserNotActive   = usererrors.ErrUserNotActive
 )
 
 // UserService defines the interface for user-related business logic
@@ -83,9 +82,6 @@ func (s *userService) CreateUser(ctx context.Context, username, email string, pa
 
 	// Save to repository
 	if err := s.userRepo.Create(ctx, user); err != nil {
-		if errors.Is(err, repository.ErrUserAlreadyExists) {
-			return nil, err
-		}
 		return nil, err
 	}
 
@@ -183,7 +179,7 @@ func (s *userService) CheckUsernameAvailability(ctx context.Context, username st
 	}
 
 	if exists {
-		return domainerrors.ErrUsernameExists
+		return usererrors.ErrUsernameExists
 	}
 
 	return nil
@@ -201,7 +197,7 @@ func (s *userService) CheckEmailAvailability(ctx context.Context, email string) 
 	}
 
 	if exists {
-		return domainerrors.ErrEmailExists
+		return usererrors.ErrEmailExists
 	}
 
 	return nil

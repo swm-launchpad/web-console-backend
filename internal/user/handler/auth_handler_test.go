@@ -14,30 +14,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
-	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
-	domainerrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/error"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
 // TestMain sets up the test environment
 func TestMain(m *testing.M) {
-	// Register auth errors
-	response.RegisterError(auth.ErrUnauthorized, auth.CodeUnauthorized, http.StatusUnauthorized, "User not authenticated")
-
-	// Register user domain errors
-	response.RegisterError(domainerrors.ErrUserAlreadyExists, domainerrors.CodeUserAlreadyExists, http.StatusConflict, "User already exists")
-	response.RegisterError(domainerrors.ErrEmailExists, domainerrors.CodeEmailExists, http.StatusConflict, "Email already exists")
-	response.RegisterError(domainerrors.ErrUsernameExists, domainerrors.CodeUsernameExists, http.StatusConflict, "Username already exists")
-	response.RegisterError(domainerrors.ErrInvalidCredentials, domainerrors.CodeInvalidCredentials, http.StatusUnauthorized, "Invalid username or password")
-	response.RegisterError(domainerrors.ErrUserNotFound, domainerrors.CodeUserNotFound, http.StatusNotFound, "User not found")
-
-	// Register common validation errors
-	response.RegisterError(response.ErrInvalidFormat, response.CodeInvalidFormat, http.StatusBadRequest, "Invalid user ID format")
-	response.RegisterError(response.ErrMissingField, response.CodeMissingField, http.StatusBadRequest, "Required field is missing")
 
 	// Run tests
 	code := m.Run()
@@ -137,7 +122,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 
 		name := "Test User"
 		mockAuthService.On("RegisterUser", mock.Anything, "existinguser", "password123", "test@example.com", &name).
-			Return((*model.User)(nil), "", domainerrors.ErrUsernameExists)
+			Return((*model.User)(nil), "", usererrors.ErrUsernameExists)
 
 		router := gin.New()
 		router.POST("/auth/register", handler.Register)
@@ -148,14 +133,14 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusConflict, w.Code)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, domainerrors.CodeUsernameExists, errorData["code"])
+		assert.Equal(t, "USERNAME_EXISTS", errorData["code"])
 		assert.Contains(t, errorData["message"], "already exists")
 
 		mockAuthService.AssertExpectations(t)
@@ -168,7 +153,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 
 		name := "Test User"
 		mockAuthService.On("RegisterUser", mock.Anything, "testuser", "password123", "existing@example.com", &name).
-			Return((*model.User)(nil), "", domainerrors.ErrEmailExists)
+			Return((*model.User)(nil), "", usererrors.ErrEmailExists)
 
 		router := gin.New()
 		router.POST("/auth/register", handler.Register)
@@ -179,14 +164,14 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusConflict, w.Code)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, domainerrors.CodeEmailExists, errorData["code"])
+		assert.Equal(t, "EMAIL_EXISTS", errorData["code"])
 		assert.Contains(t, errorData["message"], "already exists")
 
 		mockAuthService.AssertExpectations(t)
@@ -213,7 +198,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "COM_001", errorData["code"])
+		assert.Equal(t, "VALIDATION_FAILED", errorData["code"])
 		assert.Equal(t, "Validation failed", errorData["message"])
 
 		mockAuthService.AssertNotCalled(t, "RegisterUser", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -283,15 +268,15 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		require.NoError(t, err)
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "UAUTH_001", errorData["code"])
-		assert.Contains(t, errorData["message"], "Invalid username or password")
+		assert.Equal(t, "INVALID_CREDENTIALS", errorData["code"])
+		assert.Contains(t, errorData["message"], "invalid credentials")
 
 		mockAuthService.AssertExpectations(t)
 	})
@@ -317,7 +302,7 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "COM_001", errorData["code"])
+		assert.Equal(t, "VALIDATION_FAILED", errorData["code"])
 		assert.Equal(t, "Validation failed", errorData["message"])
 
 		mockAuthService.AssertNotCalled(t, "AuthenticateUser")

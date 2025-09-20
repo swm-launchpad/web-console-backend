@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -126,7 +125,7 @@ func getEnv(key, defaultValue string) string {
 func (c *Config) Validate() error {
 	// Check required fields
 	if c.JWT.Secret == "" {
-		return errors.New("JWT_SECRET is required")
+		return ErrMissingJWTSecret
 	}
 
 	return nil

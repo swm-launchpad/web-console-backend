@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
-	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
 
@@ -140,7 +140,7 @@ func TestUserService_CreateUser(t *testing.T) {
 		email := "existing@example.com"
 		passwordHash := "hashed_password"
 
-		mockRepo.On("Create", ctx, mock.Anything).Return(repository.ErrUserAlreadyExists)
+		mockRepo.On("Create", ctx, mock.Anything).Return(usererrors.ErrUserAlreadyExists)
 
 		// Act
 		user, err := service.CreateUser(ctx, username, email, passwordHash, nil)
@@ -148,7 +148,7 @@ func TestUserService_CreateUser(t *testing.T) {
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.Equal(t, repository.ErrUserAlreadyExists, err)
+		assert.Equal(t, usererrors.ErrUserAlreadyExists, err)
 
 		mockRepo.AssertExpectations(t)
 	})
@@ -205,7 +205,7 @@ func TestUserService_GetUserByID(t *testing.T) {
 
 		userID := uint(999)
 
-		mockRepo.On("FindByID", ctx, userID).Return((*model.User)(nil), repository.ErrUserNotFound)
+		mockRepo.On("FindByID", ctx, userID).Return((*model.User)(nil), usererrors.ErrUserNotFound)
 
 		// Act
 		user, err := service.GetUserByID(ctx, userID)
@@ -213,7 +213,7 @@ func TestUserService_GetUserByID(t *testing.T) {
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.Equal(t, repository.ErrUserNotFound, err)
+		assert.Equal(t, usererrors.ErrUserNotFound, err)
 
 		mockRepo.AssertExpectations(t)
 	})
@@ -414,14 +414,14 @@ func TestUserService_ActivateUser(t *testing.T) {
 
 		userID := uint(999)
 
-		mockRepo.On("FindByID", ctx, userID).Return((*model.User)(nil), repository.ErrUserNotFound)
+		mockRepo.On("FindByID", ctx, userID).Return((*model.User)(nil), usererrors.ErrUserNotFound)
 
 		// Act
 		err := service.ActivateUser(ctx, userID)
 
 		// Assert
 		assert.Error(t, err)
-		assert.Equal(t, repository.ErrUserNotFound, err)
+		assert.Equal(t, usererrors.ErrUserNotFound, err)
 
 		mockRepo.AssertExpectations(t)
 	})
@@ -564,14 +564,14 @@ func TestUserService_UpdatePassword(t *testing.T) {
 
 		userID := uint(999)
 
-		mockRepo.On("FindByID", ctx, userID).Return((*model.User)(nil), repository.ErrUserNotFound)
+		mockRepo.On("FindByID", ctx, userID).Return((*model.User)(nil), usererrors.ErrUserNotFound)
 
 		// Act
 		err := service.UpdatePassword(ctx, userID, "new_password")
 
 		// Assert
 		assert.Error(t, err)
-		assert.Equal(t, repository.ErrUserNotFound, err)
+		assert.Equal(t, usererrors.ErrUserNotFound, err)
 
 		mockRepo.AssertExpectations(t)
 	})

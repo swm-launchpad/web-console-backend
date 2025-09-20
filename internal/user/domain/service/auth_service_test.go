@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
@@ -108,7 +107,7 @@ func TestAuthService_RegisterUser(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		assert.Empty(t, token)
-		assert.Equal(t, ErrWeakPassword, err)
+		assert.True(t, errors.Is(err, ErrWeakPassword))
 	})
 
 	t.Run("실패: 잘못된 이메일 형식", func(t *testing.T) {
@@ -126,7 +125,7 @@ func TestAuthService_RegisterUser(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		assert.Empty(t, token)
-		assert.Equal(t, ErrInvalidEmail, err)
+		assert.True(t, errors.Is(err, ErrInvalidEmail))
 	})
 
 	t.Run("실패: username 이미 존재", func(t *testing.T) {
@@ -276,7 +275,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		assert.Empty(t, token)
-		assert.Equal(t, ErrInvalidCredentials, err)
+		assert.True(t, errors.Is(err, ErrInvalidCredentials))
 
 		mockUserService.AssertExpectations(t)
 	})
@@ -307,7 +306,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, resultUser)
 		assert.Empty(t, token)
-		assert.Equal(t, auth.ErrUserNotActive, err)
+		assert.True(t, errors.Is(err, ErrUserNotActive))
 
 		mockUserService.AssertExpectations(t)
 	})
@@ -344,7 +343,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, resultUser)
 		assert.Empty(t, token)
-		assert.Equal(t, ErrInvalidCredentials, err)
+		assert.True(t, errors.Is(err, ErrInvalidCredentials))
 
 		mockUserService.AssertExpectations(t)
 	})
@@ -379,7 +378,7 @@ func TestAuthService_ValidateRegistrationInput(t *testing.T) {
 	t.Run("실패: 짧은 password", func(t *testing.T) {
 		err := service.ValidateRegistrationInput("testuser", "pass", "test@example.com")
 		assert.Error(t, err)
-		assert.Equal(t, ErrWeakPassword, err)
+		assert.True(t, errors.Is(err, ErrWeakPassword))
 	})
 
 	t.Run("실패: 빈 email", func(t *testing.T) {
@@ -391,13 +390,13 @@ func TestAuthService_ValidateRegistrationInput(t *testing.T) {
 	t.Run("실패: 잘못된 email 형식 - @ 없음", func(t *testing.T) {
 		err := service.ValidateRegistrationInput("testuser", "password123", "test.example.com")
 		assert.Error(t, err)
-		assert.Equal(t, ErrInvalidEmail, err)
+		assert.True(t, errors.Is(err, ErrInvalidEmail))
 	})
 
 	t.Run("실패: 잘못된 email 형식 - . 없음", func(t *testing.T) {
 		err := service.ValidateRegistrationInput("testuser", "password123", "test@example")
 		assert.Error(t, err)
-		assert.Equal(t, ErrInvalidEmail, err)
+		assert.True(t, errors.Is(err, ErrInvalidEmail))
 	})
 }
 
@@ -532,7 +531,7 @@ func TestAuthService_VerifyPassword(t *testing.T) {
 
 		// Assert
 		assert.Error(t, err)
-		assert.Equal(t, ErrInvalidCredentials, err)
+		assert.True(t, errors.Is(err, ErrInvalidCredentials))
 	})
 
 	t.Run("실패: 빈 plainPassword", func(t *testing.T) {
@@ -548,7 +547,7 @@ func TestAuthService_VerifyPassword(t *testing.T) {
 
 		// Assert
 		assert.Error(t, err)
-		assert.Equal(t, ErrInvalidCredentials, err)
+		assert.True(t, errors.Is(err, ErrInvalidCredentials))
 	})
 
 	t.Run("실패: 잘못된 비밀번호", func(t *testing.T) {

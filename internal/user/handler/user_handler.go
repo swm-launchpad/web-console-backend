@@ -7,6 +7,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 )
 
 type UserHandler struct {
@@ -36,7 +37,7 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	// Get user ID from context (set by auth middleware)
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
-		response.HandleError(c, auth.ErrUnauthorized)
+		RespondWithError(c, auth.ErrUnauthorized)
 		return
 	}
 
@@ -46,7 +47,7 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 
 	output, err := h.getUserUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		response.HandleError(c, err)
+		RespondWithError(c, err)
 		return
 	}
 
@@ -68,13 +69,13 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 func (h *UserHandler) GetUserByID(c *gin.Context) {
 	userIDStr := c.Param("id")
 	if userIDStr == "" {
-		response.HandleError(c, response.ErrMissingField)
+		RespondWithError(c, usererrors.ErrMissingField)
 		return
 	}
 
 	userID, err := strconv.ParseUint(userIDStr, 10, 32)
 	if err != nil {
-		response.HandleError(c, response.ErrInvalidFormat)
+		RespondWithError(c, usererrors.ErrInvalidFormat)
 		return
 	}
 
@@ -84,7 +85,7 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 
 	output, err := h.getUserUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		response.HandleError(c, err)
+		RespondWithError(c, err)
 		return
 	}
 
