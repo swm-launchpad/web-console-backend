@@ -11,9 +11,8 @@ import (
 )
 
 var (
-	ErrInvalidUserData    = domainerrors.ErrInvalidUserData
-	ErrUserNotActive      = domainerrors.ErrUserNotActive
-	ErrCannotActivateUser = domainerrors.ErrCannotActivateUser
+	ErrInvalidUserData = domainerrors.ErrInvalidUserData
+	ErrUserNotActive   = domainerrors.ErrUserNotActive
 )
 
 // UserService defines the interface for user-related business logic
@@ -79,7 +78,7 @@ func (s *userService) CreateUser(ctx context.Context, username, email string, pa
 
 	// Activate user immediately (no email verification for now)
 	if err := user.Activate(); err != nil {
-		return nil, ErrCannotActivateUser
+		return nil, err
 	}
 
 	// Save to repository

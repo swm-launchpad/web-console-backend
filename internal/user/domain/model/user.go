@@ -56,7 +56,7 @@ func (u *User) IsActive() bool {
 
 func (u *User) Activate() error {
 	if u.IsDeleted {
-		return domainerrors.ErrCannotDeleteUser
+		return domainerrors.ErrCannotActivateDeletedUser
 	}
 	u.Status = UserStatusActive
 	now := time.Now()
