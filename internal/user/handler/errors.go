@@ -2,75 +2,62 @@ package handler
 
 import (
 	"errors"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 )
 
-// RespondWithError handles error with user domain error mapping
-func RespondWithError(c *gin.Context, err error) {
-	response.HandleErrorWithMapper(c, err, MapUserErrorCode)
-}
+// UserErrorMap provides mapping from user domain errors to response information
+var UserErrorMap = map[error]response.ErrorMapping{
+	// Repository errors
+	usererrors.ErrUserNotFound:      {StatusCode: http.StatusNotFound, Code: "USER_NOT_FOUND", Message: "User not found"},
+	usererrors.ErrUserAlreadyExists: {StatusCode: http.StatusConflict, Code: "USER_ALREADY_EXISTS", Message: "User already exists"},
 
-// RespondWithErrorMessage handles error with custom message
-func RespondWithErrorMessage(c *gin.Context, err error, customMessage string) {
-	status, code, _ := response.TranslateError(err, MapUserErrorCode)
-	response.Error(c, status, code, customMessage)
-}
-
-// MapUserErrorCode maps user domain errors to API error codes
-func MapUserErrorCode(err error) (string, bool) {
-	switch {
-	// User domain errors
-	case errors.Is(err, usererrors.ErrUserNotFound):
-		return "USER_NOT_FOUND", true
-	case errors.Is(err, usererrors.ErrUserAlreadyExists):
-		return "USER_ALREADY_EXISTS", true
-	case errors.Is(err, usererrors.ErrInvalidUserData):
-		return "INVALID_USER_DATA", true
-	case errors.Is(err, usererrors.ErrUserNotActive):
-		return "USER_NOT_ACTIVE", true
-	case errors.Is(err, usererrors.ErrCannotActivateDeletedUser):
-		return "CANNOT_ACTIVATE_DELETED_USER", true
-	case errors.Is(err, usererrors.ErrCannotDeleteUser):
-		return "CANNOT_DELETE_USER", true
+	// Domain errors
+	usererrors.ErrInvalidUserData:           {StatusCode: http.StatusBadRequest, Code: "INVALID_USER_DATA", Message: "Invalid user data"},
+	usererrors.ErrUserNotActive:             {StatusCode: http.StatusForbidden, Code: "USER_NOT_ACTIVE", Message: "User is not active"},
+	usererrors.ErrCannotActivateDeletedUser: {StatusCode: http.StatusBadRequest, Code: "CANNOT_ACTIVATE_DELETED_USER", Message: "Cannot activate deleted user"},
+	usererrors.ErrCannotDeleteUser:          {StatusCode: http.StatusBadRequest, Code: "CANNOT_DELETE_USER", Message: "Cannot delete user"},
 
 	// Authentication errors
-	case errors.Is(err, usererrors.ErrInvalidCredentials):
-		return "INVALID_CREDENTIALS", true
-	case errors.Is(err, usererrors.ErrWeakPassword):
-		return "WEAK_PASSWORD", true
-	case errors.Is(err, usererrors.ErrInvalidEmail):
-		return "INVALID_EMAIL", true
+	usererrors.ErrInvalidCredentials: {StatusCode: http.StatusUnauthorized, Code: "INVALID_CREDENTIALS", Message: "Invalid credentials"},
+	usererrors.ErrWeakPassword:       {StatusCode: http.StatusBadRequest, Code: "WEAK_PASSWORD", Message: "Password is too weak"},
+	usererrors.ErrInvalidEmail:       {StatusCode: http.StatusBadRequest, Code: "INVALID_EMAIL", Message: "Invalid email format"},
+
+	// Infrastructure errors
+	usererrors.ErrDatabaseUnavailable:   {StatusCode: http.StatusServiceUnavailable, Code: "DATABASE_UNAVAILABLE", Message: "Database unavailable"},
+	usererrors.ErrDatabaseOperation:     {StatusCode: http.StatusInternalServerError, Code: "DATABASE_OPERATION_FAILED", Message: "Database operation failed"},
+	usererrors.ErrTokenGenerationFailed: {StatusCode: http.StatusInternalServerError, Code: "TOKEN_GENERATION_FAILED", Message: "Failed to generate token"},
 
 	// Validation errors
-	case errors.Is(err, usererrors.ErrUsernameRequired):
-		return "USERNAME_REQUIRED", true
-	case errors.Is(err, usererrors.ErrPasswordRequired):
-		return "PASSWORD_REQUIRED", true
-	case errors.Is(err, usererrors.ErrEmailRequired):
-		return "EMAIL_REQUIRED", true
-	case errors.Is(err, usererrors.ErrUsernameTooShort):
-		return "USERNAME_TOO_SHORT", true
-	case errors.Is(err, usererrors.ErrInvalidUserID):
-		return "INVALID_USER_ID", true
-	case errors.Is(err, usererrors.ErrPasswordEmpty):
-		return "PASSWORD_EMPTY", true
-	case errors.Is(err, usererrors.ErrValidationFailed):
-		return "VALIDATION_FAILED", true
-	case errors.Is(err, usererrors.ErrInvalidFormat):
-		return "INVALID_FORMAT", true
-	case errors.Is(err, usererrors.ErrMissingField):
-		return "MISSING_FIELD", true
+	usererrors.ErrUsernameRequired: {StatusCode: http.StatusBadRequest, Code: "USERNAME_REQUIRED", Message: "Username is required"},
+	usererrors.ErrPasswordRequired: {StatusCode: http.StatusBadRequest, Code: "PASSWORD_REQUIRED", Message: "Password is required"},
+	usererrors.ErrEmailRequired:    {StatusCode: http.StatusBadRequest, Code: "EMAIL_REQUIRED", Message: "Email is required"},
+	usererrors.ErrUsernameTooShort: {StatusCode: http.StatusBadRequest, Code: "USERNAME_TOO_SHORT", Message: "Username must be at least 3 characters long"},
+	usererrors.ErrInvalidUserID:    {StatusCode: http.StatusBadRequest, Code: "INVALID_USER_ID", Message: "Invalid user ID"},
+	usererrors.ErrPasswordEmpty:    {StatusCode: http.StatusBadRequest, Code: "PASSWORD_EMPTY", Message: "Password cannot be empty"},
+	usererrors.ErrValidationFailed: {StatusCode: http.StatusBadRequest, Code: "VALIDATION_FAILED", Message: "Validation failed"},
+	usererrors.ErrInvalidFormat:    {StatusCode: http.StatusBadRequest, Code: "INVALID_FORMAT", Message: "Invalid format"},
+	usererrors.ErrMissingField:     {StatusCode: http.StatusBadRequest, Code: "MISSING_FIELD", Message: "Required field is missing"},
 
 	// Duplicate errors
-	case errors.Is(err, usererrors.ErrUsernameExists):
-		return "USERNAME_EXISTS", true
-	case errors.Is(err, usererrors.ErrEmailExists):
-		return "EMAIL_EXISTS", true
+	usererrors.ErrUsernameExists: {StatusCode: http.StatusConflict, Code: "USERNAME_EXISTS", Message: "Username already exists"},
+	usererrors.ErrEmailExists:    {StatusCode: http.StatusConflict, Code: "EMAIL_EXISTS", Message: "Email already exists"},
+}
 
-	default:
-		return "", false
+// MapUserError provides error mapping for user domain
+func MapUserError(err error) (response.ErrorMapping, bool) {
+	for domainErr, mapping := range UserErrorMap {
+		if errors.Is(err, domainErr) {
+			return mapping, true
+		}
 	}
+	return response.ErrorMapping{}, false
+}
+
+// RespondWithError handles error with user domain error mapping
+func RespondWithError(c *gin.Context, err error) {
+	response.HandleDomainError(c, err, MapUserError)
 }

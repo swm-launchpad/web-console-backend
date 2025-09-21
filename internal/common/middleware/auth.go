@@ -25,28 +25,28 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		// Get token from Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			response.HandleError(c, auth.ErrMissingAuthHeader)
+			response.HandleDomainError(c, auth.ErrMissingAuthHeader, nil)
 			return
 		}
 
 		// Check if the header starts with "Bearer "
 		const bearerPrefix = "Bearer "
 		if !strings.HasPrefix(authHeader, bearerPrefix) {
-			response.HandleError(c, auth.ErrInvalidAuthFormat)
+			response.HandleDomainError(c, auth.ErrInvalidAuthFormat, nil)
 			return
 		}
 
 		// Extract the token
 		token := authHeader[len(bearerPrefix):]
 		if token == "" {
-			response.HandleError(c, auth.ErrMissingToken)
+			response.HandleDomainError(c, auth.ErrMissingToken, nil)
 			return
 		}
 
 		// Validate the token
 		userID, err := m.jwtUtil.ValidateToken(c.Request.Context(), token)
 		if err != nil {
-			response.HandleError(c, err)
+			response.HandleDomainError(c, err, nil)
 			return
 		}
 

@@ -126,7 +126,7 @@ func TestUserFlow_E2E(t *testing.T) {
 		assert.False(t, errorResp["success"].(bool))
 		errorData := errorResp["error"].(map[string]interface{})
 		assert.Equal(t, "INVALID_CREDENTIALS", errorData["code"])
-		assert.Contains(t, errorData["message"], "invalid credentials")
+		assert.Contains(t, errorData["message"], "Invalid credentials")
 	})
 
 	t.Run("중복된 username으로 회원가입 실패", func(t *testing.T) {
@@ -191,7 +191,7 @@ func TestUserFlow_E2E(t *testing.T) {
 
 	t.Run("인증 없이 프로필 조회 실패", func(t *testing.T) {
 		w := server.MakeRequest("GET", "/users/me", nil)
-		assert.Equal(t, http.StatusInternalServerError, w.Code) // auth.ErrUnauthorized is not wrapped with cerrors
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errorResp map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &errorResp)
@@ -199,7 +199,7 @@ func TestUserFlow_E2E(t *testing.T) {
 		assert.False(t, errorResp["success"].(bool))
 		errorData := errorResp["error"].(map[string]interface{})
 		assert.Equal(t, "UNAUTHORIZED", errorData["code"])
-		assert.Equal(t, "unauthorized", errorData["message"])
+		assert.Equal(t, "Unauthorized", errorData["message"])
 	})
 
 	t.Run("ID로 다른 사용자 조회", func(t *testing.T) {
@@ -233,7 +233,7 @@ func TestUserFlow_E2E(t *testing.T) {
 		assert.False(t, errorResp["success"].(bool))
 		errorData := errorResp["error"].(map[string]interface{})
 		assert.Equal(t, "USER_NOT_FOUND", errorData["code"])
-		assert.Contains(t, errorData["message"], "user not found")
+		assert.Contains(t, errorData["message"], "User not found")
 	})
 
 	t.Run("잘못된 요청 형식 처리", func(t *testing.T) {

@@ -4,10 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
-	cerrors "github.com/swm-launchpad/web-console-backend/internal/common/errors"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 )
@@ -66,17 +64,17 @@ func NewAuthService(
 func (s *authService) RegisterUser(ctx context.Context, username, plainPassword, email string, name *string) (*model.User, string, error) {
 	// Validate input
 	if err := s.ValidateRegistrationInput(username, plainPassword, email); err != nil {
-		return nil, "", cerrors.E(cerrors.Invalid, "AuthService.RegisterUser", err, nil)
+		return nil, "", err
 	}
 
 	// Check username availability
 	if err := s.userService.CheckUsernameAvailability(ctx, username); err != nil {
-		return nil, "", cerrors.E(cerrors.Conflict, "AuthService.RegisterUser", err, nil)
+		return nil, "", err
 	}
 
 	// Check email availability
 	if err := s.userService.CheckEmailAvailability(ctx, email); err != nil {
-		return nil, "", cerrors.E(cerrors.Conflict, "AuthService.RegisterUser", err, nil)
+		return nil, "", err
 	}
 
 	// Hash password
@@ -94,7 +92,7 @@ func (s *authService) RegisterUser(ctx context.Context, username, plainPassword,
 	// Generate token
 	token, err := s.GenerateToken(ctx, user.UserID)
 	if err != nil {
-		return nil, "", cerrors.E(cerrors.Internal, "AuthService.RegisterUser", auth.ErrTokenGenerationFailed, nil)
+		return nil, "", usererrors.ErrTokenGenerationFailed
 	}
 
 	return user, token, nil
@@ -104,29 +102,29 @@ func (s *authService) RegisterUser(ctx context.Context, username, plainPassword,
 func (s *authService) AuthenticateUser(ctx context.Context, username, plainPassword string) (*model.User, string, error) {
 	// Validate input
 	if err := s.ValidateLoginInput(username, plainPassword); err != nil {
-		return nil, "", cerrors.E(cerrors.Invalid, "AuthService.AuthenticateUser", err, nil)
+		return nil, "", err
 	}
 
 	// Get user by username
 	user, err := s.userService.GetUserByUsername(ctx, username)
 	if err != nil {
-		return nil, "", cerrors.E(cerrors.Unauthorized, "AuthService.AuthenticateUser", ErrInvalidCredentials, nil)
+		return nil, "", ErrInvalidCredentials
 	}
 
 	// Validate user credentials (check if active)
 	if err := s.userService.ValidateUserCredentials(ctx, user); err != nil {
-		return nil, "", cerrors.E(cerrors.Forbidden, "AuthService.AuthenticateUser", err, nil)
+		return nil, "", err
 	}
 
 	// Verify password
 	if err := s.VerifyPassword(user.PasswordHash, plainPassword); err != nil {
-		return nil, "", cerrors.E(cerrors.Unauthorized, "AuthService.AuthenticateUser", ErrInvalidCredentials, nil)
+		return nil, "", ErrInvalidCredentials
 	}
 
 	// Generate token
 	token, err := s.GenerateToken(ctx, user.UserID)
 	if err != nil {
-		return nil, "", cerrors.E(cerrors.Internal, "AuthService.RegisterUser", auth.ErrTokenGenerationFailed, nil)
+		return nil, "", usererrors.ErrTokenGenerationFailed
 	}
 
 	return user, token, nil

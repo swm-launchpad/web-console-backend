@@ -43,3 +43,14 @@ var (
 	ErrUsernameExists = errors.New("username already exists")
 	ErrEmailExists    = errors.New("email already exists")
 )
+
+// Infrastructure errors - errors related to data persistence and external services
+var (
+	ErrDatabaseUnavailable = errors.New("database unavailable")
+	ErrDatabaseOperation   = errors.New("database operation failed")
+)
+
+// Service errors - errors related to business service operations
+var (
+	ErrTokenGenerationFailed = errors.New("failed to generate token")
+)

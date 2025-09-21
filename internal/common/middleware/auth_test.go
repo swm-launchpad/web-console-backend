@@ -55,14 +55,14 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errResp testErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
 		assert.Equal(t, "MISSING_AUTH_HEADER", errResp.Error.Code)
-		assert.Equal(t, "authorization header is required", errResp.Error.Message)
+		assert.Equal(t, "Missing authorization header", errResp.Error.Message)
 	})
 
 	t.Run("Bearer 접두사가 없는 경우", func(t *testing.T) {
@@ -80,14 +80,14 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 
 		var errResp testErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
 		assert.Equal(t, "INVALID_AUTH_FORMAT", errResp.Error.Code)
-		assert.Equal(t, "invalid authorization header format", errResp.Error.Message)
+		assert.Equal(t, "Invalid authorization format", errResp.Error.Message)
 	})
 
 	t.Run("Bearer 뒤에 토큰이 없는 경우", func(t *testing.T) {
@@ -105,14 +105,14 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errResp testErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
 		assert.Equal(t, "MISSING_TOKEN", errResp.Error.Code)
-		assert.Equal(t, "token is required", errResp.Error.Message)
+		assert.Equal(t, "Missing token", errResp.Error.Message)
 	})
 
 	t.Run("잘못된 토큰 형식", func(t *testing.T) {
@@ -130,14 +130,14 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errResp testErrorResponse
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
 		assert.Equal(t, "INVALID_TOKEN", errResp.Error.Code)
-		assert.Equal(t, "invalid token", errResp.Error.Message)
+		assert.Equal(t, "Invalid token", errResp.Error.Message)
 	})
 
 	t.Run("만료된 토큰", func(t *testing.T) {
@@ -164,14 +164,14 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errResp testErrorResponse
 		err = json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
 		assert.Equal(t, "INVALID_TOKEN", errResp.Error.Code)
-		assert.Equal(t, "invalid token", errResp.Error.Message)
+		assert.Equal(t, "Invalid token", errResp.Error.Message)
 	})
 
 	t.Run("잘못된 시크릿으로 서명된 토큰", func(t *testing.T) {
@@ -198,14 +198,14 @@ func TestAuthMiddleware_RequireAuth(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errResp testErrorResponse
 		err = json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.False(t, errResp.Success)
 		assert.Equal(t, "INVALID_TOKEN", errResp.Error.Code)
-		assert.Equal(t, "invalid token", errResp.Error.Message)
+		assert.Equal(t, "Invalid token", errResp.Error.Message)
 	})
 
 	t.Run("유효한 토큰", func(t *testing.T) {
@@ -412,7 +412,7 @@ func TestAuthMiddleware_Integration(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 		assert.False(t, handlerCalled, "핸들러가 호출되면 안됨")
 	})
 

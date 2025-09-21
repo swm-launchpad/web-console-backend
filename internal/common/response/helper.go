@@ -84,20 +84,33 @@ func ValidationError(c *gin.Context, fields map[string]interface{}) {
 	)
 }
 
-// HandleError translates a domain error and sends appropriate response
-func HandleError(c *gin.Context, err error) {
-	status, code, message := TranslateError(err, nil)
-	Error(c, status, code, message)
-}
+// HandleDomainError handles errors with domain-specific mapping, falling back to common errors
+func HandleDomainError(c *gin.Context, err error, domainMapper ErrorMapper) {
+	if err == nil {
+		return
+	}
 
-// HandleErrorWithMapper translates a domain error using a custom error mapper
-func HandleErrorWithMapper(c *gin.Context, err error, errorMapper func(error) (string, bool)) {
-	status, code, message := TranslateError(err, errorMapper)
-	Error(c, status, code, message)
-}
+	var mapping ErrorMapping
+	var found bool
 
-// HandleErrorWithMessage translates a domain error but uses a custom message
-func HandleErrorWithMessage(c *gin.Context, err error, customMessage string) {
-	status, code, _ := TranslateError(err, nil)
-	Error(c, status, code, customMessage)
+	// Try domain-specific mapping first
+	if domainMapper != nil {
+		mapping, found = domainMapper(err)
+	}
+
+	// Fall back to common error mapping
+	if !found {
+		mapping, found = MapCommonError(err)
+	}
+
+	// Final fallback to generic internal error
+	if !found {
+		mapping = ErrorMapping{
+			StatusCode: http.StatusInternalServerError,
+			Code:       "INTERNAL_ERROR",
+			Message:    err.Error(),
+		}
+	}
+
+	Error(c, mapping.StatusCode, mapping.Code, mapping.Message)
 }

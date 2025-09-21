@@ -133,7 +133,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusConflict, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -164,7 +164,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusConflict, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -268,7 +268,7 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -276,7 +276,7 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
 		assert.Equal(t, "INVALID_CREDENTIALS", errorData["code"])
-		assert.Contains(t, errorData["message"], "invalid credentials")
+		assert.Contains(t, errorData["message"], "Invalid credentials")
 
 		mockAuthService.AssertExpectations(t)
 	})

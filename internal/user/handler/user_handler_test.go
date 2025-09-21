@@ -132,7 +132,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusNotFound, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -142,7 +142,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
 		assert.Equal(t, "USER_NOT_FOUND", errorData["code"])
-		assert.Equal(t, "user not found", errorData["message"])
+		assert.Equal(t, "User not found", errorData["message"])
 
 		mockService.AssertExpectations(t)
 	})
@@ -296,7 +296,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -306,7 +306,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
 		assert.Equal(t, "UNAUTHORIZED", errorData["code"])
-		assert.Equal(t, "unauthorized", errorData["message"])
+		assert.Equal(t, "Unauthorized", errorData["message"])
 
 		// mockService should not be called
 		mockService.AssertNotCalled(t, "GetUserByID")
@@ -386,7 +386,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -396,7 +396,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
 		assert.Equal(t, "INVALID_FORMAT", errorData["code"])
-		assert.Equal(t, "invalid format", errorData["message"])
+		assert.Equal(t, "Invalid format", errorData["message"])
 
 		// mockService should not be called
 		mockService.AssertNotCalled(t, "GetUserByID")
@@ -422,7 +422,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		// Assert
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusNotFound, w.Code)
 
 		var response map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -432,7 +432,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		assert.False(t, response["success"].(bool))
 		errorData := response["error"].(map[string]interface{})
 		assert.Equal(t, "USER_NOT_FOUND", errorData["code"])
-		assert.Equal(t, "user not found", errorData["message"])
+		assert.Equal(t, "User not found", errorData["message"])
 
 		mockService.AssertExpectations(t)
 	})

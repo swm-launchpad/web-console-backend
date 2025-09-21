@@ -67,3 +67,13 @@ func NewErrorResponseWithDetails(code string, message string, details map[string
 		},
 	}
 }
+
+// ErrorMapping contains complete error mapping information
+type ErrorMapping struct {
+	StatusCode int
+	Code       string
+	Message    string
+}
+
+// ErrorMapper is a function type for domain-specific error mapping
+type ErrorMapper func(error) (ErrorMapping, bool)
