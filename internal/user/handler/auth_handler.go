@@ -40,7 +40,7 @@ type RegisterResponse struct {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.ValidationError(c, map[string]interface{}{
+		response.ErrorWithDetails(c, 400, "VALIDATION_FAILED", "Validation failed", map[string]interface{}{
 			"message": "Invalid request format: " + err.Error(),
 		})
 		return
@@ -86,7 +86,7 @@ type LoginResponse struct {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.ValidationError(c, map[string]interface{}{
+		response.ErrorWithDetails(c, 400, "VALIDATION_FAILED", "Validation failed", map[string]interface{}{
 			"message": "Invalid request format: " + err.Error(),
 		})
 		return

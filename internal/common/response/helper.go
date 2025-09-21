@@ -6,29 +6,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Success sends a standard success response
-func Success(c *gin.Context, statusCode int, data interface{}) {
-	c.JSON(statusCode, NewResponse(data))
-}
-
-// SuccessWithMeta sends a success response with metadata
-func SuccessWithMeta(c *gin.Context, statusCode int, data interface{}, meta *Meta) {
-	c.JSON(statusCode, NewResponseWithMeta(data, meta))
-}
-
 // OK sends a 200 OK response with data
 func OK(c *gin.Context, data interface{}) {
-	Success(c, http.StatusOK, data)
+	c.JSON(http.StatusOK, NewResponse(data))
 }
 
 // Created sends a 201 Created response with data
 func Created(c *gin.Context, data interface{}) {
-	Success(c, http.StatusCreated, data)
-}
-
-// NoContent sends a 204 No Content response
-func NoContent(c *gin.Context) {
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusCreated, NewResponse(data))
 }
 
 // Error sends a standard error response
@@ -41,47 +26,6 @@ func Error(c *gin.Context, statusCode int, code string, message string) {
 func ErrorWithDetails(c *gin.Context, statusCode int, code string, message string, details map[string]interface{}) {
 	c.JSON(statusCode, NewErrorResponseWithDetails(code, message, details))
 	c.Abort()
-}
-
-// BadRequest sends a 400 Bad Request error response
-func BadRequest(c *gin.Context, code string, message string) {
-	Error(c, http.StatusBadRequest, code, message)
-}
-
-// Unauthorized sends a 401 Unauthorized error response
-func Unauthorized(c *gin.Context, code string, message string) {
-	Error(c, http.StatusUnauthorized, code, message)
-}
-
-// Forbidden sends a 403 Forbidden error response
-func Forbidden(c *gin.Context, code string, message string) {
-	Error(c, http.StatusForbidden, code, message)
-}
-
-// NotFound sends a 404 Not Found error response
-func NotFound(c *gin.Context, code string, message string) {
-	Error(c, http.StatusNotFound, code, message)
-}
-
-// Conflict sends a 409 Conflict error response
-func Conflict(c *gin.Context, code string, message string) {
-	Error(c, http.StatusConflict, code, message)
-}
-
-// InternalServerError sends a 500 Internal Server Error response
-func InternalServerError(c *gin.Context, code string, message string) {
-	Error(c, http.StatusInternalServerError, code, message)
-}
-
-// ValidationError sends a validation error response with field details
-func ValidationError(c *gin.Context, fields map[string]interface{}) {
-	ErrorWithDetails(
-		c,
-		http.StatusBadRequest,
-		"VALIDATION_FAILED",
-		"Validation failed",
-		fields,
-	)
 }
 
 // HandleCommonError handles errors with common error mapping
