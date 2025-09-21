@@ -1,15 +1,24 @@
 package response
 
 import (
-	"errors"
 	"net/http"
 
 	autherrors "github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	config "github.com/swm-launchpad/web-console-backend/internal/common/config"
 )
 
-// CommonErrorMap provides mapping for common/infrastructure errors
-var CommonErrorMap = map[error]ErrorMapping{
+// ErrorMapping contains complete error mapping information
+type ErrorMapping struct {
+	StatusCode int
+	Code       string
+	Message    string
+}
+
+// ErrorMapper is a function type for domain-specific error mapping
+type ErrorMapper func(error) (ErrorMapping, bool)
+
+// commonErrorMap provides mapping for common/infrastructure errors
+var commonErrorMap = map[error]ErrorMapping{
 	// Auth package errors
 	autherrors.ErrTokenExpired:          {StatusCode: http.StatusUnauthorized, Code: "TOKEN_EXPIRED", Message: "Token expired"},
 	autherrors.ErrInvalidToken:          {StatusCode: http.StatusUnauthorized, Code: "INVALID_TOKEN", Message: "Invalid token"},
@@ -28,12 +37,12 @@ var CommonErrorMap = map[error]ErrorMapping{
 	config.ErrInvalidServerConfig: {StatusCode: http.StatusInternalServerError, Code: "INVALID_SERVER_CONFIG", Message: "Invalid server configuration"},
 }
 
-// MapCommonError maps common package errors to ErrorMapping
-func MapCommonError(err error) (ErrorMapping, bool) {
-	for commonErr, mapping := range CommonErrorMap {
-		if errors.Is(err, commonErr) {
-			return mapping, true
-		}
+// mapCommonError maps common package errors to ErrorMapping (internal use)
+func mapCommonError(err error) (ErrorMapping, bool) {
+	if err == nil {
+		return ErrorMapping{}, false
 	}
-	return ErrorMapping{}, false
+
+	m, ok := commonErrorMap[err]
+	return m, ok
 }

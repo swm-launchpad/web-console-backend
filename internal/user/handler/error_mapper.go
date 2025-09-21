@@ -1,16 +1,14 @@
 package handler
 
 import (
-	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 )
 
-// UserErrorMap provides mapping from user domain errors to response information
-var UserErrorMap = map[error]response.ErrorMapping{
+// userErrorMap provides mapping from user domain errors to response information
+var userErrorMap = map[error]response.ErrorMapping{
 	// Repository errors
 	usererrors.ErrUserNotFound:      {StatusCode: http.StatusNotFound, Code: "USER_NOT_FOUND", Message: "User not found"},
 	usererrors.ErrUserAlreadyExists: {StatusCode: http.StatusConflict, Code: "USER_ALREADY_EXISTS", Message: "User already exists"},
@@ -47,17 +45,12 @@ var UserErrorMap = map[error]response.ErrorMapping{
 	usererrors.ErrEmailExists:    {StatusCode: http.StatusConflict, Code: "EMAIL_EXISTS", Message: "Email already exists"},
 }
 
-// MapUserError provides error mapping for user domain
-func MapUserError(err error) (response.ErrorMapping, bool) {
-	for domainErr, mapping := range UserErrorMap {
-		if errors.Is(err, domainErr) {
-			return mapping, true
-		}
+// mapUserError provides error mapping for user domain
+func mapUserError(err error) (response.ErrorMapping, bool) {
+	if err == nil {
+		return response.ErrorMapping{}, false
 	}
-	return response.ErrorMapping{}, false
-}
 
-// RespondWithError handles error with user domain error mapping
-func RespondWithError(c *gin.Context, err error) {
-	response.HandleDomainError(c, err, MapUserError)
+	m, ok := userErrorMap[err]
+	return m, ok
 }

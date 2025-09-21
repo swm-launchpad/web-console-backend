@@ -37,7 +37,7 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	// Get user ID from context (set by auth middleware)
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
-		RespondWithError(c, auth.ErrUnauthorized)
+		response.Error(c, auth.ErrUnauthorized, mapUserError)
 		return
 	}
 
@@ -47,7 +47,7 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 
 	output, err := h.getUserUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		RespondWithError(c, err)
+		response.Error(c, err, mapUserError)
 		return
 	}
 
@@ -69,13 +69,13 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 func (h *UserHandler) GetUserByID(c *gin.Context) {
 	userIDStr := c.Param("id")
 	if userIDStr == "" {
-		RespondWithError(c, usererrors.ErrMissingField)
+		response.Error(c, usererrors.ErrMissingField, mapUserError)
 		return
 	}
 
 	userID, err := strconv.ParseUint(userIDStr, 10, 32)
 	if err != nil {
-		RespondWithError(c, usererrors.ErrInvalidFormat)
+		response.Error(c, usererrors.ErrInvalidFormat, mapUserError)
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 
 	output, err := h.getUserUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		RespondWithError(c, err)
+		response.Error(c, err, mapUserError)
 		return
 	}
 

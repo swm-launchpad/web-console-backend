@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 )
 
 type AuthHandler struct {
@@ -40,9 +41,9 @@ type RegisterResponse struct {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.ErrorWithDetails(c, 400, "VALIDATION_FAILED", "Validation failed", map[string]interface{}{
+		response.Error(c, usererrors.ErrValidationFailed, mapUserError, response.WithDetails(map[string]interface{}{
 			"message": "Invalid request format: " + err.Error(),
-		})
+		}))
 		return
 	}
 
@@ -55,7 +56,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	output, err := h.registerUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		RespondWithError(c, err)
+		response.Error(c, err, mapUserError)
 		return
 	}
 
@@ -86,9 +87,9 @@ type LoginResponse struct {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.ErrorWithDetails(c, 400, "VALIDATION_FAILED", "Validation failed", map[string]interface{}{
+		response.Error(c, usererrors.ErrValidationFailed, mapUserError, response.WithDetails(map[string]interface{}{
 			"message": "Invalid request format: " + err.Error(),
-		})
+		}))
 		return
 	}
 
@@ -99,7 +100,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	output, err := h.loginUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		RespondWithError(c, err)
+		response.Error(c, err, mapUserError)
 		return
 	}
 
