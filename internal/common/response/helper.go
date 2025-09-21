@@ -84,26 +84,15 @@ func ValidationError(c *gin.Context, fields map[string]interface{}) {
 	)
 }
 
-// HandleDomainError handles errors with domain-specific mapping, falling back to common errors
-func HandleDomainError(c *gin.Context, err error, domainMapper ErrorMapper) {
+// HandleCommonError handles errors with common error mapping
+func HandleCommonError(c *gin.Context, err error) {
 	if err == nil {
 		return
 	}
 
-	var mapping ErrorMapping
-	var found bool
+	mapping, found := MapCommonError(err)
 
-	// Try domain-specific mapping first
-	if domainMapper != nil {
-		mapping, found = domainMapper(err)
-	}
-
-	// Fall back to common error mapping
-	if !found {
-		mapping, found = MapCommonError(err)
-	}
-
-	// Final fallback to generic internal error
+	// Fallback to generic internal error
 	if !found {
 		mapping = ErrorMapping{
 			StatusCode: http.StatusInternalServerError,
@@ -113,4 +102,22 @@ func HandleDomainError(c *gin.Context, err error, domainMapper ErrorMapper) {
 	}
 
 	Error(c, mapping.StatusCode, mapping.Code, mapping.Message)
+}
+
+// HandleDomainError handles errors with domain-specific mapping, falling back to common errors
+func HandleDomainError(c *gin.Context, err error, domainMapper ErrorMapper) {
+	if err == nil {
+		return
+	}
+
+	// Try domain-specific mapping first
+	if domainMapper != nil {
+		if mapping, found := domainMapper(err); found {
+			Error(c, mapping.StatusCode, mapping.Code, mapping.Message)
+			return
+		}
+	}
+
+	// Fall back to HandleCommonError
+	HandleCommonError(c, err)
 }
