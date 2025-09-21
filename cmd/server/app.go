@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
+	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 )
 
 type App struct {

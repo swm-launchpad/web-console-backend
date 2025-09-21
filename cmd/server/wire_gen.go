@@ -8,8 +8,15 @@ package main
 
 import (
 	"database/sql"
-	"github.com/swm-launchpad/web-console-backend/internal/shared/config"
-	"github.com/swm-launchpad/web-console-backend/internal/shared/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
+	"github.com/swm-launchpad/web-console-backend/internal/common/config"
+	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
+	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
+	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
 
 // Injectors from wire.go:
@@ -19,12 +26,24 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := provideDatabase(configConfig)
+	database, err := provideDatabase(configConfig)
 	if err != nil {
 		return nil, err
 	}
-	router := NewRouter(configConfig, db)
-	app := NewApp(configConfig, db, router)
+	txManager := provideTxManager(database)
+	userRepository := infrastructure.NewUserRepository(database)
+	userService := service.NewUserService(userRepository)
+	jwtUtil := provideJWTUtil(configConfig)
+	passwordUtil := password.NewPasswordUtil()
+	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
+	registerUserUseCase := application.NewRegisterUserUseCase(authService, txManager)
+	loginUserUseCase := application.NewLoginUserUseCase(authService)
+	authHandler := handler.NewAuthHandler(registerUserUseCase, loginUserUseCase)
+	getUserUseCase := application.NewGetUserUseCase(userService)
+	userHandler := handler.NewUserHandler(getUserUseCase)
+	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
+	router := NewRouter(configConfig, database, authHandler, userHandler, authMiddleware)
+	app := NewApp(configConfig, database, router)
 	return app, nil
 }
 
@@ -32,4 +51,12 @@ func InitializeApp() (*App, error) {
 
 func provideDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db.NewConnection(&cfg.Database)
+}
+
+func provideTxManager(database *sql.DB) db.TxManager {
+	return db.NewTxManager(database)
+}
+
+func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
+	return jwt.NewJWTUtil(cfg.JWT.Secret)
 }
