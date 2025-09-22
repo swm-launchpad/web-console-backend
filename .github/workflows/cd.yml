@@ -86,11 +86,11 @@ jobs:
           chmod 0600 ~/.ssh/id_ed25519
           ssh-keyscan -H launchpad.kr >> ~/.ssh/known_hosts
 
-      - name: Deploy migrations
+      - name: Deploy migration
         run: |
-          # Copy migrations directory to server
-          ssh ubuntu@launchpad.kr "rm -rf ~/mysql/migrations && mkdir -p ~/mysql/migrations"
-          scp -r ./migrations ubuntu@launchpad.kr:~/mysql/
+          # Copy migration directory to server
+          ssh ubuntu@launchpad.kr "rm -rf ~/mysql/migration && mkdir -p ~/mysql/migration"
+          scp -r ./migration ubuntu@launchpad.kr:~/mysql/
 
           # Execute migration script
           ssh ubuntu@launchpad.kr "cd ~ && sudo ./mysql/scripts/migrate.sh up"
