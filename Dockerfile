@@ -33,8 +33,8 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/main .
 
-# Copy migrations for database setup
-COPY --from=builder /app/migrations ./migrations
+# Copy migration for database setup
+COPY --from=builder /app/migration ./migration
 
 # Change ownership to appuser
 RUN chown -R appuser:appuser /app
