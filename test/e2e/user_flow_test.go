@@ -76,7 +76,7 @@ func TestUserFlow_E2E(t *testing.T) {
 		loginToken := loginData["token"].(string)
 
 		// Step 3: 프로필 조회 (인증된 요청)
-		w = server.MakeAuthenticatedRequest("GET", "/users/me", nil, userID)
+		w = server.MakeAuthRequest("GET", "/api/v1/users/me", nil, loginToken)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var profileResp map[string]interface{}
@@ -190,7 +190,7 @@ func TestUserFlow_E2E(t *testing.T) {
 	})
 
 	t.Run("인증 없이 프로필 조회 실패", func(t *testing.T) {
-		w := server.MakeRequest("GET", "/users/me", nil)
+		w := server.MakeRequest("GET", "/api/v1/users/me", nil)
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errorResp map[string]interface{}
@@ -198,16 +198,16 @@ func TestUserFlow_E2E(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, errorResp["success"].(bool))
 		errorData := errorResp["error"].(map[string]interface{})
-		assert.Equal(t, "UNAUTHORIZED", errorData["code"])
-		assert.Equal(t, "Unauthorized", errorData["message"])
+		assert.Equal(t, "MISSING_AUTH_HEADER", errorData["code"])
+		assert.Equal(t, "Missing authorization header", errorData["message"])
 	})
 
 	t.Run("ID로 다른 사용자 조회", func(t *testing.T) {
 		// 사용자 등록
-		userID, _ := server.RegisterUser(t, "viewuser", "Password123!", "view@example.com")
+		userID, token := server.RegisterUser(t, "viewuser", "Password123!", "view@example.com")
 
-		// ID로 사용자 조회
-		w := server.MakeRequest("GET", fmt.Sprintf("/users/%d", userID), nil)
+		// ID로 사용자 조회 (인증 필요)
+		w := server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/users/%d", userID), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var userResp map[string]interface{}
@@ -224,7 +224,10 @@ func TestUserFlow_E2E(t *testing.T) {
 	})
 
 	t.Run("존재하지 않는 사용자 조회", func(t *testing.T) {
-		w := server.MakeRequest("GET", "/users/999999", nil)
+		// 인증을 위한 사용자 생성
+		_, token := server.RegisterUser(t, "notfounduser", "Password123!", "notfound@example.com")
+
+		w := server.MakeAuthRequest("GET", "/api/v1/users/999999", nil, token)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 
 		var errorResp map[string]interface{}

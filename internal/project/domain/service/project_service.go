@@ -31,19 +31,7 @@ type ProjectService interface {
 	// ListAllProjects retrieves all projects with pagination
 	ListAllProjects(ctx context.Context, offset, limit int) ([]*model.Project, error)
 
-	// Volume management methods
-
-	// AddVolume adds a volume to a project
-	AddVolume(ctx context.Context, projectID uint, name string, capacity uint32) (*model.Project, error)
-
-	// UpdateVolume updates a volume in a project
-	UpdateVolume(ctx context.Context, projectID uint, volumeID uint, name string, capacity uint32) (*model.Project, error)
-
-	// RemoveVolume removes a volume from a project
-	RemoveVolume(ctx context.Context, projectID uint, volumeID uint) (*model.Project, error)
-
-	// GetVolumes retrieves all volumes for a project
-	GetVolumes(ctx context.Context, projectID uint) ([]model.Volume, error)
+	// Volume management removed - volumes are now handled by VolumeService
 }
 
 // projectService is the concrete implementation of ProjectService
@@ -193,93 +181,4 @@ func (s *projectService) ListAllProjects(ctx context.Context, offset, limit int)
 	return projects, nil
 }
 
-// AddVolume adds a volume to a project
-func (s *projectService) AddVolume(ctx context.Context, projectID uint, name string, capacity uint32) (*model.Project, error) {
-	if projectID == 0 {
-		return nil, projecterrors.ErrInvalidProjectID
-	}
-
-	// Retrieve the project
-	project, err := s.projectRepo.FindByID(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add the volume
-	if err := project.AddVolume(name, capacity); err != nil {
-		return nil, err
-	}
-
-	// Save the updated project
-	if err := s.projectRepo.Save(ctx, project); err != nil {
-		return nil, err
-	}
-
-	return project, nil
-}
-
-// UpdateVolume updates a volume in a project
-func (s *projectService) UpdateVolume(ctx context.Context, projectID uint, volumeID uint, name string, capacity uint32) (*model.Project, error) {
-	if projectID == 0 {
-		return nil, projecterrors.ErrInvalidProjectID
-	}
-
-	// Retrieve the project
-	project, err := s.projectRepo.FindByID(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Update the volume
-	if err := project.UpdateVolume(volumeID, name, capacity); err != nil {
-		return nil, err
-	}
-
-	// Save the updated project
-	if err := s.projectRepo.Save(ctx, project); err != nil {
-		return nil, err
-	}
-
-	return project, nil
-}
-
-// RemoveVolume removes a volume from a project
-func (s *projectService) RemoveVolume(ctx context.Context, projectID uint, volumeID uint) (*model.Project, error) {
-	if projectID == 0 {
-		return nil, projecterrors.ErrInvalidProjectID
-	}
-
-	// Retrieve the project
-	project, err := s.projectRepo.FindByID(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Remove the volume
-	if err := project.RemoveVolume(volumeID); err != nil {
-		return nil, err
-	}
-
-	// Save the updated project
-	if err := s.projectRepo.Save(ctx, project); err != nil {
-		return nil, err
-	}
-
-	return project, nil
-}
-
-// GetVolumes retrieves all volumes for a project
-func (s *projectService) GetVolumes(ctx context.Context, projectID uint) ([]model.Volume, error) {
-	if projectID == 0 {
-		return nil, projecterrors.ErrInvalidProjectID
-	}
-
-	// Retrieve the project
-	project, err := s.projectRepo.FindByID(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return the volumes
-	return project.GetVolumes(), nil
-}
+// Volume management methods removed - volumes are now handled by VolumeService

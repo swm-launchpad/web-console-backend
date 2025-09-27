@@ -9,10 +9,14 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	projectApp "github.com/swm-launchpad/web-console-backend/internal/project/application"
+	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
+	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userhttp "github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -41,18 +45,55 @@ func SetupTestServer(t *testing.T) *TestServer {
 	passwordUtil := password.NewPasswordUtil()
 	txManager := db.NewTxManager(testDB.DB)
 
-	// Service 초기화
+	// User Service 초기화
 	userService := service.NewUserService(userRepo)
 	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
 
-	// UseCase 초기화
+	// User UseCase 초기화
 	registerUseCase := application.NewRegisterUserUseCase(authService, txManager)
 	loginUseCase := application.NewLoginUserUseCase(authService)
 	getUserUseCase := application.NewGetUserUseCase(userService)
 
+	// Project dependencies
+	projectRepo := projectInfra.NewProjectRepository(testDB.DB)
+	volumeRepo := projectInfra.NewVolumeRepository(testDB.DB)
+	slugService := projectService.NewSlugService(projectRepo)
+	projectSvc := projectService.NewProjectService(projectRepo, slugService)
+	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepo)
+	permissionSvc := projectService.NewPermissionService(projectRepo, volumeRepo)
+
+	// Project UseCases
+	createProjectUseCase := projectApp.NewCreateProjectUseCase(projectSvc, txManager)
+	getProjectUseCase := projectApp.NewGetProjectUseCase(projectSvc, volumeSvc)
+	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, txManager)
+	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, txManager)
+	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc)
+	addVolumeUseCase := projectApp.NewAddVolumeUseCase(volumeSvc, txManager)
+	getVolumesUseCase := projectApp.NewGetVolumesUseCase(volumeSvc)
+	updateVolumeUseCase := projectApp.NewUpdateVolumeUseCase(volumeSvc, txManager)
+	removeVolumeUseCase := projectApp.NewRemoveVolumeUseCase(volumeSvc, txManager)
+
 	// Handler 초기화
 	authHandler := userhttp.NewAuthHandler(registerUseCase, loginUseCase)
 	userHandler := userhttp.NewUserHandler(getUserUseCase)
+	projectHandler := projectHTTP.NewProjectHandler(
+		createProjectUseCase,
+		getProjectUseCase,
+		updateProjectUseCase,
+		deleteProjectUseCase,
+		listProjectsUseCase,
+		permissionSvc,
+	)
+	volumeHandler := projectHTTP.NewVolumeHandler(
+		addVolumeUseCase,
+		getVolumesUseCase,
+		updateVolumeUseCase,
+		removeVolumeUseCase,
+		permissionSvc,
+	)
+
+	// Middleware
+	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 
 	// Router 설정
 	router := gin.New()
@@ -65,20 +106,36 @@ func SetupTestServer(t *testing.T) *TestServer {
 		authGroup.POST("/login", authHandler.Login)
 	}
 
-	userGroup := router.Group("/users")
+	// API v1 routes
+	v1 := router.Group("/api/v1")
+
+	// User routes (protected)
+	users := v1.Group("/users")
+	users.Use(authMiddleware.RequireAuth())
 	{
-		// 인증 미들웨어를 시뮬레이션하는 테스트용 핸들러
-		userGroup.GET("/me", func(c *gin.Context) {
-			// 테스트에서 Authorization 헤더로 userID 전달
-			if authHeader := c.GetHeader("X-User-ID"); authHeader != "" {
-				var userID uint
-				if _, err := fmt.Sscanf(authHeader, "%d", &userID); err == nil {
-					c.Set(auth.ContextKeyUserID, userID)
-				}
-			}
-			userHandler.GetCurrentUser(c)
-		})
-		userGroup.GET("/:id", userHandler.GetUserByID)
+		users.GET("/me", userHandler.GetCurrentUser)
+		users.GET("/:id", userHandler.GetUserByID)
+	}
+
+	// Project routes (protected)
+	projects := v1.Group("/projects")
+	projects.Use(authMiddleware.RequireAuth())
+	{
+		projects.POST("", projectHandler.CreateProject)
+		projects.GET("", projectHandler.ListProjects)
+		projects.GET("/:id", projectHandler.GetProject)
+		projects.PUT("/:id", projectHandler.UpdateProject)
+		projects.DELETE("/:id", projectHandler.DeleteProject)
+	}
+
+	// Volume routes (protected)
+	volumes := v1.Group("/volumes")
+	volumes.Use(authMiddleware.RequireAuth())
+	{
+		volumes.POST("", volumeHandler.AddVolume)
+		volumes.GET("", volumeHandler.GetVolumes)
+		volumes.PUT("/:id", volumeHandler.UpdateVolume)
+		volumes.DELETE("/:id", volumeHandler.RemoveVolume)
 	}
 
 	return &TestServer{
@@ -123,6 +180,27 @@ func (ts *TestServer) MakeAuthenticatedRequest(method, path string, body interfa
 
 	// 테스트용 userID 헤더 추가
 	req.Header.Set("X-User-ID", fmt.Sprintf("%d", userID))
+
+	w := httptest.NewRecorder()
+	ts.Router.ServeHTTP(w, req)
+	return w
+}
+
+// MakeAuthRequest는 Bearer 토큰을 사용한 인증된 요청을 만듭니다
+func (ts *TestServer) MakeAuthRequest(method, path string, body interface{}, token string) *httptest.ResponseRecorder {
+	var req *http.Request
+	if body != nil {
+		jsonBody, _ := json.Marshal(body)
+		req = httptest.NewRequest(method, path, bytes.NewBuffer(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+	} else {
+		req = httptest.NewRequest(method, path, nil)
+	}
+
+	// Bearer 토큰 헤더 추가
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	w := httptest.NewRecorder()
 	ts.Router.ServeHTTP(w, req)
