@@ -22,8 +22,12 @@ type TestDB struct {
 func SetupTestDB(t *testing.T) *TestDB {
 	t.Helper()
 
-	// Load environment variables
-	_ = godotenv.Load(".env.test")
+	// Load environment variables - use .env.e2e for E2E tests, .env.test for integration tests
+	if os.Getenv("E2E_TEST") == "true" {
+		_ = godotenv.Load(".env.e2e")
+	} else {
+		_ = godotenv.Load(".env.test")
+	}
 
 	// Read environment variables
 	host := getEnv("DB_HOST", "localhost")
