@@ -13,6 +13,10 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	application2 "github.com/swm-launchpad/web-console-backend/internal/project/application"
+	service2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	handler2 "github.com/swm-launchpad/web-console-backend/internal/project/handler"
+	infrastructure2 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -26,24 +30,41 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	database, err := provideDatabase(configConfig)
+	db, err := provideDatabase(configConfig)
 	if err != nil {
 		return nil, err
 	}
-	txManager := provideTxManager(database)
-	userRepository := infrastructure.NewUserRepository(database)
+	userRepository := infrastructure.NewUserRepository(db)
 	userService := service.NewUserService(userRepository)
 	jwtUtil := provideJWTUtil(configConfig)
 	passwordUtil := password.NewPasswordUtil()
 	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
+	txManager := provideTxManager(db)
 	registerUserUseCase := application.NewRegisterUserUseCase(authService, txManager)
 	loginUserUseCase := application.NewLoginUserUseCase(authService)
 	authHandler := handler.NewAuthHandler(registerUserUseCase, loginUserUseCase)
 	getUserUseCase := application.NewGetUserUseCase(userService)
 	userHandler := handler.NewUserHandler(getUserUseCase)
+	projectRepository := infrastructure2.NewProjectRepository(db)
+	slugService := service2.NewSlugService(projectRepository)
+	projectService := service2.NewProjectService(projectRepository, slugService)
+	createProjectUseCase := application2.NewCreateProjectUseCase(projectService, txManager)
+	volumeRepository := infrastructure2.NewVolumeRepository(db)
+	volumeService := service2.NewVolumeService(volumeRepository, projectRepository)
+	getProjectUseCase := application2.NewGetProjectUseCase(projectService, volumeService)
+	updateProjectUseCase := application2.NewUpdateProjectUseCase(projectService, txManager)
+	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, txManager)
+	listProjectsUseCase := application2.NewListProjectsUseCase(projectService)
+	permissionService := service2.NewPermissionService(projectRepository, volumeRepository)
+	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService)
+	addVolumeUseCase := application2.NewAddVolumeUseCase(volumeService, txManager)
+	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService)
+	updateVolumeUseCase := application2.NewUpdateVolumeUseCase(volumeService, txManager)
+	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager)
+	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, updateVolumeUseCase, removeVolumeUseCase, permissionService)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
-	router := NewRouter(configConfig, database, authHandler, userHandler, authMiddleware)
-	app := NewApp(configConfig, database, router)
+	router := NewRouter(configConfig, db, authHandler, userHandler, projectHandler, volumeHandler, authMiddleware)
+	app := NewApp(configConfig, db, router)
 	return app, nil
 }
 

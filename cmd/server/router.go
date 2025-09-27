@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
 )
 
@@ -15,6 +16,8 @@ type Router struct {
 	db             *sql.DB
 	authHandler    *userHTTP.AuthHandler
 	userHandler    *userHTTP.UserHandler
+	projectHandler *projectHTTP.ProjectHandler
+	volumeHandler  *projectHTTP.VolumeHandler
 	authMiddleware *middleware.AuthMiddleware
 }
 
@@ -23,6 +26,8 @@ func NewRouter(
 	database *sql.DB,
 	authHandler *userHTTP.AuthHandler,
 	userHandler *userHTTP.UserHandler,
+	projectHandler *projectHTTP.ProjectHandler,
+	volumeHandler *projectHTTP.VolumeHandler,
 	authMiddleware *middleware.AuthMiddleware,
 ) *Router {
 	// Set Gin mode
@@ -41,6 +46,8 @@ func NewRouter(
 		db:             database,
 		authHandler:    authHandler,
 		userHandler:    userHandler,
+		projectHandler: projectHandler,
+		volumeHandler:  volumeHandler,
 		authMiddleware: authMiddleware,
 	}
 }
@@ -69,6 +76,27 @@ func (r *Router) Setup() {
 		{
 			users.GET("/me", r.userHandler.GetCurrentUser)
 			users.GET("/:id", r.userHandler.GetUserByID)
+		}
+
+		// Project routes (protected)
+		projects := v1.Group("/projects")
+		projects.Use(r.authMiddleware.RequireAuth())
+		{
+			projects.POST("", r.projectHandler.CreateProject)
+			projects.GET("", r.projectHandler.ListProjects)
+			projects.GET("/:id", r.projectHandler.GetProject)
+			projects.PUT("/:id", r.projectHandler.UpdateProject)
+			projects.DELETE("/:id", r.projectHandler.DeleteProject)
+		}
+
+		// Volume routes (protected)
+		volumes := v1.Group("/volumes")
+		volumes.Use(r.authMiddleware.RequireAuth())
+		{
+			volumes.POST("", r.volumeHandler.AddVolume)
+			volumes.GET("", r.volumeHandler.GetVolumes)
+			volumes.PUT("/:id", r.volumeHandler.UpdateVolume)
+			volumes.DELETE("/:id", r.volumeHandler.RemoveVolume)
 		}
 	}
 }
