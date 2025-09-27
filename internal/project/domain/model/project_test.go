@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
 func TestNewProject(t *testing.T) {
@@ -345,6 +344,8 @@ func TestProject_ValidateInvariants(t *testing.T) {
 
 }
 
+// Volume tests moved to separate VolumeService tests since volumes are now separate aggregates
+/*
 func TestProject_AddVolume(t *testing.T) {
 	t.Run("성공: 볼륨 추가", func(t *testing.T) {
 		slug, _ := NewProjectSlug("my-project")
@@ -391,7 +392,7 @@ func TestProject_RemoveVolume(t *testing.T) {
 		project, _ := NewProject("My Project", *slug, 100)
 		project.SetProjectID(1)
 		_ = project.AddVolume("data-volume", 100)
-		_ = project.setVolumeID("data-volume", 999)
+		_ = project.SetVolumeID("data-volume", 999)
 
 		err := project.RemoveVolume(999)
 
@@ -426,7 +427,7 @@ func TestProject_UpdateVolume(t *testing.T) {
 		project, _ := NewProject("My Project", *slug, 100)
 		project.SetProjectID(1)
 		_ = project.AddVolume("old-name", 100)
-		_ = project.setVolumeID("old-name", 999)
+		_ = project.SetVolumeID("old-name", 999)
 
 		err := project.UpdateVolume(999, "new-name", 200)
 
@@ -442,8 +443,8 @@ func TestProject_UpdateVolume(t *testing.T) {
 		project.SetProjectID(1)
 		_ = project.AddVolume("volume1", 100)
 		_ = project.AddVolume("volume2", 100)
-		_ = project.setVolumeID("volume1", 1)
-		_ = project.setVolumeID("volume2", 2)
+		_ = project.SetVolumeID("volume1", 1)
+		_ = project.SetVolumeID("volume2", 2)
 
 		err := project.UpdateVolume(2, "volume1", 200)
 
@@ -481,6 +482,7 @@ func TestProject_GetVolumeByName(t *testing.T) {
 		assert.Equal(t, projecterrors.ErrVolumeNotFound, err)
 	})
 }
+*/
 
 func TestProject_GetActiveUsers(t *testing.T) {
 	slug, _ := NewProjectSlug("my-project")

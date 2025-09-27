@@ -17,7 +17,7 @@ type Project struct {
 	plan      *string
 	limits    ResourceLimits
 	users     []ProjectUser // Aggregate's internal entities
-	volumes   []Volume      // Aggregate's internal entities
+	// volumes removed - now handled as separate aggregate
 	isDeleted bool
 	deletedAt *time.Time
 	createdAt time.Time
@@ -43,7 +43,6 @@ func NewProject(name string, slug ProjectSlug, ownerID uint) (*Project, error) {
 		status:    ProjectStatusActive,
 		limits:    ResourceLimits{}, // Default unlimited
 		users:     make([]ProjectUser, 0),
-		volumes:   make([]Volume, 0),
 		isDeleted: false,
 		createdAt: now,
 		updatedAt: &now,
@@ -64,6 +63,32 @@ func NewProject(name string, slug ProjectSlug, ownerID uint) (*Project, error) {
 	return project, nil
 }
 
+// ReconstructProject reconstructs a project from persistence without initial owner
+// This is used when loading a project from the database
+func ReconstructProject(
+	projectID uint,
+	name string,
+	slug ProjectSlug,
+	status ProjectStatus,
+	createdAt time.Time,
+	updatedAt *time.Time,
+	isDeleted bool,
+	deletedAt *time.Time,
+) *Project {
+	return &Project{
+		projectID: projectID,
+		name:      name,
+		slug:      slug,
+		status:    status,
+		limits:    ResourceLimits{},       // Will be set later
+		users:     make([]ProjectUser, 0), // Will be loaded separately
+		isDeleted: isDeleted,
+		deletedAt: deletedAt,
+		createdAt: createdAt,
+		updatedAt: updatedAt,
+	}
+}
+
 // GetProjectID returns the project ID
 func (p *Project) GetProjectID() uint {
 	return p.projectID
@@ -76,10 +101,7 @@ func (p *Project) SetProjectID(id uint) {
 	for i := range p.users {
 		p.users[i].projectID = id
 	}
-	// Update projectID for all volumes
-	for i := range p.volumes {
-		p.volumes[i].projectID = id
-	}
+	// volumes are handled separately as their own aggregate
 }
 
 // GetName returns the project name
@@ -304,115 +326,8 @@ func (p *Project) HasOwner() bool {
 	return false
 }
 
-// AddVolume adds a new volume to the project
-func (p *Project) AddVolume(name string, capacity uint32) error {
-	if p.isDeleted {
-		return projecterrors.ErrCannotModifyDeletedProject
-	}
-
-	// Check for duplicate volume name
-	for _, v := range p.volumes {
-		if v.GetName() == name {
-			return projecterrors.ErrDuplicateVolumeName
-		}
-	}
-
-	// Create new volume
-	volume, err := NewVolume(p.projectID, name, capacity)
-	if err != nil {
-		return err
-	}
-
-	p.volumes = append(p.volumes, *volume)
-	p.updateTimestamp()
-	return nil
-}
-
-// RemoveVolume removes a volume from the project
-func (p *Project) RemoveVolume(volumeID uint) error {
-	if p.isDeleted {
-		return projecterrors.ErrCannotModifyDeletedProject
-	}
-
-	// Find and remove the volume
-	for i, v := range p.volumes {
-		if v.GetVolumeID() == volumeID {
-			// Remove volume from slice
-			p.volumes = append(p.volumes[:i], p.volumes[i+1:]...)
-			p.updateTimestamp()
-			return nil
-		}
-	}
-
-	return projecterrors.ErrVolumeNotFound
-}
-
-// UpdateVolume updates an existing volume in the project
-func (p *Project) UpdateVolume(volumeID uint, name string, capacity uint32) error {
-	if p.isDeleted {
-		return projecterrors.ErrCannotModifyDeletedProject
-	}
-
-	// Check for duplicate name (except for the volume being updated)
-	for _, v := range p.volumes {
-		if v.GetVolumeID() != volumeID && v.GetName() == name {
-			return projecterrors.ErrDuplicateVolumeName
-		}
-	}
-
-	// Find and update the volume
-	for i := range p.volumes {
-		if p.volumes[i].GetVolumeID() == volumeID {
-			if err := p.volumes[i].Update(name, capacity); err != nil {
-				return err
-			}
-			p.updateTimestamp()
-			return nil
-		}
-	}
-
-	return projecterrors.ErrVolumeNotFound
-}
-
-// GetVolumes returns a copy of project volumes
-func (p *Project) GetVolumes() []Volume {
-	volumes := make([]Volume, len(p.volumes))
-	copy(volumes, p.volumes)
-	return volumes
-}
-
-// GetVolumeByID returns a volume by its ID
-func (p *Project) GetVolumeByID(volumeID uint) (*Volume, error) {
-	for i := range p.volumes {
-		if p.volumes[i].GetVolumeID() == volumeID {
-			volume := p.volumes[i]
-			return &volume, nil
-		}
-	}
-	return nil, projecterrors.ErrVolumeNotFound
-}
-
-// GetVolumeByName returns a volume by its name
-func (p *Project) GetVolumeByName(name string) (*Volume, error) {
-	for i := range p.volumes {
-		if p.volumes[i].GetName() == name {
-			volume := p.volumes[i]
-			return &volume, nil
-		}
-	}
-	return nil, projecterrors.ErrVolumeNotFound
-}
-
-// setVolumeID sets the ID for a volume (for use by repository and tests only)
-func (p *Project) setVolumeID(name string, volumeID uint) error {
-	for i := range p.volumes {
-		if p.volumes[i].GetName() == name {
-			p.volumes[i].setVolumeID(volumeID)
-			return nil
-		}
-	}
-	return projecterrors.ErrVolumeNotFound
-}
+// Volume management removed - volumes are now separate aggregates
+// managed by VolumeService
 
 // SetFQDN sets the fully qualified domain name
 func (p *Project) SetFQDN(fqdn string) error {

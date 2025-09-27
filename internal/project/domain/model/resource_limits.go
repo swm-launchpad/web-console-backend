@@ -6,125 +6,128 @@ import (
 
 // ResourceLimits represents the resource limitations for a project as a value object
 type ResourceLimits struct {
-	cpuLimit     *uint32 // millicores (1000 = 1 CPU)
-	memoryLimit  *uint32 // MB
-	diskLimit    *uint32 // GB
-	trafficLimit *uint64 // GB per month
+	cpuLimit      *uint32 // millicores (1000 = 1 CPU)
+	memoryRequest *uint32 // Mi (Mebibytes)
+	memoryLimit   *uint32 // Mi (Mebibytes)
+	diskLimit     *uint32 // Mi (Mebibytes)
+	trafficLimit  *uint64 // Mi (Mebibytes) per month, nil = unlimited
 }
 
 // ResourceUsage represents current resource usage
 type ResourceUsage struct {
-	CPUUsage     uint32 // millicores
-	MemoryUsage  uint32 // MB
-	DiskUsage    uint32 // GB
-	TrafficUsage uint64 // GB
+	CPUUsage         uint32 // millicores
+	MemoryReqUsage   uint32 // Mi (Mebibytes)
+	MemoryLimitUsage uint32 // Mi (Mebibytes)
+	DiskUsage        uint32 // Mi (Mebibytes)
+	TrafficUsage     uint64 // Mi (Mebibytes)
 }
 
-// PlanLimits defines resource limits for different plans
-var PlanLimits = map[string]ResourceLimits{
-	"free": {
-		cpuLimit:     uint32Ptr(500), // 0.5 CPU
-		memoryLimit:  uint32Ptr(512), // 512 MB
-		diskLimit:    uint32Ptr(1),   // 1 GB
-		trafficLimit: uint64Ptr(10),  // 10 GB/month
-	},
-	"starter": {
-		cpuLimit:     uint32Ptr(1000), // 1 CPU
-		memoryLimit:  uint32Ptr(2048), // 2 GB
-		diskLimit:    uint32Ptr(10),   // 10 GB
-		trafficLimit: uint64Ptr(100),  // 100 GB/month
-	},
-	"pro": {
-		cpuLimit:     uint32Ptr(2000), // 2 CPU
-		memoryLimit:  uint32Ptr(4096), // 4 GB
-		diskLimit:    uint32Ptr(50),   // 50 GB
-		trafficLimit: uint64Ptr(500),  // 500 GB/month
-	},
-	"enterprise": {
-		cpuLimit:     uint32Ptr(8000),  // 8 CPU
-		memoryLimit:  uint32Ptr(16384), // 16 GB
-		diskLimit:    uint32Ptr(500),   // 500 GB
-		trafficLimit: uint64Ptr(5000),  // 5000 GB/month
-	},
-}
+// PlanLimits - Plan-based limits are not implemented yet (per user request)
+// Plans should be set to null in database until plan feature is implemented
+// var PlanLimits = map[string]ResourceLimits{...}
 
 // NewResourceLimits creates a new ResourceLimits with validation
-func NewResourceLimits(cpu, memory, disk *uint32, traffic *uint64) (*ResourceLimits, error) {
-	// Validate that values are non-negative (nil is allowed for unlimited)
-	if cpu != nil && *cpu == 0 {
-		return nil, projecterrors.ErrCPULimitNegative
-	}
-	if memory != nil && *memory == 0 {
-		return nil, projecterrors.ErrMemoryLimitNegative
-	}
-	if disk != nil && *disk == 0 {
-		return nil, projecterrors.ErrDiskLimitNegative
-	}
-	if traffic != nil && *traffic == 0 {
-		return nil, projecterrors.ErrTrafficLimitNegative
+func NewResourceLimits(cpu *uint32, memoryRequest, memoryLimit, disk *uint32, traffic *uint64) (*ResourceLimits, error) {
+	rl := &ResourceLimits{
+		cpuLimit:      cpu,
+		memoryRequest: memoryRequest,
+		memoryLimit:   memoryLimit,
+		diskLimit:     disk,
+		trafficLimit:  traffic,
 	}
 
-	return &ResourceLimits{
-		cpuLimit:     cpu,
-		memoryLimit:  memory,
-		diskLimit:    disk,
-		trafficLimit: traffic,
-	}, nil
+	// Validate the resource limits
+	if err := rl.Validate(); err != nil {
+		return nil, err
+	}
+
+	return rl, nil
 }
 
-// NewResourceLimitsForPlan creates ResourceLimits based on a plan name
-func NewResourceLimitsForPlan(plan string) (*ResourceLimits, error) {
-	limits, exists := PlanLimits[plan]
-	if !exists {
-		return nil, projecterrors.ErrPlanNotFound
-	}
+// NewResourceLimitsForPlan - Plan-based limits are not implemented yet (per user request)
+// func NewResourceLimitsForPlan(plan string) (*ResourceLimits, error) { ... }
 
-	// Create a copy to avoid modifying the global plan limits
-	return &ResourceLimits{
-		cpuLimit:     copyUint32Ptr(limits.cpuLimit),
-		memoryLimit:  copyUint32Ptr(limits.memoryLimit),
-		diskLimit:    copyUint32Ptr(limits.diskLimit),
-		trafficLimit: copyUint64Ptr(limits.trafficLimit),
-	}, nil
-}
+// Unit conversion constants
+const (
+	MiToBytes = 1024 * 1024 // 1 Mi = 1048576 bytes
+	GiBToMi   = 1024        // 1 GiB = 1024 Mi
+)
+
+// System-wide absolute resource limits for security and resource management
+const (
+	// CPU limits in millicores (1000 = 1 CPU core)
+	MinCPULimit = 0
+	MaxCPULimit = 4000 // 4 cores
+
+	// Memory limits in Mi (Mebibytes)
+	MinMemoryRequest = 128  // 128 Mi
+	MinMemoryLimit   = 128  // 128 Mi
+	MaxMemoryLimit   = 8192 // 8192 Mi = ~8GB
+
+	// Storage limits in Mi (Mebibytes)
+	MinDiskLimit = 128          // 128 Mi
+	MaxDiskLimit = 10 * GiBToMi // 10 GB = 10240 Mi
+
+	// Traffic limits in Mi (Mebibytes) per month
+	MinTrafficLimit = 128 // 128 Mi
+	// MaxTrafficLimit = nil (unlimited)
+)
 
 // Validate validates the resource limits
 func (r ResourceLimits) Validate() error {
-	// All limits are optional (nil means unlimited)
-	// But if set, they must be positive
-	if r.cpuLimit != nil && *r.cpuLimit == 0 {
-		return projecterrors.ErrCPULimitNegative
+	// CPU Limit validation: min:0, max:4000 millicores
+	if r.cpuLimit != nil {
+		if *r.cpuLimit < MinCPULimit || *r.cpuLimit > MaxCPULimit {
+			return projecterrors.ErrCPULimitExceeded
+		}
 	}
-	if r.memoryLimit != nil && *r.memoryLimit == 0 {
-		return projecterrors.ErrMemoryLimitNegative
+
+	// Memory Request validation: min:128Mi, max: Memory Limit (if set)
+	if r.memoryRequest != nil {
+		if *r.memoryRequest < MinMemoryRequest {
+			return projecterrors.ErrMemoryRequestTooSmall
+		}
+		// If memory limit is also set, request cannot exceed limit
+		if r.memoryLimit != nil && *r.memoryRequest > *r.memoryLimit {
+			return projecterrors.ErrMemoryRequestExceedsLimit
+		}
 	}
-	if r.diskLimit != nil && *r.diskLimit == 0 {
-		return projecterrors.ErrDiskLimitNegative
+
+	// Memory Limit validation: min:128Mi, max:8192Mi
+	if r.memoryLimit != nil {
+		if *r.memoryLimit < MinMemoryLimit || *r.memoryLimit > MaxMemoryLimit {
+			return projecterrors.ErrMemoryLimitExceeded
+		}
 	}
-	if r.trafficLimit != nil && *r.trafficLimit == 0 {
-		return projecterrors.ErrTrafficLimitNegative
+
+	// Storage Limit validation: min:128Mi, max:10240Mi
+	if r.diskLimit != nil {
+		if *r.diskLimit < MinDiskLimit || *r.diskLimit > MaxDiskLimit {
+			return projecterrors.ErrDiskLimitExceeded
+		}
 	}
+
+	// Traffic Limit validation: min:128Mi, max:unlimited
+	if r.trafficLimit != nil {
+		if *r.trafficLimit < MinTrafficLimit {
+			return projecterrors.ErrTrafficLimitTooSmall
+		}
+		// No maximum limit for traffic (unlimited)
+	}
+
 	return nil
 }
 
-// ValidateForPlan validates if the resource limits are within the plan's constraints
-func (r ResourceLimits) ValidateForPlan(plan string) error {
-	planLimits, exists := PlanLimits[plan]
-	if !exists {
-		return projecterrors.ErrPlanNotFound
-	}
-
-	if r.Exceeds(planLimits) {
-		return projecterrors.ErrPlanLimitExceeded
-	}
-
-	return nil
-}
+// ValidateForPlan - Plan validation not implemented yet (per user request)
+// func (r ResourceLimits) ValidateForPlan(plan string) error { ... }
 
 // Exceeds checks if current limits exceed the other limits
 func (r ResourceLimits) Exceeds(other ResourceLimits) bool {
 	// If other has a limit and we exceed it, return true
 	if other.cpuLimit != nil && r.cpuLimit != nil && *r.cpuLimit > *other.cpuLimit {
+		return true
+	}
+	if other.memoryRequest != nil && r.memoryRequest != nil && *r.memoryRequest > *other.memoryRequest {
 		return true
 	}
 	if other.memoryLimit != nil && r.memoryLimit != nil && *r.memoryLimit > *other.memoryLimit {
@@ -145,7 +148,10 @@ func (r ResourceLimits) IsWithinQuota(usage ResourceUsage) bool {
 	if r.cpuLimit != nil && usage.CPUUsage > *r.cpuLimit {
 		return false
 	}
-	if r.memoryLimit != nil && usage.MemoryUsage > *r.memoryLimit {
+	if r.memoryRequest != nil && usage.MemoryReqUsage > *r.memoryRequest {
+		return false
+	}
+	if r.memoryLimit != nil && usage.MemoryLimitUsage > *r.memoryLimit {
 		return false
 	}
 	if r.diskLimit != nil && usage.DiskUsage > *r.diskLimit {
@@ -161,6 +167,11 @@ func (r ResourceLimits) IsWithinQuota(usage ResourceUsage) bool {
 // GetCPULimit returns the CPU limit
 func (r ResourceLimits) GetCPULimit() *uint32 {
 	return copyUint32Ptr(r.cpuLimit)
+}
+
+// GetMemoryRequest returns the memory request
+func (r ResourceLimits) GetMemoryRequest() *uint32 {
+	return copyUint32Ptr(r.memoryRequest)
 }
 
 // GetMemoryLimit returns the memory limit
@@ -183,6 +194,9 @@ func (r ResourceLimits) Equals(other ResourceLimits) bool {
 	if !equalUint32Ptr(r.cpuLimit, other.cpuLimit) {
 		return false
 	}
+	if !equalUint32Ptr(r.memoryRequest, other.memoryRequest) {
+		return false
+	}
 	if !equalUint32Ptr(r.memoryLimit, other.memoryLimit) {
 		return false
 	}
@@ -198,13 +212,18 @@ func (r ResourceLimits) Equals(other ResourceLimits) bool {
 
 // IsUnlimited checks if all resource limits are unlimited (nil)
 func (r ResourceLimits) IsUnlimited() bool {
-	return r.cpuLimit == nil && r.memoryLimit == nil &&
+	return r.cpuLimit == nil && r.memoryRequest == nil && r.memoryLimit == nil &&
 		r.diskLimit == nil && r.trafficLimit == nil
 }
 
 // HasCPULimit checks if CPU limit is set
 func (r ResourceLimits) HasCPULimit() bool {
 	return r.cpuLimit != nil
+}
+
+// HasMemoryRequest checks if memory request is set
+func (r ResourceLimits) HasMemoryRequest() bool {
+	return r.memoryRequest != nil
 }
 
 // HasMemoryLimit checks if memory limit is set
@@ -223,14 +242,6 @@ func (r ResourceLimits) HasTrafficLimit() bool {
 }
 
 // Helper functions
-
-func uint32Ptr(v uint32) *uint32 {
-	return &v
-}
-
-func uint64Ptr(v uint64) *uint64 {
-	return &v
-}
 
 func copyUint32Ptr(p *uint32) *uint32 {
 	if p == nil {

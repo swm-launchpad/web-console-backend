@@ -14,15 +14,15 @@ type ProjectRepository interface {
 	Create(ctx context.Context, project *model.Project) error
 
 	// Save updates an existing project
-	// The entire aggregate (including ProjectUsers and Volumes) should be saved
+	// The entire aggregate (including ProjectUsers) should be saved
 	Save(ctx context.Context, project *model.Project) error
 
 	// FindByID retrieves a project by its ID
-	// Should return the complete aggregate with all ProjectUsers and Volumes
+	// Should return the complete aggregate with all ProjectUsers
 	FindByID(ctx context.Context, projectID uint) (*model.Project, error)
 
 	// FindBySlug retrieves a project by its slug
-	// Should return the complete aggregate with all ProjectUsers and Volumes
+	// Should return the complete aggregate with all ProjectUsers
 	FindBySlug(ctx context.Context, slug string) (*model.Project, error)
 
 	// FindByUserID retrieves all projects for a specific user

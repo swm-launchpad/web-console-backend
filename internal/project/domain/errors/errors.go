@@ -51,14 +51,21 @@ var (
 
 // Resource limit errors - errors related to resource constraints
 var (
-	ErrInvalidResourceLimits = errors.New("invalid resource limits")
-	ErrCPULimitNegative      = errors.New("CPU limit cannot be negative")
-	ErrMemoryLimitNegative   = errors.New("memory limit cannot be negative")
-	ErrDiskLimitNegative     = errors.New("disk limit cannot be negative")
-	ErrTrafficLimitNegative  = errors.New("traffic limit cannot be negative")
-	ErrResourceLimitExceeded = errors.New("resource limit exceeded")
-	ErrPlanLimitExceeded     = errors.New("plan limit exceeded")
-	ErrIncompatiblePlan      = errors.New("resource limits incompatible with plan")
+	ErrInvalidResourceLimits     = errors.New("invalid resource limits")
+	ErrCPULimitNegative          = errors.New("CPU limit cannot be negative")
+	ErrMemoryLimitNegative       = errors.New("memory limit cannot be negative")
+	ErrDiskLimitNegative         = errors.New("disk limit cannot be negative")
+	ErrTrafficLimitNegative      = errors.New("traffic limit cannot be negative")
+	ErrCPULimitExceeded          = errors.New("CPU limit must be between 0-4000 millicores")
+	ErrMemoryRequestTooSmall     = errors.New("memory request must be at least 128Mi")
+	ErrMemoryRequestExceedsLimit = errors.New("memory request cannot exceed memory limit")
+	ErrMemoryLimitExceeded       = errors.New("memory limit must be between 128Mi-8192Mi")
+	ErrDiskLimitExceeded         = errors.New("disk limit must be between 128Mi-10240Mi")
+	ErrTrafficLimitTooSmall      = errors.New("traffic limit must be at least 128Mi")
+	ErrTrafficLimitExceeded      = errors.New("traffic limit exceeds maximum allowed")
+	ErrResourceLimitExceeded     = errors.New("resource limit exceeded")
+	ErrPlanLimitExceeded         = errors.New("plan limit exceeded")
+	ErrIncompatiblePlan          = errors.New("resource limits incompatible with plan")
 )
 
 // Plan errors - errors related to project plans
@@ -70,11 +77,14 @@ var (
 
 // Volume errors - errors related to volume management
 var (
-	ErrVolumeNotFound      = errors.New("volume not found")
-	ErrVolumeNameRequired  = errors.New("volume name is required")
-	ErrInvalidCapacity     = errors.New("invalid volume capacity")
-	ErrDuplicateVolumeName = errors.New("volume name already exists in project")
-	ErrMaxVolumesExceeded  = errors.New("maximum number of volumes exceeded")
+	ErrVolumeNotFound         = errors.New("volume not found")
+	ErrVolumeNameRequired     = errors.New("volume name is required")
+	ErrInvalidVolumeID        = errors.New("invalid volume ID")
+	ErrInvalidCapacity        = errors.New("invalid volume capacity")
+	ErrVolumeCapacityTooSmall = errors.New("volume capacity must be at least 128Mi")
+	ErrVolumeCapacityExceeded = errors.New("volume capacity exceeds maximum allowed (10240Mi)")
+	ErrDuplicateVolumeName    = errors.New("volume name already exists in project")
+	ErrMaxVolumesExceeded     = errors.New("maximum number of volumes exceeded")
 )
 
 // Infrastructure errors - errors related to data persistence and external services
