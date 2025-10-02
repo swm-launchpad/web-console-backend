@@ -4,6 +4,7 @@ import (
 	"time"
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 )
 
 // ProjectUser represents a user's membership in a project
@@ -12,23 +13,20 @@ type ProjectUser struct {
 	projectUserID uint
 	projectID     uint
 	userID        uint
-	role          ProjectUserRole
+	role          value.ProjectUserRole
 	isDeleted     bool
 	deletedAt     *time.Time
 	createdAt     time.Time
-	updatedAt     *time.Time
+	updatedAt     time.Time
 }
 
 // NewProjectUser creates a new ProjectUser entity
-func NewProjectUser(projectID, userID uint, role ProjectUserRole) (*ProjectUser, error) {
+func NewProjectUser(projectID, userID uint, role value.ProjectUserRole) (*ProjectUser, error) {
 	if projectID == 0 {
 		return nil, projecterrors.ErrInvalidProjectID
 	}
 	if userID == 0 {
 		return nil, projecterrors.ErrInvalidUserID
-	}
-	if !role.IsValid() {
-		return nil, projecterrors.ErrInvalidUserRole
 	}
 
 	now := time.Now()
@@ -38,42 +36,38 @@ func NewProjectUser(projectID, userID uint, role ProjectUserRole) (*ProjectUser,
 		role:      role,
 		isDeleted: false,
 		createdAt: now,
-		updatedAt: &now,
+		updatedAt: now,
 	}, nil
 }
 
-// GetProjectUserID returns the project user ID
-func (pu *ProjectUser) GetProjectUserID() uint {
+// ProjectUserID returns the project user ID
+func (pu *ProjectUser) ProjectUserID() uint {
 	return pu.projectUserID
 }
 
-// GetProjectID returns the project ID
-func (pu *ProjectUser) GetProjectID() uint {
+// ProjectID returns the project ID
+func (pu *ProjectUser) ProjectID() uint {
 	return pu.projectID
 }
 
-// GetUserID returns the user ID
-func (pu *ProjectUser) GetUserID() uint {
+// UserID returns the user ID
+func (pu *ProjectUser) UserID() uint {
 	return pu.userID
 }
 
-// GetRole returns the user's role in the project
-func (pu *ProjectUser) GetRole() ProjectUserRole {
+// Role returns the user's role in the project
+func (pu *ProjectUser) Role() value.ProjectUserRole {
 	return pu.role
 }
 
-// GetCreatedAt returns the creation time
-func (pu *ProjectUser) GetCreatedAt() time.Time {
+// CreatedAt returns the creation time
+func (pu *ProjectUser) CreatedAt() time.Time {
 	return pu.createdAt
 }
 
-// GetUpdatedAt returns the last update time
-func (pu *ProjectUser) GetUpdatedAt() *time.Time {
-	if pu.updatedAt == nil {
-		return nil
-	}
-	t := *pu.updatedAt
-	return &t
+// UpdatedAt returns the last update time
+func (pu *ProjectUser) UpdatedAt() time.Time {
+	return pu.updatedAt
 }
 
 // IsDeleted returns whether the user is soft deleted from the project
@@ -81,8 +75,8 @@ func (pu *ProjectUser) IsDeleted() bool {
 	return pu.isDeleted
 }
 
-// GetDeletedAt returns the deletion time
-func (pu *ProjectUser) GetDeletedAt() *time.Time {
+// DeletedAt returns the deletion time
+func (pu *ProjectUser) DeletedAt() *time.Time {
 	if pu.deletedAt == nil {
 		return nil
 	}
@@ -96,11 +90,7 @@ func (pu *ProjectUser) SetProjectUserID(id uint) {
 }
 
 // ChangeRole changes the user's role in the project
-func (pu *ProjectUser) ChangeRole(newRole ProjectUserRole) error {
-	if !newRole.IsValid() {
-		return projecterrors.ErrInvalidUserRole
-	}
-
+func (pu *ProjectUser) ChangeRole(newRole value.ProjectUserRole) error {
 	if pu.isDeleted {
 		return projecterrors.ErrUserNotInProject
 	}
@@ -111,8 +101,7 @@ func (pu *ProjectUser) ChangeRole(newRole ProjectUserRole) error {
 	}
 
 	pu.role = newRole
-	now := time.Now()
-	pu.updatedAt = &now
+	pu.updatedAt = time.Now()
 
 	return nil
 }
@@ -131,7 +120,7 @@ func (pu *ProjectUser) SoftDelete() error {
 	pu.isDeleted = true
 	now := time.Now()
 	pu.deletedAt = &now
-	pu.updatedAt = &now
+	pu.updatedAt = now
 
 	return nil
 }
@@ -145,21 +134,9 @@ func (pu *ProjectUser) Restore() error {
 	pu.isDeleted = false
 	pu.deletedAt = nil
 	now := time.Now()
-	pu.updatedAt = &now
+	pu.updatedAt = now
 
 	return nil
-}
-
-// Equals checks if two ProjectUser entities are equal
-func (pu *ProjectUser) Equals(other *ProjectUser) bool {
-	if other == nil {
-		return false
-	}
-
-	return pu.projectID == other.projectID &&
-		pu.userID == other.userID &&
-		pu.role.Equals(other.role) &&
-		pu.isDeleted == other.isDeleted
 }
 
 // BelongsToProject checks if the user belongs to a specific project

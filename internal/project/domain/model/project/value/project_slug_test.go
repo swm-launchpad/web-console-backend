@@ -1,4 +1,4 @@
-package model
+package value
 
 import (
 	"strings"
@@ -115,12 +115,4 @@ func TestProjectSlug_Equals(t *testing.T) {
 	assert.True(t, slug2.Equals(*slug1))
 	assert.False(t, slug1.Equals(*slug3))
 	assert.False(t, slug3.Equals(*slug1))
-}
-
-func TestProjectSlug_IsEmpty(t *testing.T) {
-	emptySlug := ProjectSlug{}
-	assert.True(t, emptySlug.IsEmpty())
-
-	slug, _ := NewProjectSlug("my-project")
-	assert.False(t, slug.IsEmpty())
 }

@@ -1,4 +1,4 @@
-package model
+package value
 
 import (
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
@@ -14,14 +14,14 @@ const (
 // NewProjectUserRole creates a new ProjectUserRole with validation
 func NewProjectUserRole(role string) (ProjectUserRole, error) {
 	r := ProjectUserRole(role)
-	if !r.IsValid() {
+	if !r.isValid() {
 		return "", projecterrors.ErrInvalidUserRole
 	}
 	return r, nil
 }
 
-// IsValid checks if the role is a valid ProjectUserRole
-func (r ProjectUserRole) IsValid() bool {
+// isValid checks if the role is a valid ProjectUserRole
+func (r ProjectUserRole) isValid() bool {
 	return r == ProjectUserRoleOwner
 }
 

@@ -1,4 +1,4 @@
-package model
+package value
 
 import (
 	"regexp"
@@ -28,25 +28,35 @@ func NewProjectSlug(slug string) (*ProjectSlug, error) {
 	// Convert to lowercase
 	slug = strings.ToLower(strings.TrimSpace(slug))
 
+	ps := &ProjectSlug{value: slug}
+	if err := ps.validate(); err != nil {
+		return nil, err
+	}
+
+	return ps, nil
+}
+
+// validate validates the slug format and constraints
+func (s *ProjectSlug) validate() error {
 	// Check if empty
-	if slug == "" {
-		return nil, projecterrors.ErrSlugRequired
+	if s.value == "" {
+		return projecterrors.ErrSlugRequired
 	}
 
 	// Check length constraints
-	if len(slug) < slugMinLength {
-		return nil, projecterrors.ErrSlugTooShort
+	if len(s.value) < slugMinLength {
+		return projecterrors.ErrSlugTooShort
 	}
-	if len(slug) > slugMaxLength {
-		return nil, projecterrors.ErrSlugTooLong
+	if len(s.value) > slugMaxLength {
+		return projecterrors.ErrSlugTooLong
 	}
 
 	// Check format
-	if !slugRegex.MatchString(slug) {
-		return nil, projecterrors.ErrSlugInvalidFormat
+	if !slugRegex.MatchString(s.value) {
+		return projecterrors.ErrSlugInvalidFormat
 	}
 
-	return &ProjectSlug{value: slug}, nil
+	return nil
 }
 
 // String returns the string representation of the slug
@@ -57,9 +67,4 @@ func (s ProjectSlug) String() string {
 // Equals checks if two ProjectSlug values are equal
 func (s ProjectSlug) Equals(other ProjectSlug) bool {
 	return s.value == other.value
-}
-
-// IsEmpty checks if the slug is empty
-func (s ProjectSlug) IsEmpty() bool {
-	return s.value == ""
 }

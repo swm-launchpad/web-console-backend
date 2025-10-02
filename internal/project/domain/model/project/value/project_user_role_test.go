@@ -1,4 +1,4 @@
-package model
+package value
 
 import (
 	"testing"
@@ -36,10 +36,10 @@ func TestNewProjectUserRole(t *testing.T) {
 }
 
 func TestProjectUserRole_IsValid(t *testing.T) {
-	assert.True(t, ProjectUserRoleOwner.IsValid())
+	assert.True(t, ProjectUserRoleOwner.isValid())
 
 	invalidRole := ProjectUserRole("invalid")
-	assert.False(t, invalidRole.IsValid())
+	assert.False(t, invalidRole.isValid())
 }
 
 func TestProjectUserRole_IsOwner(t *testing.T) {
