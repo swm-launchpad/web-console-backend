@@ -34,7 +34,11 @@ func NewAddVolumeUseCase(volumeService service.VolumeService, txManager db.TxMan
 }
 
 func (uc *AddVolumeUseCase) Execute(ctx context.Context, input AddVolumeInput) (*AddVolumeOutput, error) {
-	var output *AddVolumeOutput
+	var volumeID uint
+	var projectID uint
+	var name string
+	var capacity uint32
+	var createdAt string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Create volume through VolumeService
@@ -43,17 +47,26 @@ func (uc *AddVolumeUseCase) Execute(ctx context.Context, input AddVolumeInput) (
 			return err
 		}
 
-		// Build output
-		output = &AddVolumeOutput{
-			VolumeID:  volume.GetVolumeID(),
-			ProjectID: volume.GetProjectID(),
-			Name:      volume.GetName(),
-			Capacity:  volume.GetCapacity(),
-			CreatedAt: volume.GetCreatedAt().Format("2006-01-02T15:04:05Z"),
-		}
+		// Extract values within transaction
+		volumeID = volume.VolumeID()
+		projectID = volume.ProjectID()
+		name = volume.Name()
+		capacity = volume.Capacity()
+		createdAt = volume.CreatedAt().Format("2006-01-02T15:04:05Z")
 
 		return nil
 	})
 
-	return output, err
+	if err != nil {
+		return nil, err
+	}
+
+	// Build output after successful transaction
+	return &AddVolumeOutput{
+		VolumeID:  volumeID,
+		ProjectID: projectID,
+		Name:      name,
+		Capacity:  capacity,
+		CreatedAt: createdAt,
+	}, nil
 }

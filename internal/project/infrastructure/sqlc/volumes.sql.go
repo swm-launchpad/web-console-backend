@@ -38,15 +38,14 @@ const createVolume = `-- name: CreateVolume :execresult
 INSERT INTO VOLUMES (
     project_id, name, capacity,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, NULL)
 `
 
 type CreateVolumeParams struct {
-	ProjectID uint32       `json:"project_id"`
-	Name      string       `json:"name"`
-	Capacity  uint32       `json:"capacity"`
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt sql.NullTime `json:"updated_at"`
+	ProjectID uint32    `json:"project_id"`
+	Name      string    `json:"name"`
+	Capacity  uint32    `json:"capacity"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Volumes CRUD (Independent Aggregate Root)
@@ -56,7 +55,6 @@ func (q *Queries) CreateVolume(ctx context.Context, arg CreateVolumeParams) (sql
 		arg.Name,
 		arg.Capacity,
 		arg.CreatedAt,
-		arg.UpdatedAt,
 	)
 }
 
@@ -66,6 +64,14 @@ DELETE FROM VOLUMES WHERE volume_id = ?
 
 func (q *Queries) DeleteVolume(ctx context.Context, volumeID uint32) (sql.Result, error) {
 	return q.db.ExecContext(ctx, deleteVolume, volumeID)
+}
+
+const deleteVolumesByProjectID = `-- name: DeleteVolumesByProjectID :execresult
+DELETE FROM VOLUMES WHERE project_id = ?
+`
+
+func (q *Queries) DeleteVolumesByProjectID(ctx context.Context, projectID uint32) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteVolumesByProjectID, projectID)
 }
 
 const existsVolumeByName = `-- name: ExistsVolumeByName :one
@@ -85,6 +91,19 @@ func (q *Queries) ExistsVolumeByName(ctx context.Context, arg ExistsVolumeByName
 	var volume_exists bool
 	err := row.Scan(&volume_exists)
 	return volume_exists, err
+}
+
+const getTotalCapacityByProjectID = `-- name: GetTotalCapacityByProjectID :one
+SELECT COALESCE(SUM(capacity), 0) as total_capacity
+FROM VOLUMES
+WHERE project_id = ?
+`
+
+func (q *Queries) GetTotalCapacityByProjectID(ctx context.Context, projectID uint32) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getTotalCapacityByProjectID, projectID)
+	var total_capacity interface{}
+	err := row.Scan(&total_capacity)
+	return total_capacity, err
 }
 
 const getVolumeByID = `-- name: GetVolumeByID :one
@@ -217,27 +236,4 @@ func (q *Queries) ListVolumes(ctx context.Context, arg ListVolumesParams) ([]Vol
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateVolume = `-- name: UpdateVolume :execresult
-UPDATE VOLUMES SET
-    name = ?, capacity = ?,
-    updated_at = ?
-WHERE volume_id = ?
-`
-
-type UpdateVolumeParams struct {
-	Name      string       `json:"name"`
-	Capacity  uint32       `json:"capacity"`
-	UpdatedAt sql.NullTime `json:"updated_at"`
-	VolumeID  uint32       `json:"volume_id"`
-}
-
-func (q *Queries) UpdateVolume(ctx context.Context, arg UpdateVolumeParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateVolume,
-		arg.Name,
-		arg.Capacity,
-		arg.UpdatedAt,
-		arg.VolumeID,
-	)
 }

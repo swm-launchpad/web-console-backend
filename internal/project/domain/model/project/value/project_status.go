@@ -1,4 +1,4 @@
-package model
+package value
 
 import (
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
@@ -14,14 +14,14 @@ const (
 // NewProjectStatus creates a new ProjectStatus with validation
 func NewProjectStatus(status string) (ProjectStatus, error) {
 	ps := ProjectStatus(status)
-	if !ps.IsValid() {
+	if !ps.isValid() {
 		return "", projecterrors.ErrInvalidFormat
 	}
 	return ps, nil
 }
 
-// IsValid checks if the status is a valid ProjectStatus
-func (s ProjectStatus) IsValid() bool {
+// isValid checks if the status is a valid ProjectStatus
+func (s ProjectStatus) isValid() bool {
 	return s == ProjectStatusActive
 }
 

@@ -11,6 +11,15 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
+// MVP 강제 정책 상수 - Handler 계층에서 정책 적용
+const (
+	MVPMaxProjectsPerUser = 3       // 사용자당 최대 3개 프로젝트
+	MVPForcedCPULimit     = 1000    // 1000m = 1 CPU core
+	MVPForcedMemoryLimit  = 2048    // 2Gi = 2048Mi
+	MVPForcedDiskLimit    = 2048    // 2Gi = 2048Mi
+	MVPForcedTrafficLimit = 1048576 // 1TB = 1048576Mi
+)
+
 type ProjectHandler struct {
 	createProjectUseCase *application.CreateProjectUseCase
 	getProjectUseCase    *application.GetProjectUseCase
@@ -18,6 +27,7 @@ type ProjectHandler struct {
 	deleteProjectUseCase *application.DeleteProjectUseCase
 	listProjectsUseCase  *application.ListProjectsUseCase
 	permissionService    service.PermissionService
+	projectService       service.ProjectService
 }
 
 func NewProjectHandler(
@@ -27,6 +37,7 @@ func NewProjectHandler(
 	deleteProjectUseCase *application.DeleteProjectUseCase,
 	listProjectsUseCase *application.ListProjectsUseCase,
 	permissionService service.PermissionService,
+	projectService service.ProjectService,
 ) *ProjectHandler {
 	return &ProjectHandler{
 		createProjectUseCase: createProjectUseCase,
@@ -35,20 +46,21 @@ func NewProjectHandler(
 		deleteProjectUseCase: deleteProjectUseCase,
 		listProjectsUseCase:  listProjectsUseCase,
 		permissionService:    permissionService,
+		projectService:       projectService,
 	}
 }
 
 // CreateProjectRequest represents the request body for project creation
+// MVP 단계: FQDN, Plan 입력은 무시되고 nil로 강제됨
+// 리소스 제한 입력은 무시되고 MVP 고정값으로 강제됨
 type CreateProjectRequest struct {
-	Name          string  `json:"name" binding:"required,min=1,max=100"`
-	Slug          string  `json:"slug" binding:"required,min=3,max=63,ascii"`
-	FQDN          *string `json:"fqdn,omitempty" binding:"omitempty,max=253,fqdn"`
-	Plan          *string `json:"plan,omitempty"`                                                // Plan validation disabled per user request
-	CPULimit      *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=0,max=4000"`        // 0-4000 millicores
-	MemoryRequest *uint32 `json:"memory_request,omitempty" binding:"omitempty,min=128,max=8192"` // 128-8192 Mi
-	MemoryLimit   *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=128,max=8192"`   // 128-8192 Mi
-	DiskLimit     *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=128,max=10240"`    // 128-10240 Mi
-	TrafficLimit  *uint64 `json:"traffic_limit,omitempty" binding:"omitempty,min=128"`           // min=128Mi, no max
+	Name         string  `json:"name" binding:"required,min=1,max=100"`
+	FQDN         *string `json:"fqdn,omitempty"`
+	Plan         *string `json:"plan,omitempty"`
+	CPULimit     uint32  `json:"cpu_limit" binding:"required,min=100,max=4000"`
+	MemoryLimit  uint32  `json:"memory_limit" binding:"required,min=128,max=8192"`
+	DiskLimit    uint32  `json:"disk_limit" binding:"required,min=128,max=10240"`
+	TrafficLimit uint32  `json:"traffic_limit" binding:"required,min=128,max=1048576"`
 }
 
 // CreateProject handles POST /api/v1/projects
@@ -68,17 +80,28 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		return
 	}
 
+	// MVP 정책 1: 사용자당 프로젝트 개수 제한 확인
+	projectCount, err := h.projectService.CountProjectsByUserID(c.Request.Context(), userID.(uint))
+	if err != nil {
+		response.Error(c, err, mapProjectError)
+		return
+	}
+	if projectCount >= MVPMaxProjectsPerUser {
+		response.Error(c, projecterrors.ErrProjectLimitExceeded, mapProjectError)
+		return
+	}
+
+	// MVP 정책 2: FQDN, Plan 강제 적용 (null로 강제, Frontend 입력 무시)
+	// MVP 정책 3: 리소스 제한 강제 적용 (Frontend 입력 무시)
 	input := application.CreateProjectInput{
-		Name:          req.Name,
-		Slug:          req.Slug,
-		OwnerID:       userID.(uint),
-		FQDN:          req.FQDN,
-		Plan:          req.Plan,
-		CPULimit:      req.CPULimit,
-		MemoryRequest: req.MemoryRequest,
-		MemoryLimit:   req.MemoryLimit,
-		DiskLimit:     req.DiskLimit,
-		TrafficLimit:  req.TrafficLimit,
+		Name:         req.Name,
+		OwnerID:      userID.(uint),
+		FQDN:         nil,                   // MVP: FQDN not allowed
+		Plan:         nil,                   // MVP: Plan not allowed
+		CPULimit:     MVPForcedCPULimit,     // MVP: 1000m = 1 CPU core
+		MemoryLimit:  MVPForcedMemoryLimit,  // MVP: 2048Mi = 2Gi
+		DiskLimit:    MVPForcedDiskLimit,    // MVP: 2048Mi = 2Gi
+		TrafficLimit: MVPForcedTrafficLimit, // MVP: 1TB = 1048576Mi
 	}
 
 	output, err := h.createProjectUseCase.Execute(c.Request.Context(), input)
@@ -94,15 +117,11 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 func (h *ProjectHandler) GetProject(c *gin.Context) {
 	projectIDStr := c.Param("id")
 
-	// Try to parse as ID first
-	var input application.GetProjectInput
-	var projectID uint
-	if id, err := strconv.ParseUint(projectIDStr, 10, 32); err == nil {
-		projectID = uint(id)
-		input.ProjectID = &projectID
-	} else {
-		// Treat as slug - we need to resolve it to check permission
-		input.Slug = &projectIDStr
+	// Parse ID
+	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
+	if err != nil {
+		response.Error(c, projecterrors.ErrInvalidProjectID, mapProjectError)
+		return
 	}
 
 	// Check user permission for project access
@@ -112,7 +131,10 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 		return
 	}
 
-	// Execute the use case first
+	// Execute the use case
+	input := application.GetProjectInput{
+		ProjectID: uint(projectID),
+	}
 	output, err := h.getProjectUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
 		response.Error(c, err, mapProjectError)
@@ -131,16 +153,15 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 }
 
 // UpdateProjectRequest represents the request body for project update
+// MVP 단계: FQDN, Plan 입력은 무시되고 nil로 강제됨
+// 리소스 제한 입력은 무시되고 MVP 고정값으로 강제됨
 type UpdateProjectRequest struct {
-	Name          *string `json:"name,omitempty" binding:"omitempty,min=1,max=100"`
-	FQDN          *string `json:"fqdn,omitempty" binding:"omitempty,max=253,fqdn"`
-	Plan          *string `json:"plan,omitempty"` // Plan validation disabled per user request
-	Status        *string `json:"status,omitempty" binding:"omitempty,oneof=active inactive suspended"`
-	CPULimit      *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=0,max=4000"`        // 0-4000 millicores
-	MemoryRequest *uint32 `json:"memory_request,omitempty" binding:"omitempty,min=128,max=8192"` // 128-8192 Mi
-	MemoryLimit   *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=128,max=8192"`   // 128-8192 Mi
-	DiskLimit     *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=128,max=10240"`    // 128-10240 Mi
-	TrafficLimit  *uint64 `json:"traffic_limit,omitempty" binding:"omitempty,min=128"`           // min=128Mi, no max
+	FQDN         *string `json:"fqdn,omitempty"`
+	Plan         *string `json:"plan,omitempty"`
+	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=100,max=4000"`
+	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=128,max=8192"`
+	DiskLimit    *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=128,max=10240"`
+	TrafficLimit *uint32 `json:"traffic_limit,omitempty" binding:"omitempty,min=128,max=1048576"`
 }
 
 // UpdateProject handles PUT /api/v1/projects/:id
@@ -148,9 +169,7 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	projectIDStr := c.Param("id")
 	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
 	if err != nil {
-		response.Error(c, projecterrors.ErrValidationFailed, mapProjectError, response.WithDetails(map[string]any{
-			"message": "Invalid request format: " + err.Error(),
-		}))
+		response.Error(c, projecterrors.ErrInvalidProjectID, mapProjectError)
 		return
 	}
 
@@ -170,21 +189,28 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	}
 
 	if err := h.permissionService.CanUserModifyProject(c.Request.Context(), userID.(uint), uint(projectID)); err != nil {
-		response.Error(c, err, mapProjectError)
+		// Return project not found instead of permission denied to prevent information disclosure
+		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
 		return
 	}
 
+	// MVP 정책: FQDN, Plan, 리소스 제한 강제 적용 (Frontend 입력 무시)
+	// Name, Status는 업데이트 불가 (nil로 설정)
+	cpuLimit := uint32(MVPForcedCPULimit)
+	memoryLimit := uint32(MVPForcedMemoryLimit)
+	diskLimit := uint32(MVPForcedDiskLimit)
+	trafficLimit := uint32(MVPForcedTrafficLimit)
+
 	input := application.UpdateProjectInput{
-		ProjectID:     uint(projectID),
-		Name:          req.Name,
-		FQDN:          req.FQDN,
-		Plan:          req.Plan,
-		Status:        req.Status,
-		CPULimit:      req.CPULimit,
-		MemoryRequest: req.MemoryRequest,
-		MemoryLimit:   req.MemoryLimit,
-		DiskLimit:     req.DiskLimit,
-		TrafficLimit:  req.TrafficLimit,
+		ProjectID:    uint(projectID),
+		Name:         nil,           // MVP: Name 업데이트 불가
+		Status:       nil,           // MVP: Status 업데이트 불가
+		FQDN:         nil,           // MVP: FQDN not allowed (force null)
+		Plan:         nil,           // MVP: Plan not allowed (force null)
+		CPULimit:     &cpuLimit,     // MVP: force CPU limit
+		MemoryLimit:  &memoryLimit,  // MVP: force memory limit
+		DiskLimit:    &diskLimit,    // MVP: force disk limit
+		TrafficLimit: &trafficLimit, // MVP: force traffic limit (1TB)
 	}
 
 	output, err := h.updateProjectUseCase.Execute(c.Request.Context(), input)
@@ -201,9 +227,7 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 	projectIDStr := c.Param("id")
 	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
 	if err != nil {
-		response.Error(c, projecterrors.ErrValidationFailed, mapProjectError, response.WithDetails(map[string]any{
-			"message": "Invalid request format: " + err.Error(),
-		}))
+		response.Error(c, projecterrors.ErrInvalidProjectID, mapProjectError)
 		return
 	}
 
@@ -215,7 +239,8 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 	}
 
 	if err := h.permissionService.CanUserModifyProject(c.Request.Context(), userID.(uint), uint(projectID)); err != nil {
-		response.Error(c, err, mapProjectError)
+		// Return project not found instead of permission denied to prevent information disclosure
+		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
 		return
 	}
 
@@ -242,43 +267,21 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 	}
 
 	// Get query parameters
-	var userIDPtr *uint
+	userID := currentUserID.(uint)
 	if userIDStr := c.Query("user_id"); userIDStr != "" {
-		if userID, err := strconv.ParseUint(userIDStr, 10, 32); err == nil {
-			id := uint(userID)
+		if parsedUserID, err := strconv.ParseUint(userIDStr, 10, 32); err == nil {
+			id := uint(parsedUserID)
 			// Security check: users can only list their own projects
 			if id != currentUserID.(uint) {
 				response.Error(c, projecterrors.ErrPermissionDenied, mapProjectError)
 				return
 			}
-			userIDPtr = &id
-		}
-	}
-
-	// If no user_id specified, use current user
-	if userIDPtr == nil {
-		id := currentUserID.(uint)
-		userIDPtr = &id
-	}
-
-	offset := 0
-	if offsetStr := c.Query("offset"); offsetStr != "" {
-		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-			offset = o
-		}
-	}
-
-	limit := 10
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-			limit = l
+			userID = id
 		}
 	}
 
 	input := application.ListProjectsInput{
-		UserID: userIDPtr,
-		Offset: offset,
-		Limit:  limit,
+		UserID: userID,
 	}
 
 	output, err := h.listProjectsUseCase.Execute(c.Request.Context(), input)

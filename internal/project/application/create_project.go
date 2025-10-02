@@ -4,31 +4,34 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
 type CreateProjectInput struct {
-	Name          string
-	Slug          string
-	OwnerID       uint
-	FQDN          *string
-	Plan          *string
-	CPULimit      *uint32
-	MemoryRequest *uint32
-	MemoryLimit   *uint32
-	DiskLimit     *uint32
-	TrafficLimit  *uint64
+	Name         string
+	OwnerID      uint
+	FQDN         *string
+	Plan         *string
+	CPULimit     uint32
+	MemoryLimit  uint32
+	DiskLimit    uint32
+	TrafficLimit uint32
 }
 
 type CreateProjectOutput struct {
-	ProjectID uint   `json:"project_id"`
-	Name      string `json:"name"`
-	Slug      string `json:"slug"`
-	FQDN      string `json:"fqdn,omitempty"`
-	Plan      string `json:"plan,omitempty"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
+	ProjectID    uint   `json:"project_id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	FQDN         string `json:"fqdn,omitempty"`
+	Plan         string `json:"plan,omitempty"`
+	Status       string `json:"status"`
+	CPULimit     uint32 `json:"cpu_limit"`
+	MemoryLimit  uint32 `json:"memory_limit"`
+	DiskLimit    uint32 `json:"disk_limit"`
+	TrafficLimit uint32 `json:"traffic_limit"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at,omitempty"`
 }
 
 type CreateProjectUseCase struct {
@@ -44,73 +47,91 @@ func NewCreateProjectUseCase(projectService service.ProjectService, txManager db
 }
 
 func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProjectInput) (*CreateProjectOutput, error) {
-	var output *CreateProjectOutput
+	var projectID uint
+	var name string
+	var slug string
+	var status string
+	var cpuLimit, memoryLimit, diskLimit, trafficLimit uint32
+	var fqdn, plan string
+	var hasFQDN, hasPlan bool
+	var createdAt, updatedAt string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
-		// Create project slug
-		slug, err := model.NewProjectSlug(input.Slug)
+		// Prepare resource limits (all required)
+		limits, err := value.NewResourceLimits(
+			input.CPULimit,
+			input.MemoryLimit,
+			input.DiskLimit,
+			input.TrafficLimit,
+		)
 		if err != nil {
 			return err
 		}
 
 		// Create project through service
-		project, err := uc.projectService.CreateProject(txCtx, input.Name, *slug, input.OwnerID)
+		// Slug is automatically generated from name by the service
+		project, err := uc.projectService.CreateProject(
+			txCtx,
+			input.Name,
+			input.OwnerID,
+			*limits,
+			input.FQDN,
+			input.Plan,
+		)
 		if err != nil {
 			return err
 		}
 
-		// Set optional fields
-		if input.FQDN != nil {
-			if err := project.SetFQDN(*input.FQDN); err != nil {
-				return err
-			}
+		// Extract primitive values within transaction
+		projectID = project.ProjectID()
+		name = project.Name()
+		slug = project.Slug().String()
+		status = string(project.Status())
+		cpuLimit = project.Limits().CPULimit()
+		memoryLimit = project.Limits().MemoryLimit()
+		diskLimit = project.Limits().DiskLimit()
+		trafficLimit = project.Limits().TrafficLimit()
+		createdAt = project.CreatedAt().Format("2006-01-02T15:04:05Z")
+		updatedAt = project.UpdatedAt().Format("2006-01-02T15:04:05Z")
+
+		if f, ok := project.FQDN(); ok {
+			fqdn = f
+			hasFQDN = true
 		}
 
-		if input.Plan != nil {
-			if err := project.UpdatePlan(*input.Plan); err != nil {
-				return err
-			}
-		}
-
-		// TODO: 플랜에 따라, 리소스 제한량의 기본값을 설정해야 함
-		// TODO: 플랜 구현시 이 부분을 함께 구현해야 함
-
-		// Set resource limits if provided
-		if input.CPULimit != nil || input.MemoryRequest != nil || input.MemoryLimit != nil || input.DiskLimit != nil || input.TrafficLimit != nil {
-			limits, err := model.NewResourceLimits(
-				input.CPULimit,
-				input.MemoryRequest,
-				input.MemoryLimit,
-				input.DiskLimit,
-				input.TrafficLimit,
-			)
-			if err != nil {
-				return err
-			}
-			if err := project.UpdateResourceLimits(*limits); err != nil {
-				return err
-			}
-		}
-
-		// Build output
-		output = &CreateProjectOutput{
-			ProjectID: project.GetProjectID(),
-			Name:      project.GetName(),
-			Slug:      project.GetSlug().String(),
-			Status:    string(project.GetStatus()),
-			CreatedAt: project.GetCreatedAt().Format("2006-01-02T15:04:05Z"),
-		}
-
-		if project.GetFQDN() != nil {
-			output.FQDN = *project.GetFQDN()
-		}
-
-		if project.GetPlan() != nil {
-			output.Plan = *project.GetPlan()
+		if p, ok := project.Plan(); ok {
+			plan = p
+			hasPlan = true
 		}
 
 		return nil
 	})
 
-	return output, err
+	if err != nil {
+		return nil, err
+	}
+
+	// Build output after successful transaction
+	output := &CreateProjectOutput{
+		ProjectID:    projectID,
+		Name:         name,
+		Slug:         slug,
+		Status:       status,
+		CPULimit:     cpuLimit,
+		MemoryLimit:  memoryLimit,
+		DiskLimit:    diskLimit,
+		TrafficLimit: trafficLimit,
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
+	}
+
+	if hasFQDN {
+		output.FQDN = fqdn
+	}
+
+	if hasPlan {
+		output.Plan = plan
+	}
+
+	return output, nil
 }

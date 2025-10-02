@@ -1,4 +1,4 @@
-package model
+package value
 
 import (
 	"testing"
@@ -35,10 +35,10 @@ func TestNewProjectStatus(t *testing.T) {
 }
 
 func TestProjectStatus_IsValid(t *testing.T) {
-	assert.True(t, ProjectStatusActive.IsValid())
+	assert.True(t, ProjectStatusActive.isValid())
 
 	invalidStatus := ProjectStatus("invalid")
-	assert.False(t, invalidStatus.IsValid())
+	assert.False(t, invalidStatus.isValid())
 }
 
 func TestProjectStatus_IsActive(t *testing.T) {

@@ -4,7 +4,7 @@
 INSERT INTO VOLUMES (
     project_id, name, capacity,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, NULL);
 
 -- name: GetVolumeByID :one
 SELECT
@@ -34,14 +34,11 @@ SELECT EXISTS(
     WHERE project_id = ? AND name = ?
 ) as volume_exists;
 
--- name: UpdateVolume :execresult
-UPDATE VOLUMES SET
-    name = ?, capacity = ?,
-    updated_at = ?
-WHERE volume_id = ?;
-
 -- name: DeleteVolume :execresult
 DELETE FROM VOLUMES WHERE volume_id = ?;
+
+-- name: DeleteVolumesByProjectID :execresult
+DELETE FROM VOLUMES WHERE project_id = ?;
 
 -- name: ListVolumes :many
 SELECT
@@ -56,3 +53,8 @@ SELECT COUNT(*) as total FROM VOLUMES;
 
 -- name: CountVolumesByProjectID :one
 SELECT COUNT(*) as total FROM VOLUMES WHERE project_id = ?;
+
+-- name: GetTotalCapacityByProjectID :one
+SELECT COALESCE(SUM(capacity), 0) as total_capacity
+FROM VOLUMES
+WHERE project_id = ?;

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model"
+	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
 )
 
@@ -16,17 +16,14 @@ type VolumeService interface {
 	// GetVolume retrieves a volume by ID
 	GetVolume(ctx context.Context, volumeID uint) (*model.Volume, error)
 
-	// GetVolumesByProjectID retrieves all volumes for a project
-	GetVolumesByProjectID(ctx context.Context, projectID uint) ([]*model.Volume, error)
-
-	// UpdateVolume updates an existing volume
-	UpdateVolume(ctx context.Context, volumeID uint, name string, capacity uint32) (*model.Volume, error)
+	// ListVolumesByProjectID retrieves all volumes for a project
+	ListVolumesByProjectID(ctx context.Context, projectID uint) ([]*model.Volume, error)
 
 	// DeleteVolume removes a volume
 	DeleteVolume(ctx context.Context, volumeID uint) error
 
-	// ListVolumes retrieves all volumes with pagination
-	ListVolumes(ctx context.Context, offset, limit int) ([]*model.Volume, error)
+	// DeleteVolumesByProjectID removes all volumes for a project (physical delete)
+	DeleteVolumesByProjectID(ctx context.Context, projectID uint) error
 }
 
 // volumeService is the concrete implementation of VolumeService
@@ -49,8 +46,9 @@ func (s *volumeService) CreateVolume(ctx context.Context, projectID uint, name s
 		return nil, projecterrors.ErrInvalidProjectID
 	}
 
-	// Check if project exists
-	_, err := s.projectRepo.FindByID(ctx, projectID)
+	// Lock project row to prevent race conditions (SELECT FOR UPDATE)
+	// This ensures disk limit check is atomic with volume creation
+	project, err := s.projectRepo.FindByIDForUpdate(ctx, projectID)
 	if err != nil {
 		if err == projecterrors.ErrProjectNotFound {
 			return nil, projecterrors.ErrInvalidProjectID
@@ -65,6 +63,21 @@ func (s *volumeService) CreateVolume(ctx context.Context, projectID uint, name s
 	}
 	if exists {
 		return nil, projecterrors.ErrDuplicateVolumeName
+	}
+
+	// 비즈니스 로직: 프로젝트 디스크 제한 내에서 볼륨 용량 검증
+	// 프로젝트에 설정된 디스크 제한을 초과하지 않도록 볼륨 총 용량을 제한
+	diskLimit := project.Limits().DiskLimit()
+
+	// Get total capacity efficiently using aggregate query
+	totalExistingCapacity, err := s.volumeRepo.GetTotalCapacityByProjectID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if new volume would exceed project disk limit
+	if totalExistingCapacity+capacity > diskLimit {
+		return nil, projecterrors.ErrVolumeDiskLimitExceeded
 	}
 
 	// Create the volume
@@ -95,8 +108,8 @@ func (s *volumeService) GetVolume(ctx context.Context, volumeID uint) (*model.Vo
 	return volume, nil
 }
 
-// GetVolumesByProjectID retrieves all volumes for a project
-func (s *volumeService) GetVolumesByProjectID(ctx context.Context, projectID uint) ([]*model.Volume, error) {
+// ListVolumesByProjectID retrieves all volumes for a project
+func (s *volumeService) ListVolumesByProjectID(ctx context.Context, projectID uint) ([]*model.Volume, error) {
 	if projectID == 0 {
 		return nil, projecterrors.ErrInvalidProjectID
 	}
@@ -116,42 +129,6 @@ func (s *volumeService) GetVolumesByProjectID(ctx context.Context, projectID uin
 	}
 
 	return volumes, nil
-}
-
-// UpdateVolume updates an existing volume
-func (s *volumeService) UpdateVolume(ctx context.Context, volumeID uint, name string, capacity uint32) (*model.Volume, error) {
-	if volumeID == 0 {
-		return nil, projecterrors.ErrInvalidVolumeID
-	}
-
-	// Retrieve the volume
-	volume, err := s.volumeRepo.FindByID(ctx, volumeID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check for duplicate name (except for the volume being updated)
-	if volume.GetName() != name {
-		exists, err := s.volumeRepo.ExistsByName(ctx, volume.GetProjectID(), name)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			return nil, projecterrors.ErrDuplicateVolumeName
-		}
-	}
-
-	// Update the volume
-	if err := volume.Update(name, capacity); err != nil {
-		return nil, err
-	}
-
-	// Save the updated volume
-	if err := s.volumeRepo.Save(ctx, volume); err != nil {
-		return nil, err
-	}
-
-	return volume, nil
 }
 
 // DeleteVolume removes a volume
@@ -174,22 +151,16 @@ func (s *volumeService) DeleteVolume(ctx context.Context, volumeID uint) error {
 	return nil
 }
 
-// ListVolumes retrieves all volumes with pagination
-func (s *volumeService) ListVolumes(ctx context.Context, offset, limit int) ([]*model.Volume, error) {
-	if offset < 0 {
-		offset = 0
-	}
-	if limit <= 0 {
-		limit = 10 // Default limit
-	}
-	if limit > 100 {
-		limit = 100 // Maximum limit
+// DeleteVolumesByProjectID removes all volumes for a project (physical delete)
+func (s *volumeService) DeleteVolumesByProjectID(ctx context.Context, projectID uint) error {
+	if projectID == 0 {
+		return projecterrors.ErrInvalidProjectID
 	}
 
-	volumes, err := s.volumeRepo.List(ctx, offset, limit)
-	if err != nil {
-		return nil, err
+	// Delete all volumes for the project
+	if err := s.volumeRepo.DeleteByProjectID(ctx, projectID); err != nil {
+		return err
 	}
 
-	return volumes, nil
+	return nil
 }

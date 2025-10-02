@@ -3,14 +3,11 @@ package application
 import (
 	"context"
 
-	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
 type GetProjectInput struct {
-	ProjectID *uint
-	Slug      *string
+	ProjectID uint
 }
 
 type ProjectUserOutput struct {
@@ -33,10 +30,10 @@ type GetProjectOutput struct {
 	FQDN         string              `json:"fqdn,omitempty"`
 	Plan         string              `json:"plan,omitempty"`
 	Status       string              `json:"status"`
-	CPULimit     *uint32             `json:"cpu_limit,omitempty"`
-	MemoryLimit  *uint32             `json:"memory_limit,omitempty"`
-	DiskLimit    *uint32             `json:"disk_limit,omitempty"`
-	TrafficLimit *uint64             `json:"traffic_limit,omitempty"`
+	CPULimit     uint32              `json:"cpu_limit"`
+	MemoryLimit  uint32              `json:"memory_limit"`
+	DiskLimit    uint32              `json:"disk_limit"`
+	TrafficLimit uint32              `json:"traffic_limit"`
 	Users        []ProjectUserOutput `json:"users"`
 	Volumes      []VolumeOutput      `json:"volumes"`
 	CreatedAt    string              `json:"created_at"`
@@ -56,69 +53,58 @@ func NewGetProjectUseCase(projectService service.ProjectService, volumeService s
 }
 
 func (uc *GetProjectUseCase) Execute(ctx context.Context, input GetProjectInput) (*GetProjectOutput, error) {
-	var project *model.Project
-	var err error
-
-	// Get project by ID or slug
-	if input.ProjectID != nil {
-		project, err = uc.projectService.GetProject(ctx, *input.ProjectID)
-	} else if input.Slug != nil {
-		project, err = uc.projectService.GetProjectBySlug(ctx, *input.Slug)
-	} else {
-		return nil, projecterrors.ErrInvalidProjectID
-	}
-
+	// Get project by ID
+	project, err := uc.projectService.GetProject(ctx, input.ProjectID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Build output
 	output := &GetProjectOutput{
-		ProjectID:    project.GetProjectID(),
-		Name:         project.GetName(),
-		Slug:         project.GetSlug().String(),
-		Status:       string(project.GetStatus()),
-		CPULimit:     project.GetLimits().GetCPULimit(),
-		MemoryLimit:  project.GetLimits().GetMemoryLimit(),
-		DiskLimit:    project.GetLimits().GetDiskLimit(),
-		TrafficLimit: project.GetLimits().GetTrafficLimit(),
-		CreatedAt:    project.GetCreatedAt().Format("2006-01-02T15:04:05Z"),
+		ProjectID:    project.ProjectID(),
+		Name:         project.Name(),
+		Slug:         project.Slug().String(),
+		Status:       string(project.Status()),
+		CPULimit:     project.Limits().CPULimit(),
+		MemoryLimit:  project.Limits().MemoryLimit(),
+		DiskLimit:    project.Limits().DiskLimit(),
+		TrafficLimit: project.Limits().TrafficLimit(),
+		CreatedAt:    project.CreatedAt().Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:    project.UpdatedAt().Format("2006-01-02T15:04:05Z"),
 		Users:        make([]ProjectUserOutput, 0),
 		Volumes:      make([]VolumeOutput, 0),
 	}
 
-	if project.GetFQDN() != nil {
-		output.FQDN = *project.GetFQDN()
+	if fqdn, ok := project.FQDN(); ok {
+		output.FQDN = fqdn
 	}
 
-	if project.GetPlan() != nil {
-		output.Plan = *project.GetPlan()
-	}
-
-	if project.GetUpdatedAt() != nil {
-		output.UpdatedAt = project.GetUpdatedAt().Format("2006-01-02T15:04:05Z")
+	if plan, ok := project.Plan(); ok {
+		output.Plan = plan
 	}
 
 	// Add users
 	for _, user := range project.GetActiveUsers() {
 		output.Users = append(output.Users, ProjectUserOutput{
-			UserID:    user.GetUserID(),
-			Role:      string(user.GetRole()),
-			CreatedAt: user.GetCreatedAt().Format("2006-01-02T15:04:05Z"),
+			UserID:    user.UserID(),
+			Role:      string(user.Role()),
+			CreatedAt: user.CreatedAt().Format("2006-01-02T15:04:05Z"),
 		})
 	}
 
 	// Add volumes from VolumeService
-	volumes, err := uc.volumeService.GetVolumesByProjectID(ctx, project.GetProjectID())
-	if err == nil {
-		for _, volume := range volumes {
-			output.Volumes = append(output.Volumes, VolumeOutput{
-				VolumeID:  volume.GetVolumeID(),
-				Name:      volume.GetName(),
-				Capacity:  volume.GetCapacity(),
-				CreatedAt: volume.GetCreatedAt().Format("2006-01-02T15:04:05Z"),
-			})
-		}
+	volumes, err := uc.volumeService.ListVolumesByProjectID(ctx, project.ProjectID())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, volume := range volumes {
+		output.Volumes = append(output.Volumes, VolumeOutput{
+			VolumeID:  volume.VolumeID(),
+			Name:      volume.Name(),
+			Capacity:  volume.Capacity(),
+			CreatedAt: volume.CreatedAt().Format("2006-01-02T15:04:05Z"),
+		})
 	}
 
 	return output, nil

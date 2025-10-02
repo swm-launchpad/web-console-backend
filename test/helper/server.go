@@ -66,11 +66,10 @@ func SetupTestServer(t *testing.T) *TestServer {
 	createProjectUseCase := projectApp.NewCreateProjectUseCase(projectSvc, txManager)
 	getProjectUseCase := projectApp.NewGetProjectUseCase(projectSvc, volumeSvc)
 	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, txManager)
-	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, txManager)
+	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, txManager)
 	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc)
 	addVolumeUseCase := projectApp.NewAddVolumeUseCase(volumeSvc, txManager)
 	getVolumesUseCase := projectApp.NewGetVolumesUseCase(volumeSvc)
-	updateVolumeUseCase := projectApp.NewUpdateVolumeUseCase(volumeSvc, txManager)
 	removeVolumeUseCase := projectApp.NewRemoveVolumeUseCase(volumeSvc, txManager)
 
 	// Handler 초기화
@@ -83,11 +82,11 @@ func SetupTestServer(t *testing.T) *TestServer {
 		deleteProjectUseCase,
 		listProjectsUseCase,
 		permissionSvc,
+		projectSvc,
 	)
 	volumeHandler := projectHTTP.NewVolumeHandler(
 		addVolumeUseCase,
 		getVolumesUseCase,
-		updateVolumeUseCase,
 		removeVolumeUseCase,
 		permissionSvc,
 	)
@@ -134,7 +133,6 @@ func SetupTestServer(t *testing.T) *TestServer {
 	{
 		volumes.POST("", volumeHandler.AddVolume)
 		volumes.GET("", volumeHandler.GetVolumes)
-		volumes.PUT("/:id", volumeHandler.UpdateVolume)
 		volumes.DELETE("/:id", volumeHandler.RemoveVolume)
 	}
 

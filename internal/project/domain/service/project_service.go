@@ -4,20 +4,20 @@ import (
 	"context"
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model"
+	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
 )
 
 // ProjectService defines the interface for project-related business logic
 type ProjectService interface {
 	// CreateProject creates a new project with the given parameters
-	CreateProject(ctx context.Context, name string, slug model.ProjectSlug, ownerID uint) (*model.Project, error)
+	// limits is required, fqdn and plan are optional
+	// slug is automatically generated from name
+	CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *string) (*model.Project, error)
 
 	// GetProject retrieves a project by ID
 	GetProject(ctx context.Context, projectID uint) (*model.Project, error)
-
-	// GetProjectBySlug retrieves a project by slug
-	GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error)
 
 	// UpdateProject updates an existing project
 	UpdateProject(ctx context.Context, projectID uint, updateFn func(*model.Project) error) (*model.Project, error)
@@ -28,10 +28,11 @@ type ProjectService interface {
 	// ListProjects retrieves all projects for a user
 	ListProjects(ctx context.Context, userID uint) ([]*model.Project, error)
 
-	// ListAllProjects retrieves all projects with pagination
-	ListAllProjects(ctx context.Context, offset, limit int) ([]*model.Project, error)
+	// CountProjectsByUserID returns the number of active projects for a user
+	CountProjectsByUserID(ctx context.Context, userID uint) (int, error)
 
-	// Volume management removed - volumes are now handled by VolumeService
+	// CheckProjectNameExists checks if a project name already exists for a user
+	CheckProjectNameExists(ctx context.Context, name string, userID uint) (bool, error)
 }
 
 // projectService is the concrete implementation of ProjectService
@@ -49,14 +50,27 @@ func NewProjectService(projectRepo repository.ProjectRepository, slugService Slu
 }
 
 // CreateProject creates a new project with validation
-func (s *projectService) CreateProject(ctx context.Context, name string, slug model.ProjectSlug, ownerID uint) (*model.Project, error) {
-	// Validate slug uniqueness
-	if err := s.slugService.EnsureUniqueSlug(ctx, slug); err != nil {
+// slug is automatically generated from name
+// limits is required, fqdn and plan are optional
+func (s *projectService) CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *string) (*model.Project, error) {
+	// Check if project name already exists for this user
+	exists, err := s.CheckProjectNameExists(ctx, name, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, projecterrors.ErrProjectNameExists
+	}
+
+	// Generate slug from name
+	slug, err := s.slugService.GenerateSlugFromName(ctx, name)
+	if err != nil {
 		return nil, err
 	}
 
-	// Create the project aggregate
-	project, err := model.NewProject(name, slug, ownerID)
+	// Create the project aggregate with all fields (including optional ones)
+	// This ensures created_at and updated_at are the same at creation time
+	project, err := model.NewProject(name, slug, ownerID, limits, fqdn, plan)
 	if err != nil {
 		return nil, err
 	}
@@ -76,20 +90,6 @@ func (s *projectService) GetProject(ctx context.Context, projectID uint) (*model
 	}
 
 	project, err := s.projectRepo.FindByID(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-
-	return project, nil
-}
-
-// GetProjectBySlug retrieves a project by slug
-func (s *projectService) GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error) {
-	if slug == "" {
-		return nil, projecterrors.ErrSlugRequired
-	}
-
-	project, err := s.projectRepo.FindBySlug(ctx, slug)
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +134,8 @@ func (s *projectService) DeleteProject(ctx context.Context, projectID uint) erro
 		return err
 	}
 
-	// Soft delete the project
-	if err := project.Delete(); err != nil {
+	// Soft delete the project (also deletes all active users)
+	if err := project.SoftDelete(); err != nil {
 		return err
 	}
 
@@ -161,24 +161,41 @@ func (s *projectService) ListProjects(ctx context.Context, userID uint) ([]*mode
 	return projects, nil
 }
 
-// ListAllProjects retrieves all projects with pagination
-func (s *projectService) ListAllProjects(ctx context.Context, offset, limit int) ([]*model.Project, error) {
-	if offset < 0 {
-		offset = 0
-	}
-	if limit <= 0 {
-		limit = 10 // Default limit
-	}
-	if limit > 100 {
-		limit = 100 // Maximum limit
+// CountProjectsByUserID returns the number of active projects for a user
+func (s *projectService) CountProjectsByUserID(ctx context.Context, userID uint) (int, error) {
+	if userID == 0 {
+		return 0, projecterrors.ErrInvalidUserID
 	}
 
-	projects, err := s.projectRepo.List(ctx, offset, limit)
+	projects, err := s.projectRepo.FindByUserID(ctx, userID)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
-	return projects, nil
+	// Count only active (non-deleted) projects
+	count := 0
+	for _, project := range projects {
+		if !project.IsDeleted() {
+			count++
+		}
+	}
+
+	return count, nil
 }
 
-// Volume management methods removed - volumes are now handled by VolumeService
+// CheckProjectNameExists checks if a project name already exists for a user
+func (s *projectService) CheckProjectNameExists(ctx context.Context, name string, userID uint) (bool, error) {
+	if name == "" {
+		return false, projecterrors.ErrNameRequired
+	}
+	if userID == 0 {
+		return false, projecterrors.ErrInvalidUserID
+	}
+
+	exists, err := s.projectRepo.ExistsByNameAndUserID(ctx, name, userID)
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}

@@ -12,6 +12,7 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	// Repository errors
 	projecterrors.ErrProjectNotFound:      {StatusCode: http.StatusNotFound, Code: "PROJECT_NOT_FOUND", Message: "Project not found"},
 	projecterrors.ErrProjectAlreadyExists: {StatusCode: http.StatusConflict, Code: "PROJECT_ALREADY_EXISTS", Message: "Project already exists"},
+	projecterrors.ErrProjectNameExists:    {StatusCode: http.StatusConflict, Code: "PROJECT_NAME_EXISTS", Message: "Project name already exists for this user"},
 	projecterrors.ErrProjectUserNotFound:  {StatusCode: http.StatusNotFound, Code: "PROJECT_USER_NOT_FOUND", Message: "Project user not found"},
 	projecterrors.ErrSlugAlreadyExists:    {StatusCode: http.StatusConflict, Code: "SLUG_ALREADY_EXISTS", Message: "Slug already exists"},
 
@@ -37,12 +38,19 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	// Resource limit errors
 	projecterrors.ErrResourceLimitExceeded: {StatusCode: http.StatusForbidden, Code: "RESOURCE_LIMIT_EXCEEDED", Message: "Resource limit exceeded"},
 	projecterrors.ErrPlanLimitExceeded:     {StatusCode: http.StatusForbidden, Code: "PLAN_LIMIT_EXCEEDED", Message: "Plan limit exceeded"},
+	projecterrors.ErrProjectLimitExceeded:  {StatusCode: http.StatusBadRequest, Code: "PROJECT_LIMIT_EXCEEDED", Message: "Maximum number of projects exceeded"},
 
 	// Volume errors
-	projecterrors.ErrVolumeNotFound:      {StatusCode: http.StatusNotFound, Code: "VOLUME_NOT_FOUND", Message: "Volume not found"},
-	projecterrors.ErrVolumeNameRequired:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_NAME_REQUIRED", Message: "Volume name is required"},
-	projecterrors.ErrInvalidCapacity:     {StatusCode: http.StatusBadRequest, Code: "INVALID_CAPACITY", Message: "Invalid volume capacity"},
-	projecterrors.ErrDuplicateVolumeName: {StatusCode: http.StatusConflict, Code: "DUPLICATE_VOLUME_NAME", Message: "Volume name already exists"},
+	projecterrors.ErrVolumeNotFound:          {StatusCode: http.StatusNotFound, Code: "VOLUME_NOT_FOUND", Message: "Volume not found"},
+	projecterrors.ErrVolumeNameRequired:      {StatusCode: http.StatusBadRequest, Code: "VOLUME_NAME_REQUIRED", Message: "Volume name is required"},
+	projecterrors.ErrInvalidCapacity:         {StatusCode: http.StatusBadRequest, Code: "INVALID_CAPACITY", Message: "Invalid volume capacity"},
+	projecterrors.ErrInvalidVolumeID:         {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_ID", Message: "Invalid volume ID"},
+	projecterrors.ErrDuplicateVolumeName:     {StatusCode: http.StatusConflict, Code: "DUPLICATE_VOLUME_NAME", Message: "Volume name already exists"},
+	projecterrors.ErrVolumeDiskLimitExceeded: {StatusCode: http.StatusBadRequest, Code: "VOLUME_DISK_LIMIT_EXCEEDED", Message: "Volume capacity exceeds project disk limit"},
+	projecterrors.ErrVolumeCapacityTooSmall:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_CAPACITY_TOO_SMALL", Message: "Volume capacity must be at least 128Mi"},
+	projecterrors.ErrVolumeCapacityExceeded:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_CAPACITY_EXCEEDED", Message: "Volume capacity exceeds maximum allowed (2048Mi)"},
+	projecterrors.ErrInvalidVolumeName:       {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_NAME", Message: "Invalid volume name format"},
+	projecterrors.ErrMaxVolumesExceeded:      {StatusCode: http.StatusBadRequest, Code: "MAX_VOLUMES_EXCEEDED", Message: "Maximum number of volumes exceeded"},
 
 	// Infrastructure errors
 	projecterrors.ErrDatabaseUnavailable: {StatusCode: http.StatusServiceUnavailable, Code: "DATABASE_UNAVAILABLE", Message: "Service temporarily unavailable"},

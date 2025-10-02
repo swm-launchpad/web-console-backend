@@ -15,8 +15,14 @@ type PermissionService interface {
 	// CanUserAccessProject checks if a user can access (read) a project
 	CanUserAccessProject(ctx context.Context, userID uint, projectID uint) error
 
-	// GetProjectIDForVolume returns the project ID for a given volume
-	GetProjectIDForVolume(ctx context.Context, volumeID uint) (uint, error)
+	// CanUserAddVolume checks if a user can add a volume to a project
+	CanUserAddVolume(ctx context.Context, userID uint, projectID uint) error
+
+	// CanUserRemoveVolume checks if a user can remove a volume
+	CanUserRemoveVolume(ctx context.Context, userID uint, volumeID uint) error
+
+	// CanUserAccessVolume checks if a user can access a volume
+	CanUserAccessVolume(ctx context.Context, userID uint, volumeID uint) error
 }
 
 // permissionService is the concrete implementation of PermissionService
@@ -89,17 +95,40 @@ func (s *permissionService) CanUserAccessProject(ctx context.Context, userID uin
 	return nil
 }
 
-// GetProjectIDForVolume returns the project ID for a given volume
-func (s *permissionService) GetProjectIDForVolume(ctx context.Context, volumeID uint) (uint, error) {
+// CanUserAddVolume checks if a user can add a volume to a project
+func (s *permissionService) CanUserAddVolume(ctx context.Context, userID uint, projectID uint) error {
+	// Adding a volume requires project modification permission
+	return s.CanUserModifyProject(ctx, userID, projectID)
+}
+
+// CanUserRemoveVolume checks if a user can remove a volume
+func (s *permissionService) CanUserRemoveVolume(ctx context.Context, userID uint, volumeID uint) error {
 	if volumeID == 0 {
-		return 0, projecterrors.ErrVolumeNotFound
+		return projecterrors.ErrVolumeNotFound
 	}
 
 	// Get the volume from repository
 	volume, err := s.volumeRepo.FindByID(ctx, volumeID)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return volume.GetProjectID(), nil
+	// Check if user can modify the project that owns this volume
+	return s.CanUserModifyProject(ctx, userID, volume.ProjectID())
+}
+
+// CanUserAccessVolume checks if a user can access a volume
+func (s *permissionService) CanUserAccessVolume(ctx context.Context, userID uint, volumeID uint) error {
+	if volumeID == 0 {
+		return projecterrors.ErrVolumeNotFound
+	}
+
+	// Get the volume from repository
+	volume, err := s.volumeRepo.FindByID(ctx, volumeID)
+	if err != nil {
+		return err
+	}
+
+	// Check if user can access the project that owns this volume
+	return s.CanUserAccessProject(ctx, userID, volume.ProjectID())
 }

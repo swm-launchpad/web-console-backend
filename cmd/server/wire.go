@@ -24,6 +24,21 @@ import (
 	userssqlc "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
 )
 
+// provideDatabase creates a database connection from config
+func provideDatabase(cfg *config.Config) (*sql.DB, error) {
+	return db.NewConnection(&cfg.Database)
+}
+
+// provideTxManager creates a transaction manager
+func provideTxManager(database *sql.DB) db.TxManager {
+	return db.NewTxManager(database)
+}
+
+// provideJWTUtil creates a JWT utility from config
+func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
+	return jwt.NewJWTUtil(cfg.JWT.Secret)
+}
+
 func InitializeApp() (*App, error) {
 	wire.Build(
 		// Config
@@ -67,7 +82,6 @@ func InitializeApp() (*App, error) {
 		projectApp.NewListProjectsUseCase,
 		projectApp.NewAddVolumeUseCase,
 		projectApp.NewGetVolumesUseCase,
-		projectApp.NewUpdateVolumeUseCase,
 		projectApp.NewRemoveVolumeUseCase,
 
 		// HTTP handlers
@@ -83,17 +97,5 @@ func InitializeApp() (*App, error) {
 		NewRouter,
 		NewApp,
 	)
-	return nil, nil
-}
-
-func provideDatabase(cfg *config.Config) (*sql.DB, error) {
-	return db.NewConnection(&cfg.Database)
-}
-
-func provideTxManager(database *sql.DB) db.TxManager {
-	return db.NewTxManager(database)
-}
-
-func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
-	return jwt.NewJWTUtil(cfg.JWT.Secret)
+	return &App{}, nil
 }
