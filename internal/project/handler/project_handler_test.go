@@ -63,7 +63,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		cpuLimit := uint32(1000)
 		memoryLimit := uint32(2048)
 		diskLimit := uint32(2048)
-		trafficLimit := uint32(128)
+		trafficLimit := uint32(1048576)
 		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
 
 		mockProjectService.On("CreateProject", ctx, projectName, userID, *expectedLimits, (*string)(nil), (*string)(nil)).Return(project, nil)
@@ -75,10 +75,15 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		})
 
 		// Frontend가 FQDN과 Plan을 보내도 무시되어야 함
+		// 리소스 제한도 보내지만 Handler에서 무시되고 MVP 정책값으로 강제됨
 		reqBody := map[string]interface{}{
-			"name": projectName,
-			"fqdn": "should-be-ignored.com", // MVP 정책으로 무시됨
-			"plan": "premium",               // MVP 정책으로 무시됨
+			"name":          projectName,
+			"fqdn":          "should-be-ignored.com", // MVP 정책으로 무시됨
+			"plan":          "premium",               // MVP 정책으로 무시됨
+			"cpu_limit":     2000,                    // MVP 정책으로 무시됨 (1000으로 강제)
+			"memory_limit":  4096,                    // MVP 정책으로 무시됨 (2048로 강제)
+			"disk_limit":    4096,                    // MVP 정책으로 무시됨 (2048로 강제)
+			"traffic_limit": 524288,                  // MVP 정책으로 무시됨 (1048576으로 강제)
 		}
 		jsonBody, _ := json.Marshal(reqBody)
 
@@ -87,6 +92,9 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
+		if w.Code != http.StatusCreated {
+			t.Logf("Response body: %s", w.Body.String())
+		}
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var response map[string]interface{}
@@ -107,7 +115,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		assert.Equal(t, float64(1000), data["cpu_limit"])
 		assert.Equal(t, float64(2048), data["memory_limit"])
 		assert.Equal(t, float64(2048), data["disk_limit"])
-		assert.Equal(t, float64(128), data["traffic_limit"]) // MVP: minimum traffic limit
+		assert.Equal(t, float64(1048576), data["traffic_limit"]) // MVP: 1TB traffic limit
 
 		mockProjectService.AssertExpectations(t)
 	})
@@ -191,7 +199,11 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		})
 
 		reqBody := map[string]interface{}{
-			"name": projectName,
+			"name":          projectName,
+			"cpu_limit":     1000,
+			"memory_limit":  2048,
+			"disk_limit":    2048,
+			"traffic_limit": 1048576,
 		}
 		jsonBody, _ := json.Marshal(reqBody)
 
@@ -330,11 +342,11 @@ func TestProjectHandler_GetProject(t *testing.T) {
 
 // Helper function to create test project
 func createTestProject(projectID uint, name string, slug value.ProjectSlug, ownerID uint) *model.Project {
-	// Set resource limits
+	// Set resource limits matching MVP policy
 	cpuLimit := uint32(1000)
 	memoryLimit := uint32(2048)
 	diskLimit := uint32(2048)
-	trafficLimit := uint32(128)
+	trafficLimit := uint32(1048576) // MVP: 1TB
 
 	limits, err := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
 	if err != nil {

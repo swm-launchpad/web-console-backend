@@ -168,7 +168,8 @@ func TestVolumeHandler_AddVolume(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusForbidden, w.Code)
+		// Return 404 instead of 403 for security (information disclosure prevention)
+		assert.Equal(t, http.StatusNotFound, w.Code)
 
 		mockPermissionService.AssertExpectations(t)
 		mockVolumeService.AssertNotCalled(t, "AddVolume")
@@ -270,7 +271,8 @@ func TestVolumeHandler_GetVolumes(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/volumes?project_id="+strconv.Itoa(int(projectID)), nil)
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusForbidden, w.Code)
+		// Return 404 instead of 403 for security (information disclosure prevention)
+		assert.Equal(t, http.StatusNotFound, w.Code)
 
 		mockPermissionService.AssertExpectations(t)
 		mockVolumeService.AssertNotCalled(t, "ListVolumesByProjectID")
