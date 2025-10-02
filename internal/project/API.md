@@ -51,6 +51,7 @@ Authorization: Bearer <JWT_TOKEN>
 | `INVALID_PROJECT_DATA` | 400 | 유효하지 않은 프로젝트 데이터 |
 | `PROJECT_NOT_ACTIVE` | 403 | 프로젝트가 활성 상태가 아님 |
 | `CANNOT_MODIFY_DELETED_PROJECT` | 403 | 삭제된 프로젝트는 수정할 수 없음 |
+| `PROJECT_LIMIT_EXCEEDED` | 400 | 프로젝트 생성 한도 초과 (최대 3개) |
 
 ### 권한 관련 에러
 | 에러 코드 | HTTP Status | 설명 |
@@ -82,6 +83,7 @@ Authorization: Bearer <JWT_TOKEN>
 | `VOLUME_NAME_REQUIRED` | 400 | 볼륨 이름 필수 |
 | `INVALID_CAPACITY` | 400 | 유효하지 않은 볼륨 용량 |
 | `DUPLICATE_VOLUME_NAME` | 409 | 중복된 볼륨 이름 |
+| `VOLUME_DISK_LIMIT_EXCEEDED` | 400 | 볼륨 총 용량이 프로젝트 디스크 제한 초과 |
 
 ### 인프라 에러
 | 에러 코드 | HTTP Status | 설명 |
@@ -104,12 +106,26 @@ Authorization: Bearer <JWT_TOKEN>
 
 ### 리소스 제한
 - **CPU Limit**: 0-4000 millicores (1000 = 1 CPU)
-- **Memory Request/Limit**: 128-8192 Mi (Mebibytes)
+- **Memory Limit**: 128-8192 Mi (Mebibytes)
 - **Disk Limit**: 128-10240 Mi (Mebibytes)
 - **Traffic Limit**: 최소 128 Mi, 상한 없음
 
 ### 볼륨 용량
-- **Capacity**: 128-10240 Mi (Mebibytes)
+- **Capacity**: 128-2048 Mi (Mebibytes)
+
+### 비즈니스 정책
+- **프로젝트 수 제한**: 사용자당 최대 3개 프로젝트 생성 가능
+- **Slug 자동 생성**: 프로젝트 이름으로부터 백엔드가 자동 생성 (형식: `{baseSlug}-{timestamp}-{random}`)
+- **MVP 정책**:
+  - **생성 시**: 모든 필드를 입력으로 받지만, FQDN/Plan/리소스 제한은 무시되고 MVP 고정값으로 강제 적용
+    - FQDN: `null`
+    - Plan: `null`
+    - CPU: 1000m, Memory: 2048Mi, Disk: 2048Mi, Traffic: 1048576Mi (1TB)
+  - **수정 시**: FQDN/Plan/리소스 제한만 수정 가능 (입력은 무시되고 MVP 고정값으로 강제 적용)
+    - Name, Status는 수정 불가
+    - FQDN: `null`
+    - Plan: `null`
+    - CPU: 1000m, Memory: 2048Mi, Disk: 2048Mi, Traffic: 1048576Mi (1TB)
 
 ---
 
@@ -133,14 +149,12 @@ Authorization: Bearer <token>
 ```json
 {
   "name": "My Project",
-  "slug": "myproject",
   "fqdn": "myproject.example.com",
-  "plan": "basic",
-  "cpu_limit": 1000,
-  "memory_request": 512,
-  "memory_limit": 1024,
-  "disk_limit": 2048,
-  "traffic_limit": 10240
+  "plan": "premium",
+  "cpu_limit": 2000,
+  "memory_limit": 4096,
+  "disk_limit": 4096,
+  "traffic_limit": 2097152
 }
 ```
 
@@ -148,14 +162,21 @@ Authorization: Bearer <token>
 | 필드 | 타입 | 필수 | 제약사항 | 설명 |
 |------|------|------|----------|------|
 | `name` | string | ✓ | 1-100자 | 프로젝트 이름 |
-| `slug` | string | ✓ | 3-63자, 영숫자만 | URL 슬러그 |
-| `fqdn` | string | ✗ | 최대 253자, FQDN 형식 | 도메인 이름 |
-| `plan` | string | ✗ | - | 플랜 (미구현) |
-| `cpu_limit` | uint32 | ✗ | 0-4000 | CPU 제한 (밀리코어) |
-| `memory_request` | uint32 | ✗ | 128-8192 | 메모리 요청 (Mi) |
-| `memory_limit` | uint32 | ✗ | 128-8192 | 메모리 제한 (Mi) |
-| `disk_limit` | uint32 | ✗ | 128-10240 | 디스크 제한 (Mi) |
-| `traffic_limit` | uint64 | ✗ | 최소 128 | 트래픽 제한 (Mi) |
+| `fqdn` | string | ✗ | - | 도메인 이름 (MVP에서는 무시됨) |
+| `plan` | string | ✗ | - | 플랜 (MVP에서는 무시됨) |
+| `cpu_limit` | uint32 | ✓ | 100-4000 | CPU 제한 (밀리코어, MVP에서는 무시됨) |
+| `memory_limit` | uint32 | ✓ | 128-8192 | 메모리 제한 (Mi, MVP에서는 무시됨) |
+| `disk_limit` | uint32 | ✓ | 128-10240 | 디스크 제한 (Mi, MVP에서는 무시됨) |
+| `traffic_limit` | uint32 | ✓ | 128-1048576 | 트래픽 제한 (Mi, MVP에서는 무시됨) |
+
+**MVP 정책**:
+- `slug`는 백엔드에서 자동으로 생성됩니다 (형식: `{baseSlug}-{timestamp}-{random}`)
+- `fqdn`, `plan`을 전송해도 `null`로 강제 설정됩니다
+- 리소스 제한(`cpu_limit`, `memory_limit`, `disk_limit`, `traffic_limit`)을 전송해도 MVP 고정 값으로 강제 적용됩니다:
+  - CPU: 1000m (1 core)
+  - Memory: 2048Mi (2GiB)
+  - Disk: 2048Mi (2GiB)
+  - Traffic: 1048576Mi (1TB)
 
 ### 응답
 
@@ -166,10 +187,14 @@ Authorization: Bearer <token>
   "data": {
     "project_id": 1,
     "name": "My Project",
-    "slug": "myproject",
-    "fqdn": "myproject.example.com",
-    "plan": "basic",
+    "slug": "my-project-20250930170333-1234",
+    "fqdn": null,
+    "plan": null,
     "status": "active",
+    "cpu_limit": 1000,
+    "memory_limit": 2048,
+    "disk_limit": 2048,
+    "traffic_limit": 1048576,
     "created_at": "2023-01-01T00:00:00Z"
   }
 }
@@ -180,11 +205,16 @@ Authorization: Bearer <token>
 {
   "status": "error",
   "error": {
-    "code": "SLUG_ALREADY_EXISTS",
-    "message": "Slug already exists"
+    "code": "PROJECT_LIMIT_EXCEEDED",
+    "message": "Maximum number of projects exceeded"
   }
 }
 ```
+
+### 비즈니스 규칙
+- 사용자당 최대 3개의 프로젝트 생성 가능
+- Slug는 백엔드에서 자동으로 생성되며 고유성 보장
+- MVP 정책에 따라 리소스 제한이 고정 값으로 강제 적용
 
 ---
 
@@ -204,9 +234,12 @@ Authorization: Bearer <token>
 #### Query Parameters
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |----------|------|------|--------|------|
-| `user_id` | uint | ✗ | 현재 사용자 | 특정 사용자의 프로젝트 조회 |
-| `offset` | int | ✗ | 0 | 시작 위치 |
-| `limit` | int | ✗ | 10 | 조회 개수 (최대 100) |
+| `user_id` | uint | ✗ | 현재 사용자 | 특정 사용자의 프로젝트 조회 (현재 사용자만 가능) |
+
+### 권한 및 보안
+- **중요**: `user_id` 파라미터를 제공하더라도, 현재 로그인한 사용자 본인의 프로젝트만 조회 가능
+- 다른 사용자의 프로젝트를 조회하려고 하면 `PERMISSION_DENIED` 에러 반환
+- 이는 정보 노출 방지를 위한 보안 정책
 
 ### 응답
 
@@ -219,10 +252,16 @@ Authorization: Bearer <token>
       {
         "project_id": 1,
         "name": "My Project",
-        "slug": "myproject",
-        "fqdn": "myproject.example.com",
+        "slug": "my-project-20250930170333-1234",
+        "fqdn": null,
+        "plan": null,
         "status": "active",
-        "created_at": "2023-01-01T00:00:00Z"
+        "cpu_limit": 1000,
+        "memory_limit": 2048,
+        "disk_limit": 2048,
+        "traffic_limit": 1048576,
+        "created_at": "2023-01-01T00:00:00Z",
+        "updated_at": "2023-01-01T00:00:00Z"
       }
     ],
     "total": 1
@@ -236,7 +275,7 @@ Authorization: Bearer <token>
 
 **GET** `/api/v1/projects/:id`
 
-특정 프로젝트의 상세 정보를 조회합니다. ID 대신 slug도 사용 가능합니다.
+특정 프로젝트의 상세 정보를 조회합니다.
 
 ### 요청
 
@@ -248,7 +287,7 @@ Authorization: Bearer <token>
 #### Path Parameters
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
-| `id` | uint/string | 프로젝트 ID 또는 slug |
+| `id` | uint | 프로젝트 ID |
 
 ### 응답
 
@@ -259,14 +298,14 @@ Authorization: Bearer <token>
   "data": {
     "project_id": 1,
     "name": "My Project",
-    "slug": "myproject",
-    "fqdn": "myproject.example.com",
-    "plan": "basic",
+    "slug": "my-project-20250930170333-1234",
+    "fqdn": null,
+    "plan": null,
     "status": "active",
     "cpu_limit": 1000,
-    "memory_limit": 1024,
+    "memory_limit": 2048,
     "disk_limit": 2048,
-    "traffic_limit": 10240,
+    "traffic_limit": 1048576,
     "users": [
       {
         "user_id": 1,
@@ -327,32 +366,36 @@ Authorization: Bearer <token>
 #### Body
 ```json
 {
-  "name": "Updated Project Name",
   "fqdn": "updated.example.com",
   "plan": "premium",
-  "status": "active",
   "cpu_limit": 2000,
-  "memory_request": 1024,
-  "memory_limit": 2048,
+  "memory_limit": 4096,
   "disk_limit": 4096,
-  "traffic_limit": 20480
+  "traffic_limit": 2097152
 }
 ```
 
 #### 필드 설명
-모든 필드는 선택사항이며, 제공된 필드만 업데이트됩니다.
+모든 필드는 선택사항입니다.
 
 | 필드 | 타입 | 제약사항 | 설명 |
 |------|------|----------|------|
-| `name` | string | 1-100자 | 프로젝트 이름 |
-| `fqdn` | string | 최대 253자, FQDN 형식 | 도메인 이름 |
-| `plan` | string | - | 플랜 (미구현) |
-| `status` | string | active/inactive/suspended | 프로젝트 상태 |
-| `cpu_limit` | uint32 | 0-4000 | CPU 제한 (밀리코어) |
-| `memory_request` | uint32 | 128-8192 | 메모리 요청 (Mi) |
-| `memory_limit` | uint32 | 128-8192 | 메모리 제한 (Mi) |
-| `disk_limit` | uint32 | 128-10240 | 디스크 제한 (Mi) |
-| `traffic_limit` | uint64 | 최소 128 | 트래픽 제한 (Mi) |
+| `fqdn` | string | - | 도메인 이름 (MVP에서는 무시됨) |
+| `plan` | string | - | 플랜 (MVP에서는 무시됨) |
+| `cpu_limit` | uint32 | 100-4000 | CPU 제한 (밀리코어, MVP에서는 무시됨) |
+| `memory_limit` | uint32 | 128-8192 | 메모리 제한 (Mi, MVP에서는 무시됨) |
+| `disk_limit` | uint32 | 128-10240 | 디스크 제한 (Mi, MVP에서는 무시됨) |
+| `traffic_limit` | uint32 | 128-1048576 | 트래픽 제한 (Mi, MVP에서는 무시됨) |
+
+**MVP 정책**:
+- **수정 불가 필드**: `name`, `status`는 수정할 수 없습니다
+- **무시되는 필드**: `fqdn`, `plan`, 리소스 제한을 전송해도 MVP 고정값으로 강제 적용됩니다:
+  - FQDN: `null`
+  - Plan: `null`
+  - CPU: 1000m (1 core)
+  - Memory: 2048Mi (2GiB)
+  - Disk: 2048Mi (2GiB)
+  - Traffic: 1048576Mi (1TB)
 
 ### 응답
 
@@ -362,15 +405,23 @@ Authorization: Bearer <token>
   "status": "success",
   "data": {
     "project_id": 1,
-    "name": "Updated Project Name",
-    "slug": "myproject",
-    "fqdn": "updated.example.com",
-    "plan": "premium",
+    "name": "My Project",
+    "slug": "my-project-20250930170333-1234",
+    "fqdn": null,
+    "plan": null,
     "status": "active",
+    "cpu_limit": 1000,
+    "memory_limit": 2048,
+    "disk_limit": 2048,
+    "traffic_limit": 1048576,
     "updated_at": "2023-01-01T12:00:00Z"
   }
 }
 ```
+
+**참고**:
+- `name`과 `status`는 MVP 정책에 따라 수정되지 않고 기존 값이 유지됩니다
+- `fqdn`, `plan`, 리소스 제한 값들은 요청에서 다른 값을 보냈더라도 MVP 정책에 의해 강제 적용된 값입니다
 
 ### 권한
 - 프로젝트의 소유자 또는 관리자만 수정 가능
@@ -412,6 +463,9 @@ Authorization: Bearer <token>
 - 프로젝트의 소유자 또는 관리자만 삭제 가능
 - 권한이 없으면 `PERMISSION_DENIED` 에러 반환
 
+### 비즈니스 규칙
+- 프로젝트 삭제 시 포함된 모든 볼륨도 함께 삭제됩니다 (Cascade Delete)
+
 ---
 
 # 볼륨 API
@@ -444,7 +498,7 @@ Authorization: Bearer <token>
 |------|------|------|----------|------|
 | `project_id` | uint | ✓ | - | 프로젝트 ID |
 | `name` | string | ✓ | 1-63자, 영숫자만 | 볼륨 이름 |
-| `capacity` | uint32 | ✓ | 128-10240 | 볼륨 용량 (Mi) |
+| `capacity` | uint32 | ✓ | 128-2048 | 볼륨 용량 (Mi) |
 
 ### 응답
 
@@ -462,8 +516,24 @@ Authorization: Bearer <token>
 }
 ```
 
+#### 실패 예시
+```json
+{
+  "status": "error",
+  "error": {
+    "code": "VOLUME_DISK_LIMIT_EXCEEDED",
+    "message": "Volume capacity exceeds project disk limit"
+  }
+}
+```
+
 ### 권한
 - 해당 프로젝트의 소유자 또는 관리자만 볼륨 추가 가능
+
+### 비즈니스 규칙
+- 볼륨 용량은 128-2048 Mi 사이여야 함
+- 프로젝트 내 모든 볼륨의 총 용량이 프로젝트의 `disk_limit`를 초과할 수 없음
+- 볼륨 이름은 프로젝트 내에서 고유해야 함
 
 ---
 
@@ -483,7 +553,7 @@ Authorization: Bearer <token>
 #### Query Parameters
 | 파라미터 | 타입 | 필수 | 설명 |
 |----------|------|------|------|
-| `project_id` | uint | ✗ | 특정 프로젝트의 볼륨만 조회 |
+| `project_id` | uint | ✓ | 특정 프로젝트의 볼륨만 조회 |
 
 ### 응답
 
@@ -506,69 +576,11 @@ Authorization: Bearer <token>
 ```
 
 ### 권한
-- `project_id` 파라미터가 있는 경우: 해당 프로젝트에 접근 권한이 있는 사용자만 조회 가능
-- `project_id` 파라미터가 없는 경우: 사용자가 접근 가능한 모든 프로젝트의 볼륨을 필터링하여 반환
+- 해당 프로젝트에 접근 권한이 있는 사용자만 조회 가능
 
 ---
 
-## 3. 볼륨 수정
-
-**PUT** `/api/v1/volumes/:id`
-
-기존 볼륨의 정보를 수정합니다.
-
-### 요청
-
-#### Headers
-```http
-Content-Type: application/json
-Authorization: Bearer <token>
-```
-
-#### Path Parameters
-| 파라미터 | 타입 | 설명 |
-|----------|------|------|
-| `id` | uint | 볼륨 ID |
-
-#### Body
-```json
-{
-  "name": "updated-data",
-  "capacity": 2048
-}
-```
-
-#### 필드 설명
-모든 필드는 선택사항이며, 제공된 필드만 업데이트됩니다.
-
-| 필드 | 타입 | 제약사항 | 설명 |
-|------|------|----------|------|
-| `name` | string | 1-63자, 영숫자만 | 볼륨 이름 |
-| `capacity` | uint32 | 128-10240 | 볼륨 용량 (Mi) |
-
-### 응답
-
-#### 성공 (200 OK)
-```json
-{
-  "status": "success",
-  "data": {
-    "volume_id": 1,
-    "project_id": 1,
-    "name": "updated-data",
-    "capacity": 2048,
-    "updated_at": "2023-01-01T12:00:00Z"
-  }
-}
-```
-
-### 권한
-- 볼륨이 속한 프로젝트의 소유자 또는 관리자만 수정 가능
-- 권한이 없으면 `VOLUME_NOT_FOUND` 에러 반환 (정보 노출 방지)
-
----
-
-## 4. 볼륨 삭제
+## 3. 볼륨 삭제
 
 **DELETE** `/api/v1/volumes/:id`
 
@@ -604,6 +616,17 @@ Authorization: Bearer <token>
 
 ---
 
+## 구현되지 않은 API
+
+### 볼륨 수정 API
+`PUT /api/v1/volumes/:id`
+
+현재 볼륨 수정 기능은 구현되지 않았습니다. 볼륨 수정이 필요한 경우:
+1. 기존 볼륨 삭제
+2. 새로운 설정으로 볼륨 재생성
+
+---
+
 ## 보안 고려사항
 
 ### 권한 체크
@@ -620,14 +643,4 @@ Authorization: Bearer <token>
 - API 호출 빈도 제한 (Rate Limiting)
 - 페이지네이션을 통한 대용량 데이터 처리
 - 리소스 사용량 모니터링 및 제한
-
----
-
-## 변경 이력
-
-### v1.0.0 (2024-01-01)
-- 프로젝트 CRUD API 구현
-- 볼륨 관리 API 구현
-- JWT 기반 인증 시스템
-- 권한 기반 접근 제어
-- 리소스 제한 관리
+- 사용자당 프로젝트 수 제한 (최대 3개)
