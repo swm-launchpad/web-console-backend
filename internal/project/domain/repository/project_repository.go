@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model"
+	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 )
 
 // ProjectRepository defines the interface for project data persistence
@@ -21,9 +21,9 @@ type ProjectRepository interface {
 	// Should return the complete aggregate with all ProjectUsers
 	FindByID(ctx context.Context, projectID uint) (*model.Project, error)
 
-	// FindBySlug retrieves a project by its slug
-	// Should return the complete aggregate with all ProjectUsers
-	FindBySlug(ctx context.Context, slug string) (*model.Project, error)
+	// FindByIDForUpdate retrieves a project by its ID with row lock (SELECT FOR UPDATE)
+	// Used for preventing race conditions in concurrent modifications
+	FindByIDForUpdate(ctx context.Context, projectID uint) (*model.Project, error)
 
 	// FindByUserID retrieves all projects for a specific user
 	// Returns only projects where the user is an active member
@@ -32,13 +32,9 @@ type ProjectRepository interface {
 	// ExistsBySlug checks if a project with the given slug exists
 	ExistsBySlug(ctx context.Context, slug string) (bool, error)
 
+	// ExistsByNameAndUserID checks if a project with the given name exists for the user
+	ExistsByNameAndUserID(ctx context.Context, name string, userID uint) (bool, error)
+
 	// Delete soft deletes a project (sets is_deleted = true)
 	Delete(ctx context.Context, projectID uint) error
-
-	// List retrieves projects with pagination
-	// Returns only non-deleted projects
-	List(ctx context.Context, offset, limit int) ([]*model.Project, error)
-
-	// Count returns total number of non-deleted projects
-	Count(ctx context.Context) (int64, error)
 }

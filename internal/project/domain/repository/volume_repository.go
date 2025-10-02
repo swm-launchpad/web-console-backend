@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model"
+	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
 )
 
 // VolumeRepository defines the interface for volume data persistence
@@ -11,9 +11,6 @@ import (
 type VolumeRepository interface {
 	// Create persists a new volume and assigns its ID
 	Create(ctx context.Context, volume *model.Volume) error
-
-	// Save updates an existing volume
-	Save(ctx context.Context, volume *model.Volume) error
 
 	// FindByID retrieves a volume by its ID
 	FindByID(ctx context.Context, volumeID uint) (*model.Volume, error)
@@ -30,6 +27,9 @@ type VolumeRepository interface {
 	// Delete removes a volume (physical delete since volumes contain data)
 	Delete(ctx context.Context, volumeID uint) error
 
+	// DeleteByProjectID removes all volumes for a project (physical delete)
+	DeleteByProjectID(ctx context.Context, projectID uint) error
+
 	// List retrieves volumes with pagination
 	List(ctx context.Context, offset, limit int) ([]*model.Volume, error)
 
@@ -38,4 +38,7 @@ type VolumeRepository interface {
 
 	// CountByProjectID returns total number of volumes for a project
 	CountByProjectID(ctx context.Context, projectID uint) (int64, error)
+
+	// GetTotalCapacityByProjectID returns total capacity of all volumes for a project
+	GetTotalCapacityByProjectID(ctx context.Context, projectID uint) (uint32, error)
 }
