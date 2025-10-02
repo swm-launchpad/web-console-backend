@@ -3,23 +3,26 @@ package application
 import (
 	"context"
 
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
 type ListProjectsInput struct {
-	UserID *uint
-	Offset int
-	Limit  int
+	UserID uint
 }
 
 type ProjectListItem struct {
-	ProjectID uint   `json:"project_id"`
-	Name      string `json:"name"`
-	Slug      string `json:"slug"`
-	FQDN      string `json:"fqdn,omitempty"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"created_at"`
+	ProjectID    uint   `json:"project_id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	FQDN         string `json:"fqdn,omitempty"`
+	Plan         string `json:"plan,omitempty"`
+	Status       string `json:"status"`
+	CPULimit     uint32 `json:"cpu_limit"`
+	MemoryLimit  uint32 `json:"memory_limit"`
+	DiskLimit    uint32 `json:"disk_limit"`
+	TrafficLimit uint32 `json:"traffic_limit"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 type ListProjectsOutput struct {
@@ -38,27 +41,8 @@ func NewListProjectsUseCase(projectService service.ProjectService) *ListProjects
 }
 
 func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsInput) (*ListProjectsOutput, error) {
-	var projects []*model.Project
-	var err error
-
-	// Validate and set defaults
-	if input.Limit <= 0 {
-		input.Limit = 10
-	}
-	if input.Limit > 100 {
-		input.Limit = 100
-	}
-	if input.Offset < 0 {
-		input.Offset = 0
-	}
-
-	// Get projects based on user ID or all
-	if input.UserID != nil {
-		projects, err = uc.projectService.ListProjects(ctx, *input.UserID)
-	} else {
-		projects, err = uc.projectService.ListAllProjects(ctx, input.Offset, input.Limit)
-	}
-
+	// Get projects for the user
+	projects, err := uc.projectService.ListProjects(ctx, input.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -71,15 +55,24 @@ func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsIn
 
 	for _, project := range projects {
 		item := ProjectListItem{
-			ProjectID: project.GetProjectID(),
-			Name:      project.GetName(),
-			Slug:      project.GetSlug().String(),
-			Status:    string(project.GetStatus()),
-			CreatedAt: project.GetCreatedAt().Format("2006-01-02T15:04:05Z"),
+			ProjectID:    project.ProjectID(),
+			Name:         project.Name(),
+			Slug:         project.Slug().String(),
+			Status:       string(project.Status()),
+			CPULimit:     project.Limits().CPULimit(),
+			MemoryLimit:  project.Limits().MemoryLimit(),
+			DiskLimit:    project.Limits().DiskLimit(),
+			TrafficLimit: project.Limits().TrafficLimit(),
+			CreatedAt:    project.CreatedAt().Format("2006-01-02T15:04:05Z"),
+			UpdatedAt:    project.UpdatedAt().Format("2006-01-02T15:04:05Z"),
 		}
 
-		if project.GetFQDN() != nil {
-			item.FQDN = *project.GetFQDN()
+		if fqdn, ok := project.FQDN(); ok {
+			item.FQDN = fqdn
+		}
+
+		if plan, ok := project.Plan(); ok {
+			item.Plan = plan
 		}
 
 		output.Projects = append(output.Projects, item)

@@ -4,31 +4,35 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model"
+	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
 type UpdateProjectInput struct {
-	ProjectID     uint
-	Name          *string
-	FQDN          *string
-	Plan          *string
-	Status        *string
-	CPULimit      *uint32
-	MemoryRequest *uint32
-	MemoryLimit   *uint32
-	DiskLimit     *uint32
-	TrafficLimit  *uint64
+	ProjectID    uint
+	Name         *string
+	FQDN         *string
+	Plan         *string
+	Status       *string
+	CPULimit     *uint32
+	MemoryLimit  *uint32
+	DiskLimit    *uint32
+	TrafficLimit *uint32
 }
 
 type UpdateProjectOutput struct {
-	ProjectID uint   `json:"project_id"`
-	Name      string `json:"name"`
-	Slug      string `json:"slug"`
-	FQDN      string `json:"fqdn,omitempty"`
-	Plan      string `json:"plan,omitempty"`
-	Status    string `json:"status"`
-	UpdatedAt string `json:"updated_at"`
+	ProjectID    uint   `json:"project_id"`
+	Name         string `json:"name"`
+	Slug         string `json:"slug"`
+	FQDN         string `json:"fqdn,omitempty"`
+	Plan         string `json:"plan,omitempty"`
+	Status       string `json:"status"`
+	CPULimit     uint32 `json:"cpu_limit"`
+	MemoryLimit  uint32 `json:"memory_limit"`
+	DiskLimit    uint32 `json:"disk_limit"`
+	TrafficLimit uint32 `json:"traffic_limit"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
 type UpdateProjectUseCase struct {
@@ -44,14 +48,21 @@ func NewUpdateProjectUseCase(projectService service.ProjectService, txManager db
 }
 
 func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProjectInput) (*UpdateProjectOutput, error) {
-	var output *UpdateProjectOutput
+	var projectID uint
+	var name string
+	var slug string
+	var status string
+	var fqdn, plan string
+	var hasFQDN, hasPlan bool
+	var cpuLimit, memoryLimit, diskLimit, trafficLimit uint32
+	var updatedAt string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Update project through service
 		project, err := uc.projectService.UpdateProject(txCtx, input.ProjectID, func(p *model.Project) error {
 			// Update fields if provided
 			if input.Name != nil {
-				if err := p.UpdateName(*input.Name); err != nil {
+				if err := p.SetName(*input.Name); err != nil {
 					return err
 				}
 			}
@@ -63,14 +74,14 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 			}
 
 			if input.Plan != nil {
-				if err := p.UpdatePlan(*input.Plan); err != nil {
+				if err := p.SetPlan(*input.Plan); err != nil {
 					return err
 				}
 			}
 
 			if input.Status != nil {
-				status := model.ProjectStatus(*input.Status)
-				if err := p.UpdateStatus(status); err != nil {
+				status := value.ProjectStatus(*input.Status)
+				if err := p.SetStatus(status); err != nil {
 					return err
 				}
 			}
@@ -78,40 +89,35 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 			// Update resource limits if any provided
 			if input.CPULimit != nil || input.MemoryLimit != nil || input.DiskLimit != nil || input.TrafficLimit != nil {
 				// Get current limits
-				currentLimits := p.GetLimits()
+				currentLimits := p.Limits()
 
-				// Use provided values or keep current ones
-				cpuLimit := input.CPULimit
-				if cpuLimit == nil {
-					cpuLimit = currentLimits.GetCPULimit()
+				// Use provided values or keep current ones (nil = keep current, non-nil = update)
+				cpu := currentLimits.CPULimit()
+				if input.CPULimit != nil {
+					cpu = *input.CPULimit
 				}
 
-				memoryRequest := input.MemoryRequest
-				if memoryRequest == nil {
-					memoryRequest = currentLimits.GetMemoryRequest()
+				memory := currentLimits.MemoryLimit()
+				if input.MemoryLimit != nil {
+					memory = *input.MemoryLimit
 				}
 
-				memLimit := input.MemoryLimit
-				if memLimit == nil {
-					memLimit = currentLimits.GetMemoryLimit()
+				disk := currentLimits.DiskLimit()
+				if input.DiskLimit != nil {
+					disk = *input.DiskLimit
 				}
 
-				diskLimit := input.DiskLimit
-				if diskLimit == nil {
-					diskLimit = currentLimits.GetDiskLimit()
+				traffic := currentLimits.TrafficLimit()
+				if input.TrafficLimit != nil {
+					traffic = *input.TrafficLimit
 				}
 
-				trafficLimit := input.TrafficLimit
-				if trafficLimit == nil {
-					trafficLimit = currentLimits.GetTrafficLimit()
-				}
-
-				limits, err := model.NewResourceLimits(cpuLimit, memoryRequest, memLimit, diskLimit, trafficLimit)
+				limits, err := value.NewResourceLimits(cpu, memory, disk, traffic)
 				if err != nil {
 					return err
 				}
 
-				if err := p.UpdateResourceLimits(*limits); err != nil {
+				if err := p.SetResourceLimits(*limits); err != nil {
 					return err
 				}
 			}
@@ -123,28 +129,57 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 			return err
 		}
 
-		// Build output
-		output = &UpdateProjectOutput{
-			ProjectID: project.GetProjectID(),
-			Name:      project.GetName(),
-			Slug:      project.GetSlug().String(),
-			Status:    string(project.GetStatus()),
+		// Extract primitive values within transaction
+		projectID = project.ProjectID()
+		name = project.Name()
+		slug = project.Slug().String()
+		status = string(project.Status())
+		updatedAt = project.UpdatedAt().Format("2006-01-02T15:04:05Z")
+
+		// Extract resource limits
+		limits := project.Limits()
+		cpuLimit = limits.CPULimit()
+		memoryLimit = limits.MemoryLimit()
+		diskLimit = limits.DiskLimit()
+		trafficLimit = limits.TrafficLimit()
+
+		if f, ok := project.FQDN(); ok {
+			fqdn = f
+			hasFQDN = true
 		}
 
-		if project.GetFQDN() != nil {
-			output.FQDN = *project.GetFQDN()
-		}
-
-		if project.GetPlan() != nil {
-			output.Plan = *project.GetPlan()
-		}
-
-		if project.GetUpdatedAt() != nil {
-			output.UpdatedAt = project.GetUpdatedAt().Format("2006-01-02T15:04:05Z")
+		if p, ok := project.Plan(); ok {
+			plan = p
+			hasPlan = true
 		}
 
 		return nil
 	})
 
-	return output, err
+	if err != nil {
+		return nil, err
+	}
+
+	// Build output after successful transaction
+	output := &UpdateProjectOutput{
+		ProjectID:    projectID,
+		Name:         name,
+		Slug:         slug,
+		Status:       status,
+		CPULimit:     cpuLimit,
+		MemoryLimit:  memoryLimit,
+		DiskLimit:    diskLimit,
+		TrafficLimit: trafficLimit,
+		UpdatedAt:    updatedAt,
+	}
+
+	if hasFQDN {
+		output.FQDN = fqdn
+	}
+
+	if hasPlan {
+		output.Plan = plan
+	}
+
+	return output, nil
 }
