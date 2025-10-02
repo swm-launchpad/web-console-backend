@@ -53,15 +53,14 @@ func InitializeApp() (*App, error) {
 	volumeService := service2.NewVolumeService(volumeRepository, projectRepository)
 	getProjectUseCase := application2.NewGetProjectUseCase(projectService, volumeService)
 	updateProjectUseCase := application2.NewUpdateProjectUseCase(projectService, txManager)
-	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, txManager)
+	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, txManager)
 	listProjectsUseCase := application2.NewListProjectsUseCase(projectService)
 	permissionService := service2.NewPermissionService(projectRepository, volumeRepository)
-	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService)
+	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService)
 	addVolumeUseCase := application2.NewAddVolumeUseCase(volumeService, txManager)
 	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService)
-	updateVolumeUseCase := application2.NewUpdateVolumeUseCase(volumeService, txManager)
 	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager)
-	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, updateVolumeUseCase, removeVolumeUseCase, permissionService)
+	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	router := NewRouter(configConfig, db, authHandler, userHandler, projectHandler, volumeHandler, authMiddleware)
 	app := NewApp(configConfig, db, router)
@@ -70,14 +69,17 @@ func InitializeApp() (*App, error) {
 
 // wire.go:
 
+// provideDatabase creates a database connection from config
 func provideDatabase(cfg *config.Config) (*sql.DB, error) {
 	return db.NewConnection(&cfg.Database)
 }
 
+// provideTxManager creates a transaction manager
 func provideTxManager(database *sql.DB) db.TxManager {
 	return db.NewTxManager(database)
 }
 
+// provideJWTUtil creates a JWT utility from config
 func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
 	return jwt.NewJWTUtil(cfg.JWT.Secret)
 }

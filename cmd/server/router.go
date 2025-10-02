@@ -95,7 +95,6 @@ func (r *Router) Setup() {
 		{
 			volumes.POST("", r.volumeHandler.AddVolume)
 			volumes.GET("", r.volumeHandler.GetVolumes)
-			volumes.PUT("/:id", r.volumeHandler.UpdateVolume)
 			volumes.DELETE("/:id", r.volumeHandler.RemoveVolume)
 		}
 	}
