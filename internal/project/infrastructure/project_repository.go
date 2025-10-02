@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model"
+	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/sqlc"
 )
@@ -27,37 +27,21 @@ func NewProjectRepository(db sqlc.DBTX) repository.ProjectRepository {
 }
 
 func (r *projectRepository) Create(ctx context.Context, project *model.Project) error {
-	// Check if we're already in a transaction
-	var shouldCommit bool
-	tx, existingTx := db.GetTx(ctx)
-	if !existingTx || tx == nil {
-		// No existing transaction, create our own
-		var err error
-		tx, err = r.beginTx(ctx)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = tx.Rollback()
-		}()
-		shouldCommit = true
-	}
-
-	qtx := r.queriesWithContext(ctx, tx)
+	qtx := r.queriesWithContext(ctx)
 
 	// Create project
 	params := sqlc.CreateProjectParams{
-		Name:         project.GetName(),
-		Slug:         project.GetSlug().String(),
-		Fqdn:         toNullString(project.GetFQDN()),
-		Status:       sqlc.ProjectsStatus(project.GetStatus()),
-		Plan:         toNullString(project.GetPlan()),
-		CpuLimit:     toNullInt32(project.GetLimits().GetCPULimit()),
-		MemoryLimit:  toNullInt32(project.GetLimits().GetMemoryLimit()),
-		DiskLimit:    toNullInt32(project.GetLimits().GetDiskLimit()),
-		TrafficLimit: toNullInt64(project.GetLimits().GetTrafficLimit()),
-		CreatedAt:    project.GetCreatedAt(),
-		UpdatedAt:    toNullTime(project.GetUpdatedAt()),
+		Name:         project.Name(),
+		Slug:         project.Slug().String(),
+		Fqdn:         stringBoolToNullString(project.FQDN()),
+		Status:       sqlc.ProjectsStatus(project.Status()),
+		Plan:         stringBoolToNullString(project.Plan()),
+		CpuLimit:     sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
+		MemoryLimit:  sql.NullInt32{Int32: int32(project.Limits().MemoryLimit()), Valid: true},
+		DiskLimit:    sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
+		TrafficLimit: sql.NullInt64{Int64: int64(project.Limits().TrafficLimit()), Valid: true},
+		CreatedAt:    project.CreatedAt(),
+		UpdatedAt:    sql.NullTime{Time: project.UpdatedAt(), Valid: !project.UpdatedAt().IsZero()},
 	}
 
 	result, err := qtx.CreateProject(ctx, params)
@@ -76,14 +60,14 @@ func (r *projectRepository) Create(ctx context.Context, project *model.Project) 
 	project.SetProjectID(uint(projectID))
 
 	// Save project users
-	for _, user := range project.GetUsers() {
+	for _, user := range project.Users() {
 		if user.IsActive() {
 			userParams := sqlc.CreateProjectUserParams{
-				ProjectID: uint32(project.GetProjectID()),
-				UserID:    uint32(user.GetUserID()),
-				Role:      sqlc.ProjectUserRole(user.GetRole()),
-				CreatedAt: user.GetCreatedAt(),
-				UpdatedAt: toNullTime(user.GetUpdatedAt()),
+				ProjectID: uint32(project.ProjectID()),
+				UserID:    uint32(user.UserID()),
+				Role:      sqlc.ProjectUserRole(user.Role()),
+				CreatedAt: user.CreatedAt(),
+				UpdatedAt: sql.NullTime{Time: user.UpdatedAt(), Valid: !user.UpdatedAt().IsZero()},
 			}
 			if _, err := qtx.CreateProjectUser(ctx, userParams); err != nil {
 				return projecterrors.ErrDatabaseOperation
@@ -91,96 +75,128 @@ func (r *projectRepository) Create(ctx context.Context, project *model.Project) 
 		}
 	}
 
-	// Volumes are now handled separately as their own aggregate
-
-	if shouldCommit {
-		return tx.Commit()
-	}
 	return nil
 }
 
 func (r *projectRepository) Save(ctx context.Context, project *model.Project) error {
-	// Check if we're already in a transaction
-	var shouldCommit bool
-	tx, existingTx := db.GetTx(ctx)
-	if !existingTx || tx == nil {
-		// No existing transaction, create our own
-		var err error
-		tx, err = r.beginTx(ctx)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = tx.Rollback()
-		}()
-		shouldCommit = true
-	}
-
-	qtx := r.queriesWithContext(ctx, tx)
+	qtx := r.queriesWithContext(ctx)
 
 	// Update project
 	params := sqlc.UpdateProjectParams{
-		Name:         project.GetName(),
-		Fqdn:         toNullString(project.GetFQDN()),
-		Status:       sqlc.ProjectsStatus(project.GetStatus()),
-		Plan:         toNullString(project.GetPlan()),
-		CpuLimit:     toNullInt32(project.GetLimits().GetCPULimit()),
-		MemoryLimit:  toNullInt32(project.GetLimits().GetMemoryLimit()),
-		DiskLimit:    toNullInt32(project.GetLimits().GetDiskLimit()),
-		TrafficLimit: toNullInt64(project.GetLimits().GetTrafficLimit()),
-		UpdatedAt:    toNullTime(project.GetUpdatedAt()),
-		ProjectID:    uint32(project.GetProjectID()),
+		Name:         project.Name(),
+		Fqdn:         stringBoolToNullString(project.FQDN()),
+		Status:       sqlc.ProjectsStatus(project.Status()),
+		Plan:         stringBoolToNullString(project.Plan()),
+		CpuLimit:     sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
+		MemoryLimit:  sql.NullInt32{Int32: int32(project.Limits().MemoryLimit()), Valid: true},
+		DiskLimit:    sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
+		TrafficLimit: sql.NullInt64{Int64: int64(project.Limits().TrafficLimit()), Valid: true},
+		UpdatedAt:    sql.NullTime{Time: project.UpdatedAt(), Valid: !project.UpdatedAt().IsZero()},
+		ProjectID:    uint32(project.ProjectID()),
 	}
 
 	if _, err := qtx.UpdateProject(ctx, params); err != nil {
 		return projecterrors.ErrDatabaseOperation
 	}
 
-	// Hard delete all existing project users and recreate
-	// We use hard delete to avoid unique constraint violations
-	if _, err := qtx.HardDeleteProjectUsersByProjectID(ctx, uint32(project.GetProjectID())); err != nil {
+	// Load existing project users (including soft-deleted) to track changes
+	existingUsers, err := qtx.GetAllProjectUsersByProjectID(ctx, uint32(project.ProjectID()))
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return projecterrors.ErrDatabaseOperation
 	}
 
-	// Recreate project users
-	for _, user := range project.GetUsers() {
-		if user.IsActive() {
+	// Build map of existing users for quick lookup
+	existingUserMap := make(map[uint]sqlc.ProjectUser)
+	for _, u := range existingUsers {
+		existingUserMap[uint(u.UserID)] = u
+	}
+
+	// Build map of current domain users
+	currentUsers := project.Users()
+	currentUserMap := make(map[uint]model.ProjectUser)
+	for _, u := range currentUsers {
+		currentUserMap[u.UserID()] = u
+	}
+
+	// Process changes: Compare existing DB users with current domain users
+	for _, domainUser := range currentUsers {
+		userID := domainUser.UserID()
+		existingUser, exists := existingUserMap[userID]
+
+		if !exists {
+			// New user: INSERT
 			userParams := sqlc.CreateProjectUserParams{
-				ProjectID: uint32(project.GetProjectID()),
-				UserID:    uint32(user.GetUserID()),
-				Role:      sqlc.ProjectUserRole(user.GetRole()),
-				CreatedAt: user.GetCreatedAt(),
-				UpdatedAt: toNullTime(user.GetUpdatedAt()),
+				ProjectID: uint32(project.ProjectID()),
+				UserID:    uint32(userID),
+				Role:      sqlc.ProjectUserRole(domainUser.Role()),
+				CreatedAt: domainUser.CreatedAt(),
+				UpdatedAt: sql.NullTime{Time: domainUser.UpdatedAt(), Valid: !domainUser.UpdatedAt().IsZero()},
 			}
 			if _, err := qtx.CreateProjectUser(ctx, userParams); err != nil {
 				return projecterrors.ErrDatabaseOperation
 			}
+		} else {
+			// Existing user: check for changes
+			wasDeleted := existingUser.IsDeleted
+			isDeleted := domainUser.IsDeleted()
+			roleChanged := string(existingUser.Role) != string(domainUser.Role())
+
+			if wasDeleted && !isDeleted {
+				// Restore user: UPDATE (was deleted, now active)
+				restoreParams := sqlc.RestoreProjectUserParams{
+					Role:      sqlc.ProjectUserRole(domainUser.Role()),
+					UpdatedAt: sql.NullTime{Time: domainUser.UpdatedAt(), Valid: !domainUser.UpdatedAt().IsZero()},
+					ProjectID: uint32(project.ProjectID()),
+					UserID:    uint32(userID),
+				}
+				if _, err := qtx.RestoreProjectUser(ctx, restoreParams); err != nil {
+					return projecterrors.ErrDatabaseOperation
+				}
+			} else if !wasDeleted && isDeleted {
+				// Soft delete user: UPDATE (was active, now deleted)
+				deleteParams := sqlc.DeleteProjectUserParams{
+					DeletedAt: toNullTime(domainUser.DeletedAt()),
+					UpdatedAt: sql.NullTime{Time: domainUser.UpdatedAt(), Valid: !domainUser.UpdatedAt().IsZero()},
+					ProjectID: uint32(project.ProjectID()),
+					UserID:    uint32(userID),
+				}
+				if _, err := qtx.DeleteProjectUser(ctx, deleteParams); err != nil {
+					return projecterrors.ErrDatabaseOperation
+				}
+			} else if !isDeleted && roleChanged {
+				// Role changed: UPDATE
+				updateParams := sqlc.UpdateProjectUserParams{
+					Role:      sqlc.ProjectUserRole(domainUser.Role()),
+					UpdatedAt: sql.NullTime{Time: domainUser.UpdatedAt(), Valid: !domainUser.UpdatedAt().IsZero()},
+					ProjectID: uint32(project.ProjectID()),
+					UserID:    uint32(userID),
+				}
+				if _, err := qtx.UpdateProjectUser(ctx, updateParams); err != nil {
+					return projecterrors.ErrDatabaseOperation
+				}
+			}
+			// else: no changes, do nothing
 		}
 	}
 
-	// Volumes are now handled separately as their own aggregate
-
 	// Handle soft delete
-	if project.IsSoftDeleted() {
+	if project.IsDeleted() {
 		deleteParams := sqlc.DeleteProjectParams{
-			DeletedAt: toNullTime(project.GetDeletedAt()),
-			UpdatedAt: toNullTime(project.GetUpdatedAt()),
-			ProjectID: uint32(project.GetProjectID()),
+			DeletedAt: timeBoolToNullTime(project.DeletedAt()),
+			UpdatedAt: sql.NullTime{Time: project.UpdatedAt(), Valid: !project.UpdatedAt().IsZero()},
+			ProjectID: uint32(project.ProjectID()),
 		}
 		if _, err := qtx.DeleteProject(ctx, deleteParams); err != nil {
 			return projecterrors.ErrDatabaseOperation
 		}
 	}
 
-	if shouldCommit {
-		return tx.Commit()
-	}
 	return nil
 }
 
 func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*model.Project, error) {
 	// Get project
-	sqlcProject, err := r.queriesWithContext(ctx, nil).GetProjectByID(ctx, uint32(projectID))
+	sqlcProject, err := r.queriesWithContext(ctx).GetProjectByID(ctx, uint32(projectID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, projecterrors.ErrProjectNotFound
@@ -189,27 +205,27 @@ func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*mode
 	}
 
 	// Convert to domain model
-	project := r.toDomainProject(sqlcProject)
+	project, err := r.toDomainProject(sqlcProject)
+	if err != nil {
+		return nil, err
+	}
 
 	// Load project users
-	sqlcUsers, err := r.queriesWithContext(ctx, nil).GetProjectUsersByProjectID(ctx, uint32(projectID))
+	sqlcUsers, err := r.queriesWithContext(ctx).GetProjectUsersByProjectID(ctx, uint32(projectID))
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	for _, sqlcUser := range sqlcUsers {
-		user := r.toDomainProjectUser(sqlcUser)
-		_ = project.AddUser(user.GetUserID(), user.GetRole())
+	if err := r.loadProjectUsers(project, sqlcUsers); err != nil {
+		return nil, err
 	}
-
-	// Volumes are now handled separately as their own aggregate
 
 	return project, nil
 }
 
-func (r *projectRepository) FindBySlug(ctx context.Context, slug string) (*model.Project, error) {
-	// Get project
-	sqlcProject, err := r.queriesWithContext(ctx, nil).GetProjectBySlug(ctx, slug)
+func (r *projectRepository) FindByIDForUpdate(ctx context.Context, projectID uint) (*model.Project, error) {
+	// Get project with row lock
+	sqlcProject, err := r.queriesWithContext(ctx).GetProjectByIDForUpdate(ctx, uint32(projectID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, projecterrors.ErrProjectNotFound
@@ -217,12 +233,29 @@ func (r *projectRepository) FindBySlug(ctx context.Context, slug string) (*model
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	// Convert to domain model and load associations
-	return r.FindByID(ctx, uint(sqlcProject.ProjectID))
+	// Convert to domain model
+	project, err := r.toDomainProject(sqlcProject)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load project users
+	sqlcUsers, err := r.queriesWithContext(ctx).GetProjectUsersByProjectID(ctx, uint32(projectID))
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	if err := r.loadProjectUsers(project, sqlcUsers); err != nil {
+		return nil, err
+	}
+
+	return project, nil
 }
 
 func (r *projectRepository) FindByUserID(ctx context.Context, userID uint) ([]*model.Project, error) {
-	sqlcProjects, err := r.queriesWithContext(ctx, nil).ListProjectsByUserID(ctx, uint32(userID))
+	qtx := r.queriesWithContext(ctx)
+
+	sqlcProjects, err := qtx.ListProjectsByUserID(ctx, uint32(userID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return []*model.Project{}, nil
@@ -230,13 +263,44 @@ func (r *projectRepository) FindByUserID(ctx context.Context, userID uint) ([]*m
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
+	if len(sqlcProjects) == 0 {
+		return []*model.Project{}, nil
+	}
+
+	// Collect all project IDs
+	projectIDs := make([]uint32, len(sqlcProjects))
+	for i, p := range sqlcProjects {
+		projectIDs[i] = p.ProjectID
+	}
+
+	// Load all project users in one query (eliminates N+1)
+	allUsers, err := qtx.GetProjectUsersByProjectIDs(ctx, projectIDs)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	// Group users by project ID
+	usersByProject := make(map[uint][]sqlc.ProjectUser)
+	for _, user := range allUsers {
+		pid := uint(user.ProjectID)
+		usersByProject[pid] = append(usersByProject[pid], user)
+	}
+
+	// Convert to domain models
 	projects := make([]*model.Project, 0, len(sqlcProjects))
 	for _, sqlcProject := range sqlcProjects {
-		// Load full project with associations
-		project, err := r.FindByID(ctx, uint(sqlcProject.ProjectID))
+		project, err := r.toDomainProject(sqlcProject)
 		if err != nil {
-			continue // Skip projects that can't be loaded
+			return nil, err
 		}
+
+		// Add users for this project
+		if users, ok := usersByProject[uint(sqlcProject.ProjectID)]; ok {
+			if err := r.loadProjectUsers(project, users); err != nil {
+				return nil, err
+			}
+		}
+
 		projects = append(projects, project)
 	}
 
@@ -244,7 +308,19 @@ func (r *projectRepository) FindByUserID(ctx context.Context, userID uint) ([]*m
 }
 
 func (r *projectRepository) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
-	result, err := r.queriesWithContext(ctx, nil).ExistsBySlug(ctx, slug)
+	result, err := r.queriesWithContext(ctx).ExistsBySlug(ctx, slug)
+	if err != nil {
+		return false, projecterrors.ErrDatabaseOperation
+	}
+	return result, nil
+}
+
+func (r *projectRepository) ExistsByNameAndUserID(ctx context.Context, name string, userID uint) (bool, error) {
+	params := sqlc.ExistsByNameAndUserIDParams{
+		Name:   name,
+		UserID: uint32(userID),
+	}
+	result, err := r.queriesWithContext(ctx).ExistsByNameAndUserID(ctx, params)
 	if err != nil {
 		return false, projecterrors.ErrDatabaseOperation
 	}
@@ -259,7 +335,7 @@ func (r *projectRepository) Delete(ctx context.Context, projectID uint) error {
 		ProjectID: uint32(projectID),
 	}
 
-	_, err := r.queriesWithContext(ctx, nil).DeleteProject(ctx, params)
+	_, err := r.queriesWithContext(ctx).DeleteProject(ctx, params)
 	if err != nil {
 		return projecterrors.ErrDatabaseOperation
 	}
@@ -267,153 +343,129 @@ func (r *projectRepository) Delete(ctx context.Context, projectID uint) error {
 	return nil
 }
 
-func (r *projectRepository) List(ctx context.Context, offset, limit int) ([]*model.Project, error) {
-	params := sqlc.ListProjectsParams{
-		Limit:  int32(limit),
-		Offset: int32(offset),
-	}
-
-	sqlcProjects, err := r.queriesWithContext(ctx, nil).ListProjects(ctx, params)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return []*model.Project{}, nil
-		}
-		return nil, projecterrors.ErrDatabaseOperation
-	}
-
-	projects := make([]*model.Project, 0, len(sqlcProjects))
-	for _, sqlcProject := range sqlcProjects {
-		// Load full project with associations
-		project, err := r.FindByID(ctx, uint(sqlcProject.ProjectID))
-		if err != nil {
-			continue // Skip projects that can't be loaded
-		}
-		projects = append(projects, project)
-	}
-
-	return projects, nil
-}
-
-func (r *projectRepository) Count(ctx context.Context) (int64, error) {
-	count, err := r.queriesWithContext(ctx, nil).CountProjects(ctx)
-	if err != nil {
-		return 0, projecterrors.ErrDatabaseOperation
-	}
-	return count, nil
-}
-
 // Helper methods
 
-func (r *projectRepository) queriesWithContext(ctx context.Context, tx *sql.Tx) *sqlc.Queries {
-	if tx != nil {
-		return r.queries.WithTx(tx)
+func (r *projectRepository) loadProjectUsers(project *model.Project, sqlcUsers []sqlc.ProjectUser) error {
+	for _, sqlcUser := range sqlcUsers {
+		user, err := r.toDomainProjectUser(sqlcUser)
+		if err != nil {
+			return err
+		}
+		if err := project.AddUser(user.UserID(), user.Role()); err != nil {
+			// Any error here indicates data integrity issue
+			// DB should have UNIQUE constraint to prevent duplicate users
+			return projecterrors.ErrDatabaseOperation
+		}
 	}
+	return nil
+}
 
+func (r *projectRepository) queriesWithContext(ctx context.Context) *sqlc.Queries {
 	// Check if context has transaction
-	if ctxTx, ok := db.GetTx(ctx); ok && ctxTx != nil {
-		return r.queries.WithTx(ctxTx)
+	if tx, ok := db.GetTx(ctx); ok && tx != nil {
+		return r.queries.WithTx(tx)
 	}
 
 	return r.queries
 }
 
-func (r *projectRepository) beginTx(ctx context.Context) (*sql.Tx, error) {
-	// Check if already in transaction
-	if tx, ok := db.GetTx(ctx); ok && tx != nil {
-		return tx, nil
+func (r *projectRepository) toDomainProject(sqlcProject sqlc.Project) (*model.Project, error) {
+	slug, err := value.NewProjectSlug(sqlcProject.Slug)
+	if err != nil {
+		// DB에 저장된 slug가 유효하지 않은 경우 - 데이터 무결성 문제
+		return nil, projecterrors.ErrDatabaseOperation
 	}
-
-	// Get DB connection
-	dbConn, ok := r.db.(*sql.DB)
-	if !ok {
-		return nil, errors.New("failed to get database connection")
-	}
-
-	// Begin new transaction
-	return dbConn.Begin()
-}
-
-func (r *projectRepository) toDomainProject(sqlcProject sqlc.Project) *model.Project {
-	slug, _ := model.NewProjectSlug(sqlcProject.Slug)
 
 	// Reconstruct project from persistence
+	// updatedAt is always valid in domain, use createdAt as fallback if missing in DB
+	updatedAt := sqlcProject.CreatedAt
+	if sqlcProject.UpdatedAt.Valid {
+		updatedAt = sqlcProject.UpdatedAt.Time
+	}
+
+	// Set resource limits (0 = unlimited)
+	limits, err := value.NewResourceLimits(
+		nullInt32ToUint32(sqlcProject.CpuLimit),
+		nullInt32ToUint32(sqlcProject.MemoryLimit),
+		nullInt32ToUint32(sqlcProject.DiskLimit),
+		nullInt64ToUint32(sqlcProject.TrafficLimit),
+	)
+	if err != nil {
+		// DB에 저장된 리소스 제한이 유효하지 않은 경우 - 데이터 무결성 문제
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
 	project := model.ReconstructProject(
 		uint(sqlcProject.ProjectID),
 		sqlcProject.Name,
 		*slug,
-		model.ProjectStatus(sqlcProject.Status),
+		value.ProjectStatus(sqlcProject.Status),
+		*limits,
 		sqlcProject.CreatedAt,
-		fromNullTime(sqlcProject.UpdatedAt),
+		updatedAt,
 		sqlcProject.IsDeleted,
 		fromNullTime(sqlcProject.DeletedAt),
 	)
 
 	// Set fields
 	if sqlcProject.Fqdn.Valid {
-		_ = project.SetFQDN(sqlcProject.Fqdn.String)
+		if err := project.SetFQDN(sqlcProject.Fqdn.String); err != nil {
+			// DB에 저장된 FQDN이 유효하지 않은 경우 - 데이터 무결성 문제
+			return nil, projecterrors.ErrDatabaseOperation
+		}
 	}
 
 	if sqlcProject.Plan.Valid {
-		_ = project.UpdatePlan(sqlcProject.Plan.String)
+		if err := project.SetPlan(sqlcProject.Plan.String); err != nil {
+			// DB에 저장된 Plan이 유효하지 않은 경우 - 데이터 무결성 문제
+			return nil, projecterrors.ErrDatabaseOperation
+		}
 	}
 
-	_ = project.UpdateStatus(model.ProjectStatus(sqlcProject.Status))
-
-	// Set resource limits
-	limits, _ := model.NewResourceLimits(
-		fromNullInt32(sqlcProject.CpuLimit),
-		nil, // memoryRequest not in schema yet, will be added later
-		fromNullInt32(sqlcProject.MemoryLimit),
-		fromNullInt32(sqlcProject.DiskLimit),
-		fromNullInt64(sqlcProject.TrafficLimit),
-	)
-	if limits != nil {
-		_ = project.UpdateResourceLimits(*limits)
+	if err := project.SetStatus(value.ProjectStatus(sqlcProject.Status)); err != nil {
+		// DB에 저장된 Status가 유효하지 않은 경우 - 데이터 무결성 문제
+		return nil, projecterrors.ErrDatabaseOperation
 	}
 
 	// Handle soft delete
 	if sqlcProject.IsDeleted {
-		_ = project.Delete()
+		if err := project.SoftDelete(); err != nil {
+			// DB 상태가 일관되지 않은 경우 - 데이터 무결성 문제
+			return nil, projecterrors.ErrDatabaseOperation
+		}
 	}
 
-	return project
+	return project, nil
 }
 
-func (r *projectRepository) toDomainProjectUser(sqlcUser sqlc.ProjectUser) *model.ProjectUser {
-	user, _ := model.NewProjectUser(
+func (r *projectRepository) toDomainProjectUser(sqlcUser sqlc.ProjectUser) (*model.ProjectUser, error) {
+	user, err := model.NewProjectUser(
 		uint(sqlcUser.ProjectID),
 		uint(sqlcUser.UserID),
-		model.ProjectUserRole(sqlcUser.Role),
+		value.ProjectUserRole(sqlcUser.Role),
 	)
-
-	if sqlcUser.IsDeleted {
-		_ = user.SoftDelete()
+	if err != nil {
+		// DB에 저장된 ProjectUser가 유효하지 않은 경우 - 데이터 무결성 문제
+		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	return user
+	if sqlcUser.IsDeleted {
+		if err := user.SoftDelete(); err != nil {
+			// DB 상태가 일관되지 않은 경우 - 데이터 무결성 문제
+			return nil, projecterrors.ErrDatabaseOperation
+		}
+	}
+
+	return user, nil
 }
 
 // Utility functions
 
-func toNullString(s *string) sql.NullString {
-	if s == nil {
+func stringBoolToNullString(s string, ok bool) sql.NullString {
+	if !ok {
 		return sql.NullString{Valid: false}
 	}
-	return sql.NullString{String: *s, Valid: true}
-}
-
-func toNullInt32(i *uint32) sql.NullInt32 {
-	if i == nil {
-		return sql.NullInt32{Valid: false}
-	}
-	return sql.NullInt32{Int32: int32(*i), Valid: true}
-}
-
-func toNullInt64(i *uint64) sql.NullInt64 {
-	if i == nil {
-		return sql.NullInt64{Valid: false}
-	}
-	return sql.NullInt64{Int64: int64(*i), Valid: true}
+	return sql.NullString{String: s, Valid: true}
 }
 
 func toNullTime(t *time.Time) sql.NullTime {
@@ -423,20 +475,29 @@ func toNullTime(t *time.Time) sql.NullTime {
 	return sql.NullTime{Time: *t, Valid: true}
 }
 
-func fromNullInt32(n sql.NullInt32) *uint32 {
-	if !n.Valid || n.Int32 <= 0 {
-		return nil
+func timeBoolToNullTime(t time.Time, ok bool) sql.NullTime {
+	if !ok {
+		return sql.NullTime{Valid: false}
 	}
-	v := uint32(n.Int32)
-	return &v
+	return sql.NullTime{Time: t, Valid: true}
 }
 
-func fromNullInt64(n sql.NullInt64) *uint64 {
-	if !n.Valid || n.Int64 <= 0 {
-		return nil
+// nullInt32ToUint32 converts sql.NullInt32 to uint32
+// Returns 0 if NULL (for backward compatibility with old data)
+func nullInt32ToUint32(n sql.NullInt32) uint32 {
+	if !n.Valid {
+		return 0
 	}
-	v := uint64(n.Int64)
-	return &v
+	return uint32(n.Int32)
+}
+
+// nullInt64ToUint32 converts sql.NullInt64 to uint32
+// Returns 0 if NULL (for backward compatibility with old data)
+func nullInt64ToUint32(n sql.NullInt64) uint32 {
+	if !n.Valid {
+		return 0
+	}
+	return uint32(n.Int64)
 }
 
 func fromNullTime(n sql.NullTime) *time.Time {
@@ -444,14 +505,4 @@ func fromNullTime(n sql.NullTime) *time.Time {
 		return nil
 	}
 	return &n.Time
-}
-
-// FindVolumeByID method removed - volumes are now handled by VolumeRepository
-
-func isDuplicateError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := strings.ToLower(err.Error())
-	return strings.Contains(errStr, "duplicate") || strings.Contains(errStr, "unique")
 }

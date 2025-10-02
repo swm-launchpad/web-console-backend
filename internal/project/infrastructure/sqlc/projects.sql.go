@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 )
 
@@ -149,6 +150,34 @@ func (q *Queries) DeleteProjectUsersByProjectID(ctx context.Context, arg DeleteP
 	return q.db.ExecContext(ctx, deleteProjectUsersByProjectID, arg.DeletedAt, arg.UpdatedAt, arg.ProjectID)
 }
 
+const existsByNameAndUserID = `-- name: ExistsByNameAndUserID :one
+SELECT EXISTS(
+    SELECT 1
+    FROM PROJECTS p
+    WHERE p.name = ?
+    AND p.is_deleted = FALSE
+    AND EXISTS (
+        SELECT 1
+        FROM PROJECT_USER pu
+        WHERE pu.project_id = p.project_id
+        AND pu.user_id = ?
+        AND pu.is_deleted = FALSE
+    )
+) as project_exists
+`
+
+type ExistsByNameAndUserIDParams struct {
+	Name   string `json:"name"`
+	UserID uint32 `json:"user_id"`
+}
+
+func (q *Queries) ExistsByNameAndUserID(ctx context.Context, arg ExistsByNameAndUserIDParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, existsByNameAndUserID, arg.Name, arg.UserID)
+	var project_exists bool
+	err := row.Scan(&project_exists)
+	return project_exists, err
+}
+
 const existsBySlug = `-- name: ExistsBySlug :one
 SELECT EXISTS(SELECT 1 FROM PROJECTS WHERE slug = ? AND is_deleted = FALSE) as project_exists
 `
@@ -158,6 +187,47 @@ func (q *Queries) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
 	var project_exists bool
 	err := row.Scan(&project_exists)
 	return project_exists, err
+}
+
+const getAllProjectUsersByProjectID = `-- name: GetAllProjectUsersByProjectID :many
+SELECT
+    project_user_id, project_id, user_id, role,
+    created_at, updated_at, deleted_at, is_deleted
+FROM PROJECT_USER
+WHERE project_id = ?
+ORDER BY created_at ASC
+`
+
+func (q *Queries) GetAllProjectUsersByProjectID(ctx context.Context, projectID uint32) ([]ProjectUser, error) {
+	rows, err := q.db.QueryContext(ctx, getAllProjectUsersByProjectID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProjectUser{}
+	for rows.Next() {
+		var i ProjectUser
+		if err := rows.Scan(
+			&i.ProjectUserID,
+			&i.ProjectID,
+			&i.UserID,
+			&i.Role,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.IsDeleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getProjectByID = `-- name: GetProjectByID :one
@@ -171,6 +241,38 @@ WHERE project_id = ? AND is_deleted = FALSE
 
 func (q *Queries) GetProjectByID(ctx context.Context, projectID uint32) (Project, error) {
 	row := q.db.QueryRowContext(ctx, getProjectByID, projectID)
+	var i Project
+	err := row.Scan(
+		&i.ProjectID,
+		&i.Name,
+		&i.Slug,
+		&i.Fqdn,
+		&i.Status,
+		&i.Plan,
+		&i.CpuLimit,
+		&i.MemoryLimit,
+		&i.DiskLimit,
+		&i.TrafficLimit,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.IsDeleted,
+	)
+	return i, err
+}
+
+const getProjectByIDForUpdate = `-- name: GetProjectByIDForUpdate :one
+SELECT
+    project_id, name, slug, fqdn, status, plan,
+    cpu_limit, memory_limit, disk_limit, traffic_limit,
+    created_at, updated_at, deleted_at, is_deleted
+FROM PROJECTS
+WHERE project_id = ? AND is_deleted = FALSE
+FOR UPDATE
+`
+
+func (q *Queries) GetProjectByIDForUpdate(ctx context.Context, projectID uint32) (Project, error) {
+	row := q.db.QueryRowContext(ctx, getProjectByIDForUpdate, projectID)
 	var i Project
 	err := row.Scan(
 		&i.ProjectID,
@@ -251,6 +353,57 @@ ORDER BY created_at ASC
 
 func (q *Queries) GetProjectUsersByProjectID(ctx context.Context, projectID uint32) ([]ProjectUser, error) {
 	rows, err := q.db.QueryContext(ctx, getProjectUsersByProjectID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProjectUser{}
+	for rows.Next() {
+		var i ProjectUser
+		if err := rows.Scan(
+			&i.ProjectUserID,
+			&i.ProjectID,
+			&i.UserID,
+			&i.Role,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.IsDeleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProjectUsersByProjectIDs = `-- name: GetProjectUsersByProjectIDs :many
+SELECT
+    project_user_id, project_id, user_id, role,
+    created_at, updated_at, deleted_at, is_deleted
+FROM PROJECT_USER
+WHERE project_id IN (/*SLICE:project_ids*/?) AND is_deleted = FALSE
+ORDER BY project_id, created_at ASC
+`
+
+func (q *Queries) GetProjectUsersByProjectIDs(ctx context.Context, projectIds []uint32) ([]ProjectUser, error) {
+	query := getProjectUsersByProjectIDs
+	var queryParams []interface{}
+	if len(projectIds) > 0 {
+		for _, v := range projectIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:project_ids*/?", strings.Repeat(",?", len(projectIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:project_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}
@@ -393,6 +546,31 @@ func (q *Queries) ListProjectsByUserID(ctx context.Context, userID uint32) ([]Pr
 		return nil, err
 	}
 	return items, nil
+}
+
+const restoreProjectUser = `-- name: RestoreProjectUser :execresult
+UPDATE PROJECT_USER SET
+    is_deleted = FALSE,
+    deleted_at = NULL,
+    role = ?,
+    updated_at = ?
+WHERE project_id = ? AND user_id = ?
+`
+
+type RestoreProjectUserParams struct {
+	Role      ProjectUserRole `json:"role"`
+	UpdatedAt sql.NullTime    `json:"updated_at"`
+	ProjectID uint32          `json:"project_id"`
+	UserID    uint32          `json:"user_id"`
+}
+
+func (q *Queries) RestoreProjectUser(ctx context.Context, arg RestoreProjectUserParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, restoreProjectUser,
+		arg.Role,
+		arg.UpdatedAt,
+		arg.ProjectID,
+		arg.UserID,
+	)
 }
 
 const updateProject = `-- name: UpdateProject :execresult
