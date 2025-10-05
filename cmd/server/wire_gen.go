@@ -16,7 +16,7 @@ import (
 	application2 "github.com/swm-launchpad/web-console-backend/internal/project/application"
 	service2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	handler2 "github.com/swm-launchpad/web-console-backend/internal/project/handler"
-	infrastructure2 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
+	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -45,11 +45,11 @@ func InitializeApp() (*App, error) {
 	authHandler := handler.NewAuthHandler(registerUserUseCase, loginUserUseCase)
 	getUserUseCase := application.NewGetUserUseCase(userService)
 	userHandler := handler.NewUserHandler(getUserUseCase)
-	projectRepository := infrastructure2.NewProjectRepository(db)
+	projectRepository := repository.NewProjectRepository(db)
 	slugService := service2.NewSlugService(projectRepository)
 	projectService := service2.NewProjectService(projectRepository, slugService)
 	createProjectUseCase := application2.NewCreateProjectUseCase(projectService, txManager)
-	volumeRepository := infrastructure2.NewVolumeRepository(db)
+	volumeRepository := repository.NewVolumeRepository(db)
 	volumeService := service2.NewVolumeService(volumeRepository, projectRepository)
 	getProjectUseCase := application2.NewGetProjectUseCase(projectService, volumeService)
 	updateProjectUseCase := application2.NewUpdateProjectUseCase(projectService, txManager)

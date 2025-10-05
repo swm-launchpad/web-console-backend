@@ -4,8 +4,8 @@ import (
 	"context"
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
 )
 
 // VolumeService defines the interface for volume-related business logic

@@ -1,4 +1,4 @@
-package infrastructure
+package repository
 
 import (
 	"database/sql"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
-	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/sqlc"
+	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 )
 
 func TestVolumeRepository_ConversionFunctions(t *testing.T) {

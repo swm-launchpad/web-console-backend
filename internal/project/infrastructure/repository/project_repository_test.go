@@ -1,4 +1,4 @@
-package infrastructure
+package repository
 
 import (
 	"database/sql"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
-	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/sqlc"
+	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 )
 
 func TestToNullTime(t *testing.T) {

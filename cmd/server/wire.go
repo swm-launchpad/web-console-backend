@@ -15,8 +15,8 @@ import (
 	projectApp "github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
-	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
-	projectSqlc "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/sqlc"
+	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
+	projectSqlc "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -65,8 +65,8 @@ func InitializeApp() (*App, error) {
 		application.NewGetUserUseCase,
 
 		// Project infrastructure
-		projectInfra.NewProjectRepository,
-		projectInfra.NewVolumeRepository,
+		projectRepo.NewProjectRepository,
+		projectRepo.NewVolumeRepository,
 
 		// Project domain services
 		projectService.NewSlugService,

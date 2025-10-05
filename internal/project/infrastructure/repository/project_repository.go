@@ -1,4 +1,4 @@
-package infrastructure
+package repository
 
 import (
 	"context"
@@ -8,10 +8,10 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
-	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/sqlc"
+	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 )
 
 type projectRepository struct {
