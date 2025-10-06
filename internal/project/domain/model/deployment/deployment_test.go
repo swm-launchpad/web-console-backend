@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
 func TestNewDeployment(t *testing.T) {
@@ -70,7 +71,7 @@ func TestReconstructDeployment(t *testing.T) {
 			time.Time{},
 		)
 
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentStatus)
 		assert.Nil(t, deployment)
 	})
 }
@@ -104,8 +105,7 @@ func TestDeployment_Start(t *testing.T) {
 
 		err := deployment.Start("ref2")
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot start deployment")
+		assert.ErrorIs(t, err, projecterrors.ErrCannotStartDeployment)
 		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
 		assert.Equal(t, "ref1", deployment.TektonRef())
 	})
@@ -117,8 +117,7 @@ func TestDeployment_Start(t *testing.T) {
 
 		err := deployment.Start("ref2")
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot start deployment")
+		assert.ErrorIs(t, err, projecterrors.ErrCannotStartDeployment)
 		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
 	})
 }
@@ -143,8 +142,7 @@ func TestDeployment_Complete(t *testing.T) {
 
 		err := deployment.Complete("success")
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot complete deployment")
+		assert.ErrorIs(t, err, projecterrors.ErrCannotCompleteDeployment)
 		assert.Equal(t, DeploymentStatusPending, deployment.Status())
 	})
 
@@ -155,8 +153,7 @@ func TestDeployment_Complete(t *testing.T) {
 
 		err := deployment.Complete("success")
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot complete deployment")
+		assert.ErrorIs(t, err, projecterrors.ErrCannotCompleteDeployment)
 		assert.Equal(t, DeploymentStatusFailed, deployment.Status())
 	})
 }
@@ -181,8 +178,7 @@ func TestDeployment_Fail(t *testing.T) {
 
 		err := deployment.Fail("error")
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot fail deployment")
+		assert.ErrorIs(t, err, projecterrors.ErrCannotFailDeployment)
 		assert.Equal(t, DeploymentStatusPending, deployment.Status())
 	})
 
@@ -193,8 +189,7 @@ func TestDeployment_Fail(t *testing.T) {
 
 		err := deployment.Fail("error")
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot fail deployment")
+		assert.ErrorIs(t, err, projecterrors.ErrCannotFailDeployment)
 		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
 	})
 }
@@ -234,8 +229,7 @@ func TestDeployment_Cancel(t *testing.T) {
 
 		err := deployment.Cancel("cancel")
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot cancel deployment")
+		assert.ErrorIs(t, err, projecterrors.ErrCannotCancelDeployment)
 		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
 	})
 
@@ -246,8 +240,7 @@ func TestDeployment_Cancel(t *testing.T) {
 
 		err := deployment.Cancel("cancel")
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot cancel deployment")
+		assert.ErrorIs(t, err, projecterrors.ErrCannotCancelDeployment)
 		assert.Equal(t, DeploymentStatusFailed, deployment.Status())
 	})
 }

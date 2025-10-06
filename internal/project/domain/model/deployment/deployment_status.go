@@ -1,6 +1,8 @@
 package deployment
 
-import "fmt"
+import (
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+)
 
 // DeploymentStatus represents the status of a deployment
 type DeploymentStatus string
@@ -35,7 +37,7 @@ func (s DeploymentStatus) IsValid() bool {
 // ValidateDeploymentStatus validates the deployment status
 func ValidateDeploymentStatus(s DeploymentStatus) error {
 	if !s.IsValid() {
-		return fmt.Errorf("invalid deployment status: %s", s)
+		return projecterrors.ErrInvalidDeploymentStatus
 	}
 	return nil
 }

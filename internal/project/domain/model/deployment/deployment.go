@@ -1,8 +1,9 @@
 package deployment
 
 import (
-	"fmt"
 	"time"
+
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
 // Deployment represents a deployment entity
@@ -105,7 +106,7 @@ func (d *Deployment) FinishedAt() time.Time {
 // Sets the startedAt timestamp and tektonRef
 func (d *Deployment) Start(tektonRef string) error {
 	if d.status != DeploymentStatusPending {
-		return fmt.Errorf("cannot start deployment: current status is %s, expected pending", d.status)
+		return projecterrors.ErrCannotStartDeployment
 	}
 
 	d.status = DeploymentStatusRunning
@@ -118,7 +119,7 @@ func (d *Deployment) Start(tektonRef string) error {
 // Sets the finishedAt timestamp and optional summary
 func (d *Deployment) Complete(summary string) error {
 	if d.status != DeploymentStatusRunning {
-		return fmt.Errorf("cannot complete deployment: current status is %s, expected running", d.status)
+		return projecterrors.ErrCannotCompleteDeployment
 	}
 
 	d.status = DeploymentStatusSuccess
@@ -131,7 +132,7 @@ func (d *Deployment) Complete(summary string) error {
 // Sets the finishedAt timestamp and error summary
 func (d *Deployment) Fail(summary string) error {
 	if d.status != DeploymentStatusRunning {
-		return fmt.Errorf("cannot fail deployment: current status is %s, expected running", d.status)
+		return projecterrors.ErrCannotFailDeployment
 	}
 
 	d.status = DeploymentStatusFailed
@@ -144,7 +145,7 @@ func (d *Deployment) Fail(summary string) error {
 // Can be cancelled from pending or running status
 func (d *Deployment) Cancel(summary string) error {
 	if d.status != DeploymentStatusPending && d.status != DeploymentStatusRunning {
-		return fmt.Errorf("cannot cancel deployment: current status is %s, expected pending or running", d.status)
+		return projecterrors.ErrCannotCancelDeployment
 	}
 
 	d.status = DeploymentStatusCancelled
