@@ -309,6 +309,9 @@ func TestDeploymentLockRepository_Integration(t *testing.T) {
 
 		_, err = lockRepo.RenewLock(ctx, nil)
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
+
+		err = lockRepo.ReleaseLock(ctx, nil)
+		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
 	})
 }
 

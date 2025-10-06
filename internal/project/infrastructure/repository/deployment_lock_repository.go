@@ -133,6 +133,10 @@ func (r *deploymentLockRepository) RenewLock(ctx context.Context, lock *deployme
 // The input lock must contain projectID and token
 // This operation is idempotent - releasing an already expired lock is a no-op
 func (r *deploymentLockRepository) ReleaseLock(ctx context.Context, lock *deployment.DeploymentLock) error {
+	if lock == nil {
+		return projecterrors.ErrInvalidProjectData
+	}
+
 	qtx := r.queriesWithContext(ctx)
 
 	// Set the lock's expiration to NOW - only if token matches
