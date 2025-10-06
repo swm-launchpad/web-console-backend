@@ -367,6 +367,12 @@ type Deployment struct {
 	FinishedAt   sql.NullTime      `json:"finished_at"`
 }
 
+type DeploymentLock struct {
+	ProjectID uint32    `json:"project_id"`
+	Token     uint64    `json:"token"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
 type EnvVar struct {
 	EnvVarID    uint32         `json:"env_var_id"`
 	ContainerID uint32         `json:"container_id"`

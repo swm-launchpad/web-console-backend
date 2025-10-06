@@ -28,6 +28,8 @@ type Querier interface {
 	ExistsBySlug(ctx context.Context, slug string) (bool, error)
 	ExistsVolumeByName(ctx context.Context, arg ExistsVolumeByNameParams) (bool, error)
 	GetAllProjectUsersByProjectID(ctx context.Context, projectID uint32) ([]ProjectUser, error)
+	// Deployment Locks CRUD
+	GetDeploymentLock(ctx context.Context, projectID uint32) (DeploymentLock, error)
 	GetProjectByID(ctx context.Context, projectID uint32) (Project, error)
 	GetProjectByIDForUpdate(ctx context.Context, projectID uint32) (Project, error)
 	GetProjectBySlug(ctx context.Context, slug string) (Project, error)
@@ -39,10 +41,14 @@ type Querier interface {
 	GetVolumeByName(ctx context.Context, arg GetVolumeByNameParams) (Volume, error)
 	GetVolumesByProjectID(ctx context.Context, projectID uint32) ([]Volume, error)
 	HardDeleteProjectUsersByProjectID(ctx context.Context, projectID uint32) (sql.Result, error)
+	InsertNewLock(ctx context.Context, arg InsertNewLockParams) (sql.Result, error)
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error)
 	ListProjectsByUserID(ctx context.Context, userID uint32) ([]Project, error)
 	ListVolumes(ctx context.Context, arg ListVolumesParams) ([]Volume, error)
+	ReleaseDeploymentLock(ctx context.Context, arg ReleaseDeploymentLockParams) (sql.Result, error)
+	RenewDeploymentLock(ctx context.Context, arg RenewDeploymentLockParams) (sql.Result, error)
 	RestoreProjectUser(ctx context.Context, arg RestoreProjectUserParams) (sql.Result, error)
+	UpdateExpiredLock(ctx context.Context, arg UpdateExpiredLockParams) (sql.Result, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (sql.Result, error)
 	UpdateProjectUser(ctx context.Context, arg UpdateProjectUserParams) (sql.Result, error)
 }
