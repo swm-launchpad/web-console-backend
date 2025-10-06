@@ -104,6 +104,11 @@ var (
 	ErrSlugGenerationFailed    = errors.New("failed to generate unique slug")
 )
 
+// Deployment errors - errors related to deployment management
+var (
+	ErrDeploymentNotFound = errors.New("deployment not found")
+)
+
 // Deployment lock errors - errors related to deployment locking mechanism
 var (
 	ErrLockAlreadyAcquired = errors.New("deployment lock already acquired for this project")
