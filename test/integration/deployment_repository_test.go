@@ -75,6 +75,32 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		assert.ErrorIs(t, err, projecterrors.ErrDeploymentNotFound)
 	})
 
+	t.Run("Save - Idempotent update with same values", func(t *testing.T) {
+		// Given - Create and start deployment
+		pid := createTestProject(t, testDB)
+		d := deployment.NewDeployment(pid)
+		err := repo.Create(ctx, d)
+		require.NoError(t, err)
+
+		tektonRef := "pipeline-run-456"
+		err = d.Start(tektonRef)
+		require.NoError(t, err)
+		err = repo.Save(ctx, d)
+		require.NoError(t, err)
+
+		// When - Save again with same values (idempotent retry)
+		err = repo.Save(ctx, d)
+
+		// Then - Should succeed (no error, even though 0 rows affected)
+		require.NoError(t, err)
+
+		// Verify data is still correct
+		fetched, err := repo.FindByID(ctx, d.DeploymentID())
+		require.NoError(t, err)
+		assert.Equal(t, deployment.DeploymentStatusRunning, fetched.Status())
+		assert.Equal(t, tektonRef, fetched.TektonRef())
+	})
+
 	t.Run("FindByID - Existing deployment", func(t *testing.T) {
 		// Given
 		pid := createTestProject(t, testDB)

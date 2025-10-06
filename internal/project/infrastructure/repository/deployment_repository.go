@@ -80,15 +80,27 @@ func (r *deploymentRepository) Save(ctx context.Context, d *deployment.Deploymen
 		return projecterrors.ErrDatabaseOperation
 	}
 
-	// Check if the deployment was actually updated
+	// Check if any rows were affected
+	// Note: MySQL returns 0 rows affected in two cases:
+	// 1. Record doesn't exist (error case)
+	// 2. Record exists but UPDATE with same values (idempotent, OK)
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return projecterrors.ErrDatabaseOperation
 	}
 
 	if rowsAffected == 0 {
-		// No rows updated - deployment doesn't exist or was deleted
-		return projecterrors.ErrDeploymentNotFound
+		// Verify if the deployment exists to distinguish between case 1 and 2
+		_, err := qtx.FindDeploymentByID(ctx, uint32(d.DeploymentID()))
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				// Case 1: Deployment was deleted or never existed
+				return projecterrors.ErrDeploymentNotFound
+			}
+			return projecterrors.ErrDatabaseOperation
+		}
+		// Case 2: Deployment exists, idempotent update (same values)
+		// This is a successful no-op, return nil
 	}
 
 	return nil
