@@ -3,7 +3,6 @@ package integration
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -64,6 +63,18 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		assert.False(t, fetched.StartedAt().IsZero())
 	})
 
+	t.Run("Save - Not found error", func(t *testing.T) {
+		// Given - Create deployment but don't persist it
+		d := deployment.NewDeployment(123)
+		d.SetDeploymentID(99999) // Non-existent ID
+
+		// When - Try to save
+		err := repo.Save(ctx, d)
+
+		// Then - Should return not found error
+		assert.ErrorIs(t, err, projecterrors.ErrDeploymentNotFound)
+	})
+
 	t.Run("FindByID - Existing deployment", func(t *testing.T) {
 		// Given
 		pid := createTestProject(t, testDB)
@@ -97,13 +108,9 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		err := repo.Create(ctx, d1)
 		require.NoError(t, err)
 
-		time.Sleep(1100 * time.Millisecond) // Ensure different created_at (MySQL TIMESTAMP has 1 second precision)
-
 		d2 := deployment.NewDeployment(pid)
 		err = repo.Create(ctx, d2)
 		require.NoError(t, err)
-
-		time.Sleep(1100 * time.Millisecond)
 
 		d3 := deployment.NewDeployment(pid)
 		err = repo.Create(ctx, d3)
@@ -114,6 +121,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
+		// With ORDER BY created_at DESC, deployment_id DESC, the latest created (highest ID) is returned
 		assert.Equal(t, d3.DeploymentID(), latest.DeploymentID(), "Should return the most recent deployment")
 	})
 
@@ -138,9 +146,6 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 			err := repo.Create(ctx, d)
 			require.NoError(t, err)
 			deploymentIDs = append(deploymentIDs, d.DeploymentID())
-			if i < 4 {
-				time.Sleep(1100 * time.Millisecond) // Ensure different created_at
-			}
 		}
 
 		// When - Fetch first page (limit 3, offset 0)
@@ -157,7 +162,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, page2, 2, "Second page should have 2 items")
 
-		// Verify order (newest first) - last created should be first
+		// Verify order (newest first by deployment_id DESC) - last created should be first
 		assert.Equal(t, deploymentIDs[4], page1[0].DeploymentID(), "Newest deployment should be first")
 		assert.Equal(t, deploymentIDs[3], page1[1].DeploymentID())
 		assert.Equal(t, deploymentIDs[2], page1[2].DeploymentID())

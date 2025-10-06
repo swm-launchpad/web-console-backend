@@ -11,7 +11,7 @@ INSERT INTO `DEPLOYMENTS` (
     ?, ?, ?, ?, ?, ?, ?
 );
 
--- name: UpdateDeployment :exec
+-- name: UpdateDeployment :execresult
 UPDATE `DEPLOYMENTS`
 SET
     `status` = ?,
@@ -48,7 +48,7 @@ SELECT
     `finished_at`
 FROM `DEPLOYMENTS`
 WHERE `project_id` = ?
-ORDER BY `created_at` DESC
+ORDER BY `created_at` DESC, `deployment_id` DESC
 LIMIT 1;
 
 -- name: FindDeploymentsByProjectID :many
@@ -63,5 +63,5 @@ SELECT
     `finished_at`
 FROM `DEPLOYMENTS`
 WHERE `project_id` = ?
-ORDER BY `created_at` DESC
+ORDER BY `created_at` DESC, `deployment_id` DESC
 LIMIT ? OFFSET ?;

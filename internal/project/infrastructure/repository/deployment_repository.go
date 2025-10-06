@@ -68,7 +68,7 @@ func (r *deploymentRepository) Save(ctx context.Context, d *deployment.Deploymen
 
 	qtx := r.queriesWithContext(ctx)
 
-	err := qtx.UpdateDeployment(ctx, sqlc.UpdateDeploymentParams{
+	result, err := qtx.UpdateDeployment(ctx, sqlc.UpdateDeploymentParams{
 		Status:       deploymentStatusToDB(d.Status()),
 		Summary:      toNullString(d.Summary()),
 		TektonRef:    toNullString(d.TektonRef()),
@@ -78,6 +78,17 @@ func (r *deploymentRepository) Save(ctx context.Context, d *deployment.Deploymen
 	})
 	if err != nil {
 		return projecterrors.ErrDatabaseOperation
+	}
+
+	// Check if the deployment was actually updated
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return projecterrors.ErrDatabaseOperation
+	}
+
+	if rowsAffected == 0 {
+		// No rows updated - deployment doesn't exist or was deleted
+		return projecterrors.ErrDeploymentNotFound
 	}
 
 	return nil

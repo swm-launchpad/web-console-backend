@@ -90,7 +90,7 @@ SELECT
     ` + "`" + `finished_at` + "`" + `
 FROM ` + "`" + `DEPLOYMENTS` + "`" + `
 WHERE ` + "`" + `project_id` + "`" + ` = ?
-ORDER BY ` + "`" + `created_at` + "`" + ` DESC
+ORDER BY ` + "`" + `created_at` + "`" + ` DESC, ` + "`" + `deployment_id` + "`" + ` DESC
 LIMIT ? OFFSET ?
 `
 
@@ -144,7 +144,7 @@ SELECT
     ` + "`" + `finished_at` + "`" + `
 FROM ` + "`" + `DEPLOYMENTS` + "`" + `
 WHERE ` + "`" + `project_id` + "`" + ` = ?
-ORDER BY ` + "`" + `created_at` + "`" + ` DESC
+ORDER BY ` + "`" + `created_at` + "`" + ` DESC, ` + "`" + `deployment_id` + "`" + ` DESC
 LIMIT 1
 `
 
@@ -164,7 +164,7 @@ func (q *Queries) FindLatestDeploymentByProjectID(ctx context.Context, projectID
 	return i, err
 }
 
-const updateDeployment = `-- name: UpdateDeployment :exec
+const updateDeployment = `-- name: UpdateDeployment :execresult
 UPDATE ` + "`" + `DEPLOYMENTS` + "`" + `
 SET
     ` + "`" + `status` + "`" + ` = ?,
@@ -185,8 +185,8 @@ type UpdateDeploymentParams struct {
 	DeploymentID uint32            `json:"deployment_id"`
 }
 
-func (q *Queries) UpdateDeployment(ctx context.Context, arg UpdateDeploymentParams) error {
-	_, err := q.db.ExecContext(ctx, updateDeployment,
+func (q *Queries) UpdateDeployment(ctx context.Context, arg UpdateDeploymentParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateDeployment,
 		arg.Status,
 		arg.Summary,
 		arg.TektonRef,
@@ -194,5 +194,4 @@ func (q *Queries) UpdateDeployment(ctx context.Context, arg UpdateDeploymentPara
 		arg.FinishedAt,
 		arg.DeploymentID,
 	)
-	return err
 }

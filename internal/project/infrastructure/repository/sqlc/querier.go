@@ -54,7 +54,7 @@ type Querier interface {
 	ReleaseDeploymentLock(ctx context.Context, arg ReleaseDeploymentLockParams) (sql.Result, error)
 	RenewDeploymentLock(ctx context.Context, arg RenewDeploymentLockParams) (sql.Result, error)
 	RestoreProjectUser(ctx context.Context, arg RestoreProjectUserParams) (sql.Result, error)
-	UpdateDeployment(ctx context.Context, arg UpdateDeploymentParams) error
+	UpdateDeployment(ctx context.Context, arg UpdateDeploymentParams) (sql.Result, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (sql.Result, error)
 	UpdateProjectUser(ctx context.Context, arg UpdateProjectUserParams) (sql.Result, error)
 }
