@@ -11,6 +11,26 @@ import (
 	"time"
 )
 
+const acquireOrUpdateLock = `-- name: AcquireOrUpdateLock :execresult
+INSERT INTO DEPLOYMENT_LOCKS (
+    project_id, token, expires_at
+) VALUES (?, 1, ?)
+ON DUPLICATE KEY UPDATE
+    token = IF(expires_at <= NOW(), token + 1, token),
+    expires_at = IF(expires_at <= NOW(), VALUES(expires_at), expires_at)
+`
+
+type AcquireOrUpdateLockParams struct {
+	ProjectID uint32    `json:"project_id"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// Atomically acquire a new lock or update an expired lock
+// Returns RowsAffected: 1 (INSERT new), 2 (UPDATE expired), 0 (active lock exists)
+func (q *Queries) AcquireOrUpdateLock(ctx context.Context, arg AcquireOrUpdateLockParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, acquireOrUpdateLock, arg.ProjectID, arg.ExpiresAt)
+}
+
 const getDeploymentLock = `-- name: GetDeploymentLock :one
 
 SELECT
@@ -27,26 +47,10 @@ func (q *Queries) GetDeploymentLock(ctx context.Context, projectID uint32) (Depl
 	return i, err
 }
 
-const insertNewLock = `-- name: InsertNewLock :execresult
-INSERT INTO DEPLOYMENT_LOCKS (
-    project_id, token, expires_at
-) VALUES (?, ?, ?)
-`
-
-type InsertNewLockParams struct {
-	ProjectID uint32    `json:"project_id"`
-	Token     uint64    `json:"token"`
-	ExpiresAt time.Time `json:"expires_at"`
-}
-
-func (q *Queries) InsertNewLock(ctx context.Context, arg InsertNewLockParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, insertNewLock, arg.ProjectID, arg.Token, arg.ExpiresAt)
-}
-
 const releaseDeploymentLock = `-- name: ReleaseDeploymentLock :execresult
 UPDATE DEPLOYMENT_LOCKS SET
     expires_at = NOW()
-WHERE project_id = ? AND token <= ?
+WHERE project_id = ? AND token = ?
 `
 
 type ReleaseDeploymentLockParams struct {
@@ -61,7 +65,7 @@ func (q *Queries) ReleaseDeploymentLock(ctx context.Context, arg ReleaseDeployme
 const renewDeploymentLock = `-- name: RenewDeploymentLock :execresult
 UPDATE DEPLOYMENT_LOCKS SET
     expires_at = ?
-WHERE project_id = ? AND token <= ? AND expires_at > NOW()
+WHERE project_id = ? AND token = ? AND expires_at > NOW()
 `
 
 type RenewDeploymentLockParams struct {
@@ -72,20 +76,4 @@ type RenewDeploymentLockParams struct {
 
 func (q *Queries) RenewDeploymentLock(ctx context.Context, arg RenewDeploymentLockParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, renewDeploymentLock, arg.ExpiresAt, arg.ProjectID, arg.Token)
-}
-
-const updateExpiredLock = `-- name: UpdateExpiredLock :execresult
-UPDATE DEPLOYMENT_LOCKS SET
-    token = token + 1,
-    expires_at = ?
-WHERE project_id = ? AND expires_at <= NOW()
-`
-
-type UpdateExpiredLockParams struct {
-	ExpiresAt time.Time `json:"expires_at"`
-	ProjectID uint32    `json:"project_id"`
-}
-
-func (q *Queries) UpdateExpiredLock(ctx context.Context, arg UpdateExpiredLockParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateExpiredLock, arg.ExpiresAt, arg.ProjectID)
 }

@@ -82,17 +82,24 @@ func SetupTestDB(t *testing.T) *TestDB {
 
 // Migrate applies schema to test database
 func (tdb *TestDB) Migrate() error {
-	// Read schema file
-	schemaPath := filepath.Join("..", "..", "migration", "000001_initial_schema.up.sql")
-	schema, err := os.ReadFile(schemaPath)
-	if err != nil {
-		return fmt.Errorf("failed to read schema file: %w", err)
+	// Apply all migrations in order
+	migrations := []string{
+		"000001_initial_schema.up.sql",
+		"000002_add_deployment_locks.up.sql",
 	}
 
-	// Execute schema
-	_, err = tdb.DB.Exec(string(schema))
-	if err != nil {
-		return fmt.Errorf("failed to execute schema: %w", err)
+	for _, migration := range migrations {
+		schemaPath := filepath.Join("..", "..", "migration", migration)
+		schema, err := os.ReadFile(schemaPath)
+		if err != nil {
+			return fmt.Errorf("failed to read schema file %s: %w", migration, err)
+		}
+
+		// Execute schema
+		_, err = tdb.DB.Exec(string(schema))
+		if err != nil {
+			return fmt.Errorf("failed to execute schema %s: %w", migration, err)
+		}
 	}
 
 	return nil
