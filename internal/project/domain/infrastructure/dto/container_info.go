@@ -117,29 +117,3 @@ type ContainerDeploymentConfig struct {
 	// Containers contains container configurations (required, at least 1)
 	Containers []ContainerInfo `json:"containers"`
 }
-
-// DeploymentRequest represents the final deployment request for Tekton API.
-// This combines Project metadata with Container configuration.
-type DeploymentRequest struct {
-	// ProjectID is the unique project identifier (from Project context)
-	ProjectID string `json:"project_id"`
-
-	// ServiceName is the Knative service name (from Project.slug)
-	// Will be used as the base name for all resources
-	ServiceName string `json:"service_name"`
-
-	// Namespace is the Kubernetes namespace for deployment (constant: "application")
-	Namespace string `json:"namespace"`
-
-	// StableWindow is the observation period for scale-to-zero decisions in seconds (constant: 180)
-	StableWindow int `json:"stable_window"`
-
-	// ConfigMaps contains ConfigMap configurations (from Container context)
-	ConfigMaps []ConfigMapInfo `json:"config_maps"`
-
-	// Volumes contains volume configurations (from Container context)
-	Volumes []VolumeInfo `json:"volumes"`
-
-	// Containers contains container configurations (from Container context)
-	Containers []ContainerInfo `json:"containers"`
-}
