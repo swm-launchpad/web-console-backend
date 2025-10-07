@@ -8,10 +8,12 @@ import (
 	"strings"
 	"time"
 
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -111,6 +113,10 @@ func (k *kubeClient) GetPipelineRunStatus(ctx context.Context, pipelineRunName s
 		Get(ctx, pipelineRunName, metav1.GetOptions{})
 
 	if err != nil {
+		// Map Kubernetes NotFound error to domain error
+		if apierrors.IsNotFound(err) {
+			return nil, projecterrors.ErrDeploymentNotFound
+		}
 		return nil, fmt.Errorf("failed to get PipelineRun %s: %w", pipelineRunName, err)
 	}
 
