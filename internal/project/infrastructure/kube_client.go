@@ -150,6 +150,22 @@ func (k *kubeClient) GetPipelineRunStatus(ctx context.Context, pipelineRunName s
 // GetPipelineRunLogs retrieves aggregated logs from all tasks in a PipelineRun.
 // It traverses TaskRuns associated with the PipelineRun and collects logs from their Pods.
 func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName string) (string, error) {
+	// First, verify that the PipelineRun exists
+	// This ensures we return ErrDeploymentNotFound for nonexistent PipelineRuns,
+	// distinguishing "not found" from "no logs available yet"
+	_, err := k.dynamicClient.
+		Resource(k.pipelineRunGVR).
+		Namespace(k.namespace).
+		Get(ctx, pipelineRunName, metav1.GetOptions{})
+
+	if err != nil {
+		// Map Kubernetes NotFound error to domain error
+		if apierrors.IsNotFound(err) {
+			return "", projecterrors.ErrDeploymentNotFound
+		}
+		return "", projecterrors.ErrKubernetesUnavailable
+	}
+
 	// List TaskRuns that belong to this PipelineRun
 	taskRuns, err := k.dynamicClient.
 		Resource(k.taskRunGVR).
