@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -94,19 +95,28 @@ func (t *tektonClient) TriggerDeploy(ctx context.Context, request *dto.TektonDep
 	// Check status code
 	// Tekton EventListener returns 202 Accepted on success
 	if resp.StatusCode != http.StatusAccepted {
+		// Extract error message from response body for debugging
+		var errorMsg string
+		if len(responseBody) > 0 {
+			errorMsg = string(responseBody)
+		} else {
+			errorMsg = fmt.Sprintf("unexpected status code: %d", resp.StatusCode)
+		}
+
 		// Map different status codes to appropriate errors
+		// Always include Tekton's response for debugging
 		switch resp.StatusCode {
 		case http.StatusBadRequest:
 			// 400 Bad Request: deployment configuration validation failed
-			return nil, projecterrors.ErrTektonDeploymentFailed
+			return nil, fmt.Errorf("%w: %s", projecterrors.ErrTektonDeploymentFailed, errorMsg)
 		case http.StatusUnauthorized, http.StatusForbidden:
 			// 401/403: authentication/authorization failure - infrastructure issue
 			// This indicates wrong credentials or ACL changes, not a user error
 			// Must be treated as infrastructure failure to trigger ops alerts
-			return nil, projecterrors.ErrTektonAuthenticationFailed
+			return nil, fmt.Errorf("%w: %s", projecterrors.ErrTektonAuthenticationFailed, errorMsg)
 		default:
 			// Server errors or other issues
-			return nil, projecterrors.ErrTektonUnavailable
+			return nil, fmt.Errorf("%w: %s", projecterrors.ErrTektonUnavailable, errorMsg)
 		}
 	}
 
