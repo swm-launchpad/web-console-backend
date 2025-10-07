@@ -51,17 +51,17 @@ func NewKubeClient() (infrastructure.KubeClient, error) {
 	// Read configuration from environment variables
 	apiServer := os.Getenv("KUBE_API_SERVER")
 	if apiServer == "" {
-		return nil, fmt.Errorf("KUBE_API_SERVER environment variable is required")
+		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
 	token := os.Getenv("KUBE_SERVICE_ACCOUNT_TOKEN")
 	if token == "" {
-		return nil, fmt.Errorf("KUBE_SERVICE_ACCOUNT_TOKEN environment variable is required")
+		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
 	namespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
 	if namespace == "" {
-		return nil, fmt.Errorf("KUBE_DEPLOY_NAMESPACE environment variable is required")
+		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
 	// Configure TLS
@@ -76,7 +76,7 @@ func NewKubeClient() (infrastructure.KubeClient, error) {
 		if caCertPath != "" {
 			// Verify CA cert file exists
 			if _, err := os.Stat(caCertPath); err != nil {
-				return nil, fmt.Errorf("CA certificate file not found at %s: %w", caCertPath, err)
+				return nil, projecterrors.ErrKubernetesUnavailable
 			}
 			tlsConfig.CAFile = caCertPath
 		}
@@ -93,13 +93,13 @@ func NewKubeClient() (infrastructure.KubeClient, error) {
 	// Create dynamic client for CRDs (Tekton PipelineRuns)
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
+		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
 	// Create standard clientset for Pod operations
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create clientset: %w", err)
+		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
 	// Define Group-Version-Resource for Tekton PipelineRuns and TaskRuns
@@ -139,7 +139,7 @@ func (k *kubeClient) GetPipelineRunStatus(ctx context.Context, pipelineRunName s
 		if apierrors.IsNotFound(err) {
 			return nil, projecterrors.ErrDeploymentNotFound
 		}
-		return nil, fmt.Errorf("failed to get PipelineRun %s: %w", pipelineRunName, err)
+		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
 	// Extract status information
@@ -159,7 +159,7 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 		})
 
 	if err != nil {
-		return "", fmt.Errorf("failed to list TaskRuns for PipelineRun %s: %w", pipelineRunName, err)
+		return "", projecterrors.ErrKubernetesUnavailable
 	}
 
 	// Collect logs from all TaskRuns
@@ -209,7 +209,7 @@ func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*d
 		})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to list PipelineRuns for project %d: %w", projectID, err)
+		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
 	// Convert to PipelineRunInfo
@@ -351,10 +351,10 @@ func getPodNameFromTaskRun(taskRun *unstructured.Unstructured) (string, error) {
 	// Try to get from status.podName
 	podName, found, err := unstructured.NestedString(taskRun.Object, "status", "podName")
 	if err != nil {
-		return "", fmt.Errorf("failed to extract podName from TaskRun status: %w", err)
+		return "", projecterrors.ErrKubernetesUnavailable
 	}
 	if !found || podName == "" {
-		return "", fmt.Errorf("podName not found in TaskRun status")
+		return "", projecterrors.ErrKubernetesUnavailable
 	}
 
 	return podName, nil
@@ -383,7 +383,7 @@ func (k *kubeClient) getPodLogs(ctx context.Context, podName string) (string, er
 	// Get Pod to list containers
 	pod, err := k.clientset.CoreV1().Pods(k.namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to get pod %s: %w", podName, err)
+		return "", projecterrors.ErrKubernetesUnavailable
 	}
 
 	var logs strings.Builder
@@ -417,7 +417,7 @@ func (k *kubeClient) getContainerLogs(ctx context.Context, podName, containerNam
 
 	stream, err := req.Stream(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to stream logs: %w", err)
+		return "", projecterrors.ErrKubernetesUnavailable
 	}
 	defer func() {
 		if closeErr := stream.Close(); closeErr != nil {

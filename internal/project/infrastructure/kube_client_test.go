@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
 // TestNewKubeClient_EnvironmentVariables tests that NewKubeClient properly validates
@@ -27,7 +28,7 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 		apiServer     string
 		token         string
 		namespace     string
-		expectedError string
+		expectedError error
 		shouldSucceed bool
 	}{
 		{
@@ -35,7 +36,7 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 			apiServer:     "",
 			token:         "test-token",
 			namespace:     "test-namespace",
-			expectedError: "KUBE_API_SERVER environment variable is required",
+			expectedError: projecterrors.ErrKubernetesUnavailable,
 			shouldSucceed: false,
 		},
 		{
@@ -43,7 +44,7 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 			apiServer:     "https://test-server",
 			token:         "",
 			namespace:     "test-namespace",
-			expectedError: "KUBE_SERVICE_ACCOUNT_TOKEN environment variable is required",
+			expectedError: projecterrors.ErrKubernetesUnavailable,
 			shouldSucceed: false,
 		},
 		{
@@ -51,7 +52,7 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 			apiServer:     "https://test-server",
 			token:         "test-token",
 			namespace:     "",
-			expectedError: "KUBE_DEPLOY_NAMESPACE environment variable is required",
+			expectedError: projecterrors.ErrKubernetesUnavailable,
 			shouldSucceed: false,
 		},
 	}
@@ -72,7 +73,7 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.Nil(t, client)
-				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Equal(t, tt.expectedError, err)
 			}
 		})
 	}
