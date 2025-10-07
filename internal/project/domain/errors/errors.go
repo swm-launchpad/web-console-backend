@@ -96,6 +96,9 @@ var (
 	ErrDatabaseOperation      = errors.New("database operation failed")
 	ErrConcurrentModification = errors.New("concurrent modification detected")
 	ErrKubernetesUnavailable  = errors.New("kubernetes API unavailable")
+	ErrTektonUnavailable      = errors.New("tekton API unavailable")
+	ErrTektonDeploymentFailed = errors.New("tekton deployment request failed")
+	ErrInvalidTektonResponse  = errors.New("invalid response from tekton API")
 )
 
 // Service errors - errors related to business service operations
