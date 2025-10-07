@@ -189,7 +189,7 @@ func TestTektonClient_TriggerDeploy(t *testing.T) {
 			},
 			mockStatusCode: http.StatusUnauthorized,
 			mockResponse:   "unauthorized",
-			expectedError:  projecterrors.ErrTektonDeploymentFailed,
+			expectedError:  projecterrors.ErrTektonAuthenticationFailed,
 			checkResponse:  nil,
 		},
 		{

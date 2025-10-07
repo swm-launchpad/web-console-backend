@@ -92,13 +92,14 @@ var (
 
 // Infrastructure errors - errors related to data persistence and external services
 var (
-	ErrDatabaseUnavailable    = errors.New("database unavailable")
-	ErrDatabaseOperation      = errors.New("database operation failed")
-	ErrConcurrentModification = errors.New("concurrent modification detected")
-	ErrKubernetesUnavailable  = errors.New("kubernetes API unavailable")
-	ErrTektonUnavailable      = errors.New("tekton API unavailable")
-	ErrTektonDeploymentFailed = errors.New("tekton deployment request failed")
-	ErrInvalidTektonResponse  = errors.New("invalid response from tekton API")
+	ErrDatabaseUnavailable        = errors.New("database unavailable")
+	ErrDatabaseOperation          = errors.New("database operation failed")
+	ErrConcurrentModification     = errors.New("concurrent modification detected")
+	ErrKubernetesUnavailable      = errors.New("kubernetes API unavailable")
+	ErrTektonUnavailable          = errors.New("tekton API unavailable")
+	ErrTektonAuthenticationFailed = errors.New("tekton API authentication failed")
+	ErrTektonDeploymentFailed     = errors.New("tekton deployment request failed")
+	ErrInvalidTektonResponse      = errors.New("invalid response from tekton API")
 )
 
 // Service errors - errors related to business service operations
