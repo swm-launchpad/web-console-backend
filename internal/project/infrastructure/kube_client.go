@@ -40,10 +40,9 @@ type kubeClient struct {
 //   - KUBE_SERVICE_ACCOUNT_TOKEN: The ServiceAccount token for authentication
 //   - KUBE_DEPLOY_NAMESPACE: The namespace where PipelineRuns are deployed (e.g., "deploy-pipeline")
 //
-// Optional environment variables:
-//   - KUBE_CA_CERT_PATH: Path to the CA certificate file for TLS verification
-//     If not provided, system CA pool will be used
-//   - KUBE_INSECURE_SKIP_TLS_VERIFY: Set to "true" to skip TLS verification (not recommended for production)
+// TLS configuration (one of the following is required):
+//   - KUBE_CA_CERT_PATH: Path to the CA certificate file for TLS verification (recommended for production)
+//   - KUBE_INSECURE_SKIP_TLS_VERIFY: Set to "true" to skip TLS verification (development only, not recommended)
 //
 // Returns an error if any required environment variable is missing or if the client
 // cannot be initialized.
@@ -71,16 +70,18 @@ func NewKubeClient() (infrastructure.KubeClient, error) {
 	if os.Getenv("KUBE_INSECURE_SKIP_TLS_VERIFY") == "true" {
 		tlsConfig.Insecure = true
 	} else {
-		// Use CA certificate if provided
+		// CA certificate path is required for production use
 		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath != "" {
-			// Verify CA cert file exists
-			if _, err := os.Stat(caCertPath); err != nil {
-				return nil, projecterrors.ErrKubernetesUnavailable
-			}
-			tlsConfig.CAFile = caCertPath
+		if caCertPath == "" {
+			return nil, projecterrors.ErrKubernetesUnavailable
 		}
-		// If no CA cert path is provided, Go will use the system CA pool
+
+		// Verify CA cert file exists
+		if _, err := os.Stat(caCertPath); err != nil {
+			return nil, projecterrors.ErrKubernetesUnavailable
+		}
+
+		tlsConfig.CAFile = caCertPath
 	}
 
 	// Create REST config with Bearer token authentication
