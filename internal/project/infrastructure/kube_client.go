@@ -36,9 +36,14 @@ type kubeClient struct {
 // NewKubeClient creates a new Kubernetes client using configuration from environment variables.
 //
 // Required environment variables:
-//   - KUBE_API_SERVER: The Kubernetes API server URL (e.g., "https://kube-api.launchpad.kr")
+//   - KUBE_API_SERVER: The Kubernetes API server URL (e.g., "https://kube-api.launchpad.kr:6443")
 //   - KUBE_SERVICE_ACCOUNT_TOKEN: The ServiceAccount token for authentication
 //   - KUBE_DEPLOY_NAMESPACE: The namespace where PipelineRuns are deployed (e.g., "deploy-pipeline")
+//
+// Optional environment variables:
+//   - KUBE_CA_CERT_PATH: Path to the CA certificate file for TLS verification
+//     If not provided, system CA pool will be used
+//   - KUBE_INSECURE_SKIP_TLS_VERIFY: Set to "true" to skip TLS verification (not recommended for production)
 //
 // Returns an error if any required environment variable is missing or if the client
 // cannot be initialized.
@@ -59,13 +64,30 @@ func NewKubeClient() (infrastructure.KubeClient, error) {
 		return nil, fmt.Errorf("KUBE_DEPLOY_NAMESPACE environment variable is required")
 	}
 
+	// Configure TLS
+	tlsConfig := rest.TLSClientConfig{}
+
+	// Check if TLS verification should be skipped (not recommended for production)
+	if os.Getenv("KUBE_INSECURE_SKIP_TLS_VERIFY") == "true" {
+		tlsConfig.Insecure = true
+	} else {
+		// Use CA certificate if provided
+		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+		if caCertPath != "" {
+			// Verify CA cert file exists
+			if _, err := os.Stat(caCertPath); err != nil {
+				return nil, fmt.Errorf("CA certificate file not found at %s: %w", caCertPath, err)
+			}
+			tlsConfig.CAFile = caCertPath
+		}
+		// If no CA cert path is provided, Go will use the system CA pool
+	}
+
 	// Create REST config with Bearer token authentication
 	config := &rest.Config{
-		Host:        apiServer,
-		BearerToken: token,
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: false, // We trust the server certificate
-		},
+		Host:            apiServer,
+		BearerToken:     token,
+		TLSClientConfig: tlsConfig,
 	}
 
 	// Create dynamic client for CRDs (Tekton PipelineRuns)
