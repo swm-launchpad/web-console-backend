@@ -2,10 +2,12 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
 func TestMockContainerClient_GetAllContainerInfo(t *testing.T) {
@@ -144,17 +146,8 @@ func TestMockContainerClient_GetAllContainerInfo(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, info)
 
-		// Verify error type
-		mockErr, ok := err.(*MockProjectNotFoundError)
-		assert.True(t, ok)
-		assert.Equal(t, uint(999), mockErr.ProjectID)
-		assert.Equal(t, "mock: project not found", mockErr.Error())
-	})
-
-	t.Run("Verify interface implementation", func(t *testing.T) {
-		// This test verifies that MockContainerClient implements ContainerClient interface
-		var _ interface{} = client
-		// If this compiles, the interface is correctly implemented
+		// Verify it returns domain error
+		assert.True(t, errors.Is(err, projecterrors.ErrProjectNotFound))
 	})
 }
 
@@ -167,17 +160,5 @@ func TestNewMockContainerClient(t *testing.T) {
 		info, err := client.GetAllContainerInfo(context.Background(), 1)
 		require.NoError(t, err)
 		require.NotNil(t, info)
-	})
-}
-
-func TestMockProjectNotFoundError(t *testing.T) {
-	t.Run("Error message", func(t *testing.T) {
-		err := &MockProjectNotFoundError{ProjectID: 123}
-		assert.Equal(t, "mock: project not found", err.Error())
-	})
-
-	t.Run("Error contains project ID", func(t *testing.T) {
-		err := &MockProjectNotFoundError{ProjectID: 456}
-		assert.Equal(t, uint(456), err.ProjectID)
 	})
 }

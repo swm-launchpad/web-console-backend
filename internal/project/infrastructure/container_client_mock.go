@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 )
@@ -20,7 +21,7 @@ func NewMockContainerClient() infrastructure.ContainerClient {
 // Different project IDs return different scenarios:
 //   - projectID 1: Single container (spring-helloworld)
 //   - projectID 2: Multi-container with MySQL (spring-helloworld + mysql)
-//   - Other IDs: Returns error (project not found)
+//   - Other IDs: Returns projecterrors.ErrProjectNotFound
 func (m *MockContainerClient) GetAllContainerInfo(ctx context.Context, projectID uint) (*dto.ContainerDeploymentInfo, error) {
 	switch projectID {
 	case 1:
@@ -28,7 +29,7 @@ func (m *MockContainerClient) GetAllContainerInfo(ctx context.Context, projectID
 	case 2:
 		return m.getMultiContainerDeployment(), nil
 	default:
-		return nil, &MockProjectNotFoundError{ProjectID: projectID}
+		return nil, projecterrors.ErrProjectNotFound
 	}
 }
 
@@ -152,12 +153,5 @@ func (m *MockContainerClient) getMultiContainerDeployment() *dto.ContainerDeploy
 	}
 }
 
-// MockProjectNotFoundError represents an error when a project is not found in the mock.
-type MockProjectNotFoundError struct {
-	ProjectID uint
-}
-
-// Error implements the error interface.
-func (e *MockProjectNotFoundError) Error() string {
-	return "mock: project not found"
-}
+// Compile-time assertion that MockContainerClient implements ContainerClient interface
+var _ infrastructure.ContainerClient = (*MockContainerClient)(nil)
