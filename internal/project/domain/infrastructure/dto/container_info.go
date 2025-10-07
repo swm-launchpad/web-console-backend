@@ -103,23 +103,11 @@ type ConfigMapInfo struct {
 	Data map[string]string `json:"data"`
 }
 
-// ContainerDeploymentInfo represents all container deployment information for a project.
-// This is the top-level DTO that contains all information needed to deploy a project.
-type ContainerDeploymentInfo struct {
-	// ProjectID is the unique project identifier (required)
-	ProjectID string `json:"project_id"`
-
-	// ServiceName is the Knative service name (required)
-	// Will be used as the base name for all resources
-	ServiceName string `json:"service_name"`
-
-	// Namespace is the Kubernetes namespace for deployment (required)
-	// Typically "application"
-	Namespace string `json:"namespace"`
-
-	// StableWindow is the observation period for scale-to-zero decisions in seconds (optional, default: 60)
-	StableWindow *int `json:"stable_window,omitempty"`
-
+// ContainerDeploymentConfig represents container-specific deployment configuration.
+// This is provided by the Container bounded context and contains only container-level settings.
+// Project metadata (project_id, service_name, namespace, stable_window) should come from
+// the Project bounded context.
+type ContainerDeploymentConfig struct {
 	// ConfigMaps contains ConfigMap configurations (required, can be empty array)
 	ConfigMaps []ConfigMapInfo `json:"config_maps"`
 
@@ -127,5 +115,31 @@ type ContainerDeploymentInfo struct {
 	Volumes []VolumeInfo `json:"volumes"`
 
 	// Containers contains container configurations (required, at least 1)
+	Containers []ContainerInfo `json:"containers"`
+}
+
+// DeploymentRequest represents the final deployment request for Tekton API.
+// This combines Project metadata with Container configuration.
+type DeploymentRequest struct {
+	// ProjectID is the unique project identifier (from Project context)
+	ProjectID string `json:"project_id"`
+
+	// ServiceName is the Knative service name (from Project.slug)
+	// Will be used as the base name for all resources
+	ServiceName string `json:"service_name"`
+
+	// Namespace is the Kubernetes namespace for deployment (constant: "application")
+	Namespace string `json:"namespace"`
+
+	// StableWindow is the observation period for scale-to-zero decisions in seconds (constant: 180)
+	StableWindow int `json:"stable_window"`
+
+	// ConfigMaps contains ConfigMap configurations (from Container context)
+	ConfigMaps []ConfigMapInfo `json:"config_maps"`
+
+	// Volumes contains volume configurations (from Container context)
+	Volumes []VolumeInfo `json:"volumes"`
+
+	// Containers contains container configurations (from Container context)
 	Containers []ContainerInfo `json:"containers"`
 }

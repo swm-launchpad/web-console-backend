@@ -10,25 +10,18 @@ import (
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
-func TestMockContainerClient_GetAllContainerInfo(t *testing.T) {
+func TestMockContainerClient_GetContainerConfig(t *testing.T) {
 	client := NewMockContainerClient()
 	ctx := context.Background()
 
-	t.Run("Project ID 1: Single container deployment", func(t *testing.T) {
-		info, err := client.GetAllContainerInfo(ctx, 1)
+	t.Run("Project ID 1: Single container configuration", func(t *testing.T) {
+		config, err := client.GetContainerConfig(ctx, 1)
 		require.NoError(t, err)
-		require.NotNil(t, info)
-
-		// Verify service info
-		assert.Equal(t, "b7c376f2-4cb4-4056-89be-33f562c09a63", info.ProjectID)
-		assert.Equal(t, "spring-helloworld", info.ServiceName)
-		assert.Equal(t, "application", info.Namespace)
-		assert.NotNil(t, info.StableWindow)
-		assert.Equal(t, 300, *info.StableWindow)
+		require.NotNil(t, config)
 
 		// Verify containers
-		assert.Len(t, info.Containers, 1)
-		backend := info.Containers[0]
+		assert.Len(t, config.Containers, 1)
+		backend := config.Containers[0]
 		assert.Equal(t, "backend", backend.Name)
 		assert.NotNil(t, backend.Domain)
 		assert.Equal(t, "spring-helloworld.launchpad.kr", *backend.Domain)
@@ -53,34 +46,29 @@ func TestMockContainerClient_GetAllContainerInfo(t *testing.T) {
 		assert.Empty(t, backend.VolumeMounts)
 
 		// Verify no ConfigMaps
-		assert.Empty(t, info.ConfigMaps)
+		assert.Empty(t, config.ConfigMaps)
 
 		// Verify no Volumes
-		assert.Empty(t, info.Volumes)
+		assert.Empty(t, config.Volumes)
 	})
 
-	t.Run("Project ID 2: Multi-container deployment with MySQL", func(t *testing.T) {
-		info, err := client.GetAllContainerInfo(ctx, 2)
+	t.Run("Project ID 2: Multi-container configuration with MySQL", func(t *testing.T) {
+		config, err := client.GetContainerConfig(ctx, 2)
 		require.NoError(t, err)
-		require.NotNil(t, info)
-
-		// Verify service info
-		assert.Equal(t, "bdeb92-ebwe9fjf32ir239s", info.ProjectID)
-		assert.Equal(t, "spring-helloworld-stack", info.ServiceName)
-		assert.Equal(t, "application", info.Namespace)
+		require.NotNil(t, config)
 
 		// Verify ConfigMaps
-		assert.Len(t, info.ConfigMaps, 1)
-		configMap := info.ConfigMaps[0]
+		assert.Len(t, config.ConfigMaps, 1)
+		configMap := config.ConfigMaps[0]
 		assert.Equal(t, "mysql-initdb-config", configMap.Name)
 		assert.Contains(t, configMap.Data, "init.sql")
 		assert.Contains(t, configMap.Data["init.sql"], "CREATE DATABASE IF NOT EXISTS mydb")
 
 		// Verify Volumes
-		assert.Len(t, info.Volumes, 2)
+		assert.Len(t, config.Volumes, 2)
 
 		// First volume: ConfigMap type
-		mysqlInitdb := info.Volumes[0]
+		mysqlInitdb := config.Volumes[0]
 		assert.Equal(t, "mysql-initdb", mysqlInitdb.Name)
 		assert.NotNil(t, mysqlInitdb.Type)
 		assert.Equal(t, "config_map", *mysqlInitdb.Type)
@@ -88,7 +76,7 @@ func TestMockContainerClient_GetAllContainerInfo(t *testing.T) {
 		assert.Equal(t, "mysql-initdb-config", *mysqlInitdb.ConfigMapName)
 
 		// Second volume: PVC type
-		mysqlData := info.Volumes[1]
+		mysqlData := config.Volumes[1]
 		assert.Equal(t, "mysql-data", mysqlData.Name)
 		assert.NotNil(t, mysqlData.Type)
 		assert.Equal(t, "pvc", *mysqlData.Type)
@@ -96,10 +84,10 @@ func TestMockContainerClient_GetAllContainerInfo(t *testing.T) {
 		assert.Equal(t, "1Gi", *mysqlData.Capacity)
 
 		// Verify containers
-		assert.Len(t, info.Containers, 2)
+		assert.Len(t, config.Containers, 2)
 
 		// Backend container
-		backend := info.Containers[0]
+		backend := config.Containers[0]
 		assert.Equal(t, "backend", backend.Name)
 		assert.NotNil(t, backend.Domain)
 		assert.Equal(t, "spring-helloworld-stack.launchpad.kr", *backend.Domain)
@@ -110,7 +98,7 @@ func TestMockContainerClient_GetAllContainerInfo(t *testing.T) {
 		assert.Empty(t, backend.VolumeMounts)
 
 		// MySQL container
-		mysql := info.Containers[1]
+		mysql := config.Containers[1]
 		assert.Equal(t, "mysql", mysql.Name)
 		assert.Nil(t, mysql.Domain) // Internal-only
 		assert.Equal(t, "tcp", mysql.HealthCheckType)
@@ -142,9 +130,9 @@ func TestMockContainerClient_GetAllContainerInfo(t *testing.T) {
 	})
 
 	t.Run("Project ID not found", func(t *testing.T) {
-		info, err := client.GetAllContainerInfo(ctx, 999)
+		config, err := client.GetContainerConfig(ctx, 999)
 		assert.Error(t, err)
-		assert.Nil(t, info)
+		assert.Nil(t, config)
 
 		// Verify it returns domain error
 		assert.True(t, errors.Is(err, projecterrors.ErrProjectNotFound))
@@ -157,8 +145,8 @@ func TestNewMockContainerClient(t *testing.T) {
 		require.NotNil(t, client)
 
 		// Verify it can be used
-		info, err := client.GetAllContainerInfo(context.Background(), 1)
+		config, err := client.GetContainerConfig(context.Background(), 1)
 		require.NoError(t, err)
-		require.NotNil(t, info)
+		require.NotNil(t, config)
 	})
 }

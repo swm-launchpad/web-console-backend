@@ -17,36 +17,32 @@ func NewMockContainerClient() infrastructure.ContainerClient {
 	return &MockContainerClient{}
 }
 
-// GetAllContainerInfo returns mock container deployment information based on project ID.
+// GetContainerConfig returns mock container configuration based on project ID.
 // Different project IDs return different scenarios:
 //   - projectID 1: Single container (spring-helloworld)
 //   - projectID 2: Multi-container with MySQL (spring-helloworld + mysql)
 //   - Other IDs: Returns projecterrors.ErrProjectNotFound
-func (m *MockContainerClient) GetAllContainerInfo(ctx context.Context, projectID uint) (*dto.ContainerDeploymentInfo, error) {
+func (m *MockContainerClient) GetContainerConfig(ctx context.Context, projectID uint) (*dto.ContainerDeploymentConfig, error) {
 	switch projectID {
 	case 1:
-		return m.getSingleContainerDeployment(), nil
+		return m.getSingleContainerConfig(), nil
 	case 2:
-		return m.getMultiContainerDeployment(), nil
+		return m.getMultiContainerConfig(), nil
 	default:
 		return nil, projecterrors.ErrProjectNotFound
 	}
 }
 
-// getSingleContainerDeployment returns a single container deployment scenario.
+// getSingleContainerConfig returns a single container configuration scenario.
 // Based on Tekton README example: spring-helloworld single container.
-func (m *MockContainerClient) getSingleContainerDeployment() *dto.ContainerDeploymentInfo {
+// Note: Project metadata (project_id, service_name, namespace, stable_window) are NOT included.
+func (m *MockContainerClient) getSingleContainerConfig() *dto.ContainerDeploymentConfig {
 	domain := "spring-helloworld.launchpad.kr"
 	healthEndpoint := "/"
-	stableWindow := 300
 
-	return &dto.ContainerDeploymentInfo{
-		ProjectID:    "b7c376f2-4cb4-4056-89be-33f562c09a63",
-		ServiceName:  "spring-helloworld",
-		Namespace:    "application",
-		StableWindow: &stableWindow,
-		ConfigMaps:   []dto.ConfigMapInfo{},
-		Volumes:      []dto.VolumeInfo{},
+	return &dto.ContainerDeploymentConfig{
+		ConfigMaps: []dto.ConfigMapInfo{},
+		Volumes:    []dto.VolumeInfo{},
 		Containers: []dto.ContainerInfo{
 			{
 				Name:            "backend",
@@ -70,9 +66,10 @@ func (m *MockContainerClient) getSingleContainerDeployment() *dto.ContainerDeplo
 	}
 }
 
-// getMultiContainerDeployment returns a multi-container deployment scenario.
+// getMultiContainerConfig returns a multi-container configuration scenario.
 // Based on Tekton README example: spring-helloworld + mysql stack.
-func (m *MockContainerClient) getMultiContainerDeployment() *dto.ContainerDeploymentInfo {
+// Note: Project metadata (project_id, service_name, namespace, stable_window) are NOT included.
+func (m *MockContainerClient) getMultiContainerConfig() *dto.ContainerDeploymentConfig {
 	domain := "spring-helloworld-stack.launchpad.kr"
 	healthEndpoint := "/"
 	pvcType := "pvc"
@@ -80,10 +77,7 @@ func (m *MockContainerClient) getMultiContainerDeployment() *dto.ContainerDeploy
 	mysqlInitdbConfigMapName := "mysql-initdb-config"
 	mysqlDataCapacity := "1Gi"
 
-	return &dto.ContainerDeploymentInfo{
-		ProjectID:   "bdeb92-ebwe9fjf32ir239s",
-		ServiceName: "spring-helloworld-stack",
-		Namespace:   "application",
+	return &dto.ContainerDeploymentConfig{
 		ConfigMaps: []dto.ConfigMapInfo{
 			{
 				Name: mysqlInitdbConfigMapName,
