@@ -98,6 +98,7 @@ var (
 	ErrKubernetesUnavailable      = errors.New("kubernetes API unavailable")
 	ErrTektonUnavailable          = errors.New("tekton API unavailable")
 	ErrTektonAuthenticationFailed = errors.New("tekton API authentication failed")
+	ErrInvalidDeploymentRequest   = errors.New("invalid deployment request")
 	ErrTektonDeploymentFailed     = errors.New("tekton deployment request failed")
 	ErrInvalidTektonResponse      = errors.New("invalid response from tekton API")
 )

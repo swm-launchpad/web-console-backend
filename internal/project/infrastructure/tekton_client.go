@@ -58,8 +58,9 @@ func (t *tektonClient) TriggerDeploy(ctx context.Context, request *dto.TektonDep
 	// Marshal request to JSON
 	requestBody, err := json.Marshal(request)
 	if err != nil {
-		// This is a client-side error (failed to build request), not a response error
-		return nil, projecterrors.ErrTektonDeploymentFailed
+		// Request marshaling failed - this is a client-side validation error,
+		// not a Tekton API response error
+		return nil, projecterrors.ErrInvalidDeploymentRequest
 	}
 
 	// Create HTTP request
