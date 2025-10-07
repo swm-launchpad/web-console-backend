@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 
@@ -141,8 +140,14 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 		taskRunName := taskRun.GetName()
 		taskName := getTaskNameFromTaskRun(&taskRun)
 
-		// Get the Pod associated with this TaskRun
-		podName := taskRun.GetName() // TaskRun creates a Pod with the same name
+		// Get the Pod name from TaskRun status
+		// Tekton stores the actual Pod name in .status.podName
+		podName, err := getPodNameFromTaskRun(&taskRun)
+		if err != nil {
+			logs.WriteString(fmt.Sprintf("\n=== Task: %s (TaskRun: %s) ===\n", taskName, taskRunName))
+			logs.WriteString(fmt.Sprintf("Error getting pod name: %v\n", err))
+			continue
+		}
 
 		taskLogs, err := k.getPodLogs(ctx, podName)
 		if err != nil {
@@ -199,15 +204,19 @@ func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*d
 
 	// Sort by creation time (newest first)
 	sort.Slice(result, func(i, j int) bool {
+		// Both nil: equal, return false for strict ordering
 		if result[i].StartTime == nil && result[j].StartTime == nil {
-			return true
+			return false
 		}
+		// i is nil: place after j (nil timestamps last)
 		if result[i].StartTime == nil {
 			return false
 		}
+		// j is nil: place i before j
 		if result[j].StartTime == nil {
 			return true
 		}
+		// Both have timestamps: newer first
 		return result[i].StartTime.After(*result[j].StartTime)
 	})
 
@@ -230,18 +239,19 @@ func extractPipelineRunStatus(pr *unstructured.Unstructured) *dto.PipelineRunSta
 	}
 
 	// Extract startTime
+	// Tekton uses RFC3339Nano format (with nanosecond precision)
 	startTimeStr, found, err := unstructured.NestedString(statusField, "startTime")
 	if found && err == nil {
-		if t, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
-			status.StartTime = &t
+		if t := parseTimestamp(startTimeStr); t != nil {
+			status.StartTime = t
 		}
 	}
 
 	// Extract completionTime
 	completionTimeStr, found, err := unstructured.NestedString(statusField, "completionTime")
 	if found && err == nil {
-		if t, err := time.Parse(time.RFC3339, completionTimeStr); err == nil {
-			status.CompletionTime = &t
+		if t := parseTimestamp(completionTimeStr); t != nil {
+			status.CompletionTime = t
 		}
 	}
 
@@ -307,6 +317,39 @@ func getTaskNameFromTaskRun(taskRun *unstructured.Unstructured) string {
 	return taskRun.GetName()
 }
 
+// getPodNameFromTaskRun extracts the Pod name from a TaskRun resource.
+// Tekton stores the actual Pod name in .status.podName field.
+func getPodNameFromTaskRun(taskRun *unstructured.Unstructured) (string, error) {
+	// Try to get from status.podName
+	podName, found, err := unstructured.NestedString(taskRun.Object, "status", "podName")
+	if err != nil {
+		return "", fmt.Errorf("failed to extract podName from TaskRun status: %w", err)
+	}
+	if !found || podName == "" {
+		return "", fmt.Errorf("podName not found in TaskRun status")
+	}
+
+	return podName, nil
+}
+
+// parseTimestamp parses a Kubernetes/Tekton timestamp string.
+// Tekton uses RFC3339Nano format (with nanosecond precision).
+// This function tries RFC3339Nano first, then falls back to RFC3339.
+func parseTimestamp(timeStr string) *time.Time {
+	// Try RFC3339Nano first (e.g., "2025-10-07T12:34:56.123456789Z")
+	if t, err := time.Parse(time.RFC3339Nano, timeStr); err == nil {
+		return &t
+	}
+
+	// Fallback to RFC3339 (e.g., "2025-10-07T12:34:56Z")
+	if t, err := time.Parse(time.RFC3339, timeStr); err == nil {
+		return &t
+	}
+
+	// Unable to parse
+	return nil
+}
+
 // getPodLogs retrieves logs from all containers in a Pod.
 func (k *kubeClient) getPodLogs(ctx context.Context, podName string) (string, error) {
 	// Get Pod to list containers
@@ -369,28 +412,4 @@ func (k *kubeClient) getContainerLogs(ctx context.Context, podName, containerNam
 	}
 
 	return logs.String(), nil
-}
-
-// Helper functions for error handling
-
-// IsNotFoundError checks if an error is a "not found" error from Kubernetes API.
-func IsNotFoundError(err error) bool {
-	if err == nil {
-		return false
-	}
-	// Check if the error message contains "not found"
-	return strings.Contains(strings.ToLower(err.Error()), "not found")
-}
-
-// ConvertKubeError converts Kubernetes errors to domain errors.
-func ConvertKubeError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	if IsNotFoundError(err) {
-		return projecterrors.ErrProjectNotFound
-	}
-
-	return err
 }
