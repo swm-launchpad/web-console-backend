@@ -44,5 +44,5 @@ If successful, the CA certificate is correctly configured.
 
 ## Security Notes
 
-- **Production**: Always set `KUBE_CA_CERT_PATH` for secure TLS verification
-- **Development**: You may temporarily use `KUBE_INSECURE_SKIP_TLS_VERIFY=true` (not recommended)
+- `KUBE_CA_CERT_PATH` is **required** for all environments (development and production)
+- TLS verification cannot be disabled to ensure secure communication with the Kubernetes API

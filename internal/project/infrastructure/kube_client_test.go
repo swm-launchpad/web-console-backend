@@ -16,7 +16,6 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 	originalToken := os.Getenv("KUBE_SERVICE_ACCOUNT_TOKEN")
 	originalNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
 	originalCACertPath := os.Getenv("KUBE_CA_CERT_PATH")
-	originalInsecureSkip := os.Getenv("KUBE_INSECURE_SKIP_TLS_VERIFY")
 
 	// Restore environment after test
 	defer func() {
@@ -24,7 +23,6 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 		_ = os.Setenv("KUBE_SERVICE_ACCOUNT_TOKEN", originalToken)
 		_ = os.Setenv("KUBE_DEPLOY_NAMESPACE", originalNamespace)
 		_ = os.Setenv("KUBE_CA_CERT_PATH", originalCACertPath)
-		_ = os.Setenv("KUBE_INSECURE_SKIP_TLS_VERIFY", originalInsecureSkip)
 	}()
 
 	tests := []struct {
@@ -33,7 +31,6 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 		token         string
 		namespace     string
 		caCertPath    string
-		insecureSkip  string
 		expectedError error
 		shouldSucceed bool
 	}{
@@ -43,7 +40,6 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 			token:         "test-token",
 			namespace:     "test-namespace",
 			caCertPath:    "",
-			insecureSkip:  "",
 			expectedError: projecterrors.ErrKubernetesUnavailable,
 			shouldSucceed: false,
 		},
@@ -53,7 +49,6 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 			token:         "",
 			namespace:     "test-namespace",
 			caCertPath:    "",
-			insecureSkip:  "",
 			expectedError: projecterrors.ErrKubernetesUnavailable,
 			shouldSucceed: false,
 		},
@@ -63,17 +58,15 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 			token:         "test-token",
 			namespace:     "",
 			caCertPath:    "",
-			insecureSkip:  "",
 			expectedError: projecterrors.ErrKubernetesUnavailable,
 			shouldSucceed: false,
 		},
 		{
-			name:          "missing TLS configuration (no CA cert, no insecure skip)",
+			name:          "missing KUBE_CA_CERT_PATH",
 			apiServer:     "https://test-server",
 			token:         "test-token",
 			namespace:     "test-namespace",
 			caCertPath:    "",
-			insecureSkip:  "",
 			expectedError: projecterrors.ErrKubernetesUnavailable,
 			shouldSucceed: false,
 		},
@@ -104,12 +97,6 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 				_ = os.Setenv("KUBE_CA_CERT_PATH", tt.caCertPath)
 			} else {
 				_ = os.Unsetenv("KUBE_CA_CERT_PATH")
-			}
-
-			if tt.insecureSkip != "" {
-				_ = os.Setenv("KUBE_INSECURE_SKIP_TLS_VERIFY", tt.insecureSkip)
-			} else {
-				_ = os.Unsetenv("KUBE_INSECURE_SKIP_TLS_VERIFY")
 			}
 
 			// Create client

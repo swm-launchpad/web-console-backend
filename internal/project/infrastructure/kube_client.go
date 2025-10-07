@@ -39,10 +39,7 @@ type kubeClient struct {
 //   - KUBE_API_SERVER: The Kubernetes API server URL (e.g., "https://kube-api.launchpad.kr:6443")
 //   - KUBE_SERVICE_ACCOUNT_TOKEN: The ServiceAccount token for authentication
 //   - KUBE_DEPLOY_NAMESPACE: The namespace where PipelineRuns are deployed (e.g., "deploy-pipeline")
-//
-// TLS configuration (one of the following is required):
-//   - KUBE_CA_CERT_PATH: Path to the CA certificate file for TLS verification (recommended for production)
-//   - KUBE_INSECURE_SKIP_TLS_VERIFY: Set to "true" to skip TLS verification (development only, not recommended)
+//   - KUBE_CA_CERT_PATH: Path to the CA certificate file for TLS verification (required)
 //
 // Returns an error if any required environment variable is missing or if the client
 // cannot be initialized.
@@ -63,25 +60,19 @@ func NewKubeClient() (infrastructure.KubeClient, error) {
 		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
-	// Configure TLS
-	tlsConfig := rest.TLSClientConfig{}
+	// Configure TLS - CA certificate is required
+	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+	if caCertPath == "" {
+		return nil, projecterrors.ErrKubernetesUnavailable
+	}
 
-	// Check if TLS verification should be skipped (not recommended for production)
-	if os.Getenv("KUBE_INSECURE_SKIP_TLS_VERIFY") == "true" {
-		tlsConfig.Insecure = true
-	} else {
-		// CA certificate path is required for production use
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "" {
-			return nil, projecterrors.ErrKubernetesUnavailable
-		}
+	// Verify CA cert file exists
+	if _, err := os.Stat(caCertPath); err != nil {
+		return nil, projecterrors.ErrKubernetesUnavailable
+	}
 
-		// Verify CA cert file exists
-		if _, err := os.Stat(caCertPath); err != nil {
-			return nil, projecterrors.ErrKubernetesUnavailable
-		}
-
-		tlsConfig.CAFile = caCertPath
+	tlsConfig := rest.TLSClientConfig{
+		CAFile: caCertPath,
 	}
 
 	// Create REST config with Bearer token authentication
