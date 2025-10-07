@@ -121,7 +121,15 @@ func (r *deploymentLockRepository) RenewLock(ctx context.Context, lock *deployme
 			return nil, projecterrors.ErrInvalidLockToken
 		}
 
-		// Token matches but update failed - must be expired
+		// Token matches but update failed - two possibilities:
+		// 1. No-op update (same expires_at within same second) - lock still valid
+		// 2. Lock actually expired
+		if sqlcLock.ExpiresAt.After(time.Now()) {
+			// Lock is still valid (no-op update case)
+			return lock, nil
+		}
+
+		// Lock actually expired
 		return nil, projecterrors.ErrLockExpired
 	}
 

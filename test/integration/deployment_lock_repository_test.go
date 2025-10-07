@@ -313,6 +313,32 @@ func TestDeploymentLockRepository_Integration(t *testing.T) {
 		err = lockRepo.ReleaseLock(ctx, nil)
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
 	})
+
+	t.Run("RenewLock - No-op update with same expires_at should succeed", func(t *testing.T) {
+		// Given - Acquire lock
+		pid := createTestProject(t, testDB)
+		expiresAt := time.Now().Add(5 * time.Minute)
+		acquiredLock, err := lockRepo.AcquireLock(ctx, pid, expiresAt)
+		require.NoError(t, err)
+		token := acquiredLock.Token()
+
+		// When - Renew with the same expires_at (within same second)
+		// This causes MySQL to return RowsAffected=0 (no-op update)
+		renewLock1 := deployment.ReconstructDeploymentLock(pid, token, expiresAt)
+		renewedLock1, err1 := lockRepo.RenewLock(ctx, renewLock1)
+
+		// Then - First renewal should succeed (no-op is OK)
+		require.NoError(t, err1)
+		assert.Equal(t, token, renewedLock1.Token())
+
+		// When - Renew again with the same expires_at immediately
+		renewLock2 := deployment.ReconstructDeploymentLock(pid, token, expiresAt)
+		renewedLock2, err2 := lockRepo.RenewLock(ctx, renewLock2)
+
+		// Then - Second renewal should also succeed (still a valid lock)
+		require.NoError(t, err2)
+		assert.Equal(t, token, renewedLock2.Token())
+	})
 }
 
 // createTestProject creates a test project and returns its ID
