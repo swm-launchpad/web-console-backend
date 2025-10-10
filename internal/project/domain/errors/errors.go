@@ -95,6 +95,7 @@ var (
 	ErrDatabaseUnavailable    = errors.New("database unavailable")
 	ErrDatabaseOperation      = errors.New("database operation failed")
 	ErrConcurrentModification = errors.New("concurrent modification detected")
+	ErrKubernetesUnavailable  = errors.New("kubernetes API unavailable")
 )
 
 // Service errors - errors related to business service operations
