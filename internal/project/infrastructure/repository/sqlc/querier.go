@@ -10,6 +10,9 @@ import (
 )
 
 type Querier interface {
+	// Atomically acquire a new lock or update an expired lock
+	// Returns RowsAffected: 1 (INSERT new), 2 (UPDATE expired), 0 (active lock exists)
+	AcquireOrUpdateLock(ctx context.Context, arg AcquireOrUpdateLockParams) (sql.Result, error)
 	CountProjects(ctx context.Context) (int64, error)
 	CountVolumes(ctx context.Context) (int64, error)
 	CountVolumesByProjectID(ctx context.Context, projectID uint32) (int64, error)
@@ -28,6 +31,8 @@ type Querier interface {
 	ExistsBySlug(ctx context.Context, slug string) (bool, error)
 	ExistsVolumeByName(ctx context.Context, arg ExistsVolumeByNameParams) (bool, error)
 	GetAllProjectUsersByProjectID(ctx context.Context, projectID uint32) ([]ProjectUser, error)
+	// Deployment Locks CRUD
+	GetDeploymentLock(ctx context.Context, projectID uint32) (DeploymentLock, error)
 	GetProjectByID(ctx context.Context, projectID uint32) (Project, error)
 	GetProjectByIDForUpdate(ctx context.Context, projectID uint32) (Project, error)
 	GetProjectBySlug(ctx context.Context, slug string) (Project, error)
@@ -42,6 +47,8 @@ type Querier interface {
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error)
 	ListProjectsByUserID(ctx context.Context, userID uint32) ([]Project, error)
 	ListVolumes(ctx context.Context, arg ListVolumesParams) ([]Volume, error)
+	ReleaseDeploymentLock(ctx context.Context, arg ReleaseDeploymentLockParams) (sql.Result, error)
+	RenewDeploymentLock(ctx context.Context, arg RenewDeploymentLockParams) (sql.Result, error)
 	RestoreProjectUser(ctx context.Context, arg RestoreProjectUserParams) (sql.Result, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (sql.Result, error)
 	UpdateProjectUser(ctx context.Context, arg UpdateProjectUserParams) (sql.Result, error)

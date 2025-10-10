@@ -103,3 +103,13 @@ var (
 	ErrOwnershipTransferFailed = errors.New("failed to transfer ownership")
 	ErrSlugGenerationFailed    = errors.New("failed to generate unique slug")
 )
+
+// Deployment lock errors - errors related to deployment locking mechanism
+var (
+	ErrLockAlreadyAcquired = errors.New("deployment lock already acquired for this project")
+	ErrLockNotFound        = errors.New("deployment lock not found")
+	ErrLockExpired         = errors.New("deployment lock has expired")
+	ErrInvalidLockToken    = errors.New("invalid lock token")
+	ErrLockRenewalFailed   = errors.New("failed to renew deployment lock")
+	ErrInvalidLockTTL      = errors.New("invalid lock TTL: must be positive duration")
+)

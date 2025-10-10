@@ -2,7 +2,9 @@ version: "2"
 sql:
   - engine: "mysql"
     queries: "query"
-    schema: "../../../../migration/000001_initial_schema.up.sql"
+    schema:
+      - "../../../../migration/000001_initial_schema.up.sql"
+      - "../../../../migration/000002_add_deployment_locks.up.sql"
     gen:
       go:
         package: "sqlc"
