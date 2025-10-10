@@ -104,6 +104,17 @@ var (
 	ErrSlugGenerationFailed    = errors.New("failed to generate unique slug")
 )
 
+// Deployment errors - errors related to deployment management
+var (
+	ErrDeploymentNotFound          = errors.New("deployment not found")
+	ErrInvalidDeploymentStatus     = errors.New("invalid deployment status")
+	ErrCannotStartDeployment       = errors.New("cannot start deployment: current status must be pending")
+	ErrCannotCompleteDeployment    = errors.New("cannot complete deployment: current status must be running")
+	ErrCannotFailDeployment        = errors.New("cannot fail deployment: current status must be running")
+	ErrCannotCancelDeployment      = errors.New("cannot cancel deployment: current status must be pending or running")
+	ErrInvalidDeploymentTransition = errors.New("invalid deployment state transition")
+)
+
 // Deployment lock errors - errors related to deployment locking mechanism
 var (
 	ErrLockAlreadyAcquired = errors.New("deployment lock already acquired for this project")

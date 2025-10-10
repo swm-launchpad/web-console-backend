@@ -16,6 +16,7 @@ type Querier interface {
 	CountProjects(ctx context.Context) (int64, error)
 	CountVolumes(ctx context.Context) (int64, error)
 	CountVolumesByProjectID(ctx context.Context, projectID uint32) (int64, error)
+	CreateDeployment(ctx context.Context, arg CreateDeploymentParams) (sql.Result, error)
 	// Projects CRUD
 	CreateProject(ctx context.Context, arg CreateProjectParams) (sql.Result, error)
 	// ProjectUsers CRUD
@@ -30,6 +31,9 @@ type Querier interface {
 	ExistsByNameAndUserID(ctx context.Context, arg ExistsByNameAndUserIDParams) (bool, error)
 	ExistsBySlug(ctx context.Context, slug string) (bool, error)
 	ExistsVolumeByName(ctx context.Context, arg ExistsVolumeByNameParams) (bool, error)
+	FindDeploymentByID(ctx context.Context, deploymentID uint32) (Deployment, error)
+	FindDeploymentsByProjectID(ctx context.Context, arg FindDeploymentsByProjectIDParams) ([]Deployment, error)
+	FindLatestDeploymentByProjectID(ctx context.Context, projectID uint32) (Deployment, error)
 	GetAllProjectUsersByProjectID(ctx context.Context, projectID uint32) ([]ProjectUser, error)
 	// Deployment Locks CRUD
 	GetDeploymentLock(ctx context.Context, projectID uint32) (DeploymentLock, error)
@@ -50,6 +54,7 @@ type Querier interface {
 	ReleaseDeploymentLock(ctx context.Context, arg ReleaseDeploymentLockParams) (sql.Result, error)
 	RenewDeploymentLock(ctx context.Context, arg RenewDeploymentLockParams) (sql.Result, error)
 	RestoreProjectUser(ctx context.Context, arg RestoreProjectUserParams) (sql.Result, error)
+	UpdateDeployment(ctx context.Context, arg UpdateDeploymentParams) (sql.Result, error)
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (sql.Result, error)
 	UpdateProjectUser(ctx context.Context, arg UpdateProjectUserParams) (sql.Result, error)
 }
