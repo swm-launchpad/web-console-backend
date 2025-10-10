@@ -4,9 +4,9 @@ import (
 	"context"
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
 )
 
 // ProjectService defines the interface for project-related business logic

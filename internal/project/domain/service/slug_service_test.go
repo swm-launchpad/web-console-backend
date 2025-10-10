@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
 )
 
 func TestSlugService_EnsureUniqueSlug(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 )
 
 // PermissionService defines the interface for project permission checks

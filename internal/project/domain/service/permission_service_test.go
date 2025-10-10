@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	volumemodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
 )
 
 func TestPermissionService_CanUserModifyProject(t *testing.T) {

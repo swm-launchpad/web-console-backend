@@ -16,7 +16,7 @@ import (
 	projectApp "github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
-	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
+	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userhttp "github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -55,12 +55,12 @@ func SetupTestServer(t *testing.T) *TestServer {
 	getUserUseCase := application.NewGetUserUseCase(userService)
 
 	// Project dependencies
-	projectRepo := projectInfra.NewProjectRepository(testDB.DB)
-	volumeRepo := projectInfra.NewVolumeRepository(testDB.DB)
-	slugService := projectService.NewSlugService(projectRepo)
-	projectSvc := projectService.NewProjectService(projectRepo, slugService)
-	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepo)
-	permissionSvc := projectService.NewPermissionService(projectRepo, volumeRepo)
+	projectRepository := projectRepo.NewProjectRepository(testDB.DB)
+	volumeRepo := projectRepo.NewVolumeRepository(testDB.DB)
+	slugService := projectService.NewSlugService(projectRepository)
+	projectSvc := projectService.NewProjectService(projectRepository, slugService)
+	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepository)
+	permissionSvc := projectService.NewPermissionService(projectRepository, volumeRepo)
 
 	// Project UseCases
 	createProjectUseCase := projectApp.NewCreateProjectUseCase(projectSvc, txManager)

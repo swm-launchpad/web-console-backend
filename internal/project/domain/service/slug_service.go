@@ -8,8 +8,8 @@ import (
 
 	"github.com/gosimple/slug"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/repository"
 )
 
 // SlugService defines the interface for slug-related operations
