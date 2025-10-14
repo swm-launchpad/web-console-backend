@@ -358,10 +358,29 @@ func (r *projectRepository) Delete(ctx context.Context, projectID uint) error {
 }
 
 // FindProjectsWithActiveOperations finds all projects that have ongoing operations
-// TODO: Implement in Commit 7 with SQLC query
 func (r *projectRepository) FindProjectsWithActiveOperations(ctx context.Context) ([]*model.Project, error) {
-	// Stub implementation - will be replaced in Commit 7
-	return []*model.Project{}, nil
+	qtx := r.queriesWithContext(ctx)
+
+	rows, err := qtx.FindProjectsWithActiveOperations(ctx)
+	if err != nil {
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	projects := make([]*model.Project, 0, len(rows))
+	for _, row := range rows {
+		project, err := r.rowToDomainProject(
+			row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+			row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
+			row.ProjectOperationStatus, row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, project)
+	}
+
+	return projects, nil
 }
 
 // Helper methods

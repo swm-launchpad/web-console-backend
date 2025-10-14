@@ -180,17 +180,49 @@ func (r *deploymentRepository) FindByProjectID(ctx context.Context, projectID ui
 }
 
 // FindByTektonPipelineRunName finds a deployment by its Tekton PipelineRun name
-// TODO: Implement in Commit 8 with SQLC query
 func (r *deploymentRepository) FindByTektonPipelineRunName(ctx context.Context, pipelineRunName string) (*deployment.Deployment, error) {
-	// Stub implementation - will be replaced in Commit 8
-	return nil, projecterrors.ErrDeploymentNotFound
+	if pipelineRunName == "" {
+		return nil, projecterrors.ErrInvalidProjectData
+	}
+
+	qtx := r.queriesWithContext(ctx)
+
+	row, err := qtx.FindDeploymentByTektonPipelineRunName(ctx, toNullString(pipelineRunName))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, projecterrors.ErrDeploymentNotFound
+		}
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
+		row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
 }
 
 // FindActiveDeploymentsByProjectID finds all active (non-completed) deployments for a project
-// TODO: Implement in Commit 8 with SQLC query
 func (r *deploymentRepository) FindActiveDeploymentsByProjectID(ctx context.Context, projectID uint) ([]*deployment.Deployment, error) {
-	// Stub implementation - will be replaced in Commit 8
-	return []*deployment.Deployment{}, nil
+	if projectID == 0 {
+		return nil, projecterrors.ErrInvalidProjectData
+	}
+
+	qtx := r.queriesWithContext(ctx)
+
+	sqlcDeployments, err := qtx.FindActiveDeploymentsByProjectID(ctx, uint32(projectID))
+	if err != nil {
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	deployments := make([]*deployment.Deployment, 0, len(sqlcDeployments))
+	for _, row := range sqlcDeployments {
+		d, err := r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
+			row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
+		if err != nil {
+			return nil, err
+		}
+		deployments = append(deployments, d)
+	}
+
+	return deployments, nil
 }
 
 // rowToDeploymentModel converts sqlc query result row to domain Deployment model
