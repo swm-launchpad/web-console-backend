@@ -56,7 +56,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		userID := uint(123)
 		createdAt := time.Date(2024, 1, 15, 10, 30, 45, 0, time.UTC)
@@ -113,7 +113,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		userID := uint(456)
 
@@ -151,7 +151,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		userID := uint(789)
 
@@ -189,7 +189,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		userID := uint(321)
 		createdAt := time.Date(2024, 1, 15, 10, 30, 45, 0, time.UTC)
@@ -247,7 +247,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		userID := uint(0)
 
@@ -285,7 +285,7 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		// Act
 		router := gin.New()
@@ -321,7 +321,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		userID := uint(100)
 		createdAt := time.Date(2024, 2, 20, 14, 25, 30, 0, time.UTC)
@@ -375,7 +375,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		// Act
 		router := gin.New()
@@ -406,7 +406,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		userID := uint(999)
 
@@ -441,7 +441,7 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase)
+		handler := NewUserHandler(getUserUseCase, nil, nil)
 
 		userID := uint(200)
 
