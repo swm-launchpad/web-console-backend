@@ -55,50 +55,53 @@ func TestDeploymentStatusConversion(t *testing.T) {
 		name           string
 		domainStatus   deployment.DeploymentStatus
 		expectedDBType string
-		skipRoundTrip  bool // Skip round-trip test for temporary mappings
 	}{
 		{
-			name:           "pending status",
+			name:           "untracked status",
 			domainStatus:   deployment.DeploymentStatusUntracked,
-			expectedDBType: "pending",
-			skipRoundTrip:  false,
+			expectedDBType: "untracked",
+		},
+		{
+			name:           "backend_trigger_failed status",
+			domainStatus:   deployment.DeploymentStatusBackendTriggerFailed,
+			expectedDBType: "backend_trigger_failed",
+		},
+		{
+			name:           "backend_tracking_failed status",
+			domainStatus:   deployment.DeploymentStatusBackendTrackingFailed,
+			expectedDBType: "backend_tracking_failed",
+		},
+		{
+			name:           "backend_tracking_lost status",
+			domainStatus:   deployment.DeploymentStatusBackendTrackingLost,
+			expectedDBType: "backend_tracking_lost",
 		},
 		{
 			name:           "running status",
 			domainStatus:   deployment.DeploymentStatusRunning,
 			expectedDBType: "running",
-			skipRoundTrip:  false,
 		},
 		{
 			name:           "success status",
 			domainStatus:   deployment.DeploymentStatusSuccess,
 			expectedDBType: "success",
-			skipRoundTrip:  false,
 		},
 		{
 			name:           "failed status",
 			domainStatus:   deployment.DeploymentStatusFailed,
 			expectedDBType: "failed",
-			skipRoundTrip:  false,
-		},
-		{
-			name:           "backend_trigger_failed status",
-			domainStatus:   deployment.DeploymentStatusBackendTriggerFailed,
-			expectedDBType: "failed",
-			skipRoundTrip:  true, // Skip because of temporary mapping
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Test domain to DB conversion
 			dbStatus := deploymentStatusToDB(tt.domainStatus)
 			assert.Equal(t, tt.expectedDBType, string(dbStatus))
 
-			// Test round-trip conversion (skip for temporary mappings)
-			if !tt.skipRoundTrip {
-				backToDomain := deploymentStatusFromDB(dbStatus)
-				assert.Equal(t, tt.domainStatus, backToDomain)
-			}
+			// Test round-trip conversion
+			backToDomain := deploymentStatusFromDB(dbStatus)
+			assert.Equal(t, tt.domainStatus, backToDomain)
 		})
 	}
 }

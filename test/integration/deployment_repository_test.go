@@ -2,7 +2,9 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,6 +13,26 @@ import (
 	projectinfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/test/helper"
 )
+
+// createTestProject creates a test project for integration tests
+func createTestProject(t *testing.T, testDB *helper.TestDB) uint {
+	t.Helper()
+
+	query := `
+		INSERT INTO PROJECTS (name, slug, status, project_operation_status, cpu_limit, memory_limit, disk_limit, traffic_limit, created_at)
+		VALUES (?, ?, 'active', 'nothing', 1000, 2048, 2048, 1048576, NOW())
+	`
+
+	// Use nanosecond timestamp for unique slugs
+	slug := fmt.Sprintf("test-project-%d", time.Now().UnixNano())
+	result, err := testDB.DB.Exec(query, "Test Project", slug)
+	require.NoError(t, err)
+
+	id, err := result.LastInsertId()
+	require.NoError(t, err)
+
+	return uint(id)
+}
 
 func TestDeploymentRepository_Integration(t *testing.T) {
 	if testing.Short() {
@@ -286,7 +308,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		// Then - Verify backend_trigger_failed status
 		fetched, err := repo.FindByID(ctx, d.DeploymentID())
 		require.NoError(t, err)
-		assert.Equal(t, deployment.DeploymentStatusFailed, fetched.Status())
+		assert.Equal(t, deployment.DeploymentStatusBackendTriggerFailed, fetched.Status())
 		assert.Equal(t, "Failed to trigger", fetched.Summary())
 		assert.True(t, fetched.IsCompleted())
 	})

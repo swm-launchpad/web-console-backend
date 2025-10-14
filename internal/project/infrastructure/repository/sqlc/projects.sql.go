@@ -28,22 +28,24 @@ const createProject = `-- name: CreateProject :execresult
 INSERT INTO PROJECTS (
     name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
+    project_operation_status,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateProjectParams struct {
-	Name         string         `json:"name"`
-	Slug         string         `json:"slug"`
-	Fqdn         sql.NullString `json:"fqdn"`
-	Status       ProjectsStatus `json:"status"`
-	Plan         sql.NullString `json:"plan"`
-	CpuLimit     sql.NullInt32  `json:"cpu_limit"`
-	MemoryLimit  sql.NullInt32  `json:"memory_limit"`
-	DiskLimit    sql.NullInt32  `json:"disk_limit"`
-	TrafficLimit sql.NullInt64  `json:"traffic_limit"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    sql.NullTime   `json:"updated_at"`
+	Name                   string                         `json:"name"`
+	Slug                   string                         `json:"slug"`
+	Fqdn                   sql.NullString                 `json:"fqdn"`
+	Status                 ProjectsStatus                 `json:"status"`
+	Plan                   sql.NullString                 `json:"plan"`
+	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
+	MemoryLimit            sql.NullInt32                  `json:"memory_limit"`
+	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
+	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
+	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	CreatedAt              time.Time                      `json:"created_at"`
+	UpdatedAt              sql.NullTime                   `json:"updated_at"`
 }
 
 // Projects CRUD
@@ -58,6 +60,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (s
 		arg.MemoryLimit,
 		arg.DiskLimit,
 		arg.TrafficLimit,
+		arg.ProjectOperationStatus,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -189,6 +192,75 @@ func (q *Queries) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
 	return project_exists, err
 }
 
+const findProjectsWithActiveOperations = `-- name: FindProjectsWithActiveOperations :many
+SELECT
+    project_id, name, slug, fqdn, status, plan,
+    cpu_limit, memory_limit, disk_limit, traffic_limit,
+    project_operation_status,
+    created_at, updated_at, deleted_at, is_deleted
+FROM PROJECTS
+WHERE is_deleted = FALSE
+AND project_operation_status != 'nothing'
+ORDER BY created_at DESC
+`
+
+type FindProjectsWithActiveOperationsRow struct {
+	ProjectID              uint32                         `json:"project_id"`
+	Name                   string                         `json:"name"`
+	Slug                   string                         `json:"slug"`
+	Fqdn                   sql.NullString                 `json:"fqdn"`
+	Status                 ProjectsStatus                 `json:"status"`
+	Plan                   sql.NullString                 `json:"plan"`
+	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
+	MemoryLimit            sql.NullInt32                  `json:"memory_limit"`
+	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
+	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
+	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	CreatedAt              time.Time                      `json:"created_at"`
+	UpdatedAt              sql.NullTime                   `json:"updated_at"`
+	DeletedAt              sql.NullTime                   `json:"deleted_at"`
+	IsDeleted              bool                           `json:"is_deleted"`
+}
+
+func (q *Queries) FindProjectsWithActiveOperations(ctx context.Context) ([]FindProjectsWithActiveOperationsRow, error) {
+	rows, err := q.db.QueryContext(ctx, findProjectsWithActiveOperations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindProjectsWithActiveOperationsRow{}
+	for rows.Next() {
+		var i FindProjectsWithActiveOperationsRow
+		if err := rows.Scan(
+			&i.ProjectID,
+			&i.Name,
+			&i.Slug,
+			&i.Fqdn,
+			&i.Status,
+			&i.Plan,
+			&i.CpuLimit,
+			&i.MemoryLimit,
+			&i.DiskLimit,
+			&i.TrafficLimit,
+			&i.ProjectOperationStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.IsDeleted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAllProjectUsersByProjectID = `-- name: GetAllProjectUsersByProjectID :many
 SELECT
     project_user_id, project_id, user_id, role,
@@ -234,14 +306,33 @@ const getProjectByID = `-- name: GetProjectByID :one
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
+    project_operation_status,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE project_id = ? AND is_deleted = FALSE
 `
 
-func (q *Queries) GetProjectByID(ctx context.Context, projectID uint32) (Project, error) {
+type GetProjectByIDRow struct {
+	ProjectID              uint32                         `json:"project_id"`
+	Name                   string                         `json:"name"`
+	Slug                   string                         `json:"slug"`
+	Fqdn                   sql.NullString                 `json:"fqdn"`
+	Status                 ProjectsStatus                 `json:"status"`
+	Plan                   sql.NullString                 `json:"plan"`
+	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
+	MemoryLimit            sql.NullInt32                  `json:"memory_limit"`
+	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
+	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
+	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	CreatedAt              time.Time                      `json:"created_at"`
+	UpdatedAt              sql.NullTime                   `json:"updated_at"`
+	DeletedAt              sql.NullTime                   `json:"deleted_at"`
+	IsDeleted              bool                           `json:"is_deleted"`
+}
+
+func (q *Queries) GetProjectByID(ctx context.Context, projectID uint32) (GetProjectByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getProjectByID, projectID)
-	var i Project
+	var i GetProjectByIDRow
 	err := row.Scan(
 		&i.ProjectID,
 		&i.Name,
@@ -253,6 +344,7 @@ func (q *Queries) GetProjectByID(ctx context.Context, projectID uint32) (Project
 		&i.MemoryLimit,
 		&i.DiskLimit,
 		&i.TrafficLimit,
+		&i.ProjectOperationStatus,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -265,15 +357,34 @@ const getProjectByIDForUpdate = `-- name: GetProjectByIDForUpdate :one
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
+    project_operation_status,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE project_id = ? AND is_deleted = FALSE
 FOR UPDATE
 `
 
-func (q *Queries) GetProjectByIDForUpdate(ctx context.Context, projectID uint32) (Project, error) {
+type GetProjectByIDForUpdateRow struct {
+	ProjectID              uint32                         `json:"project_id"`
+	Name                   string                         `json:"name"`
+	Slug                   string                         `json:"slug"`
+	Fqdn                   sql.NullString                 `json:"fqdn"`
+	Status                 ProjectsStatus                 `json:"status"`
+	Plan                   sql.NullString                 `json:"plan"`
+	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
+	MemoryLimit            sql.NullInt32                  `json:"memory_limit"`
+	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
+	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
+	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	CreatedAt              time.Time                      `json:"created_at"`
+	UpdatedAt              sql.NullTime                   `json:"updated_at"`
+	DeletedAt              sql.NullTime                   `json:"deleted_at"`
+	IsDeleted              bool                           `json:"is_deleted"`
+}
+
+func (q *Queries) GetProjectByIDForUpdate(ctx context.Context, projectID uint32) (GetProjectByIDForUpdateRow, error) {
 	row := q.db.QueryRowContext(ctx, getProjectByIDForUpdate, projectID)
-	var i Project
+	var i GetProjectByIDForUpdateRow
 	err := row.Scan(
 		&i.ProjectID,
 		&i.Name,
@@ -285,6 +396,7 @@ func (q *Queries) GetProjectByIDForUpdate(ctx context.Context, projectID uint32)
 		&i.MemoryLimit,
 		&i.DiskLimit,
 		&i.TrafficLimit,
+		&i.ProjectOperationStatus,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -297,14 +409,33 @@ const getProjectBySlug = `-- name: GetProjectBySlug :one
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
+    project_operation_status,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE slug = ? AND is_deleted = FALSE
 `
 
-func (q *Queries) GetProjectBySlug(ctx context.Context, slug string) (Project, error) {
+type GetProjectBySlugRow struct {
+	ProjectID              uint32                         `json:"project_id"`
+	Name                   string                         `json:"name"`
+	Slug                   string                         `json:"slug"`
+	Fqdn                   sql.NullString                 `json:"fqdn"`
+	Status                 ProjectsStatus                 `json:"status"`
+	Plan                   sql.NullString                 `json:"plan"`
+	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
+	MemoryLimit            sql.NullInt32                  `json:"memory_limit"`
+	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
+	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
+	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	CreatedAt              time.Time                      `json:"created_at"`
+	UpdatedAt              sql.NullTime                   `json:"updated_at"`
+	DeletedAt              sql.NullTime                   `json:"deleted_at"`
+	IsDeleted              bool                           `json:"is_deleted"`
+}
+
+func (q *Queries) GetProjectBySlug(ctx context.Context, slug string) (GetProjectBySlugRow, error) {
 	row := q.db.QueryRowContext(ctx, getProjectBySlug, slug)
-	var i Project
+	var i GetProjectBySlugRow
 	err := row.Scan(
 		&i.ProjectID,
 		&i.Name,
@@ -316,6 +447,7 @@ func (q *Queries) GetProjectBySlug(ctx context.Context, slug string) (Project, e
 		&i.MemoryLimit,
 		&i.DiskLimit,
 		&i.TrafficLimit,
+		&i.ProjectOperationStatus,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -447,6 +579,7 @@ const listProjects = `-- name: ListProjects :many
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
+    project_operation_status,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE is_deleted = FALSE
@@ -459,15 +592,33 @@ type ListProjectsParams struct {
 	Offset int32 `json:"offset"`
 }
 
-func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]Project, error) {
+type ListProjectsRow struct {
+	ProjectID              uint32                         `json:"project_id"`
+	Name                   string                         `json:"name"`
+	Slug                   string                         `json:"slug"`
+	Fqdn                   sql.NullString                 `json:"fqdn"`
+	Status                 ProjectsStatus                 `json:"status"`
+	Plan                   sql.NullString                 `json:"plan"`
+	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
+	MemoryLimit            sql.NullInt32                  `json:"memory_limit"`
+	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
+	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
+	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	CreatedAt              time.Time                      `json:"created_at"`
+	UpdatedAt              sql.NullTime                   `json:"updated_at"`
+	DeletedAt              sql.NullTime                   `json:"deleted_at"`
+	IsDeleted              bool                           `json:"is_deleted"`
+}
+
+func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]ListProjectsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listProjects, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Project{}
+	items := []ListProjectsRow{}
 	for rows.Next() {
-		var i Project
+		var i ListProjectsRow
 		if err := rows.Scan(
 			&i.ProjectID,
 			&i.Name,
@@ -479,6 +630,7 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]P
 			&i.MemoryLimit,
 			&i.DiskLimit,
 			&i.TrafficLimit,
+			&i.ProjectOperationStatus,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -501,6 +653,7 @@ const listProjectsByUserID = `-- name: ListProjectsByUserID :many
 SELECT DISTINCT
     p.project_id, p.name, p.slug, p.fqdn, p.status, p.plan,
     p.cpu_limit, p.memory_limit, p.disk_limit, p.traffic_limit,
+    p.project_operation_status,
     p.created_at, p.updated_at, p.deleted_at, p.is_deleted
 FROM PROJECTS p
 JOIN PROJECT_USER pu ON p.project_id = pu.project_id
@@ -510,15 +663,33 @@ AND pu.is_deleted = FALSE
 ORDER BY p.created_at DESC
 `
 
-func (q *Queries) ListProjectsByUserID(ctx context.Context, userID uint32) ([]Project, error) {
+type ListProjectsByUserIDRow struct {
+	ProjectID              uint32                         `json:"project_id"`
+	Name                   string                         `json:"name"`
+	Slug                   string                         `json:"slug"`
+	Fqdn                   sql.NullString                 `json:"fqdn"`
+	Status                 ProjectsStatus                 `json:"status"`
+	Plan                   sql.NullString                 `json:"plan"`
+	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
+	MemoryLimit            sql.NullInt32                  `json:"memory_limit"`
+	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
+	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
+	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	CreatedAt              time.Time                      `json:"created_at"`
+	UpdatedAt              sql.NullTime                   `json:"updated_at"`
+	DeletedAt              sql.NullTime                   `json:"deleted_at"`
+	IsDeleted              bool                           `json:"is_deleted"`
+}
+
+func (q *Queries) ListProjectsByUserID(ctx context.Context, userID uint32) ([]ListProjectsByUserIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, listProjectsByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Project{}
+	items := []ListProjectsByUserIDRow{}
 	for rows.Next() {
-		var i Project
+		var i ListProjectsByUserIDRow
 		if err := rows.Scan(
 			&i.ProjectID,
 			&i.Name,
@@ -530,6 +701,7 @@ func (q *Queries) ListProjectsByUserID(ctx context.Context, userID uint32) ([]Pr
 			&i.MemoryLimit,
 			&i.DiskLimit,
 			&i.TrafficLimit,
+			&i.ProjectOperationStatus,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -577,21 +749,23 @@ const updateProject = `-- name: UpdateProject :execresult
 UPDATE PROJECTS SET
     name = ?, fqdn = ?, status = ?, plan = ?,
     cpu_limit = ?, memory_limit = ?, disk_limit = ?, traffic_limit = ?,
+    project_operation_status = ?,
     updated_at = ?
 WHERE project_id = ? AND is_deleted = FALSE
 `
 
 type UpdateProjectParams struct {
-	Name         string         `json:"name"`
-	Fqdn         sql.NullString `json:"fqdn"`
-	Status       ProjectsStatus `json:"status"`
-	Plan         sql.NullString `json:"plan"`
-	CpuLimit     sql.NullInt32  `json:"cpu_limit"`
-	MemoryLimit  sql.NullInt32  `json:"memory_limit"`
-	DiskLimit    sql.NullInt32  `json:"disk_limit"`
-	TrafficLimit sql.NullInt64  `json:"traffic_limit"`
-	UpdatedAt    sql.NullTime   `json:"updated_at"`
-	ProjectID    uint32         `json:"project_id"`
+	Name                   string                         `json:"name"`
+	Fqdn                   sql.NullString                 `json:"fqdn"`
+	Status                 ProjectsStatus                 `json:"status"`
+	Plan                   sql.NullString                 `json:"plan"`
+	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
+	MemoryLimit            sql.NullInt32                  `json:"memory_limit"`
+	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
+	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
+	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	UpdatedAt              sql.NullTime                   `json:"updated_at"`
+	ProjectID              uint32                         `json:"project_id"`
 }
 
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (sql.Result, error) {
@@ -604,6 +778,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (s
 		arg.MemoryLimit,
 		arg.DiskLimit,
 		arg.TrafficLimit,
+		arg.ProjectOperationStatus,
 		arg.UpdatedAt,
 		arg.ProjectID,
 	)

@@ -60,11 +60,13 @@ func (ns NullBuildHistoryStatus) Value() (driver.Value, error) {
 type DeploymentsStatus string
 
 const (
-	DeploymentsStatusPending   DeploymentsStatus = "pending"
-	DeploymentsStatusRunning   DeploymentsStatus = "running"
-	DeploymentsStatusSuccess   DeploymentsStatus = "success"
-	DeploymentsStatusFailed    DeploymentsStatus = "failed"
-	DeploymentsStatusCancelled DeploymentsStatus = "cancelled"
+	DeploymentsStatusUntracked             DeploymentsStatus = "untracked"
+	DeploymentsStatusBackendTriggerFailed  DeploymentsStatus = "backend_trigger_failed"
+	DeploymentsStatusBackendTrackingFailed DeploymentsStatus = "backend_tracking_failed"
+	DeploymentsStatusBackendTrackingLost   DeploymentsStatus = "backend_tracking_lost"
+	DeploymentsStatusRunning               DeploymentsStatus = "running"
+	DeploymentsStatusSuccess               DeploymentsStatus = "success"
+	DeploymentsStatusFailed                DeploymentsStatus = "failed"
 )
 
 func (e *DeploymentsStatus) Scan(src interface{}) error {
@@ -186,6 +188,49 @@ func (ns NullProjectUserRole) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.ProjectUserRole), nil
+}
+
+type ProjectsProjectOperationStatus string
+
+const (
+	ProjectsProjectOperationStatusNothing   ProjectsProjectOperationStatus = "nothing"
+	ProjectsProjectOperationStatusBuilding  ProjectsProjectOperationStatus = "building"
+	ProjectsProjectOperationStatusDeploying ProjectsProjectOperationStatus = "deploying"
+)
+
+func (e *ProjectsProjectOperationStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ProjectsProjectOperationStatus(s)
+	case string:
+		*e = ProjectsProjectOperationStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ProjectsProjectOperationStatus: %T", src)
+	}
+	return nil
+}
+
+type NullProjectsProjectOperationStatus struct {
+	ProjectsProjectOperationStatus ProjectsProjectOperationStatus `json:"projects_project_operation_status"`
+	Valid                          bool                           `json:"valid"` // Valid is true if ProjectsProjectOperationStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullProjectsProjectOperationStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.ProjectsProjectOperationStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ProjectsProjectOperationStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullProjectsProjectOperationStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ProjectsProjectOperationStatus), nil
 }
 
 type ProjectsStatus string
@@ -398,20 +443,17 @@ type Container struct {
 }
 
 type Deployment struct {
-	DeploymentID uint32            `json:"deployment_id"`
-	ProjectID    uint32            `json:"project_id"`
-	Status       DeploymentsStatus `json:"status"`
-	Summary      sql.NullString    `json:"summary"`
-	TektonRef    sql.NullString    `json:"tekton_ref"`
-	CreatedAt    time.Time         `json:"created_at"`
-	StartedAt    sql.NullTime      `json:"started_at"`
-	FinishedAt   sql.NullTime      `json:"finished_at"`
-}
-
-type DeploymentLock struct {
-	ProjectID uint32    `json:"project_id"`
-	Token     uint64    `json:"token"`
-	ExpiresAt time.Time `json:"expires_at"`
+	DeploymentID uint32         `json:"deployment_id"`
+	ProjectID    uint32         `json:"project_id"`
+	Summary      sql.NullString `json:"summary"`
+	CreatedAt    time.Time      `json:"created_at"`
+	StartedAt    sql.NullTime   `json:"started_at"`
+	FinishedAt   sql.NullTime   `json:"finished_at"`
+	// Tekton event ID from API response
+	TektonEventID sql.NullString `json:"tekton_event_id"`
+	// Tekton PipelineRun name
+	TektonPipelineRunName sql.NullString    `json:"tekton_pipeline_run_name"`
+	Status                DeploymentsStatus `json:"status"`
 }
 
 type EnvVar struct {
@@ -458,6 +500,8 @@ type Project struct {
 	UpdatedAt    sql.NullTime   `json:"updated_at"`
 	DeletedAt    sql.NullTime   `json:"deleted_at"`
 	IsDeleted    bool           `json:"is_deleted"`
+	// Current operation status of the project
+	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
 }
 
 type ProjectUser struct {
