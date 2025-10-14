@@ -187,6 +187,20 @@ func (r *deploymentRepository) FindByProjectID(ctx context.Context, projectID ui
 	return deployments, nil
 }
 
+// FindByTektonPipelineRunName finds a deployment by its Tekton PipelineRun name
+// TODO: Implement in Commit 8 with SQLC query
+func (r *deploymentRepository) FindByTektonPipelineRunName(ctx context.Context, pipelineRunName string) (*deployment.Deployment, error) {
+	// Stub implementation - will be replaced in Commit 8
+	return nil, projecterrors.ErrDeploymentNotFound
+}
+
+// FindActiveDeploymentsByProjectID finds all active (non-completed) deployments for a project
+// TODO: Implement in Commit 8 with SQLC query
+func (r *deploymentRepository) FindActiveDeploymentsByProjectID(ctx context.Context, projectID uint) ([]*deployment.Deployment, error) {
+	// Stub implementation - will be replaced in Commit 8
+	return []*deployment.Deployment{}, nil
+}
+
 // toDeploymentModel converts a sqlc Deployment to a domain Deployment model
 func (r *deploymentRepository) toDeploymentModel(sqlcDeployment sqlc.Deployment) (*deployment.Deployment, error) {
 	status := deploymentStatusFromDB(sqlcDeployment.Status)

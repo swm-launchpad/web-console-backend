@@ -37,4 +37,9 @@ type ProjectRepository interface {
 
 	// Delete soft deletes a project (sets is_deleted = true)
 	Delete(ctx context.Context, projectID uint) error
+
+	// FindProjectsWithActiveOperations finds all projects that have ongoing operations
+	// Used for monitoring and preventing concurrent operations
+	// Returns projects with operation_status != 'nothing'
+	FindProjectsWithActiveOperations(ctx context.Context) ([]*model.Project, error)
 }

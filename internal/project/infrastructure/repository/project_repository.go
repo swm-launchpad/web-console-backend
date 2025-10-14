@@ -343,6 +343,13 @@ func (r *projectRepository) Delete(ctx context.Context, projectID uint) error {
 	return nil
 }
 
+// FindProjectsWithActiveOperations finds all projects that have ongoing operations
+// TODO: Implement in Commit 7 with SQLC query
+func (r *projectRepository) FindProjectsWithActiveOperations(ctx context.Context) ([]*model.Project, error) {
+	// Stub implementation - will be replaced in Commit 7
+	return []*model.Project{}, nil
+}
+
 // Helper methods
 
 func (r *projectRepository) loadProjectUsers(project *model.Project, sqlcUsers []sqlc.ProjectUser) error {
