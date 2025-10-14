@@ -8,6 +8,7 @@ sql:
       - "../../../../migration/000003_add_verification_tokens.up.sql"
       - "../../../../migration/000004_move_fqdn_to_networks.up.sql"
       - "../../../../migration/000005_add_initial_templates.up.sql"
+      - "../../../../migration/000006_refactor_deployment_mechanism.up.sql"
     gen:
       go:
         package: "sqlc"
