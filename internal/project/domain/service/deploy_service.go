@@ -262,16 +262,10 @@ func (s *deployService) RefreshDeploymentStatus(ctx context.Context, deploymentI
 	if err != nil {
 		// Handle fatal errors
 		if projecterrors.IsFatalKubeError(err) {
-			// Mark as tracking lost
-			_ = d.MarkAsTrackingLost(fmt.Sprintf("Kubernetes error during refresh: %v", err))
-			_ = s.deploymentRepo.Save(ctx, d)
-
-			// Reset project status
-			proj, _ := s.projectRepo.FindByID(ctx, uint(d.ProjectID()))
-			if proj != nil {
-				_ = proj.CompleteOperation()
-				_ = s.projectRepo.Save(ctx, proj)
-			}
+			// Use handleDeployFailure to atomically update both deployment and project status
+			s.handleDeployFailure(ctx, uint(d.ProjectID()), uint(d.DeploymentID()),
+				deployment.DeploymentStatusBackendTrackingLost,
+				fmt.Sprintf("Kubernetes error during refresh: %v", err))
 		}
 		return nil, err
 	}
@@ -331,7 +325,8 @@ func (s *deployService) convertVolumesToDTO(volumes []*volumemodel.Volume) []dto
 	return result
 }
 
-// handleDeployFailure handles deployment failure by resetting project status and marking deployment as failed
+// handleDeployFailure handles deployment failure by resetting project status and marking deployment as failed.
+// This operation is performed atomically within a transaction to ensure data consistency.
 func (s *deployService) handleDeployFailure(
 	ctx context.Context,
 	projectID uint,
@@ -339,34 +334,60 @@ func (s *deployService) handleDeployFailure(
 	status deployment.DeploymentStatus,
 	reason string,
 ) {
-	// Mark deployment as failed
-	d, err := s.deploymentRepo.FindByID(ctx, deploymentID)
+	// Perform all state changes atomically within a transaction
+	err := s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+		// Mark deployment as failed
+		d, err := s.deploymentRepo.FindByID(txCtx, deploymentID)
+		if err != nil {
+			return fmt.Errorf("failed to find deployment: %w", err)
+		}
+
+		switch status {
+		case deployment.DeploymentStatusBackendTriggerFailed:
+			if err := d.MarkAsTriggerFailed(reason); err != nil {
+				return fmt.Errorf("failed to mark deployment as trigger failed: %w", err)
+			}
+		case deployment.DeploymentStatusBackendTrackingFailed:
+			if err := d.MarkAsTrackingFailed(reason); err != nil {
+				return fmt.Errorf("failed to mark deployment as tracking failed: %w", err)
+			}
+		case deployment.DeploymentStatusBackendTrackingLost:
+			if err := d.MarkAsTrackingLost(reason); err != nil {
+				return fmt.Errorf("failed to mark deployment as tracking lost: %w", err)
+			}
+		}
+
+		if err := s.deploymentRepo.Save(txCtx, d); err != nil {
+			return fmt.Errorf("failed to save deployment: %w", err)
+		}
+
+		// Reset project operation status to 'nothing'
+		proj, err := s.projectRepo.FindByID(txCtx, projectID)
+		if err != nil {
+			return fmt.Errorf("failed to find project: %w", err)
+		}
+
+		if err := proj.CompleteOperation(); err != nil {
+			return fmt.Errorf("failed to complete operation: %w", err)
+		}
+
+		if err := s.projectRepo.Save(txCtx, proj); err != nil {
+			return fmt.Errorf("failed to save project: %w", err)
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return
+		// Log the error but don't propagate it since this is a cleanup/recovery operation
+		// and we don't want to fail the caller's flow
+		fmt.Printf("ERROR: handleDeployFailure failed: %v\n", err)
 	}
-
-	switch status {
-	case deployment.DeploymentStatusBackendTriggerFailed:
-		_ = d.MarkAsTriggerFailed(reason)
-	case deployment.DeploymentStatusBackendTrackingFailed:
-		_ = d.MarkAsTrackingFailed(reason)
-	case deployment.DeploymentStatusBackendTrackingLost:
-		_ = d.MarkAsTrackingLost(reason)
-	}
-
-	_ = s.deploymentRepo.Save(ctx, d)
-
-	// Reset project operation status to 'nothing'
-	proj, err := s.projectRepo.FindByID(ctx, projectID)
-	if err != nil {
-		return
-	}
-
-	_ = proj.CompleteOperation()
-	_ = s.projectRepo.Save(ctx, proj)
 }
 
-// updateDeploymentFromKubeStatus updates deployment based on Kubernetes PipelineRun status
+// updateDeploymentFromKubeStatus updates deployment based on Kubernetes PipelineRun status.
+// For terminal states (Succeeded/Failed), this operation is performed atomically within a transaction
+// to ensure deployment and project status are updated consistently.
 func (s *deployService) updateDeploymentFromKubeStatus(
 	ctx context.Context,
 	d *deployment.Deployment,
@@ -374,7 +395,7 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 ) error {
 	switch status.Status {
 	case "Running", "Pending":
-		// Update to running status
+		// Update to running status (no project status change needed)
 		if d.Status() != deployment.DeploymentStatusRunning {
 			if d.TektonPipelineRunName() == "" && status.Name != "" {
 				if err := d.MarkAsRunning(status.Name); err != nil {
@@ -382,38 +403,71 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 				}
 			}
 		}
+		// Save deployment only (no transaction needed for non-terminal states)
+		return s.deploymentRepo.Save(ctx, d)
 
 	case "Succeeded":
-		// Mark as success
-		if !d.IsCompleted() {
-			if err := d.Complete(status.Message); err != nil {
-				return err
+		// Mark as success and reset project status atomically
+		return s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+			if !d.IsCompleted() {
+				if err := d.Complete(status.Message); err != nil {
+					return fmt.Errorf("failed to mark deployment as complete: %w", err)
+				}
 			}
-		}
 
-		// Reset project status
-		proj, err := s.projectRepo.FindByID(ctx, uint(d.ProjectID()))
-		if err == nil && proj != nil {
-			_ = proj.CompleteOperation()
-			_ = s.projectRepo.Save(ctx, proj)
-		}
+			if err := s.deploymentRepo.Save(txCtx, d); err != nil {
+				return fmt.Errorf("failed to save deployment: %w", err)
+			}
+
+			// Reset project status
+			proj, err := s.projectRepo.FindByID(txCtx, uint(d.ProjectID()))
+			if err != nil {
+				return fmt.Errorf("failed to find project: %w", err)
+			}
+
+			if err := proj.CompleteOperation(); err != nil {
+				return fmt.Errorf("failed to complete operation: %w", err)
+			}
+
+			if err := s.projectRepo.Save(txCtx, proj); err != nil {
+				return fmt.Errorf("failed to save project: %w", err)
+			}
+
+			return nil
+		})
 
 	case "Failed":
-		// Mark as failed
-		if !d.IsCompleted() {
-			if err := d.Fail(status.Message); err != nil {
-				return err
+		// Mark as failed and reset project status atomically
+		return s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+			if !d.IsCompleted() {
+				if err := d.Fail(status.Message); err != nil {
+					return fmt.Errorf("failed to mark deployment as failed: %w", err)
+				}
 			}
-		}
 
-		// Reset project status
-		proj, err := s.projectRepo.FindByID(ctx, uint(d.ProjectID()))
-		if err == nil && proj != nil {
-			_ = proj.CompleteOperation()
-			_ = s.projectRepo.Save(ctx, proj)
-		}
+			if err := s.deploymentRepo.Save(txCtx, d); err != nil {
+				return fmt.Errorf("failed to save deployment: %w", err)
+			}
+
+			// Reset project status
+			proj, err := s.projectRepo.FindByID(txCtx, uint(d.ProjectID()))
+			if err != nil {
+				return fmt.Errorf("failed to find project: %w", err)
+			}
+
+			if err := proj.CompleteOperation(); err != nil {
+				return fmt.Errorf("failed to complete operation: %w", err)
+			}
+
+			if err := s.projectRepo.Save(txCtx, proj); err != nil {
+				return fmt.Errorf("failed to save project: %w", err)
+			}
+
+			return nil
+		})
 	}
 
+	// For unknown statuses, just save deployment
 	return s.deploymentRepo.Save(ctx, d)
 }
 
