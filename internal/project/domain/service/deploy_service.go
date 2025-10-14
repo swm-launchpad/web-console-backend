@@ -4,7 +4,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -109,7 +108,7 @@ type DeployService interface {
 
 // deployService implements the DeployService interface
 type deployService struct {
-	dbConn             *sql.DB
+	txManager          db.TxManager
 	projectRepo        repository.ProjectRepository
 	deploymentRepo     repository.DeploymentRepository
 	volumeRepo         repository.VolumeRepository
@@ -122,7 +121,7 @@ type deployService struct {
 
 // NewDeployService creates a new instance of deployService
 func NewDeployService(
-	dbConn *sql.DB,
+	txManager db.TxManager,
 	projectRepo repository.ProjectRepository,
 	deploymentRepo repository.DeploymentRepository,
 	volumeRepo repository.VolumeRepository,
@@ -133,7 +132,7 @@ func NewDeployService(
 	projectServiceName string,
 ) DeployService {
 	return &deployService{
-		dbConn:             dbConn,
+		txManager:          txManager,
 		projectRepo:        projectRepo,
 		deploymentRepo:     deploymentRepo,
 		volumeRepo:         volumeRepo,
@@ -147,45 +146,43 @@ func NewDeployService(
 
 // DeployProject initiates a deployment for the specified project
 func (s *deployService) DeployProject(ctx context.Context, projectID uint, userID uint) (*deployment.Deployment, error) {
-	// Step 1: Start transaction and atomically change project status + create deployment
-	tx, err := s.dbConn.BeginTx(ctx, nil)
+	// Step 1: Atomically change project status + create deployment in a transaction
+	var d *deployment.Deployment
+	var proj *projectmodel.Project
+	err := s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+		// Load project with FOR UPDATE lock
+		var err error
+		proj, err = s.projectRepo.FindByIDForUpdate(txCtx, projectID)
+		if err != nil {
+			return err
+		}
+
+		// Check if project is already deploying
+		if proj.OperationStatus() != value.ProjectOperationStatusNothing {
+			return projecterrors.ErrProjectAlreadyDeploying
+		}
+
+		// Change project status to deploying
+		if err := proj.StartDeploying(); err != nil {
+			return err
+		}
+
+		if err := s.projectRepo.Save(txCtx, proj); err != nil {
+			return err
+		}
+
+		// Create deployment record with status 'untracked'
+		d = deployment.NewDeployment(projectID)
+
+		if err := s.deploymentRepo.Create(txCtx, d); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, projecterrors.ErrDatabaseOperation
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	txCtx := db.WithTx(ctx, tx)
-
-	// Load project with FOR UPDATE lock
-	proj, err := s.projectRepo.FindByIDForUpdate(txCtx, projectID)
-	if err != nil {
 		return nil, err
-	}
-
-	// Check if project is already deploying
-	if proj.OperationStatus() != value.ProjectOperationStatusNothing {
-		return nil, projecterrors.ErrProjectAlreadyDeploying
-	}
-
-	// Change project status to deploying
-	if err := proj.StartDeploying(); err != nil {
-		return nil, err
-	}
-
-	if err := s.projectRepo.Save(txCtx, proj); err != nil {
-		return nil, err
-	}
-
-	// Create deployment record with status 'untracked'
-	d := deployment.NewDeployment(projectID)
-
-	if err := s.deploymentRepo.Create(txCtx, d); err != nil {
-		return nil, err
-	}
-
-	// Commit transaction
-	if err := tx.Commit(); err != nil {
-		return nil, projecterrors.ErrDatabaseOperation
 	}
 
 	// From now on, any error should rollback project status and mark deployment as failed
