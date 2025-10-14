@@ -10,18 +10,19 @@ import (
 // Project represents a project aggregate root
 // It manages ProjectUser entities and enforces domain invariants
 type Project struct {
-	projectID uint
-	name      string
-	slug      value.ProjectSlug
-	fqdn      *string
-	status    value.ProjectStatus
-	plan      *string
-	limits    value.ResourceLimits
-	users     []ProjectUser // Aggregate's internal entities
-	isDeleted bool
-	deletedAt *time.Time
-	createdAt time.Time
-	updatedAt time.Time
+	projectID       uint
+	name            string
+	slug            value.ProjectSlug
+	fqdn            *string
+	status          value.ProjectStatus
+	operationStatus value.ProjectOperationStatus
+	plan            *string
+	limits          value.ResourceLimits
+	users           []ProjectUser // Aggregate's internal entities
+	isDeleted       bool
+	deletedAt       *time.Time
+	createdAt       time.Time
+	updatedAt       time.Time
 }
 
 // NewProject creates a new project with an initial owner
@@ -36,14 +37,15 @@ func NewProject(name string, slug value.ProjectSlug, ownerID uint, limits value.
 
 	now := time.Now()
 	project := &Project{
-		name:      name,
-		slug:      slug,
-		status:    value.ProjectStatusActive,
-		limits:    limits,
-		users:     make([]ProjectUser, 0),
-		isDeleted: false,
-		createdAt: now,
-		updatedAt: now,
+		name:            name,
+		slug:            slug,
+		status:          value.ProjectStatusActive,
+		operationStatus: value.ProjectOperationStatusNothing,
+		limits:          limits,
+		users:           make([]ProjectUser, 0),
+		isDeleted:       false,
+		createdAt:       now,
+		updatedAt:       now,
 	}
 
 	// Set optional fields by copying the pointer values
@@ -80,6 +82,7 @@ func ReconstructProject(
 	name string,
 	slug value.ProjectSlug,
 	status value.ProjectStatus,
+	operationStatus value.ProjectOperationStatus,
 	limits value.ResourceLimits,
 	createdAt time.Time,
 	updatedAt time.Time,
@@ -87,16 +90,17 @@ func ReconstructProject(
 	deletedAt *time.Time,
 ) *Project {
 	return &Project{
-		projectID: projectID,
-		name:      name,
-		slug:      slug,
-		status:    status,
-		limits:    limits,
-		users:     make([]ProjectUser, 0), // Will be loaded separately
-		isDeleted: isDeleted,
-		deletedAt: deletedAt,
-		createdAt: createdAt,
-		updatedAt: updatedAt,
+		projectID:       projectID,
+		name:            name,
+		slug:            slug,
+		status:          status,
+		operationStatus: operationStatus,
+		limits:          limits,
+		users:           make([]ProjectUser, 0), // Will be loaded separately
+		isDeleted:       isDeleted,
+		deletedAt:       deletedAt,
+		createdAt:       createdAt,
+		updatedAt:       updatedAt,
 	}
 }
 
@@ -126,6 +130,11 @@ func (p *Project) FQDN() (string, bool) {
 // Status returns the project status
 func (p *Project) Status() value.ProjectStatus {
 	return p.status
+}
+
+// OperationStatus returns the project operation status
+func (p *Project) OperationStatus() value.ProjectOperationStatus {
+	return p.operationStatus
 }
 
 // Plan returns the project plan and whether it is set
@@ -453,4 +462,60 @@ func (p *Project) hasOtherOwner(excludeUserID uint) bool {
 func (p *Project) updateTimestamp() {
 	now := time.Now()
 	p.updatedAt = now
+}
+
+// StartDeploying transitions the project to deploying status
+// Returns error if project is already in an active operation
+func (p *Project) StartDeploying() error {
+	if p.isDeleted {
+		return projecterrors.ErrCannotModifyDeletedProject
+	}
+
+	if p.operationStatus != value.ProjectOperationStatusNothing {
+		return projecterrors.ErrInvalidStatusTransition
+	}
+
+	p.operationStatus = value.ProjectOperationStatusDeploying
+	p.updateTimestamp()
+	return nil
+}
+
+// StartBuilding transitions the project to building status
+// Returns error if project is already in an active operation
+func (p *Project) StartBuilding() error {
+	if p.isDeleted {
+		return projecterrors.ErrCannotModifyDeletedProject
+	}
+
+	if p.operationStatus != value.ProjectOperationStatusNothing {
+		return projecterrors.ErrInvalidStatusTransition
+	}
+
+	p.operationStatus = value.ProjectOperationStatusBuilding
+	p.updateTimestamp()
+	return nil
+}
+
+// CompleteOperation resets the operation status to nothing
+// This is called when an operation (build or deploy) completes successfully
+func (p *Project) CompleteOperation() error {
+	if p.isDeleted {
+		return projecterrors.ErrCannotModifyDeletedProject
+	}
+
+	p.operationStatus = value.ProjectOperationStatusNothing
+	p.updateTimestamp()
+	return nil
+}
+
+// ResetOperationStatus forcefully resets the operation status to nothing
+// This is used for error recovery or manual intervention
+func (p *Project) ResetOperationStatus() error {
+	if p.isDeleted {
+		return projecterrors.ErrCannotModifyDeletedProject
+	}
+
+	p.operationStatus = value.ProjectOperationStatusNothing
+	p.updateTimestamp()
+	return nil
 }

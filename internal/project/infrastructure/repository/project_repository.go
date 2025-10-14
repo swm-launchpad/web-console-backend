@@ -395,11 +395,14 @@ func (r *projectRepository) toDomainProject(sqlcProject sqlc.Project) (*model.Pr
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
+	// TODO: operationStatus will be loaded from DB after sqlc regeneration in next commit
+	// For now, use default value
 	project := model.ReconstructProject(
 		uint(sqlcProject.ProjectID),
 		sqlcProject.Name,
 		*slug,
 		value.ProjectStatus(sqlcProject.Status),
+		value.ProjectOperationStatusNothing,
 		*limits,
 		sqlcProject.CreatedAt,
 		updatedAt,
