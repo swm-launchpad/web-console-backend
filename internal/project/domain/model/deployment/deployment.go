@@ -8,23 +8,24 @@ import (
 
 // Deployment represents a deployment entity
 type Deployment struct {
-	deploymentID uint
-	projectID    uint
-	status       DeploymentStatus
-	summary      string
-	tektonRef    string
-	createdAt    time.Time
-	startedAt    time.Time
-	finishedAt   time.Time
+	deploymentID          uint
+	projectID             uint
+	status                DeploymentStatus
+	summary               string
+	tektonEventID         string
+	tektonPipelineRunName string
+	createdAt             time.Time
+	startedAt             time.Time
+	finishedAt            time.Time
 }
 
-// NewDeployment creates a new deployment in pending status
+// NewDeployment creates a new deployment in untracked status
 func NewDeployment(
 	projectID uint,
 ) *Deployment {
 	return &Deployment{
 		projectID: projectID,
-		status:    DeploymentStatusPending,
+		status:    DeploymentStatusUntracked,
 		createdAt: time.Now(),
 	}
 }
@@ -36,7 +37,8 @@ func ReconstructDeployment(
 	projectID uint,
 	status DeploymentStatus,
 	summary string,
-	tektonRef string,
+	tektonEventID string,
+	tektonPipelineRunName string,
 	createdAt time.Time,
 	startedAt time.Time,
 	finishedAt time.Time,
@@ -46,14 +48,15 @@ func ReconstructDeployment(
 	}
 
 	return &Deployment{
-		deploymentID: deploymentID,
-		projectID:    projectID,
-		status:       status,
-		summary:      summary,
-		tektonRef:    tektonRef,
-		createdAt:    createdAt,
-		startedAt:    startedAt,
-		finishedAt:   finishedAt,
+		deploymentID:          deploymentID,
+		projectID:             projectID,
+		status:                status,
+		summary:               summary,
+		tektonEventID:         tektonEventID,
+		tektonPipelineRunName: tektonPipelineRunName,
+		createdAt:             createdAt,
+		startedAt:             startedAt,
+		finishedAt:            finishedAt,
 	}, nil
 }
 
@@ -82,9 +85,14 @@ func (d *Deployment) Summary() string {
 	return d.summary
 }
 
-// TektonRef returns the Tekton PipelineRun reference
-func (d *Deployment) TektonRef() string {
-	return d.tektonRef
+// TektonEventID returns the Tekton event ID from API response
+func (d *Deployment) TektonEventID() string {
+	return d.tektonEventID
+}
+
+// TektonPipelineRunName returns the Tekton PipelineRun name
+func (d *Deployment) TektonPipelineRunName() string {
+	return d.tektonPipelineRunName
 }
 
 // CreatedAt returns the creation time
@@ -102,15 +110,65 @@ func (d *Deployment) FinishedAt() time.Time {
 	return d.finishedAt
 }
 
-// Start transitions the deployment to running status
-// Sets the startedAt timestamp and tektonRef
-func (d *Deployment) Start(tektonRef string) error {
-	if d.status != DeploymentStatusPending {
-		return projecterrors.ErrCannotStartDeployment
+// MarkAsTriggerFailed transitions the deployment to backend_trigger_failed status
+// Called when backend fails to trigger Tekton API
+func (d *Deployment) MarkAsTriggerFailed(summary string) error {
+	if d.status != DeploymentStatusUntracked {
+		return projecterrors.ErrInvalidDeploymentTransition
+	}
+
+	d.status = DeploymentStatusBackendTriggerFailed
+	d.summary = summary
+	d.finishedAt = time.Now()
+	return nil
+}
+
+// MarkAsTracking sets the Tekton event ID after successful trigger
+// Status remains untracked until we find the PipelineRun
+func (d *Deployment) MarkAsTracking(eventID string) error {
+	if d.status != DeploymentStatusUntracked {
+		return projecterrors.ErrInvalidDeploymentTransition
+	}
+
+	d.tektonEventID = eventID
+	return nil
+}
+
+// MarkAsTrackingFailed transitions the deployment to backend_tracking_failed status
+// Called when backend fails to track the deployment within 5 minutes
+func (d *Deployment) MarkAsTrackingFailed(summary string) error {
+	if d.status != DeploymentStatusUntracked {
+		return projecterrors.ErrInvalidDeploymentTransition
+	}
+
+	d.status = DeploymentStatusBackendTrackingFailed
+	d.summary = summary
+	d.finishedAt = time.Now()
+	return nil
+}
+
+// MarkAsTrackingLost transitions the deployment to backend_tracking_lost status
+// Called when fatal errors occur (auth failure, PipelineRun not found)
+func (d *Deployment) MarkAsTrackingLost(summary string) error {
+	if d.status != DeploymentStatusUntracked {
+		return projecterrors.ErrInvalidDeploymentTransition
+	}
+
+	d.status = DeploymentStatusBackendTrackingLost
+	d.summary = summary
+	d.finishedAt = time.Now()
+	return nil
+}
+
+// MarkAsRunning transitions the deployment to running status
+// Sets the PipelineRun name and startedAt timestamp
+func (d *Deployment) MarkAsRunning(pipelineRunName string) error {
+	if d.status != DeploymentStatusUntracked {
+		return projecterrors.ErrInvalidDeploymentTransition
 	}
 
 	d.status = DeploymentStatusRunning
-	d.tektonRef = tektonRef
+	d.tektonPipelineRunName = pipelineRunName
 	d.startedAt = time.Now()
 	return nil
 }
@@ -141,22 +199,11 @@ func (d *Deployment) Fail(summary string) error {
 	return nil
 }
 
-// Cancel transitions the deployment to cancelled status
-// Can be cancelled from pending or running status
-func (d *Deployment) Cancel(summary string) error {
-	if d.status != DeploymentStatusPending && d.status != DeploymentStatusRunning {
-		return projecterrors.ErrCannotCancelDeployment
-	}
-
-	d.status = DeploymentStatusCancelled
-	d.summary = summary
-	d.finishedAt = time.Now()
-	return nil
-}
-
 // IsCompleted returns true if the deployment is in a terminal status
 func (d *Deployment) IsCompleted() bool {
 	return d.status == DeploymentStatusSuccess ||
 		d.status == DeploymentStatusFailed ||
-		d.status == DeploymentStatusCancelled
+		d.status == DeploymentStatusBackendTriggerFailed ||
+		d.status == DeploymentStatusBackendTrackingFailed ||
+		d.status == DeploymentStatusBackendTrackingLost
 }

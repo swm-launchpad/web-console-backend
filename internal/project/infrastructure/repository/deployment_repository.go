@@ -34,11 +34,18 @@ func (r *deploymentRepository) Create(ctx context.Context, d *deployment.Deploym
 
 	qtx := r.queriesWithContext(ctx)
 
+	// TODO: After sqlc regeneration, use TektonEventID and TektonPipelineRunName
+	// For now, use TektonRef for backward compatibility
+	tektonRef := d.TektonPipelineRunName()
+	if tektonRef == "" {
+		tektonRef = d.TektonEventID()
+	}
+
 	result, err := qtx.CreateDeployment(ctx, sqlc.CreateDeploymentParams{
 		ProjectID:  uint32(d.ProjectID()),
 		Status:     deploymentStatusToDB(d.Status()),
 		Summary:    toNullString(d.Summary()),
-		TektonRef:  toNullString(d.TektonRef()),
+		TektonRef:  toNullString(tektonRef),
 		CreatedAt:  d.CreatedAt(),
 		StartedAt:  timeToNullTime(d.StartedAt()),
 		FinishedAt: timeToNullTime(d.FinishedAt()),
@@ -68,10 +75,17 @@ func (r *deploymentRepository) Save(ctx context.Context, d *deployment.Deploymen
 
 	qtx := r.queriesWithContext(ctx)
 
+	// TODO: After sqlc regeneration, use TektonEventID and TektonPipelineRunName
+	// For now, use TektonRef for backward compatibility
+	tektonRef := d.TektonPipelineRunName()
+	if tektonRef == "" {
+		tektonRef = d.TektonEventID()
+	}
+
 	result, err := qtx.UpdateDeployment(ctx, sqlc.UpdateDeploymentParams{
 		Status:       deploymentStatusToDB(d.Status()),
 		Summary:      toNullString(d.Summary()),
-		TektonRef:    toNullString(d.TektonRef()),
+		TektonRef:    toNullString(tektonRef),
 		StartedAt:    timeToNullTime(d.StartedAt()),
 		FinishedAt:   timeToNullTime(d.FinishedAt()),
 		DeploymentID: uint32(d.DeploymentID()),
@@ -177,12 +191,17 @@ func (r *deploymentRepository) FindByProjectID(ctx context.Context, projectID ui
 func (r *deploymentRepository) toDeploymentModel(sqlcDeployment sqlc.Deployment) (*deployment.Deployment, error) {
 	status := deploymentStatusFromDB(sqlcDeployment.Status)
 
+	// TODO: After sqlc regeneration, tekton_ref will be split into tekton_event_id and tekton_pipeline_run_name
+	// For now, use tekton_ref for both fields
+	tektonRef := fromNullString(sqlcDeployment.TektonRef)
+
 	d, err := deployment.ReconstructDeployment(
 		uint(sqlcDeployment.DeploymentID),
 		uint(sqlcDeployment.ProjectID),
 		status,
 		fromNullString(sqlcDeployment.Summary),
-		fromNullString(sqlcDeployment.TektonRef),
+		tektonRef, // tektonEventID
+		tektonRef, // tektonPipelineRunName
 		sqlcDeployment.CreatedAt,
 		nullTimeToTime(sqlcDeployment.StartedAt),
 		nullTimeToTime(sqlcDeployment.FinishedAt),
@@ -195,28 +214,34 @@ func (r *deploymentRepository) toDeploymentModel(sqlcDeployment sqlc.Deployment)
 }
 
 // deploymentStatusToDB converts domain DeploymentStatus to sqlc DeploymentsStatus
+// TODO: After sqlc regeneration, map to new status enums directly
 func deploymentStatusToDB(status deployment.DeploymentStatus) sqlc.DeploymentsStatus {
 	switch status {
-	case deployment.DeploymentStatusPending:
-		return sqlc.DeploymentsStatusPending
+	case deployment.DeploymentStatusUntracked:
+		return sqlc.DeploymentsStatusPending // Temporary mapping
+	case deployment.DeploymentStatusBackendTriggerFailed:
+		return sqlc.DeploymentsStatusFailed // Temporary mapping
+	case deployment.DeploymentStatusBackendTrackingFailed:
+		return sqlc.DeploymentsStatusFailed // Temporary mapping
+	case deployment.DeploymentStatusBackendTrackingLost:
+		return sqlc.DeploymentsStatusFailed // Temporary mapping
 	case deployment.DeploymentStatusRunning:
 		return sqlc.DeploymentsStatusRunning
 	case deployment.DeploymentStatusSuccess:
 		return sqlc.DeploymentsStatusSuccess
 	case deployment.DeploymentStatusFailed:
 		return sqlc.DeploymentsStatusFailed
-	case deployment.DeploymentStatusCancelled:
-		return sqlc.DeploymentsStatusCancelled
 	default:
 		return sqlc.DeploymentsStatusPending
 	}
 }
 
 // deploymentStatusFromDB converts sqlc DeploymentsStatus to domain DeploymentStatus
+// TODO: After sqlc regeneration, map from new status enums directly
 func deploymentStatusFromDB(status sqlc.DeploymentsStatus) deployment.DeploymentStatus {
 	switch status {
 	case sqlc.DeploymentsStatusPending:
-		return deployment.DeploymentStatusPending
+		return deployment.DeploymentStatusUntracked // Temporary mapping
 	case sqlc.DeploymentsStatusRunning:
 		return deployment.DeploymentStatusRunning
 	case sqlc.DeploymentsStatusSuccess:
@@ -224,9 +249,9 @@ func deploymentStatusFromDB(status sqlc.DeploymentsStatus) deployment.Deployment
 	case sqlc.DeploymentsStatusFailed:
 		return deployment.DeploymentStatusFailed
 	case sqlc.DeploymentsStatusCancelled:
-		return deployment.DeploymentStatusCancelled
+		return deployment.DeploymentStatusFailed // Temporary mapping
 	default:
-		return deployment.DeploymentStatusPending
+		return deployment.DeploymentStatusUntracked
 	}
 }
 

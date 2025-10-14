@@ -13,9 +13,24 @@ func TestDeploymentStatus_String(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "pending status",
-			status:   DeploymentStatusPending,
-			expected: "pending",
+			name:     "untracked status",
+			status:   DeploymentStatusUntracked,
+			expected: "untracked",
+		},
+		{
+			name:     "backend_trigger_failed status",
+			status:   DeploymentStatusBackendTriggerFailed,
+			expected: "backend_trigger_failed",
+		},
+		{
+			name:     "backend_tracking_failed status",
+			status:   DeploymentStatusBackendTrackingFailed,
+			expected: "backend_tracking_failed",
+		},
+		{
+			name:     "backend_tracking_lost status",
+			status:   DeploymentStatusBackendTrackingLost,
+			expected: "backend_tracking_lost",
 		},
 		{
 			name:     "running status",
@@ -31,11 +46,6 @@ func TestDeploymentStatus_String(t *testing.T) {
 			name:     "failed status",
 			status:   DeploymentStatusFailed,
 			expected: "failed",
-		},
-		{
-			name:     "cancelled status",
-			status:   DeploymentStatusCancelled,
-			expected: "cancelled",
 		},
 	}
 
@@ -53,8 +63,23 @@ func TestDeploymentStatus_IsValid(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "valid pending status",
-			status:   DeploymentStatusPending,
+			name:     "valid untracked status",
+			status:   DeploymentStatusUntracked,
+			expected: true,
+		},
+		{
+			name:     "valid backend_trigger_failed status",
+			status:   DeploymentStatusBackendTriggerFailed,
+			expected: true,
+		},
+		{
+			name:     "valid backend_tracking_failed status",
+			status:   DeploymentStatusBackendTrackingFailed,
+			expected: true,
+		},
+		{
+			name:     "valid backend_tracking_lost status",
+			status:   DeploymentStatusBackendTrackingLost,
 			expected: true,
 		},
 		{
@@ -70,11 +95,6 @@ func TestDeploymentStatus_IsValid(t *testing.T) {
 		{
 			name:     "valid failed status",
 			status:   DeploymentStatusFailed,
-			expected: true,
-		},
-		{
-			name:     "valid cancelled status",
-			status:   DeploymentStatusCancelled,
 			expected: true,
 		},
 		{
@@ -103,8 +123,23 @@ func TestValidateDeploymentStatus(t *testing.T) {
 		wantError bool
 	}{
 		{
-			name:      "valid pending status",
-			status:    DeploymentStatusPending,
+			name:      "valid untracked status",
+			status:    DeploymentStatusUntracked,
+			wantError: false,
+		},
+		{
+			name:      "valid backend_trigger_failed status",
+			status:    DeploymentStatusBackendTriggerFailed,
+			wantError: false,
+		},
+		{
+			name:      "valid backend_tracking_failed status",
+			status:    DeploymentStatusBackendTrackingFailed,
+			wantError: false,
+		},
+		{
+			name:      "valid backend_tracking_lost status",
+			status:    DeploymentStatusBackendTrackingLost,
 			wantError: false,
 		},
 		{
@@ -120,11 +155,6 @@ func TestValidateDeploymentStatus(t *testing.T) {
 		{
 			name:      "valid failed status",
 			status:    DeploymentStatusFailed,
-			wantError: false,
-		},
-		{
-			name:      "valid cancelled status",
-			status:    DeploymentStatusCancelled,
 			wantError: false,
 		},
 		{

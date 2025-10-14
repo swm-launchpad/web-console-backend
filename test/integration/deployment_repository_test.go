@@ -36,7 +36,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		// Then
 		require.NoError(t, err)
 		assert.NotZero(t, d.DeploymentID(), "Deployment ID should be set after creation")
-		assert.Equal(t, deployment.DeploymentStatusPending, d.Status())
+		assert.Equal(t, deployment.DeploymentStatusUntracked, d.Status())
 	})
 
 	t.Run("Save - Update deployment status", func(t *testing.T) {
@@ -48,7 +48,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 
 		// When - Start deployment
 		tektonRef := "pipeline-run-123"
-		err = d.Start(tektonRef)
+		err = d.MarkAsRunning(tektonRef)
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 
@@ -59,7 +59,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		fetched, err := repo.FindByID(ctx, d.DeploymentID())
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusRunning, fetched.Status())
-		assert.Equal(t, tektonRef, fetched.TektonRef())
+		assert.Equal(t, tektonRef, fetched.TektonPipelineRunName())
 		assert.False(t, fetched.StartedAt().IsZero())
 	})
 
@@ -83,7 +83,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		tektonRef := "pipeline-run-456"
-		err = d.Start(tektonRef)
+		err = d.MarkAsRunning(tektonRef)
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 		require.NoError(t, err)
@@ -98,7 +98,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		fetched, err := repo.FindByID(ctx, d.DeploymentID())
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusRunning, fetched.Status())
-		assert.Equal(t, tektonRef, fetched.TektonRef())
+		assert.Equal(t, tektonRef, fetched.TektonPipelineRunName())
 	})
 
 	t.Run("FindByID - Existing deployment", func(t *testing.T) {
@@ -212,10 +212,10 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		d := deployment.NewDeployment(pid)
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
-		assert.Equal(t, deployment.DeploymentStatusPending, d.Status())
+		assert.Equal(t, deployment.DeploymentStatusUntracked, d.Status())
 
 		// When - Start deployment
-		err = d.Start("pipeline-run-123")
+		err = d.MarkAsRunning("pipeline-run-123")
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 		require.NoError(t, err)
@@ -224,7 +224,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		fetched, err := repo.FindByID(ctx, d.DeploymentID())
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusRunning, fetched.Status())
-		assert.Equal(t, "pipeline-run-123", fetched.TektonRef())
+		assert.Equal(t, "pipeline-run-123", fetched.TektonPipelineRunName())
 
 		// When - Complete deployment
 		err = fetched.Complete("Deployment successful")
@@ -248,7 +248,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
 
-		err = d.Start("pipeline-run-456")
+		err = d.MarkAsRunning("pipeline-run-456")
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 		require.NoError(t, err)
@@ -277,17 +277,17 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
 
-		// When - Cancel immediately from pending
-		err = d.Cancel("User cancelled")
+		// When - Mark trigger failed immediately
+		err = d.MarkAsTriggerFailed("Failed to trigger")
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 		require.NoError(t, err)
 
-		// Then - Verify cancelled status
+		// Then - Verify backend_trigger_failed status
 		fetched, err := repo.FindByID(ctx, d.DeploymentID())
 		require.NoError(t, err)
-		assert.Equal(t, deployment.DeploymentStatusCancelled, fetched.Status())
-		assert.Equal(t, "User cancelled", fetched.Summary())
+		assert.Equal(t, deployment.DeploymentStatusFailed, fetched.Status())
+		assert.Equal(t, "Failed to trigger", fetched.Summary())
 		assert.True(t, fetched.IsCompleted())
 	})
 }
