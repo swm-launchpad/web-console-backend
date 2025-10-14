@@ -270,6 +270,42 @@ func TestDeployment_Fail(t *testing.T) {
 	})
 }
 
+func TestDeployment_Cancel(t *testing.T) {
+	t.Run("successful cancellation from running", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.MarkAsRunning("pipeline-run-123")
+		summary := "Deployment cancelled by user"
+
+		err := deployment.Cancel(summary)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusCancelled, deployment.Status())
+		assert.Equal(t, summary, deployment.Summary())
+		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
+		assert.True(t, deployment.IsCompleted())
+	})
+
+	t.Run("cannot cancel from untracked", func(t *testing.T) {
+		deployment := NewDeployment(123)
+
+		err := deployment.Cancel("cancelled")
+
+		assert.ErrorIs(t, err, projecterrors.ErrCannotCancelDeployment)
+		assert.Equal(t, DeploymentStatusUntracked, deployment.Status())
+	})
+
+	t.Run("cannot cancel from success", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.MarkAsRunning("pipeline-run-123")
+		_ = deployment.Complete("success")
+
+		err := deployment.Cancel("cancelled")
+
+		assert.ErrorIs(t, err, projecterrors.ErrCannotCancelDeployment)
+		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
+	})
+}
+
 func TestDeployment_IsCompleted(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -301,6 +337,14 @@ func TestDeployment_IsCompleted(t *testing.T) {
 			setup: func(d *Deployment) {
 				_ = d.MarkAsRunning("pipeline-run")
 				_ = d.Fail("error")
+			},
+			completed: true,
+		},
+		{
+			name: "cancelled is completed",
+			setup: func(d *Deployment) {
+				_ = d.MarkAsRunning("pipeline-run")
+				_ = d.Cancel("cancelled by user")
 			},
 			completed: true,
 		},
@@ -409,6 +453,21 @@ func TestDeployment_StateTransitions(t *testing.T) {
 		err := deployment.MarkAsTrackingLost("Authentication failed")
 		require.NoError(t, err)
 		assert.Equal(t, DeploymentStatusBackendTrackingLost, deployment.Status())
+		assert.True(t, deployment.IsCompleted())
+	})
+
+	t.Run("cancellation flow", func(t *testing.T) {
+		deployment := NewDeployment(123)
+
+		// untracked -> running
+		err := deployment.MarkAsRunning("pipeline-run-123")
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
+
+		// running -> cancelled
+		err = deployment.Cancel("User cancelled deployment")
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusCancelled, deployment.Status())
 		assert.True(t, deployment.IsCompleted())
 	})
 }

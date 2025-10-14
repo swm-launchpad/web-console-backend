@@ -199,10 +199,25 @@ func (d *Deployment) Fail(summary string) error {
 	return nil
 }
 
+// Cancel transitions the deployment to cancelled status
+// Sets the finishedAt timestamp and cancellation summary
+// Can be called from Running status when user or system cancels the deployment
+func (d *Deployment) Cancel(summary string) error {
+	if d.status != DeploymentStatusRunning {
+		return projecterrors.ErrCannotCancelDeployment
+	}
+
+	d.status = DeploymentStatusCancelled
+	d.summary = summary
+	d.finishedAt = time.Now()
+	return nil
+}
+
 // IsCompleted returns true if the deployment is in a terminal status
 func (d *Deployment) IsCompleted() bool {
 	return d.status == DeploymentStatusSuccess ||
 		d.status == DeploymentStatusFailed ||
+		d.status == DeploymentStatusCancelled ||
 		d.status == DeploymentStatusBackendTriggerFailed ||
 		d.status == DeploymentStatusBackendTrackingFailed ||
 		d.status == DeploymentStatusBackendTrackingLost

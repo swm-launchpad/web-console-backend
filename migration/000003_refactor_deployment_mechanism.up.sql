@@ -30,5 +30,6 @@ MODIFY COLUMN `status` ENUM(
     'backend_tracking_lost',        -- Backend lost tracking (fatal errors)
     'running',                      -- Tekton: Running
     'success',                      -- Tekton: Success
-    'failed'                        -- Tekton: Failed
+    'failed',                       -- Tekton: Failed
+    'cancelled'                     -- Tekton: Cancelled (user or system initiated)
 ) NOT NULL DEFAULT 'untracked';

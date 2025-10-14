@@ -47,6 +47,11 @@ func TestDeploymentStatus_String(t *testing.T) {
 			status:   DeploymentStatusFailed,
 			expected: "failed",
 		},
+		{
+			name:     "cancelled status",
+			status:   DeploymentStatusCancelled,
+			expected: "cancelled",
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,6 +100,11 @@ func TestDeploymentStatus_IsValid(t *testing.T) {
 		{
 			name:     "valid failed status",
 			status:   DeploymentStatusFailed,
+			expected: true,
+		},
+		{
+			name:     "valid cancelled status",
+			status:   DeploymentStatusCancelled,
 			expected: true,
 		},
 		{
@@ -155,6 +165,11 @@ func TestValidateDeploymentStatus(t *testing.T) {
 		{
 			name:      "valid failed status",
 			status:    DeploymentStatusFailed,
+			wantError: false,
+		},
+		{
+			name:      "valid cancelled status",
+			status:    DeploymentStatusCancelled,
 			wantError: false,
 		},
 		{

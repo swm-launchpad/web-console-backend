@@ -16,9 +16,10 @@ const (
 	DeploymentStatusBackendTrackingLost   DeploymentStatus = "backend_tracking_lost"   // Backend lost tracking (fatal errors)
 
 	// Tekton-managed states
-	DeploymentStatusRunning DeploymentStatus = "running" // Tekton: Running
-	DeploymentStatusSuccess DeploymentStatus = "success" // Tekton: Success
-	DeploymentStatusFailed  DeploymentStatus = "failed"  // Tekton: Failed
+	DeploymentStatusRunning   DeploymentStatus = "running"   // Tekton: Running
+	DeploymentStatusSuccess   DeploymentStatus = "success"   // Tekton: Success
+	DeploymentStatusFailed    DeploymentStatus = "failed"    // Tekton: Failed
+	DeploymentStatusCancelled DeploymentStatus = "cancelled" // Tekton: Cancelled (user-initiated or system cancellation)
 )
 
 // String returns the string representation of the status
@@ -35,7 +36,8 @@ func (s DeploymentStatus) IsValid() bool {
 		DeploymentStatusBackendTrackingLost,
 		DeploymentStatusRunning,
 		DeploymentStatusSuccess,
-		DeploymentStatusFailed:
+		DeploymentStatusFailed,
+		DeploymentStatusCancelled:
 		return true
 	default:
 		return false

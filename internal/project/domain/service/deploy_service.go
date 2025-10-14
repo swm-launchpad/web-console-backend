@@ -465,6 +465,37 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 
 			return nil
 		})
+
+	case "Cancelled", "StoppedRunFinally", "CancelledRunFinally":
+		// Mark as cancelled and reset project status atomically
+		// All three cancellation types (Cancelled, StoppedRunFinally, CancelledRunFinally) are treated as cancelled
+		return s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+			if !d.IsCompleted() {
+				if err := d.Cancel(status.Message); err != nil {
+					return fmt.Errorf("failed to mark deployment as cancelled: %w", err)
+				}
+			}
+
+			if err := s.deploymentRepo.Save(txCtx, d); err != nil {
+				return fmt.Errorf("failed to save deployment: %w", err)
+			}
+
+			// Reset project status
+			proj, err := s.projectRepo.FindByID(txCtx, uint(d.ProjectID()))
+			if err != nil {
+				return fmt.Errorf("failed to find project: %w", err)
+			}
+
+			if err := proj.CompleteOperation(); err != nil {
+				return fmt.Errorf("failed to complete operation: %w", err)
+			}
+
+			if err := s.projectRepo.Save(txCtx, proj); err != nil {
+				return fmt.Errorf("failed to save project: %w", err)
+			}
+
+			return nil
+		})
 	}
 
 	// For unknown statuses, just save deployment

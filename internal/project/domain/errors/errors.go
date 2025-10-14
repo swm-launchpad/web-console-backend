@@ -124,7 +124,7 @@ var (
 	ErrCannotStartDeployment       = errors.New("cannot start deployment: current status must be pending")
 	ErrCannotCompleteDeployment    = errors.New("cannot complete deployment: current status must be running")
 	ErrCannotFailDeployment        = errors.New("cannot fail deployment: current status must be running")
-	ErrCannotCancelDeployment      = errors.New("cannot cancel deployment: current status must be pending or running")
+	ErrCannotCancelDeployment      = errors.New("cannot cancel deployment: current status must be running")
 	ErrInvalidDeploymentTransition = errors.New("invalid deployment state transition")
 )
 
