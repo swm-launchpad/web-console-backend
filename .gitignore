@@ -37,6 +37,3 @@ tmp/
 # Test coverage
 coverage.out
 coverage.html
-
-# Kubernetes
-ca.crt
