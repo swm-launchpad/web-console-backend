@@ -31,7 +31,7 @@ func TestUserService_CreateUser(t *testing.T) {
 			return user.Username == username &&
 				user.Email == email &&
 				user.PasswordHash == passwordHash &&
-				user.Status == model.UserStatusActive &&
+				user.Status == model.UserStatusPending &&
 				!user.IsDeleted
 		})).Return(nil)
 
@@ -45,7 +45,7 @@ func TestUserService_CreateUser(t *testing.T) {
 		assert.Equal(t, email, user.Email)
 		assert.Equal(t, passwordHash, user.PasswordHash)
 		assert.Equal(t, name, *user.Name)
-		assert.Equal(t, model.UserStatusActive, user.Status)
+		assert.Equal(t, model.UserStatusPending, user.Status)
 		assert.False(t, user.IsDeleted)
 
 		mockRepo.AssertExpectations(t)
