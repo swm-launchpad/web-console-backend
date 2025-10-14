@@ -168,6 +168,31 @@ func TestDeployment_MarkAsTrackingLost(t *testing.T) {
 		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
 		assert.True(t, deployment.IsCompleted())
 	})
+
+	t.Run("successful transition from running", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.MarkAsRunning("pipeline-run-123")
+		summary := "PipelineRun not found"
+
+		err := deployment.MarkAsTrackingLost(summary)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusBackendTrackingLost, deployment.Status())
+		assert.Equal(t, summary, deployment.Summary())
+		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
+		assert.True(t, deployment.IsCompleted())
+	})
+
+	t.Run("cannot transition from success", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.MarkAsRunning("pipeline-run-123")
+		_ = deployment.Complete("success")
+
+		err := deployment.MarkAsTrackingLost("error")
+
+		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentTransition)
+		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
+	})
 }
 
 func TestDeployment_MarkAsRunning(t *testing.T) {

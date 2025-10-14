@@ -149,8 +149,9 @@ func (d *Deployment) MarkAsTrackingFailed(summary string) error {
 
 // MarkAsTrackingLost transitions the deployment to backend_tracking_lost status
 // Called when fatal errors occur (auth failure, PipelineRun not found)
+// Can be called from untracked (before monitoring starts) or running (during monitoring)
 func (d *Deployment) MarkAsTrackingLost(summary string) error {
-	if d.status != DeploymentStatusUntracked {
+	if d.status != DeploymentStatusUntracked && d.status != DeploymentStatusRunning {
 		return projecterrors.ErrInvalidDeploymentTransition
 	}
 

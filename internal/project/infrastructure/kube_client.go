@@ -129,7 +129,7 @@ func (k *kubeClient) GetPipelineRunStatus(ctx context.Context, pipelineRunName s
 	if err != nil {
 		// Map Kubernetes NotFound error to domain error
 		if apierrors.IsNotFound(err) {
-			return nil, projecterrors.ErrDeploymentNotFound
+			return nil, projecterrors.ErrKubePipelineRunNotFound
 		}
 		return nil, projecterrors.ErrKubernetesUnavailable
 	}
@@ -143,7 +143,7 @@ func (k *kubeClient) GetPipelineRunStatus(ctx context.Context, pipelineRunName s
 // It traverses TaskRuns associated with the PipelineRun and collects logs from their Pods.
 func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName string) (string, error) {
 	// First, verify that the PipelineRun exists
-	// This ensures we return ErrDeploymentNotFound for nonexistent PipelineRuns,
+	// This ensures we return ErrKubePipelineRunNotFound for nonexistent PipelineRuns,
 	// distinguishing "not found" from "no logs available yet"
 	_, err := k.dynamicClient.
 		Resource(k.pipelineRunGVR).
@@ -153,7 +153,7 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 	if err != nil {
 		// Map Kubernetes NotFound error to domain error
 		if apierrors.IsNotFound(err) {
-			return "", projecterrors.ErrDeploymentNotFound
+			return "", projecterrors.ErrKubePipelineRunNotFound
 		}
 		return "", projecterrors.ErrKubernetesUnavailable
 	}

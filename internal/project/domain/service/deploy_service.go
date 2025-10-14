@@ -327,6 +327,7 @@ func (s *deployService) convertVolumesToDTO(volumes []*volumemodel.Volume) []dto
 
 // handleDeployFailure handles deployment failure by resetting project status and marking deployment as failed.
 // This operation is performed atomically within a transaction to ensure data consistency.
+// Uses a fresh context with timeout to ensure cleanup succeeds even if the caller's context is cancelled.
 func (s *deployService) handleDeployFailure(
 	ctx context.Context,
 	projectID uint,
@@ -334,8 +335,13 @@ func (s *deployService) handleDeployFailure(
 	status deployment.DeploymentStatus,
 	reason string,
 ) {
+	// Create a fresh context with timeout for cleanup operations
+	// This ensures cleanup succeeds even if the caller's context is cancelled/expired
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	// Perform all state changes atomically within a transaction
-	err := s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+	err := s.txManager.RunInTx(cleanupCtx, func(txCtx context.Context) error {
 		// Mark deployment as failed
 		d, err := s.deploymentRepo.FindByID(txCtx, deploymentID)
 		if err != nil {
