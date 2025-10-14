@@ -9,11 +9,16 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	containerApp "github.com/swm-launchpad/web-console-backend/internal/container/application"
+	containerService "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
+	containerInfra "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	projectApp "github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
@@ -42,20 +47,24 @@ func SetupTestServer(t *testing.T) *TestServer {
 
 	// 의존성 초기화
 	userRepo := infrastructure.NewUserRepository(testDB.DB)
+	tokenRepo := infrastructure.NewTokenRepository(testDB.DB)
 	jwtUtil := jwt.NewJWTUtil("test-secret")
 	passwordUtil := password.NewPasswordUtil()
 	txManager := db.NewTxManager(testDB.DB)
 
+	// Email Service 초기화 (테스트용 Mock 사용)
+	mockEmailService := new(email.MockService)
+	// Mock email service to always succeed
+	mockEmailService.On("SendVerificationEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockEmailService.On("SendPasswordResetEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	// User Service 초기화
 	userService := service.NewUserService(userRepo)
 	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
-
-	// Mock email and token services
-	mockEmailService := &email.MockService{}
-	mockTokenService := &service.MockTokenService{}
+	tokenService := service.NewTokenService(tokenRepo)
 
 	// User UseCase 초기화
-	registerUseCase := application.NewRegisterUserUseCase(authService, mockTokenService, mockEmailService, txManager)
+	registerUseCase := application.NewRegisterUserUseCase(authService, tokenService, mockEmailService, txManager)
 	loginUseCase := application.NewLoginUserUseCase(authService)
 	getUserUseCase := application.NewGetUserUseCase(userService)
 	updateUserUseCase := application.NewUpdateUserUseCase(userService)
@@ -79,6 +88,35 @@ func SetupTestServer(t *testing.T) *TestServer {
 	getVolumesUseCase := projectApp.NewGetVolumesUseCase(volumeSvc)
 	removeVolumeUseCase := projectApp.NewRemoveVolumeUseCase(volumeSvc, txManager)
 
+	// Container dependencies
+	containerRepo := containerInfra.NewContainerRepository(testDB.DB)
+	templateRepo := containerInfra.NewTemplateRepository(testDB.DB)
+	containerSlugService := containerService.NewSlugService(containerRepo)
+	containerSvc := containerService.NewContainerService(containerRepo, containerSlugService)
+	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository)
+	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository)
+
+	// Container UseCases
+	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, txManager)
+	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, containerPermissionSvc)
+	listContainersUseCase := containerApp.NewListContainersUseCase(containerRepo, containerPermissionSvc)
+	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, txManager)
+	deleteContainerUseCase := containerApp.NewDeleteContainerUseCase(containerRepo, containerPermissionSvc, txManager)
+	addEnvVarUseCase := containerApp.NewAddEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
+	updateEnvVarUseCase := containerApp.NewUpdateEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
+	deleteEnvVarUseCase := containerApp.NewDeleteEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
+	addNetworkUseCase := containerApp.NewAddNetworkUseCase(containerRepo, containerPermissionSvc, txManager)
+	deleteNetworkUseCase := containerApp.NewDeleteNetworkUseCase(containerRepo, containerPermissionSvc, txManager)
+	addSecretUseCase := containerApp.NewAddSecretUseCase(containerRepo, containerPermissionSvc, txManager)
+	updateSecretUseCase := containerApp.NewUpdateSecretUseCase(containerRepo, containerPermissionSvc, txManager)
+	deleteSecretUseCase := containerApp.NewDeleteSecretUseCase(containerRepo, containerPermissionSvc, txManager)
+	addMountUseCase := containerApp.NewAddMountUseCase(containerRepo, containerPermissionSvc, txManager)
+	deleteMountUseCase := containerApp.NewDeleteMountUseCase(containerRepo, containerPermissionSvc, txManager)
+
+	// Template UseCases
+	getTemplatesUseCase := containerApp.NewGetTemplatesUseCase(templateRepo)
+	getTemplateUseCase := containerApp.NewGetTemplateUseCase(templateRepo)
+
 	// Handler 초기화
 	authHandler := userhttp.NewAuthHandler(registerUseCase, loginUseCase)
 	userHandler := userhttp.NewUserHandler(getUserUseCase, updateUserUseCase, changePasswordUseCase)
@@ -96,6 +134,27 @@ func SetupTestServer(t *testing.T) *TestServer {
 		getVolumesUseCase,
 		removeVolumeUseCase,
 		permissionSvc,
+	)
+	containerHandler := containerHTTP.NewContainerHandler(
+		createContainerUseCase,
+		getContainerUseCase,
+		updateContainerUseCase,
+		deleteContainerUseCase,
+		listContainersUseCase,
+		addEnvVarUseCase,
+		updateEnvVarUseCase,
+		deleteEnvVarUseCase,
+		addNetworkUseCase,
+		deleteNetworkUseCase,
+		addSecretUseCase,
+		updateSecretUseCase,
+		deleteSecretUseCase,
+		addMountUseCase,
+		deleteMountUseCase,
+	)
+	templateHandler := containerHTTP.NewTemplateHandler(
+		getTemplatesUseCase,
+		getTemplateUseCase,
 	)
 
 	// Middleware
@@ -141,6 +200,54 @@ func SetupTestServer(t *testing.T) *TestServer {
 		volumes.POST("", volumeHandler.AddVolume)
 		volumes.GET("", volumeHandler.GetVolumes)
 		volumes.DELETE("/:id", volumeHandler.RemoveVolume)
+	}
+
+	// Container routes (protected)
+	// Note: We support both nested and top-level container routes
+	projects.POST("/:id/containers", containerHandler.CreateContainer)
+
+	containers := v1.Group("/containers")
+	containers.Use(authMiddleware.RequireAuth())
+	{
+		containers.GET("", containerHandler.ListContainers)
+		containers.GET("/:id", containerHandler.GetContainer)
+		containers.PUT("/:id", containerHandler.UpdateContainer)
+		containers.DELETE("/:id", containerHandler.DeleteContainer)
+
+		// Git settings (uses UpdateContainer handler)
+		containers.PUT("/:id/git", containerHandler.UpdateContainer)
+
+		// Resource limits (uses UpdateContainer handler)
+		containers.PUT("/:id/resources", containerHandler.UpdateContainer)
+
+		// Environment variables
+		containers.GET("/:id/env-vars", containerHandler.ListEnvVars)
+		containers.POST("/:id/env-vars", containerHandler.AddEnvVar)
+		containers.PUT("/:id/env-vars/:key", containerHandler.UpdateEnvVar)
+		containers.DELETE("/:id/env-vars/:key", containerHandler.DeleteEnvVar)
+
+		// Networks
+		containers.GET("/:id/networks", containerHandler.ListNetworks)
+		containers.POST("/:id/networks", containerHandler.AddNetwork)
+		containers.DELETE("/:id/networks/:port", containerHandler.DeleteNetwork)
+
+		// Secrets
+		containers.GET("/:id/secrets", containerHandler.ListSecrets)
+		containers.POST("/:id/secrets", containerHandler.AddSecret)
+		containers.PUT("/:id/secrets/:key", containerHandler.UpdateSecret)
+		containers.DELETE("/:id/secrets/:key", containerHandler.DeleteSecret)
+
+		// Mounts
+		containers.POST("/:id/mounts", containerHandler.AddMount)
+		containers.DELETE("/:id/mounts/:volume_id", containerHandler.DeleteMount)
+	}
+
+	// Template routes (protected)
+	templates := v1.Group("/templates")
+	templates.Use(authMiddleware.RequireAuth())
+	{
+		templates.GET("", templateHandler.GetTemplates)
+		templates.GET("/:id", templateHandler.GetTemplate)
 	}
 
 	return &TestServer{
@@ -237,6 +344,13 @@ func (ts *TestServer) RegisterUser(t *testing.T, username, password, email strin
 	data := response["data"].(map[string]interface{})
 	userID := uint(data["user_id"].(float64))
 	token := data["token"].(string)
+
+	// Activate user for testing (bypass email verification)
+	// In production, users would verify email, but for E2E tests we activate directly
+	_, err := ts.DB.DB.Exec("UPDATE USERS SET status = 'active' WHERE user_id = ?", userID)
+	if err != nil {
+		t.Fatalf("Failed to activate user: %v", err)
+	}
 
 	return userID, token
 }
