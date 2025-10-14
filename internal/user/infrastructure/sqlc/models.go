@@ -379,7 +379,6 @@ type Container struct {
 	TemplateID             sql.NullInt32   `json:"template_id"`
 	Name                   string          `json:"name"`
 	Slug                   string          `json:"slug"`
-	Fqdn                   sql.NullString  `json:"fqdn"`
 	StableWindow           sql.NullInt32   `json:"stable_window"`
 	TemplateConfig         json.RawMessage `json:"template_config"`
 	GitRepositoryUrl       sql.NullString  `json:"git_repository_url"`
@@ -441,6 +440,7 @@ type Network struct {
 	Type         NetworksType   `json:"type"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    sql.NullTime   `json:"updated_at"`
+	Fqdn         sql.NullString `json:"fqdn"`
 }
 
 type Project struct {
