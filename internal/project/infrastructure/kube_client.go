@@ -228,6 +228,12 @@ func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*d
 			ProjectID: projectID,
 		}
 
+		// Extract EventID from labels
+		labels := pr.GetLabels()
+		if eventID, ok := labels["tekton.dev/triggers-eventid"]; ok {
+			info.EventID = eventID
+		}
+
 		// Extract status
 		status := extractPipelineRunStatus(&pr)
 		info.Status = status.Status

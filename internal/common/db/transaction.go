@@ -77,3 +77,10 @@ func GetTx(ctx context.Context) (*sql.Tx, bool) {
 	tx, ok := ctx.Value(txContextKey{}).(*sql.Tx)
 	return tx, ok
 }
+
+// WithTx attaches a transaction to the context.
+// This allows manually created transactions to be used with repositories
+// that expect transactions in the context.
+func WithTx(ctx context.Context, tx *sql.Tx) context.Context {
+	return context.WithValue(ctx, txContextKey{}, tx)
+}

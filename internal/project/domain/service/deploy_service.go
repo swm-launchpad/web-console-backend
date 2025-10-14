@@ -4,8 +4,19 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
+	"time"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
+	projectmodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
+	volumemodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
 )
 
 // DeployService defines the interface for deploying projects.
@@ -94,4 +105,440 @@ type DeployService interface {
 	//   }
 	//   log.Printf("Refreshed status: %s", deployment.Status())
 	RefreshDeploymentStatus(ctx context.Context, deploymentID uint64) (*deployment.Deployment, error)
+}
+
+// deployService implements the DeployService interface
+type deployService struct {
+	dbConn             *sql.DB
+	projectRepo        repository.ProjectRepository
+	deploymentRepo     repository.DeploymentRepository
+	volumeRepo         repository.VolumeRepository
+	containerClient    infrastructure.ContainerClient
+	tektonClient       infrastructure.TektonClient
+	kubeClient         infrastructure.KubeClient
+	deployNamespace    string
+	projectServiceName string
+}
+
+// NewDeployService creates a new instance of deployService
+func NewDeployService(
+	dbConn *sql.DB,
+	projectRepo repository.ProjectRepository,
+	deploymentRepo repository.DeploymentRepository,
+	volumeRepo repository.VolumeRepository,
+	containerClient infrastructure.ContainerClient,
+	tektonClient infrastructure.TektonClient,
+	kubeClient infrastructure.KubeClient,
+	deployNamespace string,
+	projectServiceName string,
+) DeployService {
+	return &deployService{
+		dbConn:             dbConn,
+		projectRepo:        projectRepo,
+		deploymentRepo:     deploymentRepo,
+		volumeRepo:         volumeRepo,
+		containerClient:    containerClient,
+		tektonClient:       tektonClient,
+		kubeClient:         kubeClient,
+		deployNamespace:    deployNamespace,
+		projectServiceName: projectServiceName,
+	}
+}
+
+// DeployProject initiates a deployment for the specified project
+func (s *deployService) DeployProject(ctx context.Context, projectID uint, userID uint) (*deployment.Deployment, error) {
+	// Step 1: Start transaction and atomically change project status + create deployment
+	tx, err := s.dbConn.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	txCtx := db.WithTx(ctx, tx)
+
+	// Load project with FOR UPDATE lock
+	proj, err := s.projectRepo.FindByIDForUpdate(txCtx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if project is already deploying
+	if proj.OperationStatus() != value.ProjectOperationStatusNothing {
+		return nil, projecterrors.ErrProjectAlreadyDeploying
+	}
+
+	// Change project status to deploying
+	if err := proj.StartDeploying(); err != nil {
+		return nil, err
+	}
+
+	if err := s.projectRepo.Save(txCtx, proj); err != nil {
+		return nil, err
+	}
+
+	// Create deployment record with status 'untracked'
+	d := deployment.NewDeployment(projectID)
+
+	if err := s.deploymentRepo.Create(txCtx, d); err != nil {
+		return nil, err
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	// From now on, any error should rollback project status and mark deployment as failed
+
+	// Step 2: Gather container configuration
+	containerConfig, err := s.containerClient.GetContainerConfig(ctx, projectID)
+	if err != nil {
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID(), deployment.DeploymentStatusBackendTriggerFailed,
+			fmt.Sprintf("Failed to get container config: %v", err))
+		return nil, projecterrors.ErrContainerConfigNotFound
+	}
+
+	// Step 3: Gather volume information
+	volumes, err := s.volumeRepo.FindByProjectID(ctx, projectID)
+	if err != nil {
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID(), deployment.DeploymentStatusBackendTriggerFailed,
+			fmt.Sprintf("Failed to get volumes: %v", err))
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	// Step 4: Build Tekton deployment request
+	tektonRequest, err := s.buildTektonRequest(proj, containerConfig, volumes)
+	if err != nil {
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID(), deployment.DeploymentStatusBackendTriggerFailed,
+			fmt.Sprintf("Failed to build Tekton request: %v", err))
+		return nil, err
+	}
+
+	// Step 5: Trigger deployment via Tekton API
+	tektonResponse, err := s.tektonClient.TriggerDeploy(ctx, tektonRequest)
+	if err != nil {
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID(), deployment.DeploymentStatusBackendTriggerFailed,
+			fmt.Sprintf("Failed to trigger Tekton deployment: %v", err))
+		return nil, projecterrors.ErrTektonDeploymentFailed
+	}
+
+	// Step 6: Update deployment with Tekton event ID
+	if err := d.MarkAsTracking(tektonResponse.EventID); err != nil {
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID(), deployment.DeploymentStatusBackendTriggerFailed,
+			fmt.Sprintf("Failed to mark deployment as tracking: %v", err))
+		return nil, err
+	}
+
+	if err := s.deploymentRepo.Save(ctx, d); err != nil {
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID(), deployment.DeploymentStatusBackendTriggerFailed,
+			fmt.Sprintf("Failed to save deployment: %v", err))
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	// Step 7: Start background monitoring in goroutine
+	go s.monitorDeployment(context.Background(), projectID, d.DeploymentID(), tektonResponse.EventID)
+
+	// Return the deployment record
+	return d, nil
+}
+
+// RefreshDeploymentStatus queries Kubernetes for the latest status and updates the database
+func (s *deployService) RefreshDeploymentStatus(ctx context.Context, deploymentID uint64) (*deployment.Deployment, error) {
+	// Load deployment
+	d, err := s.deploymentRepo.FindByID(ctx, uint(deploymentID))
+	if err != nil {
+		return nil, err
+	}
+
+	// If deployment is already completed, no need to refresh
+	if d.IsCompleted() {
+		return d, nil
+	}
+
+	// If no pipeline run name yet, cannot refresh
+	if d.TektonPipelineRunName() == "" {
+		return nil, fmt.Errorf("deployment has no pipeline run name yet, cannot refresh")
+	}
+
+	// Query Kubernetes for current status
+	status, err := s.kubeClient.GetPipelineRunStatus(ctx, d.TektonPipelineRunName())
+	if err != nil {
+		// Handle fatal errors
+		if projecterrors.IsFatalKubeError(err) {
+			// Mark as tracking lost
+			_ = d.MarkAsTrackingLost(fmt.Sprintf("Kubernetes error during refresh: %v", err))
+			_ = s.deploymentRepo.Save(ctx, d)
+
+			// Reset project status
+			proj, _ := s.projectRepo.FindByID(ctx, uint(d.ProjectID()))
+			if proj != nil {
+				_ = proj.CompleteOperation()
+				_ = s.projectRepo.Save(ctx, proj)
+			}
+		}
+		return nil, err
+	}
+
+	// Update deployment status based on PipelineRun status
+	if err := s.updateDeploymentFromKubeStatus(ctx, d, status); err != nil {
+		return nil, err
+	}
+
+	return d, nil
+}
+
+// buildTektonRequest constructs the Tekton deployment request from project data
+func (s *deployService) buildTektonRequest(
+	proj *projectmodel.Project,
+	containerConfig *dto.ContainerDeploymentConfig,
+	volumes []*volumemodel.Volume,
+) (*dto.TektonDeployRequest, error) {
+	// Convert project ID to string for Tekton API
+	projectIDStr := fmt.Sprintf("%d", proj.ProjectID())
+
+	// Merge container config volumes with dynamically created PVC volumes
+	allVolumes := make([]dto.VolumeInfo, 0)
+	allVolumes = append(allVolumes, containerConfig.Volumes...)
+	allVolumes = append(allVolumes, s.convertVolumesToDTO(volumes)...)
+
+	// Build deployment config
+	deploymentConfig := dto.DeploymentConfig{
+		ProjectID:    projectIDStr,
+		ServiceName:  s.projectServiceName,
+		Namespace:    s.deployNamespace,
+		StableWindow: 180, // constant: 180 seconds
+		ConfigMaps:   containerConfig.ConfigMaps,
+		Volumes:      allVolumes,
+		Containers:   containerConfig.Containers,
+	}
+
+	return &dto.TektonDeployRequest{
+		DeploymentConfigJSON: deploymentConfig,
+		DryRun:               "false",
+	}, nil
+}
+
+// convertVolumesToDTO converts domain volumes to DTO format
+func (s *deployService) convertVolumesToDTO(volumes []*volumemodel.Volume) []dto.VolumeInfo {
+	result := make([]dto.VolumeInfo, 0, len(volumes))
+	for _, v := range volumes {
+		volumeType := "pvc"
+		// Convert capacity from Mi to string format (e.g., "1024Mi")
+		capacityStr := fmt.Sprintf("%dMi", v.Capacity())
+		result = append(result, dto.VolumeInfo{
+			Name:     v.Name(),
+			Type:     &volumeType,
+			Capacity: &capacityStr,
+		})
+	}
+	return result
+}
+
+// handleDeployFailure handles deployment failure by resetting project status and marking deployment as failed
+func (s *deployService) handleDeployFailure(
+	ctx context.Context,
+	projectID uint,
+	deploymentID uint,
+	status deployment.DeploymentStatus,
+	reason string,
+) {
+	// Mark deployment as failed
+	d, err := s.deploymentRepo.FindByID(ctx, deploymentID)
+	if err != nil {
+		return
+	}
+
+	switch status {
+	case deployment.DeploymentStatusBackendTriggerFailed:
+		_ = d.MarkAsTriggerFailed(reason)
+	case deployment.DeploymentStatusBackendTrackingFailed:
+		_ = d.MarkAsTrackingFailed(reason)
+	case deployment.DeploymentStatusBackendTrackingLost:
+		_ = d.MarkAsTrackingLost(reason)
+	}
+
+	_ = s.deploymentRepo.Save(ctx, d)
+
+	// Reset project operation status to 'nothing'
+	proj, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		return
+	}
+
+	_ = proj.CompleteOperation()
+	_ = s.projectRepo.Save(ctx, proj)
+}
+
+// updateDeploymentFromKubeStatus updates deployment based on Kubernetes PipelineRun status
+func (s *deployService) updateDeploymentFromKubeStatus(
+	ctx context.Context,
+	d *deployment.Deployment,
+	status *dto.PipelineRunStatus,
+) error {
+	switch status.Status {
+	case "Running", "Pending":
+		// Update to running status
+		if d.Status() != deployment.DeploymentStatusRunning {
+			if d.TektonPipelineRunName() == "" && status.Name != "" {
+				if err := d.MarkAsRunning(status.Name); err != nil {
+					return err
+				}
+			}
+		}
+
+	case "Succeeded":
+		// Mark as success
+		if !d.IsCompleted() {
+			if err := d.Complete(status.Message); err != nil {
+				return err
+			}
+		}
+
+		// Reset project status
+		proj, err := s.projectRepo.FindByID(ctx, uint(d.ProjectID()))
+		if err == nil && proj != nil {
+			_ = proj.CompleteOperation()
+			_ = s.projectRepo.Save(ctx, proj)
+		}
+
+	case "Failed":
+		// Mark as failed
+		if !d.IsCompleted() {
+			if err := d.Fail(status.Message); err != nil {
+				return err
+			}
+		}
+
+		// Reset project status
+		proj, err := s.projectRepo.FindByID(ctx, uint(d.ProjectID()))
+		if err == nil && proj != nil {
+			_ = proj.CompleteOperation()
+			_ = s.projectRepo.Save(ctx, proj)
+		}
+	}
+
+	return s.deploymentRepo.Save(ctx, d)
+}
+
+// monitorDeployment monitors a deployment in the background
+func (s *deployService) monitorDeployment(ctx context.Context, projectID uint, deploymentID uint, eventID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("PANIC in monitorDeployment: %v\n", r)
+		}
+	}()
+
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	var pipelineRunName string
+	failureCount := 0
+	maxFailures := 30 // 5 minutes (30 * 10 seconds)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// If we don't have pipeline run name yet, try to find it
+			if pipelineRunName == "" {
+				runs, err := s.kubeClient.ListPipelineRuns(ctx, projectID)
+				if err != nil {
+					failureCount++
+					fmt.Printf("WARNING: Failed to list PipelineRuns (attempt %d/%d): %v\n", failureCount, maxFailures, err)
+
+					if failureCount >= maxFailures {
+						fmt.Printf("CRITICAL: Failed to find PipelineRun after 5 minutes for deployment %d. Manual verification required.\n", deploymentID)
+						s.handleDeployFailure(ctx, projectID, deploymentID, deployment.DeploymentStatusBackendTrackingFailed,
+							fmt.Sprintf("Failed to find PipelineRun after 5 minutes: %v", err))
+						return
+					}
+					continue
+				}
+
+				// Find the pipeline run with matching event ID
+				found := false
+				for _, run := range runs {
+					if run.EventID == eventID {
+						pipelineRunName = run.Name
+						found = true
+						break
+					}
+				}
+
+				if !found {
+					failureCount++
+					fmt.Printf("WARNING: PipelineRun not found for event %s (attempt %d/%d)\n", eventID, failureCount, maxFailures)
+
+					if failureCount >= maxFailures {
+						fmt.Printf("CRITICAL: PipelineRun not found after 5 minutes for deployment %d. Manual verification required.\n", deploymentID)
+						s.handleDeployFailure(ctx, projectID, deploymentID, deployment.DeploymentStatusBackendTrackingFailed,
+							fmt.Sprintf("PipelineRun not found after 5 minutes for event %s", eventID))
+						return
+					}
+					continue
+				}
+
+				// Found pipeline run, update deployment
+				d, err := s.deploymentRepo.FindByID(ctx, deploymentID)
+				if err != nil {
+					fmt.Printf("ERROR: Failed to load deployment %d: %v\n", deploymentID, err)
+					return
+				}
+
+				if err := d.MarkAsRunning(pipelineRunName); err != nil {
+					fmt.Printf("ERROR: Failed to mark deployment as running: %v\n", err)
+					return
+				}
+
+				if err := s.deploymentRepo.Save(ctx, d); err != nil {
+					fmt.Printf("ERROR: Failed to save deployment: %v\n", err)
+					return
+				}
+
+				failureCount = 0
+				fmt.Printf("INFO: Found PipelineRun %s for deployment %d\n", pipelineRunName, deploymentID)
+			}
+
+			// Query pipeline run status
+			status, err := s.kubeClient.GetPipelineRunStatus(ctx, pipelineRunName)
+			if err != nil {
+				// Handle fatal errors
+				if projecterrors.IsFatalKubeError(err) {
+					fmt.Printf("CRITICAL: Fatal Kubernetes error for deployment %d: %v\n", deploymentID, err)
+					s.handleDeployFailure(ctx, projectID, deploymentID, deployment.DeploymentStatusBackendTrackingLost,
+						fmt.Sprintf("Fatal Kubernetes error: %v", err))
+					return
+				}
+
+				// Log warning for retriable errors and continue
+				fmt.Printf("WARNING: Failed to get PipelineRun status: %v\n", err)
+				continue
+			}
+
+			// Load deployment
+			d, err := s.deploymentRepo.FindByID(ctx, deploymentID)
+			if err != nil {
+				fmt.Printf("ERROR: Failed to load deployment %d: %v\n", deploymentID, err)
+				return
+			}
+
+			// Warn if overwriting a completed status
+			if d.IsCompleted() && (status.Status == "Succeeded" || status.Status == "Failed") {
+				fmt.Printf("WARNING: Overwriting %s status with %s for deployment %d\n", d.Status(), status.Status, deploymentID)
+			}
+
+			// Update deployment status
+			if err := s.updateDeploymentFromKubeStatus(ctx, d, status); err != nil {
+				fmt.Printf("ERROR: Failed to update deployment status: %v\n", err)
+				continue
+			}
+
+			// If deployment is completed, stop monitoring
+			if d.IsCompleted() {
+				fmt.Printf("INFO: Deployment %d completed with status %s\n", deploymentID, d.Status())
+				return
+			}
+		}
+	}
 }

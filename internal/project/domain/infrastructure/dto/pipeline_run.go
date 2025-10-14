@@ -40,6 +40,10 @@ type PipelineRunInfo struct {
 	// Retrieved from the "project-id" label on the PipelineRun
 	ProjectID uint
 
+	// EventID is the Tekton event ID that triggered this PipelineRun
+	// Retrieved from the "tekton.dev/triggers-eventid" label on the PipelineRun
+	EventID string
+
 	// Status is the overall status of the PipelineRun
 	// Valid values: "Succeeded", "Failed", "Running", "Pending", "Unknown"
 	Status string

@@ -21,6 +21,7 @@ var (
 	ErrCannotDeleteProject        = errors.New("cannot delete project")
 	ErrInvalidStatusTransition    = errors.New("invalid status transition")
 	ErrCannotModifyDeletedProject = errors.New("cannot modify deleted project")
+	ErrProjectAlreadyDeploying    = errors.New("project operation already in progress")
 )
 
 // Permission errors - access control and authorization errors
@@ -95,6 +96,7 @@ var (
 	ErrDatabaseUnavailable        = errors.New("database unavailable")
 	ErrDatabaseOperation          = errors.New("database operation failed")
 	ErrConcurrentModification     = errors.New("concurrent modification detected")
+	ErrContainerConfigNotFound    = errors.New("container configuration not found")
 	ErrKubernetesUnavailable      = errors.New("kubernetes API unavailable")
 	ErrKubeAuthenticationFailed   = errors.New("kubernetes authentication failed")
 	ErrKubeConnectionFailed       = errors.New("kubernetes connection failed")
@@ -135,3 +137,12 @@ var (
 	ErrLockRenewalFailed   = errors.New("failed to renew deployment lock")
 	ErrInvalidLockTTL      = errors.New("invalid lock TTL: must be positive duration")
 )
+
+// IsFatalKubeError returns true if the error is a fatal Kubernetes error that should stop monitoring.
+// Fatal errors include authentication failures and configuration issues that won't be resolved by retrying.
+// Retriable errors like connection failures and timeouts return false.
+func IsFatalKubeError(err error) bool {
+	return errors.Is(err, ErrKubeAuthenticationFailed) ||
+		errors.Is(err, ErrKubePipelineRunNotFound) ||
+		errors.Is(err, ErrKubeUnknownError)
+}
