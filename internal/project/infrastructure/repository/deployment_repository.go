@@ -274,6 +274,8 @@ func deploymentStatusToDB(status deployment.DeploymentStatus) sqlc.DeploymentsSt
 		return sqlc.DeploymentsStatusSuccess
 	case deployment.DeploymentStatusFailed:
 		return sqlc.DeploymentsStatusFailed
+	case deployment.DeploymentStatusCancelled:
+		return sqlc.DeploymentsStatusCancelled
 	default:
 		return sqlc.DeploymentsStatusUntracked
 	}
@@ -296,6 +298,8 @@ func deploymentStatusFromDB(status sqlc.DeploymentsStatus) deployment.Deployment
 		return deployment.DeploymentStatusSuccess
 	case sqlc.DeploymentsStatusFailed:
 		return deployment.DeploymentStatusFailed
+	case sqlc.DeploymentsStatusCancelled:
+		return deployment.DeploymentStatusCancelled
 	default:
 		return deployment.DeploymentStatusUntracked
 	}

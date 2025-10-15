@@ -67,6 +67,7 @@ const (
 	DeploymentsStatusRunning               DeploymentsStatus = "running"
 	DeploymentsStatusSuccess               DeploymentsStatus = "success"
 	DeploymentsStatusFailed                DeploymentsStatus = "failed"
+	DeploymentsStatusCancelled             DeploymentsStatus = "cancelled"
 )
 
 func (e *DeploymentsStatus) Scan(src interface{}) error {
