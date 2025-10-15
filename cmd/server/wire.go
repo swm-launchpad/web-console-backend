@@ -105,8 +105,6 @@ func InitializeApp() (*App, error) {
 		application.NewRegisterUserUseCase,
 		application.NewLoginUserUseCase,
 		application.NewGetUserUseCase,
-		application.NewUpdateUserUseCase,
-		application.NewChangePasswordUseCase,
 		application.NewVerifyEmailUseCase,
 		application.NewResendVerificationEmailUseCase,
 		application.NewRequestPasswordResetUseCase,
