@@ -85,7 +85,7 @@ func (r *Router) Setup() {
 		users.Use(r.authMiddleware.RequireAuth())
 		{
 			users.GET("/me", r.userHandler.GetCurrentUser)
-			users.PUT("/me", r.userHandler.UpdateProfile)
+			users.PUT("/me", r.userHandler.UpdateCurrentUser)
 			users.PUT("/me/password", r.userHandler.ChangePassword)
 			users.GET("/:id", r.userHandler.GetUserByID)
 		}
