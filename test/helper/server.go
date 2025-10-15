@@ -110,7 +110,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	addSecretUseCase := containerApp.NewAddSecretUseCase(containerRepo, containerPermissionSvc, txManager)
 	updateSecretUseCase := containerApp.NewUpdateSecretUseCase(containerRepo, containerPermissionSvc, txManager)
 	deleteSecretUseCase := containerApp.NewDeleteSecretUseCase(containerRepo, containerPermissionSvc, txManager)
-	addMountUseCase := containerApp.NewAddMountUseCase(containerRepo, containerPermissionSvc, txManager)
+	addMountUseCase := containerApp.NewAddMountUseCase(containerRepo, containerPermissionSvc, volumeSvc, txManager)
 	deleteMountUseCase := containerApp.NewDeleteMountUseCase(containerRepo, containerPermissionSvc, txManager)
 
 	// Template UseCases
@@ -119,7 +119,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 
 	// Handler 초기화
 	authHandler := userhttp.NewAuthHandler(registerUseCase, loginUseCase)
-	userHandler := userhttp.NewUserHandler(getUserUseCase, updateUserUseCase, changePasswordUseCase)
+	userHandler := userhttp.NewUserHandler(getUserUseCase)
 	projectHandler := projectHTTP.NewProjectHandler(
 		createProjectUseCase,
 		getProjectUseCase,

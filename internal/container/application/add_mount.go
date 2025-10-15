@@ -26,10 +26,10 @@ type AddMountOutput struct {
 }
 
 type AddMountUseCase struct {
-	containerRepo      repository.ContainerRepository
-	permissionSvc      service.PermissionService
-	projectVolumeSvc   projectService.VolumeService
-	txManager          db.TxManager
+	containerRepo    repository.ContainerRepository
+	permissionSvc    service.PermissionService
+	projectVolumeSvc projectService.VolumeService
+	txManager        db.TxManager
 }
 
 func NewAddMountUseCase(
@@ -70,8 +70,8 @@ func (uc *AddMountUseCase) Execute(ctx context.Context, input AddMountInput) (*A
 
 		// Verify volume belongs to the same project as the container
 		if volume.ProjectID() != container.ProjectID() {
-			return fmt.Errorf("%w: volume %d does not belong to project %d",
-				errors.ErrInvalidInput, input.VolumeID, container.ProjectID())
+			return fmt.Errorf("volume %d does not belong to project %d",
+				input.VolumeID, container.ProjectID())
 		}
 
 		// Add volume mount
