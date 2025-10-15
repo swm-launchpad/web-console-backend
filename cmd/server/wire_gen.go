@@ -12,6 +12,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	application2 "github.com/swm-launchpad/web-console-backend/internal/project/application"
 	service2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
@@ -39,12 +40,21 @@ func InitializeApp() (*App, error) {
 	jwtUtil := provideJWTUtil(configConfig)
 	passwordUtil := password.NewPasswordUtil()
 	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
+	tokenRepository := infrastructure.NewTokenRepository(db)
+	tokenService := service.NewTokenService(tokenRepository)
+	emailService := provideEmailService(configConfig)
 	txManager := provideTxManager(db)
-	registerUserUseCase := application.NewRegisterUserUseCase(authService, txManager)
+	registerUserUseCase := application.NewRegisterUserUseCase(authService, tokenService, emailService, txManager)
 	loginUserUseCase := application.NewLoginUserUseCase(authService)
 	authHandler := handler.NewAuthHandler(registerUserUseCase, loginUserUseCase)
 	getUserUseCase := application.NewGetUserUseCase(userService)
 	userHandler := handler.NewUserHandler(getUserUseCase)
+	verifyEmailUseCase := application.NewVerifyEmailUseCase(tokenService, userService, txManager)
+	resendVerificationEmailUseCase := application.NewResendVerificationEmailUseCase(userService, tokenService, emailService, txManager)
+	verificationHandler := handler.NewVerificationHandler(verifyEmailUseCase, resendVerificationEmailUseCase)
+	requestPasswordResetUseCase := application.NewRequestPasswordResetUseCase(userService, tokenService, emailService, txManager)
+	resetPasswordUseCase := application.NewResetPasswordUseCase(tokenService, authService, userService, txManager)
+	passwordResetHandler := handler.NewPasswordResetHandler(requestPasswordResetUseCase, resetPasswordUseCase)
 	projectRepository := repository.NewProjectRepository(db)
 	slugService := service2.NewSlugService(projectRepository)
 	projectService := service2.NewProjectService(projectRepository, slugService)
@@ -62,7 +72,7 @@ func InitializeApp() (*App, error) {
 	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager)
 	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
-	router := NewRouter(configConfig, db, authHandler, userHandler, projectHandler, volumeHandler, authMiddleware)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, projectHandler, volumeHandler, authMiddleware)
 	app := NewApp(configConfig, db, router)
 	return app, nil
 }
@@ -82,4 +92,16 @@ func provideTxManager(database *sql.DB) db.TxManager {
 // provideJWTUtil creates a JWT utility from config
 func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
 	return jwt.NewJWTUtil(cfg.JWT.Secret)
+}
+
+// provideEmailService creates an email service from config
+func provideEmailService(cfg *config.Config) email.Service {
+	return email.NewService(
+		cfg.Email.Host,
+		cfg.Email.Port,
+		cfg.Email.Username,
+		cfg.Email.Password,
+		cfg.Email.From,
+		cfg.Frontend.URL,
+	)
 }
