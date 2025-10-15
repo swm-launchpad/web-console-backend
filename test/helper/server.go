@@ -58,6 +58,8 @@ func SetupTestServer(t *testing.T) *TestServer {
 	registerUseCase := application.NewRegisterUserUseCase(authService, mockTokenService, mockEmailService, txManager)
 	loginUseCase := application.NewLoginUserUseCase(authService)
 	getUserUseCase := application.NewGetUserUseCase(userService)
+	updateUserUseCase := application.NewUpdateUserUseCase(userService)
+	changePasswordUseCase := application.NewChangePasswordUseCase(userService, authService)
 
 	// Project dependencies
 	projectRepository := projectRepo.NewProjectRepository(testDB.DB)
@@ -79,7 +81,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 
 	// Handler 초기화
 	authHandler := userhttp.NewAuthHandler(registerUseCase, loginUseCase)
-	userHandler := userhttp.NewUserHandler(getUserUseCase)
+	userHandler := userhttp.NewUserHandler(getUserUseCase, updateUserUseCase, changePasswordUseCase)
 	projectHandler := projectHTTP.NewProjectHandler(
 		createProjectUseCase,
 		getProjectUseCase,
