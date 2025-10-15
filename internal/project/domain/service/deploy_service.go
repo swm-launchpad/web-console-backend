@@ -252,13 +252,68 @@ func (s *deployService) RefreshDeploymentStatus(ctx context.Context, deploymentI
 		return d, nil
 	}
 
-	// If no pipeline run name yet, cannot refresh
-	if d.TektonPipelineRunName() == "" {
-		return nil, fmt.Errorf("deployment has no pipeline run name yet, cannot refresh")
+	pipelineRunName := d.TektonPipelineRunName()
+
+	// If no pipeline run name yet, try to find it via label-based lookup
+	// This enables "force refresh" to accelerate tracking
+	if pipelineRunName == "" {
+		// Need TektonEventID to perform lookup
+		if d.TektonEventID() == "" {
+			return nil, fmt.Errorf("deployment has no event ID yet, cannot refresh")
+		}
+
+		// List all pipeline runs for this project to find the matching one
+		runs, err := s.kubeClient.ListPipelineRuns(ctx, uint(d.ProjectID()))
+		if err != nil {
+			return nil, fmt.Errorf("failed to list pipeline runs: %w", err)
+		}
+
+		// Find the pipeline run with matching event ID
+		found := false
+		for _, run := range runs {
+			if run.EventID == d.TektonEventID() {
+				pipelineRunName = run.Name
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			// PipelineRun not created yet by Tekton
+			return nil, fmt.Errorf("pipeline run not found for event %s (may not be created yet)", d.TektonEventID())
+		}
+
+		// Try to update deployment with pipeline run name
+		// NOTE: This might fail if background monitoring already marked it as running (race condition)
+		if err := d.MarkAsRunning(pipelineRunName); err != nil {
+			// Race condition: background monitoring already marked it as running
+			// Reload deployment to get the updated state
+			d, reloadErr := s.deploymentRepo.FindByID(ctx, uint(deploymentID))
+			if reloadErr != nil {
+				return nil, fmt.Errorf("failed to reload deployment after race: %w", reloadErr)
+			}
+			pipelineRunName = d.TektonPipelineRunName()
+
+			// If still no pipeline run name after reload, the original error was real
+			if pipelineRunName == "" {
+				return nil, fmt.Errorf("failed to mark as running: %w", err)
+			}
+			// Successfully resolved race condition, continue with reloaded deployment
+		} else {
+			// Successfully marked as running, save it
+			if err := s.deploymentRepo.Save(ctx, d); err != nil {
+				return nil, fmt.Errorf("failed to save deployment: %w", err)
+			}
+			// Reload to ensure we have fresh state with updated timestamps
+			d, err = s.deploymentRepo.FindByID(ctx, uint(deploymentID))
+			if err != nil {
+				return nil, fmt.Errorf("failed to reload deployment after save: %w", err)
+			}
+		}
 	}
 
 	// Query Kubernetes for current status
-	status, err := s.kubeClient.GetPipelineRunStatus(ctx, d.TektonPipelineRunName())
+	status, err := s.kubeClient.GetPipelineRunStatus(ctx, pipelineRunName)
 	if err != nil {
 		// Handle fatal errors
 		if projecterrors.IsFatalKubeError(err) {
