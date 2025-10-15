@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 
@@ -49,7 +50,11 @@ func (uc *ResendVerificationEmailUseCase) Execute(ctx context.Context, input Res
 		// Find user by email
 		user, err := uc.userService.GetUserByEmail(txCtx, input.Email)
 		if err != nil {
-			return usererrors.ErrUserNotFound
+			// Only hide ErrUserNotFound for security - propagate other errors
+			if errors.Is(err, usererrors.ErrUserNotFound) {
+				return usererrors.ErrUserNotFound
+			}
+			return err
 		}
 
 		// Check if user is already active

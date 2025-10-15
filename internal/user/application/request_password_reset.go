@@ -2,10 +2,12 @@ package application
 
 import (
 	"context"
+	"errors"
 	"log"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
+	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
@@ -47,8 +49,11 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, input Reques
 		// Find user by email
 		user, err := uc.userService.GetUserByEmail(txCtx, input.Email)
 		if err != nil {
-			// Don't reveal if user exists - return success message anyway
-			return nil
+			// Only hide ErrUserNotFound for security - propagate other errors
+			if errors.Is(err, usererrors.ErrUserNotFound) {
+				return nil
+			}
+			return err
 		}
 
 		// Create password reset token
