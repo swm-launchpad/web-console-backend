@@ -14,6 +14,10 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	application3 "github.com/swm-launchpad/web-console-backend/internal/container/application"
+	service3 "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	handler3 "github.com/swm-launchpad/web-console-backend/internal/container/handler"
+	infrastructure2 "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	application2 "github.com/swm-launchpad/web-console-backend/internal/project/application"
 	service2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	handler2 "github.com/swm-launchpad/web-console-backend/internal/project/handler"
@@ -73,8 +77,33 @@ func InitializeApp() (*App, error) {
 	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService)
 	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager)
 	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService)
+	containerRepository := infrastructure2.NewContainerRepository(db)
+	serviceSlugService := service3.NewSlugService(containerRepository)
+	containerService := service3.NewContainerService(containerRepository, serviceSlugService)
+	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository)
+	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository)
+	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, servicePermissionService, resourceValidationService, volumeService, txManager)
+	getContainerUseCase := application3.NewGetContainerUseCase(containerRepository, servicePermissionService)
+	updateContainerUseCase := application3.NewUpdateContainerUseCase(containerRepository, servicePermissionService, resourceValidationService, txManager)
+	deleteContainerUseCase := application3.NewDeleteContainerUseCase(containerRepository, servicePermissionService, txManager)
+	listContainersUseCase := application3.NewListContainersUseCase(containerRepository, servicePermissionService)
+	addEnvVarUseCase := application3.NewAddEnvVarUseCase(containerRepository, servicePermissionService, txManager)
+	updateEnvVarUseCase := application3.NewUpdateEnvVarUseCase(containerRepository, servicePermissionService, txManager)
+	deleteEnvVarUseCase := application3.NewDeleteEnvVarUseCase(containerRepository, servicePermissionService, txManager)
+	addNetworkUseCase := application3.NewAddNetworkUseCase(containerRepository, servicePermissionService, txManager)
+	deleteNetworkUseCase := application3.NewDeleteNetworkUseCase(containerRepository, servicePermissionService, txManager)
+	addSecretUseCase := application3.NewAddSecretUseCase(containerRepository, servicePermissionService, txManager)
+	updateSecretUseCase := application3.NewUpdateSecretUseCase(containerRepository, servicePermissionService, txManager)
+	deleteSecretUseCase := application3.NewDeleteSecretUseCase(containerRepository, servicePermissionService, txManager)
+	addMountUseCase := application3.NewAddMountUseCase(containerRepository, servicePermissionService, volumeService, txManager)
+	deleteMountUseCase := application3.NewDeleteMountUseCase(containerRepository, servicePermissionService, txManager)
+	containerHandler := handler3.NewContainerHandler(createContainerUseCase, getContainerUseCase, updateContainerUseCase, deleteContainerUseCase, listContainersUseCase, addEnvVarUseCase, updateEnvVarUseCase, deleteEnvVarUseCase, addNetworkUseCase, deleteNetworkUseCase, addSecretUseCase, updateSecretUseCase, deleteSecretUseCase, addMountUseCase, deleteMountUseCase)
+	templateRepository := infrastructure2.NewTemplateRepository(db)
+	getTemplatesUseCase := application3.NewGetTemplatesUseCase(templateRepository)
+	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository)
+	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, projectHandler, volumeHandler, authMiddleware)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, projectHandler, volumeHandler, containerHandler, templateHandler, authMiddleware)
 	app := NewApp(configConfig, db, router)
 	return app, nil
 }

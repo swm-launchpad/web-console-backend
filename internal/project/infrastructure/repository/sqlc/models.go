@@ -319,6 +319,48 @@ func (ns NullUsersStatus) Value() (driver.Value, error) {
 	return string(ns.UsersStatus), nil
 }
 
+type VerificationTokensTokenType string
+
+const (
+	VerificationTokensTokenTypeEmailVerification VerificationTokensTokenType = "email_verification"
+	VerificationTokensTokenTypePasswordReset     VerificationTokensTokenType = "password_reset"
+)
+
+func (e *VerificationTokensTokenType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = VerificationTokensTokenType(s)
+	case string:
+		*e = VerificationTokensTokenType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for VerificationTokensTokenType: %T", src)
+	}
+	return nil
+}
+
+type NullVerificationTokensTokenType struct {
+	VerificationTokensTokenType VerificationTokensTokenType `json:"verification_tokens_token_type"`
+	Valid                       bool                        `json:"valid"` // Valid is true if VerificationTokensTokenType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullVerificationTokensTokenType) Scan(value interface{}) error {
+	if value == nil {
+		ns.VerificationTokensTokenType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.VerificationTokensTokenType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullVerificationTokensTokenType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.VerificationTokensTokenType), nil
+}
+
 type BuildHistory struct {
 	BuildHistoryID uint32             `json:"build_history_id"`
 	ContainerID    uint32             `json:"container_id"`
@@ -337,7 +379,6 @@ type Container struct {
 	TemplateID             sql.NullInt32   `json:"template_id"`
 	Name                   string          `json:"name"`
 	Slug                   string          `json:"slug"`
-	Fqdn                   sql.NullString  `json:"fqdn"`
 	StableWindow           sql.NullInt32   `json:"stable_window"`
 	TemplateConfig         json.RawMessage `json:"template_config"`
 	GitRepositoryUrl       sql.NullString  `json:"git_repository_url"`
@@ -399,6 +440,7 @@ type Network struct {
 	Type         NetworksType   `json:"type"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    sql.NullTime   `json:"updated_at"`
+	Fqdn         sql.NullString `json:"fqdn"`
 }
 
 type Project struct {
@@ -430,11 +472,12 @@ type ProjectUser struct {
 }
 
 type Secret struct {
-	SecretID    uint32       `json:"secret_id"`
-	ContainerID uint32       `json:"container_id"`
-	Key         string       `json:"key"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   sql.NullTime `json:"updated_at"`
+	SecretID    uint32         `json:"secret_id"`
+	ContainerID uint32         `json:"container_id"`
+	Key         string         `json:"key"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   sql.NullTime   `json:"updated_at"`
+	Value       sql.NullString `json:"value"`
 }
 
 type Template struct {
@@ -461,6 +504,16 @@ type User struct {
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
 	DeletedAt         sql.NullTime   `json:"deleted_at"`
 	IsDeleted         bool           `json:"is_deleted"`
+}
+
+type VerificationToken struct {
+	TokenID   uint32                      `json:"token_id"`
+	UserID    uint32                      `json:"user_id"`
+	Token     string                      `json:"token"`
+	TokenType VerificationTokensTokenType `json:"token_type"`
+	ExpiresAt time.Time                   `json:"expires_at"`
+	UsedAt    sql.NullTime                `json:"used_at"`
+	CreatedAt time.Time                   `json:"created_at"`
 }
 
 type Volume struct {

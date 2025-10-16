@@ -48,6 +48,10 @@ func TestUserFlow_E2E(t *testing.T) {
 		userID := uint(registerData["user_id"].(float64))
 		registerToken := registerData["token"].(string)
 
+		// Activate user for testing (bypass email verification)
+		_, err = server.DB.DB.Exec("UPDATE USERS SET status = 'active' WHERE user_id = ?", userID)
+		require.NoError(t, err)
+
 		// Step 2: 로그인
 		loginReq := map[string]string{
 			"username": "e2euser",
@@ -111,6 +115,14 @@ func TestUserFlow_E2E(t *testing.T) {
 		w := server.MakeRequest("POST", "/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
+		// Activate user for testing
+		var registerResp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &registerResp)
+		require.NoError(t, err)
+		userID := uint(registerResp["data"].(map[string]interface{})["user_id"].(float64))
+		_, err = server.DB.DB.Exec("UPDATE USERS SET status = 'active' WHERE user_id = ?", userID)
+		require.NoError(t, err)
+
 		// 잘못된 비밀번호로 로그인 시도
 		loginReq := map[string]string{
 			"username": "failuser",
@@ -121,7 +133,7 @@ func TestUserFlow_E2E(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errorResp map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &errorResp)
+		err = json.Unmarshal(w.Body.Bytes(), &errorResp)
 		require.NoError(t, err)
 		assert.False(t, errorResp["success"].(bool))
 		errorData := errorResp["error"].(map[string]interface{})
@@ -285,6 +297,12 @@ func TestUserFlow_E2E(t *testing.T) {
 		// 모든 고루틴 완료 대기
 		for i := 0; i < 5; i++ {
 			<-done
+		}
+
+		// Activate all concurrently registered users
+		for i := 0; i < 5; i++ {
+			_, err := server.DB.DB.Exec("UPDATE USERS SET status = 'active' WHERE username = ?", fmt.Sprintf("concurrent%d", i))
+			require.NoError(t, err)
 		}
 
 		// 등록된 사용자들 확인

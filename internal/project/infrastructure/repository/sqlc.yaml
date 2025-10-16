@@ -5,6 +5,9 @@ sql:
     schema:
       - "../../../../migration/000001_initial_schema.up.sql"
       - "../../../../migration/000002_add_deployment_locks.up.sql"
+      - "../../../../migration/000003_add_verification_tokens.up.sql"
+      - "../../../../migration/000004_move_fqdn_to_networks.up.sql"
+      - "../../../../migration/000005_add_initial_templates.up.sql"
     gen:
       go:
         package: "sqlc"

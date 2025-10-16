@@ -13,6 +13,11 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	containerApp "github.com/swm-launchpad/web-console-backend/internal/container/application"
+	containerService "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
+	containerInfra "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
+	containerSqlc "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure/sqlc"
 	projectApp "github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
@@ -42,13 +47,31 @@ func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
 
 // provideEmailService creates an email service from config
 func provideEmailService(cfg *config.Config) email.Service {
+	// For development, use default values if not configured
+	host := cfg.Email.Host
+	if host == "" {
+		host = "localhost"
+	}
+	port := cfg.Email.Port
+	if port == 0 {
+		port = 587
+	}
+	from := cfg.Email.From
+	if from == "" {
+		from = "noreply@localhost"
+	}
+	frontendURL := cfg.Frontend.URL
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
+
 	return email.NewService(
-		cfg.Email.Host,
-		cfg.Email.Port,
+		host,
+		port,
 		cfg.Email.Username,
 		cfg.Email.Password,
-		cfg.Email.From,
-		cfg.Frontend.URL,
+		from,
+		frontendURL,
 	)
 }
 
@@ -60,12 +83,13 @@ func InitializeApp() (*App, error) {
 		provideTxManager,
 		wire.Bind(new(userssqlc.DBTX), new(*sql.DB)),
 		wire.Bind(new(projectSqlc.DBTX), new(*sql.DB)),
+		wire.Bind(new(containerSqlc.DBTX), new(*sql.DB)),
 
 		// Auth infrastructure
 		provideJWTUtil,
 		password.NewPasswordUtil,
 
-		// Email infrastructure
+		// Email service
 		provideEmailService,
 
 		// User infrastructure
@@ -81,8 +105,6 @@ func InitializeApp() (*App, error) {
 		application.NewRegisterUserUseCase,
 		application.NewLoginUserUseCase,
 		application.NewGetUserUseCase,
-		application.NewUpdateUserUseCase,
-		application.NewChangePasswordUseCase,
 		application.NewVerifyEmailUseCase,
 		application.NewResendVerificationEmailUseCase,
 		application.NewRequestPasswordResetUseCase,
@@ -108,6 +130,35 @@ func InitializeApp() (*App, error) {
 		projectApp.NewGetVolumesUseCase,
 		projectApp.NewRemoveVolumeUseCase,
 
+		// Container infrastructure
+		containerInfra.NewContainerRepository,
+		containerInfra.NewTemplateRepository,
+
+		// Container domain services
+		containerService.NewSlugService,
+		containerService.NewContainerService,
+		containerService.NewPermissionService,
+		containerService.NewResourceValidationService,
+
+		// Container use cases
+		containerApp.NewCreateContainerUseCase,
+		containerApp.NewGetContainerUseCase,
+		containerApp.NewUpdateContainerUseCase,
+		containerApp.NewDeleteContainerUseCase,
+		containerApp.NewListContainersUseCase,
+		containerApp.NewAddEnvVarUseCase,
+		containerApp.NewUpdateEnvVarUseCase,
+		containerApp.NewDeleteEnvVarUseCase,
+		containerApp.NewAddNetworkUseCase,
+		containerApp.NewDeleteNetworkUseCase,
+		containerApp.NewAddSecretUseCase,
+		containerApp.NewUpdateSecretUseCase,
+		containerApp.NewDeleteSecretUseCase,
+		containerApp.NewAddMountUseCase,
+		containerApp.NewDeleteMountUseCase,
+		containerApp.NewGetTemplatesUseCase,
+		containerApp.NewGetTemplateUseCase,
+
 		// HTTP handlers
 		userHTTP.NewAuthHandler,
 		userHTTP.NewUserHandler,
@@ -115,6 +166,8 @@ func InitializeApp() (*App, error) {
 		userHTTP.NewPasswordResetHandler,
 		projectHTTP.NewProjectHandler,
 		projectHTTP.NewVolumeHandler,
+		containerHTTP.NewContainerHandler,
+		containerHTTP.NewTemplateHandler,
 
 		// Middleware
 		middleware.NewAuthMiddleware,

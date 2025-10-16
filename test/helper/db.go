@@ -86,6 +86,9 @@ func (tdb *TestDB) Migrate() error {
 	migrations := []string{
 		"000001_initial_schema.up.sql",
 		"000002_add_deployment_locks.up.sql",
+		"000003_add_verification_tokens.up.sql",
+		"000004_move_fqdn_to_networks.up.sql",
+		"000005_add_initial_templates.up.sql",
 	}
 
 	for _, migration := range migrations {
@@ -117,14 +120,14 @@ func (tdb *TestDB) TruncateAllTables() error {
 		return err
 	}
 
-	// Truncate all tables
+	// Truncate each table
 	for _, table := range tables {
 		if _, err := tdb.DB.Exec(fmt.Sprintf("TRUNCATE TABLE %s", table)); err != nil {
 			return err
 		}
 	}
 
-	// Enable foreign key checks
+	// Re-enable foreign key checks
 	if _, err := tdb.DB.Exec("SET FOREIGN_KEY_CHECKS = 1"); err != nil {
 		return err
 	}
@@ -132,79 +135,43 @@ func (tdb *TestDB) TruncateAllTables() error {
 	return nil
 }
 
-// Cleanup cleans up test database
+// Cleanup drops the test database and closes connection
 func (tdb *TestDB) Cleanup() {
 	if tdb.DB != nil {
-		// Drop database
 		_, _ = tdb.DB.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s", tdb.Name))
 		_ = tdb.DB.Close()
 	}
 }
 
-// BeginTx starts a transaction
-func (tdb *TestDB) BeginTx() (*sql.Tx, error) {
-	return tdb.DB.Begin()
-}
-
-// InsertTestUser inserts a test user
-func (tdb *TestDB) InsertTestUser(username, passwordHash, email string) (uint, error) {
-	query := `
-		INSERT INTO USERS (username, password_hash, email, status, is_deleted, created_at)
-		VALUES (?, ?, ?, 'active', false, NOW())
-	`
-
-	result, err := tdb.DB.Exec(query, username, passwordHash, email)
-	if err != nil {
-		return 0, err
-	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-
-	return uint(id), nil
-}
-
-// GetUserByUsername retrieves user by username
+// GetUserByUsername retrieves a user by username from the database
 func (tdb *TestDB) GetUserByUsername(username string) (map[string]interface{}, error) {
-	query := `
-		SELECT user_id, username, password_hash, email, status, is_deleted, created_at
-		FROM USERS
-		WHERE username = ?
-	`
-
+	query := "SELECT user_id, username, email, password_hash, status, created_at, updated_at FROM USERS WHERE username = ?"
 	row := tdb.DB.QueryRow(query, username)
 
-	var user = make(map[string]interface{})
 	var userID uint
-	var uname, passwordHash, status string
-	var email sql.NullString
-	var isDeleted bool
-	var createdAt time.Time
+	var usernameVal, email, passwordHash, status string
+	var createdAt, updatedAt time.Time
 
-	err := row.Scan(&userID, &uname, &passwordHash, &email, &status, &isDeleted, &createdAt)
+	err := row.Scan(&userID, &usernameVal, &email, &passwordHash, &status, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
 
-	user["user_id"] = userID
-	user["username"] = uname
-	user["password_hash"] = passwordHash
-	if email.Valid {
-		user["email"] = email.String
-	}
-	user["status"] = status
-	user["is_deleted"] = isDeleted
-	user["created_at"] = createdAt
-
-	return user, nil
+	return map[string]interface{}{
+		"user_id":       userID,
+		"username":      usernameVal,
+		"email":         email,
+		"password_hash": passwordHash,
+		"status":        status,
+		"created_at":    createdAt,
+		"updated_at":    updatedAt,
+	}, nil
 }
 
-// getEnv reads environment variable or returns default value
-func getEnv(key, defaultValue string) string {
+// getEnv retrieves environment variable with fallback
+func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
-	return defaultValue
+	return fallback
 }
