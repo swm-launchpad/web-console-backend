@@ -36,6 +36,9 @@ COPY --from=builder /app/main .
 # Copy migration for database setup
 COPY --from=builder /app/migration ./migration
 
+# Copy email templates
+COPY --from=builder /app/templates ./templates
+
 # Change ownership to appuser
 RUN chown -R appuser:appuser /app
 
