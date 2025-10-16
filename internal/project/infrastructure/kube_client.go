@@ -117,9 +117,8 @@ func NewKubeClient() (infrastructure.KubeClient, error) {
 }
 
 // GetPipelineRunStatus retrieves the current status of a PipelineRun.
-// It examines the PipelineRun's status.conditions to determine if it has
-// succeeded, failed, or is still running.
-func (k *kubeClient) GetPipelineRunStatus(ctx context.Context, pipelineRunName string) (*dto.PipelineRunStatus, error) {
+// It examines the PipelineRun's status.conditions to extract raw condition values.
+func (k *kubeClient) GetPipelineRunStatus(ctx context.Context, pipelineRunName string) (*dto.PipelineRun, error) {
 	// Get the PipelineRun resource
 	pipelineRun, err := k.dynamicClient.
 		Resource(k.pipelineRunGVR).
@@ -207,7 +206,7 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 // ListPipelineRuns retrieves all PipelineRuns associated with a project.
 // It filters PipelineRuns by the "project-id" label and sorts them by creation time
 // in descending order (newest first).
-func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*dto.PipelineRunInfo, error) {
+func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*dto.PipelineRun, error) {
 	// List PipelineRuns with project-id label
 	pipelineRuns, err := k.dynamicClient.
 		Resource(k.pipelineRunGVR).
@@ -220,28 +219,22 @@ func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*d
 		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
-	// Convert to PipelineRunInfo
-	result := make([]*dto.PipelineRunInfo, 0, len(pipelineRuns.Items))
+	// Convert to PipelineRun
+	result := make([]*dto.PipelineRun, 0, len(pipelineRuns.Items))
 	for _, pr := range pipelineRuns.Items {
-		info := &dto.PipelineRunInfo{
-			Name:      pr.GetName(),
-			ProjectID: projectID,
-		}
+		// Extract status information using the shared function
+		pipelineRun := extractPipelineRunStatus(&pr)
+
+		// Set ProjectID (common for all results)
+		pipelineRun.ProjectID = projectID
 
 		// Extract EventID from labels
 		labels := pr.GetLabels()
 		if eventID, ok := labels["tekton.dev/triggers-eventid"]; ok {
-			info.EventID = eventID
+			pipelineRun.EventID = eventID
 		}
 
-		// Extract status
-		status := extractPipelineRunStatus(&pr)
-		info.Status = status.Status
-		info.StartTime = status.StartTime
-		info.CompletionTime = status.CompletionTime
-		info.Message = status.Message
-
-		result = append(result, info)
+		result = append(result, pipelineRun)
 	}
 
 	// Sort by creation time (newest first)
@@ -265,10 +258,66 @@ func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*d
 	return result, nil
 }
 
+// FindPipelineRunNameByEventID retrieves the PipelineRun name associated with a Tekton event ID.
+// It searches for PipelineRuns with the "tekton.dev/triggers-eventid" label matching the given EventID.
+func (k *kubeClient) FindPipelineRunNameByEventID(ctx context.Context, eventID string) (string, error) {
+	// List PipelineRuns with tekton.dev/triggers-eventid label
+	pipelineRuns, err := k.dynamicClient.
+		Resource(k.pipelineRunGVR).
+		Namespace(k.namespace).
+		List(ctx, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("tekton.dev/triggers-eventid=%s", eventID),
+		})
+
+	if err != nil {
+		return "", projecterrors.ErrKubernetesUnavailable
+	}
+
+	// Check if any PipelineRuns were found
+	if len(pipelineRuns.Items) == 0 {
+		return "", projecterrors.ErrKubePipelineRunNotFound
+	}
+
+	// If multiple PipelineRuns found, return the most recent one
+	if len(pipelineRuns.Items) > 1 {
+		// Extract status information to get startTime
+		runs := make([]*dto.PipelineRun, 0, len(pipelineRuns.Items))
+		for _, pr := range pipelineRuns.Items {
+			run := extractPipelineRunStatus(&pr)
+			runs = append(runs, run)
+		}
+
+		// Sort by creation time (newest first)
+		sort.Slice(runs, func(i, j int) bool {
+			// Both nil: equal, return false for strict ordering
+			if runs[i].StartTime == nil && runs[j].StartTime == nil {
+				return false
+			}
+			// i is nil: place after j (nil timestamps last)
+			if runs[i].StartTime == nil {
+				return false
+			}
+			// j is nil: place i before j
+			if runs[j].StartTime == nil {
+				return true
+			}
+			// Both have timestamps: newer first
+			return runs[i].StartTime.After(*runs[j].StartTime)
+		})
+
+		// Return the name of the most recent PipelineRun
+		return runs[0].Name, nil
+	}
+
+	// Single PipelineRun found
+	return pipelineRuns.Items[0].GetName(), nil
+}
+
 // extractPipelineRunStatus extracts status information from a PipelineRun unstructured object.
-// It examines the status.conditions field to determine the current state.
-func extractPipelineRunStatus(pr *unstructured.Unstructured) *dto.PipelineRunStatus {
-	status := &dto.PipelineRunStatus{
+// It examines the status.conditions field to extract raw condition values.
+// Prefers type="Succeeded" condition, but falls back to the first condition if not found.
+func extractPipelineRunStatus(pr *unstructured.Unstructured) *dto.PipelineRun {
+	pipelineRun := &dto.PipelineRun{
 		Name:   pr.GetName(),
 		Status: "Unknown",
 		Reason: "Unknown",
@@ -277,7 +326,7 @@ func extractPipelineRunStatus(pr *unstructured.Unstructured) *dto.PipelineRunSta
 	// Extract status field
 	statusField, found, err := unstructured.NestedMap(pr.Object, "status")
 	if !found || err != nil {
-		return status
+		return pipelineRun
 	}
 
 	// Extract startTime
@@ -285,7 +334,7 @@ func extractPipelineRunStatus(pr *unstructured.Unstructured) *dto.PipelineRunSta
 	startTimeStr, found, err := unstructured.NestedString(statusField, "startTime")
 	if found && err == nil {
 		if t := parseTimestamp(startTimeStr); t != nil {
-			status.StartTime = t
+			pipelineRun.StartTime = t
 		}
 	}
 
@@ -293,17 +342,20 @@ func extractPipelineRunStatus(pr *unstructured.Unstructured) *dto.PipelineRunSta
 	completionTimeStr, found, err := unstructured.NestedString(statusField, "completionTime")
 	if found && err == nil {
 		if t := parseTimestamp(completionTimeStr); t != nil {
-			status.CompletionTime = t
+			pipelineRun.CompletionTime = t
 		}
 	}
 
 	// Extract conditions
 	conditions, found, err := unstructured.NestedSlice(statusField, "conditions")
 	if !found || err != nil {
-		return status
+		return pipelineRun
 	}
 
-	// Find the "Succeeded" condition
+	// Option A: Find type="Succeeded" condition first, fallback to first condition
+	var selectedCondition map[string]interface{}
+
+	// Try to find type="Succeeded" condition
 	for _, cond := range conditions {
 		condMap, ok := cond.(map[string]interface{})
 		if !ok {
@@ -311,40 +363,32 @@ func extractPipelineRunStatus(pr *unstructured.Unstructured) *dto.PipelineRunSta
 		}
 
 		condType, _, _ := unstructured.NestedString(condMap, "type")
-		if condType != "Succeeded" {
-			continue
-		}
-
-		// Extract status (True/False/Unknown)
-		condStatus, _, _ := unstructured.NestedString(condMap, "status")
-		reason, _, _ := unstructured.NestedString(condMap, "reason")
-		message, _, _ := unstructured.NestedString(condMap, "message")
-
-		status.Reason = reason
-		status.Message = message
-
-		switch condStatus {
-		case string(corev1.ConditionTrue):
-			status.Status = "Succeeded"
-		case string(corev1.ConditionFalse):
-			// Check reason to distinguish between Failed and Cancelled
-			if strings.Contains(strings.ToLower(reason), "cancel") ||
-				strings.Contains(strings.ToLower(message), "cancel") {
-				status.Status = "Cancelled"
-			} else {
-				status.Status = "Failed"
-			}
-		case string(corev1.ConditionUnknown):
-			// PipelineRun is still running or pending
-			if status.StartTime != nil {
-				status.Status = "Running"
-			} else {
-				status.Status = "Pending"
-			}
+		if condType == "Succeeded" {
+			selectedCondition = condMap
+			break
 		}
 	}
 
-	return status
+	// Fallback to first condition if "Succeeded" not found
+	if selectedCondition == nil && len(conditions) > 0 {
+		if condMap, ok := conditions[0].(map[string]interface{}); ok {
+			selectedCondition = condMap
+		}
+	}
+
+	// Extract raw values from selected condition (no transformation)
+	if selectedCondition != nil {
+		condStatus, _, _ := unstructured.NestedString(selectedCondition, "status")
+		reason, _, _ := unstructured.NestedString(selectedCondition, "reason")
+		message, _, _ := unstructured.NestedString(selectedCondition, "message")
+
+		// Use raw values without transformation
+		pipelineRun.Status = condStatus
+		pipelineRun.Reason = reason
+		pipelineRun.Message = message
+	}
+
+	return pipelineRun
 }
 
 // getTaskNameFromTaskRun extracts the task name from a TaskRun resource.
