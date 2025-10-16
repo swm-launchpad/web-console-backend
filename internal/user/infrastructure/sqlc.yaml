@@ -1,8 +1,11 @@
 version: "2"
 sql:
   - engine: "mysql"
-    queries: "queries"
-    schema: "../../../../migrations/000001_initial_schema.up.sql"
+    queries: "query"
+    schema:
+      - "../../../migration/000001_initial_schema.up.sql"
+      - "../../../migration/000002_add_deployment_locks.up.sql"
+      - "../../../migration/000003_add_verification_tokens.up.sql"
     gen:
       go:
         package: "sqlc"

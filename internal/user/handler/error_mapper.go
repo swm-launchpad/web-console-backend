@@ -39,6 +39,7 @@ var userErrorMap = map[error]response.ErrorMapping{
 	usererrors.ErrValidationFailed: {StatusCode: http.StatusBadRequest, Code: "VALIDATION_FAILED", Message: "Validation failed"},
 	usererrors.ErrInvalidFormat:    {StatusCode: http.StatusBadRequest, Code: "INVALID_FORMAT", Message: "Invalid format"},
 	usererrors.ErrMissingField:     {StatusCode: http.StatusBadRequest, Code: "MISSING_FIELD", Message: "Required field is missing"},
+	usererrors.ErrNoFieldsToUpdate: {StatusCode: http.StatusBadRequest, Code: "NO_FIELDS_TO_UPDATE", Message: "No fields to update"},
 
 	// Duplicate errors
 	usererrors.ErrUsernameExists: {StatusCode: http.StatusConflict, Code: "USERNAME_EXISTS", Message: "Username already exists"},

@@ -75,10 +75,8 @@ func (s *userService) CreateUser(ctx context.Context, username, email string, pa
 	// Set password
 	user.UpdatePassword(passwordHash)
 
-	// Activate user immediately (no email verification for now)
-	if err := user.Activate(); err != nil {
-		return nil, err
-	}
+	// Keep user in pending status - will be activated after email verification
+	// user.Activate() will be called in the VerifyEmailUseCase
 
 	// Save to repository
 	if err := s.userRepo.Create(ctx, user); err != nil {

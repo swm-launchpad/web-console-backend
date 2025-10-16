@@ -12,6 +12,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	projectApp "github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
@@ -49,8 +50,12 @@ func SetupTestServer(t *testing.T) *TestServer {
 	userService := service.NewUserService(userRepo)
 	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
 
+	// Mock email and token services
+	mockEmailService := &email.MockService{}
+	mockTokenService := &service.MockTokenService{}
+
 	// User UseCase 초기화
-	registerUseCase := application.NewRegisterUserUseCase(authService, txManager)
+	registerUseCase := application.NewRegisterUserUseCase(authService, mockTokenService, mockEmailService, txManager)
 	loginUseCase := application.NewLoginUserUseCase(authService)
 	getUserUseCase := application.NewGetUserUseCase(userService)
 

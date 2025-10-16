@@ -11,14 +11,16 @@ import (
 )
 
 type Router struct {
-	engine         *gin.Engine
-	config         *config.Config
-	db             *sql.DB
-	authHandler    *userHTTP.AuthHandler
-	userHandler    *userHTTP.UserHandler
-	projectHandler *projectHTTP.ProjectHandler
-	volumeHandler  *projectHTTP.VolumeHandler
-	authMiddleware *middleware.AuthMiddleware
+	engine               *gin.Engine
+	config               *config.Config
+	db                   *sql.DB
+	authHandler          *userHTTP.AuthHandler
+	userHandler          *userHTTP.UserHandler
+	verificationHandler  *userHTTP.VerificationHandler
+	passwordResetHandler *userHTTP.PasswordResetHandler
+	projectHandler       *projectHTTP.ProjectHandler
+	volumeHandler        *projectHTTP.VolumeHandler
+	authMiddleware       *middleware.AuthMiddleware
 }
 
 func NewRouter(
@@ -26,6 +28,8 @@ func NewRouter(
 	database *sql.DB,
 	authHandler *userHTTP.AuthHandler,
 	userHandler *userHTTP.UserHandler,
+	verificationHandler *userHTTP.VerificationHandler,
+	passwordResetHandler *userHTTP.PasswordResetHandler,
 	projectHandler *projectHTTP.ProjectHandler,
 	volumeHandler *projectHTTP.VolumeHandler,
 	authMiddleware *middleware.AuthMiddleware,
@@ -41,14 +45,16 @@ func NewRouter(
 	r.Use(middleware.CORS(&cfg.CORS))
 
 	return &Router{
-		engine:         r,
-		config:         cfg,
-		db:             database,
-		authHandler:    authHandler,
-		userHandler:    userHandler,
-		projectHandler: projectHandler,
-		volumeHandler:  volumeHandler,
-		authMiddleware: authMiddleware,
+		engine:               r,
+		config:               cfg,
+		db:                   database,
+		authHandler:          authHandler,
+		userHandler:          userHandler,
+		verificationHandler:  verificationHandler,
+		passwordResetHandler: passwordResetHandler,
+		projectHandler:       projectHandler,
+		volumeHandler:        volumeHandler,
+		authMiddleware:       authMiddleware,
 	}
 }
 
@@ -68,6 +74,10 @@ func (r *Router) Setup() {
 		{
 			auth.POST("/register", r.authHandler.Register)
 			auth.POST("/login", r.authHandler.Login)
+			auth.GET("/verify-email", r.verificationHandler.VerifyEmail)
+			auth.POST("/resend-verification", r.verificationHandler.ResendVerificationEmail)
+			auth.POST("/request-password-reset", r.passwordResetHandler.RequestPasswordReset)
+			auth.POST("/reset-password", r.passwordResetHandler.ResetPassword)
 		}
 
 		// User routes (protected)

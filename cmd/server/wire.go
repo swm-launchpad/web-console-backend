@@ -11,6 +11,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	projectApp "github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
@@ -39,6 +40,18 @@ func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
 	return jwt.NewJWTUtil(cfg.JWT.Secret)
 }
 
+// provideEmailService creates an email service from config
+func provideEmailService(cfg *config.Config) email.Service {
+	return email.NewService(
+		cfg.Email.Host,
+		cfg.Email.Port,
+		cfg.Email.Username,
+		cfg.Email.Password,
+		cfg.Email.From,
+		cfg.Frontend.URL,
+	)
+}
+
 func InitializeApp() (*App, error) {
 	wire.Build(
 		// Config
@@ -52,17 +65,26 @@ func InitializeApp() (*App, error) {
 		provideJWTUtil,
 		password.NewPasswordUtil,
 
+		// Email infrastructure
+		provideEmailService,
+
 		// User infrastructure
 		infrastructure.NewUserRepository,
+		infrastructure.NewTokenRepository,
 
 		// User domain services
 		service.NewUserService,
 		service.NewAuthService,
+		service.NewTokenService,
 
 		// User use cases
 		application.NewRegisterUserUseCase,
 		application.NewLoginUserUseCase,
 		application.NewGetUserUseCase,
+		application.NewVerifyEmailUseCase,
+		application.NewResendVerificationEmailUseCase,
+		application.NewRequestPasswordResetUseCase,
+		application.NewResetPasswordUseCase,
 
 		// Project infrastructure
 		projectRepo.NewProjectRepository,
@@ -87,6 +109,8 @@ func InitializeApp() (*App, error) {
 		// HTTP handlers
 		userHTTP.NewAuthHandler,
 		userHTTP.NewUserHandler,
+		userHTTP.NewVerificationHandler,
+		userHTTP.NewPasswordResetHandler,
 		projectHTTP.NewProjectHandler,
 		projectHTTP.NewVolumeHandler,
 

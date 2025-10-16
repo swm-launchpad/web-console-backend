@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
+	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model/token"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 )
 
@@ -19,7 +22,9 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 유효한 입력으로 사용자 등록", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		uc := NewRegisterUserUseCase(mockAuthService, txManager)
+		mockTokenService := new(service.MockTokenService)
+		mockEmailService := new(email.MockService)
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -34,13 +39,29 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Username: input.Username,
 			Email:    input.Email,
 			Name:     &name,
-			Status:   model.UserStatusActive,
+			Status:   model.UserStatusPending, // Changed to pending
 		}
 		expectedToken := "jwt_token"
+		verificationToken := &token.VerificationToken{
+			TokenID:   1,
+			UserID:    1,
+			Token:     "verification_token_123",
+			TokenType: token.TokenTypeEmailVerification,
+			ExpiresAt: time.Now().Add(24 * time.Hour),
+			CreatedAt: time.Now(),
+		}
 
 		mockAuthService.
 			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, &name).
 			Return(expectedUser, expectedToken, nil)
+
+		mockTokenService.
+			On("CreateEmailVerificationToken", mock.Anything, uint(1)).
+			Return(verificationToken, nil)
+
+		mockEmailService.
+			On("SendVerificationEmail", input.Email, input.Username, verificationToken.Token).
+			Return(nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -50,11 +71,15 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, expectedToken, output.Token)
 
 		mockAuthService.AssertExpectations(t)
+		mockTokenService.AssertExpectations(t)
+		mockEmailService.AssertExpectations(t)
 	})
 
 	t.Run("성공: name 없이 사용자 등록", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		uc := NewRegisterUserUseCase(mockAuthService, txManager)
+		mockTokenService := new(service.MockTokenService)
+		mockEmailService := new(email.MockService)
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -68,13 +93,29 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Username: input.Username,
 			Email:    input.Email,
 			Name:     nil,
-			Status:   model.UserStatusActive,
+			Status:   model.UserStatusPending,
 		}
 		expectedToken := "jwt_token"
+		verificationToken := &token.VerificationToken{
+			TokenID:   2,
+			UserID:    2,
+			Token:     "verification_token_456",
+			TokenType: token.TokenTypeEmailVerification,
+			ExpiresAt: time.Now().Add(24 * time.Hour),
+			CreatedAt: time.Now(),
+		}
 
 		mockAuthService.
 			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
 			Return(expectedUser, expectedToken, nil)
+
+		mockTokenService.
+			On("CreateEmailVerificationToken", mock.Anything, uint(2)).
+			Return(verificationToken, nil)
+
+		mockEmailService.
+			On("SendVerificationEmail", input.Email, input.Username, verificationToken.Token).
+			Return(nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -84,11 +125,15 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, expectedToken, output.Token)
 
 		mockAuthService.AssertExpectations(t)
+		mockTokenService.AssertExpectations(t)
+		mockEmailService.AssertExpectations(t)
 	})
 
 	t.Run("실패: 유효성 검증 실패", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		uc := NewRegisterUserUseCase(mockAuthService, txManager)
+		mockTokenService := new(service.MockTokenService)
+		mockEmailService := new(email.MockService)
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
 
 		input := RegisterUserInput{
 			Username: "",
@@ -112,7 +157,9 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: username 이미 존재", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		uc := NewRegisterUserUseCase(mockAuthService, txManager)
+		mockTokenService := new(service.MockTokenService)
+		mockEmailService := new(email.MockService)
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
 
 		input := RegisterUserInput{
 			Username: "existinguser",
@@ -136,7 +183,9 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: email 이미 존재", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		uc := NewRegisterUserUseCase(mockAuthService, txManager)
+		mockTokenService := new(service.MockTokenService)
+		mockEmailService := new(email.MockService)
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -160,7 +209,9 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 약한 비밀번호", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		uc := NewRegisterUserUseCase(mockAuthService, txManager)
+		mockTokenService := new(service.MockTokenService)
+		mockEmailService := new(email.MockService)
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -184,7 +235,9 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 잘못된 이메일 형식", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		uc := NewRegisterUserUseCase(mockAuthService, txManager)
+		mockTokenService := new(service.MockTokenService)
+		mockEmailService := new(email.MockService)
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -208,7 +261,9 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 토큰 생성 실패", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		uc := NewRegisterUserUseCase(mockAuthService, txManager)
+		mockTokenService := new(service.MockTokenService)
+		mockEmailService := new(email.MockService)
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
 
 		input := RegisterUserInput{
 			Username: "testuser",

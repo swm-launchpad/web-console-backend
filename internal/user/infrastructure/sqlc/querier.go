@@ -11,12 +11,18 @@ import (
 
 type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error)
+	CreateVerificationToken(ctx context.Context, arg CreateVerificationTokenParams) error
+	DeleteExpiredTokens(ctx context.Context) error
 	DeleteUser(ctx context.Context, arg DeleteUserParams) (sql.Result, error)
+	DeleteUserTokensByType(ctx context.Context, arg DeleteUserTokensByTypeParams) error
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
 	ExistsByUsername(ctx context.Context, username string) (bool, error)
+	FindLatestTokenByUserAndType(ctx context.Context, arg FindLatestTokenByUserAndTypeParams) (VerificationToken, error)
+	FindTokenByToken(ctx context.Context, token string) (VerificationToken, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
 	GetUserByID(ctx context.Context, userID uint32) (GetUserByIDRow, error)
 	GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error)
+	MarkTokenAsUsed(ctx context.Context, arg MarkTokenAsUsedParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (sql.Result, error)
 }
 

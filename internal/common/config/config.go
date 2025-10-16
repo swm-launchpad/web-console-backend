@@ -15,6 +15,8 @@ type Config struct {
 	Server   ServerConfig
 	JWT      JWTConfig
 	CORS     CORSConfig
+	Email    EmailConfig
+	Frontend FrontendConfig
 }
 
 type DatabaseConfig struct {
@@ -40,6 +42,18 @@ type JWTConfig struct {
 
 type CORSConfig struct {
 	AllowedOrigins []string
+}
+
+type EmailConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	From     string
+}
+
+type FrontendConfig struct {
+	URL string
 }
 
 func Load() (*Config, error) {
@@ -83,6 +97,12 @@ func Load() (*Config, error) {
 		allowedOrigins[i] = strings.TrimSpace(allowedOrigins[i])
 	}
 
+	// Parse email port
+	emailPort, err := strconv.Atoi(getEnv("EMAIL_PORT", "587"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid EMAIL_PORT: %w", err)
+	}
+
 	config := &Config{
 		Database: DatabaseConfig{
 			Host:            getEnv("DB_HOST", "localhost"),
@@ -104,6 +124,16 @@ func Load() (*Config, error) {
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: allowedOrigins,
+		},
+		Email: EmailConfig{
+			Host:     getEnv("EMAIL_HOST", "smtp.gmail.com"),
+			Port:     emailPort,
+			Username: getEnv("EMAIL_USERNAME", ""),
+			Password: getEnv("EMAIL_PASSWORD", ""),
+			From:     getEnv("EMAIL_FROM", getEnv("EMAIL_USERNAME", "")),
+		},
+		Frontend: FrontendConfig{
+			URL: getEnv("FRONTEND_URL", "http://localhost:5173"),
 		},
 	}
 

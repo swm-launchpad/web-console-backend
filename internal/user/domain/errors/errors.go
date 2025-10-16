@@ -36,6 +36,7 @@ var (
 	ErrValidationFailed = errors.New("validation failed")
 	ErrInvalidFormat    = errors.New("invalid format")
 	ErrMissingField     = errors.New("required field is missing")
+	ErrNoFieldsToUpdate = errors.New("no fields to update")
 )
 
 // Duplicate errors - errors for unique constraint violations
@@ -53,4 +54,16 @@ var (
 // Service errors - errors related to business service operations
 var (
 	ErrTokenGenerationFailed = errors.New("failed to generate token")
+)
+
+// Token errors - errors related to verification tokens
+var (
+	ErrTokenNotFound      = errors.New("token not found")
+	ErrTokenExpired       = errors.New("token has expired")
+	ErrTokenAlreadyUsed   = errors.New("token has already been used")
+	ErrTokenInvalid       = errors.New("token is invalid")
+	ErrEmailSendFailed    = errors.New("failed to send email")
+	ErrTooManyRequests    = errors.New("too many requests, please try again later")
+	ErrEmailNotVerified   = errors.New("email not verified")
+	ErrVerificationFailed = errors.New("verification failed")
 )
