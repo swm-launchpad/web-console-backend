@@ -156,6 +156,7 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 // MVP 단계: FQDN, Plan 입력은 무시되고 nil로 강제됨
 // 리소스 제한 입력은 무시되고 MVP 고정값으로 강제됨
 type UpdateProjectRequest struct {
+	Name         *string `json:"name,omitempty" binding:"omitempty,min=1,max=100"`
 	FQDN         *string `json:"fqdn,omitempty"`
 	Plan         *string `json:"plan,omitempty"`
 	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=100,max=4000"`
@@ -195,7 +196,7 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	}
 
 	// MVP 정책: FQDN, Plan, 리소스 제한 강제 적용 (Frontend 입력 무시)
-	// Name, Status는 업데이트 불가 (nil로 설정)
+	// Status는 업데이트 불가 (nil로 설정)
 	cpuLimit := uint32(MVPForcedCPULimit)
 	memoryLimit := uint32(MVPForcedMemoryLimit)
 	diskLimit := uint32(MVPForcedDiskLimit)
@@ -203,7 +204,7 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 
 	input := application.UpdateProjectInput{
 		ProjectID:    uint(projectID),
-		Name:         nil,           // MVP: Name 업데이트 불가
+		Name:         req.Name,      // MVP: Name 업데이트 허용
 		Status:       nil,           // MVP: Status 업데이트 불가
 		FQDN:         nil,           // MVP: FQDN not allowed (force null)
 		Plan:         nil,           // MVP: Plan not allowed (force null)
