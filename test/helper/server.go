@@ -119,7 +119,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 
 	// Handler 초기화
 	authHandler := userhttp.NewAuthHandler(registerUseCase, loginUseCase)
-	userHandler := userhttp.NewUserHandler(getUserUseCase)
+	userHandler := userhttp.NewUserHandler(getUserUseCase, updateUserUseCase, changePasswordUseCase)
 	projectHandler := projectHTTP.NewProjectHandler(
 		createProjectUseCase,
 		getProjectUseCase,

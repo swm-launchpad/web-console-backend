@@ -29,13 +29,13 @@ var (
 )
 
 // NewGitConfig creates a new GitConfig with validation
+// URL can be empty for template-based containers (e.g., databases)
 func NewGitConfig(url, branch string, dirPath *string) (GitConfig, error) {
-	// Validate repository URL
-	if url == "" {
-		return GitConfig{}, containererrors.ErrGitURLRequired
-	}
-	if !isValidGitURL(url) {
-		return GitConfig{}, containererrors.ErrInvalidGitURL
+	// Validate repository URL only if provided (empty URL allowed for template-based containers)
+	if url != "" {
+		if !isValidGitURL(url) {
+			return GitConfig{}, containererrors.ErrInvalidGitURL
+		}
 	}
 
 	// Validate branch (default to "main" if empty)

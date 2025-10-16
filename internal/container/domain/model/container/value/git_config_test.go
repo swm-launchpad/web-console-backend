@@ -65,8 +65,11 @@ func TestNewGitConfig_ValidConfigs(t *testing.T) {
 }
 
 func TestNewGitConfig_EmptyURL(t *testing.T) {
-	_, err := NewGitConfig("", "main", nil)
-	assert.ErrorIs(t, err, containererrors.ErrGitURLRequired)
+	// Empty URL is now allowed for template-based containers (e.g., databases)
+	config, err := NewGitConfig("", "main", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, "", config.RepositoryURL())
+	assert.Equal(t, "main", config.Branch())
 }
 
 func TestNewGitConfig_InvalidURL(t *testing.T) {
