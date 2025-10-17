@@ -31,17 +31,19 @@ func (r *projectRepository) Create(ctx context.Context, project *model.Project) 
 
 	// Create project
 	params := sqlc.CreateProjectParams{
-		Name:         project.Name(),
-		Slug:         project.Slug().String(),
-		Fqdn:         stringBoolToNullString(project.FQDN()),
-		Status:       sqlc.ProjectsStatus(project.Status()),
-		Plan:         stringBoolToNullString(project.Plan()),
-		CpuLimit:     sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
-		MemoryLimit:  sql.NullInt32{Int32: int32(project.Limits().MemoryLimit()), Valid: true},
-		DiskLimit:    sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
-		TrafficLimit: sql.NullInt64{Int64: int64(project.Limits().TrafficLimit()), Valid: true},
-		CreatedAt:    project.CreatedAt(),
-		UpdatedAt:    sql.NullTime{Time: project.UpdatedAt(), Valid: !project.UpdatedAt().IsZero()},
+		Name:                   project.Name(),
+		Slug:                   project.Slug().String(),
+		Fqdn:                   stringBoolToNullString(project.FQDN()),
+		Status:                 sqlc.ProjectsStatus(project.Status()),
+		Plan:                   stringBoolToNullString(project.Plan()),
+		CpuLimit:               sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
+		MemoryLimit:            sql.NullInt32{Int32: int32(project.Limits().MemoryLimit()), Valid: true},
+		DiskLimit:              sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
+		TrafficLimit:           sql.NullInt64{Int64: int64(project.Limits().TrafficLimit()), Valid: true},
+		ProjectOperationStatus: projectOperationStatusToDB(project.OperationStatus()),
+		ActiveDeploymentID:     uintBoolToNullInt32(project.ActiveDeploymentID()),
+		CreatedAt:              project.CreatedAt(),
+		UpdatedAt:              sql.NullTime{Time: project.UpdatedAt(), Valid: !project.UpdatedAt().IsZero()},
 	}
 
 	result, err := qtx.CreateProject(ctx, params)
@@ -83,16 +85,18 @@ func (r *projectRepository) Save(ctx context.Context, project *model.Project) er
 
 	// Update project
 	params := sqlc.UpdateProjectParams{
-		Name:         project.Name(),
-		Fqdn:         stringBoolToNullString(project.FQDN()),
-		Status:       sqlc.ProjectsStatus(project.Status()),
-		Plan:         stringBoolToNullString(project.Plan()),
-		CpuLimit:     sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
-		MemoryLimit:  sql.NullInt32{Int32: int32(project.Limits().MemoryLimit()), Valid: true},
-		DiskLimit:    sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
-		TrafficLimit: sql.NullInt64{Int64: int64(project.Limits().TrafficLimit()), Valid: true},
-		UpdatedAt:    sql.NullTime{Time: project.UpdatedAt(), Valid: !project.UpdatedAt().IsZero()},
-		ProjectID:    uint32(project.ProjectID()),
+		Name:                   project.Name(),
+		Fqdn:                   stringBoolToNullString(project.FQDN()),
+		Status:                 sqlc.ProjectsStatus(project.Status()),
+		Plan:                   stringBoolToNullString(project.Plan()),
+		CpuLimit:               sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
+		MemoryLimit:            sql.NullInt32{Int32: int32(project.Limits().MemoryLimit()), Valid: true},
+		DiskLimit:              sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
+		TrafficLimit:           sql.NullInt64{Int64: int64(project.Limits().TrafficLimit()), Valid: true},
+		ProjectOperationStatus: projectOperationStatusToDB(project.OperationStatus()),
+		ActiveDeploymentID:     uintBoolToNullInt32(project.ActiveDeploymentID()),
+		UpdatedAt:              sql.NullTime{Time: project.UpdatedAt(), Valid: !project.UpdatedAt().IsZero()},
+		ProjectID:              uint32(project.ProjectID()),
 	}
 
 	if _, err := qtx.UpdateProject(ctx, params); err != nil {
@@ -196,7 +200,7 @@ func (r *projectRepository) Save(ctx context.Context, project *model.Project) er
 
 func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*model.Project, error) {
 	// Get project
-	sqlcProject, err := r.queriesWithContext(ctx).GetProjectByID(ctx, uint32(projectID))
+	row, err := r.queriesWithContext(ctx).GetProjectByID(ctx, uint32(projectID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, projecterrors.ErrProjectNotFound
@@ -205,7 +209,12 @@ func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*mode
 	}
 
 	// Convert to domain model
-	project, err := r.toDomainProject(sqlcProject)
+	project, err := r.rowToDomainProject(
+		row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+		row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
+		row.ProjectOperationStatus, row.ActiveDeploymentID,
+		row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +234,7 @@ func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*mode
 
 func (r *projectRepository) FindByIDForUpdate(ctx context.Context, projectID uint) (*model.Project, error) {
 	// Get project with row lock
-	sqlcProject, err := r.queriesWithContext(ctx).GetProjectByIDForUpdate(ctx, uint32(projectID))
+	row, err := r.queriesWithContext(ctx).GetProjectByIDForUpdate(ctx, uint32(projectID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, projecterrors.ErrProjectNotFound
@@ -234,7 +243,12 @@ func (r *projectRepository) FindByIDForUpdate(ctx context.Context, projectID uin
 	}
 
 	// Convert to domain model
-	project, err := r.toDomainProject(sqlcProject)
+	project, err := r.rowToDomainProject(
+		row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+		row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
+		row.ProjectOperationStatus, row.ActiveDeploymentID,
+		row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -288,14 +302,19 @@ func (r *projectRepository) FindByUserID(ctx context.Context, userID uint) ([]*m
 
 	// Convert to domain models
 	projects := make([]*model.Project, 0, len(sqlcProjects))
-	for _, sqlcProject := range sqlcProjects {
-		project, err := r.toDomainProject(sqlcProject)
+	for _, row := range sqlcProjects {
+		project, err := r.rowToDomainProject(
+			row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+			row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
+			row.ProjectOperationStatus, row.ActiveDeploymentID,
+			row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+		)
 		if err != nil {
 			return nil, err
 		}
 
 		// Add users for this project
-		if users, ok := usersByProject[uint(sqlcProject.ProjectID)]; ok {
+		if users, ok := usersByProject[uint(row.ProjectID)]; ok {
 			if err := r.loadProjectUsers(project, users); err != nil {
 				return nil, err
 			}
@@ -343,6 +362,33 @@ func (r *projectRepository) Delete(ctx context.Context, projectID uint) error {
 	return nil
 }
 
+// FindProjectsWithActiveOperations finds all projects that have ongoing operations
+func (r *projectRepository) FindProjectsWithActiveOperations(ctx context.Context) ([]*model.Project, error) {
+	qtx := r.queriesWithContext(ctx)
+
+	rows, err := qtx.FindProjectsWithActiveOperations(ctx)
+	if err != nil {
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	projects := make([]*model.Project, 0, len(rows))
+	for _, row := range rows {
+		project, err := r.rowToDomainProject(
+			row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+			row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
+			row.ProjectOperationStatus, row.ActiveDeploymentID,
+			row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, project)
+	}
+
+	return projects, nil
+}
+
 // Helper methods
 
 func (r *projectRepository) loadProjectUsers(project *model.Project, sqlcUsers []sqlc.ProjectUser) error {
@@ -369,8 +415,25 @@ func (r *projectRepository) queriesWithContext(ctx context.Context) *sqlc.Querie
 	return r.queries
 }
 
-func (r *projectRepository) toDomainProject(sqlcProject sqlc.Project) (*model.Project, error) {
-	slug, err := value.NewProjectSlug(sqlcProject.Slug)
+func (r *projectRepository) rowToDomainProject(
+	projectID uint32,
+	name string,
+	slugStr string,
+	fqdn sql.NullString,
+	status sqlc.ProjectsStatus,
+	plan sql.NullString,
+	cpuLimit sql.NullInt32,
+	memoryLimit sql.NullInt32,
+	diskLimit sql.NullInt32,
+	trafficLimit sql.NullInt64,
+	operationStatus sqlc.ProjectsProjectOperationStatus,
+	activeDeploymentID sql.NullInt32,
+	createdAt time.Time,
+	updatedAt sql.NullTime,
+	deletedAt sql.NullTime,
+	isDeleted bool,
+) (*model.Project, error) {
+	slug, err := value.NewProjectSlug(slugStr)
 	if err != nil {
 		// DB에 저장된 slug가 유효하지 않은 경우 - 데이터 무결성 문제
 		return nil, projecterrors.ErrDatabaseOperation
@@ -378,57 +441,69 @@ func (r *projectRepository) toDomainProject(sqlcProject sqlc.Project) (*model.Pr
 
 	// Reconstruct project from persistence
 	// updatedAt is always valid in domain, use createdAt as fallback if missing in DB
-	updatedAt := sqlcProject.CreatedAt
-	if sqlcProject.UpdatedAt.Valid {
-		updatedAt = sqlcProject.UpdatedAt.Time
+	finalUpdatedAt := createdAt
+	if updatedAt.Valid {
+		finalUpdatedAt = updatedAt.Time
 	}
 
 	// Set resource limits (0 = unlimited)
 	limits, err := value.NewResourceLimits(
-		nullInt32ToUint32(sqlcProject.CpuLimit),
-		nullInt32ToUint32(sqlcProject.MemoryLimit),
-		nullInt32ToUint32(sqlcProject.DiskLimit),
-		nullInt64ToUint32(sqlcProject.TrafficLimit),
+		nullInt32ToUint32(cpuLimit),
+		nullInt32ToUint32(memoryLimit),
+		nullInt32ToUint32(diskLimit),
+		nullInt64ToUint32(trafficLimit),
 	)
 	if err != nil {
 		// DB에 저장된 리소스 제한이 유효하지 않은 경우 - 데이터 무결성 문제
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
+	// Convert operation status from DB
+	domainOperationStatus := projectOperationStatusFromDB(operationStatus)
+
+	// Convert active_deployment_id from DB
+	var domainActiveDeploymentID *uint
+	if activeDeploymentID.Valid {
+		deploymentID := uint(activeDeploymentID.Int32)
+		domainActiveDeploymentID = &deploymentID
+	}
+
 	project := model.ReconstructProject(
-		uint(sqlcProject.ProjectID),
-		sqlcProject.Name,
+		uint(projectID),
+		name,
 		*slug,
-		value.ProjectStatus(sqlcProject.Status),
+		value.ProjectStatus(status),
+		domainOperationStatus,
+		domainActiveDeploymentID,
 		*limits,
-		sqlcProject.CreatedAt,
-		updatedAt,
-		sqlcProject.IsDeleted,
-		fromNullTime(sqlcProject.DeletedAt),
+		createdAt,
+		finalUpdatedAt,
+		isDeleted,
+		fromNullTime(deletedAt),
 	)
 
 	// Set fields
-	if sqlcProject.Fqdn.Valid {
-		if err := project.SetFQDN(sqlcProject.Fqdn.String); err != nil {
+	if fqdn.Valid {
+		if err := project.SetFQDN(fqdn.String); err != nil {
 			// DB에 저장된 FQDN이 유효하지 않은 경우 - 데이터 무결성 문제
 			return nil, projecterrors.ErrDatabaseOperation
 		}
 	}
 
-	if sqlcProject.Plan.Valid {
-		if err := project.SetPlan(sqlcProject.Plan.String); err != nil {
+	if plan.Valid {
+		if err := project.SetPlan(plan.String); err != nil {
 			// DB에 저장된 Plan이 유효하지 않은 경우 - 데이터 무결성 문제
 			return nil, projecterrors.ErrDatabaseOperation
 		}
 	}
 
-	if err := project.SetStatus(value.ProjectStatus(sqlcProject.Status)); err != nil {
+	if err := project.SetStatus(value.ProjectStatus(status)); err != nil {
 		// DB에 저장된 Status가 유효하지 않은 경우 - 데이터 무결성 문제
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
 	// Handle soft delete
-	if sqlcProject.IsDeleted {
+	if isDeleted {
 		if err := project.SoftDelete(); err != nil {
 			// DB 상태가 일관되지 않은 경우 - 데이터 무결성 문제
 			return nil, projecterrors.ErrDatabaseOperation
@@ -436,6 +511,34 @@ func (r *projectRepository) toDomainProject(sqlcProject sqlc.Project) (*model.Pr
 	}
 
 	return project, nil
+}
+
+// projectOperationStatusFromDB converts sqlc ProjectsProjectOperationStatus to domain ProjectOperationStatus
+func projectOperationStatusFromDB(status sqlc.ProjectsProjectOperationStatus) value.ProjectOperationStatus {
+	switch status {
+	case sqlc.ProjectsProjectOperationStatusNothing:
+		return value.ProjectOperationStatusNothing
+	case sqlc.ProjectsProjectOperationStatusBuilding:
+		return value.ProjectOperationStatusBuilding
+	case sqlc.ProjectsProjectOperationStatusDeploying:
+		return value.ProjectOperationStatusDeploying
+	default:
+		return value.ProjectOperationStatusNothing
+	}
+}
+
+// projectOperationStatusToDB converts domain ProjectOperationStatus to sqlc ProjectsProjectOperationStatus
+func projectOperationStatusToDB(status value.ProjectOperationStatus) sqlc.ProjectsProjectOperationStatus {
+	switch status {
+	case value.ProjectOperationStatusNothing:
+		return sqlc.ProjectsProjectOperationStatusNothing
+	case value.ProjectOperationStatusBuilding:
+		return sqlc.ProjectsProjectOperationStatusBuilding
+	case value.ProjectOperationStatusDeploying:
+		return sqlc.ProjectsProjectOperationStatusDeploying
+	default:
+		return sqlc.ProjectsProjectOperationStatusNothing
+	}
 }
 
 func (r *projectRepository) toDomainProjectUser(sqlcUser sqlc.ProjectUser) (*model.ProjectUser, error) {
@@ -505,4 +608,13 @@ func fromNullTime(n sql.NullTime) *time.Time {
 		return nil
 	}
 	return &n.Time
+}
+
+// uintBoolToNullInt32 converts (uint, bool) to sql.NullInt32
+// Used for optional uint fields like ActiveDeploymentID
+func uintBoolToNullInt32(val uint, ok bool) sql.NullInt32 {
+	if !ok {
+		return sql.NullInt32{Valid: false}
+	}
+	return sql.NullInt32{Int32: int32(val), Valid: true}
 }

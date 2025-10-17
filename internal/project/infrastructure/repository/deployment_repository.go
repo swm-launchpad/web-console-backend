@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
@@ -34,14 +35,46 @@ func (r *deploymentRepository) Create(ctx context.Context, d *deployment.Deploym
 
 	qtx := r.queriesWithContext(ctx)
 
+	// Convert (value, bool) getters to pointers for nullable fields
+	var summaryPtr *string
+	if summary, exists := d.Summary(); exists {
+		s := summary
+		summaryPtr = &s
+	}
+
+	var tektonEventIDPtr *string
+	if eventID, exists := d.TektonEventID(); exists {
+		e := eventID
+		tektonEventIDPtr = &e
+	}
+
+	var tektonPipelineRunNamePtr *string
+	if runName, exists := d.TektonPipelineRunName(); exists {
+		r := runName
+		tektonPipelineRunNamePtr = &r
+	}
+
+	var startedAtPtr *time.Time
+	if startedAt, exists := d.StartedAt(); exists {
+		st := startedAt
+		startedAtPtr = &st
+	}
+
+	var finishedAtPtr *time.Time
+	if finishedAt, exists := d.FinishedAt(); exists {
+		ft := finishedAt
+		finishedAtPtr = &ft
+	}
+
 	result, err := qtx.CreateDeployment(ctx, sqlc.CreateDeploymentParams{
-		ProjectID:  uint32(d.ProjectID()),
-		Status:     deploymentStatusToDB(d.Status()),
-		Summary:    toNullString(d.Summary()),
-		TektonRef:  toNullString(d.TektonRef()),
-		CreatedAt:  d.CreatedAt(),
-		StartedAt:  timeToNullTime(d.StartedAt()),
-		FinishedAt: timeToNullTime(d.FinishedAt()),
+		ProjectID:             uint32(d.ProjectID()),
+		Status:                deploymentStatusToDB(d.Status()),
+		Summary:               stringPtrToNullString(summaryPtr),
+		TektonEventID:         stringPtrToNullString(tektonEventIDPtr),
+		TektonPipelineRunName: stringPtrToNullString(tektonPipelineRunNamePtr),
+		CreatedAt:             d.CreatedAt(),
+		StartedAt:             timePtrToNullTime(startedAtPtr),
+		FinishedAt:            timePtrToNullTime(finishedAtPtr),
 	})
 	if err != nil {
 		return projecterrors.ErrDatabaseOperation
@@ -62,19 +95,51 @@ func (r *deploymentRepository) Save(ctx context.Context, d *deployment.Deploymen
 		return projecterrors.ErrInvalidProjectData
 	}
 
-	if d.DeploymentID() == 0 {
+	if d.DeploymentID == 0 {
 		return projecterrors.ErrInvalidProjectData
 	}
 
 	qtx := r.queriesWithContext(ctx)
 
+	// Convert (value, bool) getters to pointers for nullable fields
+	var summaryPtr *string
+	if summary, exists := d.Summary(); exists {
+		s := summary
+		summaryPtr = &s
+	}
+
+	var tektonEventIDPtr *string
+	if eventID, exists := d.TektonEventID(); exists {
+		e := eventID
+		tektonEventIDPtr = &e
+	}
+
+	var tektonPipelineRunNamePtr *string
+	if runName, exists := d.TektonPipelineRunName(); exists {
+		r := runName
+		tektonPipelineRunNamePtr = &r
+	}
+
+	var startedAtPtr *time.Time
+	if startedAt, exists := d.StartedAt(); exists {
+		st := startedAt
+		startedAtPtr = &st
+	}
+
+	var finishedAtPtr *time.Time
+	if finishedAt, exists := d.FinishedAt(); exists {
+		ft := finishedAt
+		finishedAtPtr = &ft
+	}
+
 	result, err := qtx.UpdateDeployment(ctx, sqlc.UpdateDeploymentParams{
-		Status:       deploymentStatusToDB(d.Status()),
-		Summary:      toNullString(d.Summary()),
-		TektonRef:    toNullString(d.TektonRef()),
-		StartedAt:    timeToNullTime(d.StartedAt()),
-		FinishedAt:   timeToNullTime(d.FinishedAt()),
-		DeploymentID: uint32(d.DeploymentID()),
+		Status:                deploymentStatusToDB(d.Status()),
+		Summary:               stringPtrToNullString(summaryPtr),
+		TektonEventID:         stringPtrToNullString(tektonEventIDPtr),
+		TektonPipelineRunName: stringPtrToNullString(tektonPipelineRunNamePtr),
+		StartedAt:             timePtrToNullTime(startedAtPtr),
+		FinishedAt:            timePtrToNullTime(finishedAtPtr),
+		DeploymentID:          uint32(d.DeploymentID),
 	})
 	if err != nil {
 		return projecterrors.ErrDatabaseOperation
@@ -91,7 +156,7 @@ func (r *deploymentRepository) Save(ctx context.Context, d *deployment.Deploymen
 
 	if rowsAffected == 0 {
 		// Verify if the deployment exists to distinguish between case 1 and 2
-		_, err := qtx.FindDeploymentByID(ctx, uint32(d.DeploymentID()))
+		_, err := qtx.FindDeploymentByID(ctx, uint32(d.DeploymentID))
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				// Case 1: Deployment was deleted or never existed
@@ -114,7 +179,7 @@ func (r *deploymentRepository) FindByID(ctx context.Context, deploymentID uint) 
 
 	qtx := r.queriesWithContext(ctx)
 
-	sqlcDeployment, err := qtx.FindDeploymentByID(ctx, uint32(deploymentID))
+	row, err := qtx.FindDeploymentByID(ctx, uint32(deploymentID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, projecterrors.ErrDeploymentNotFound
@@ -122,7 +187,8 @@ func (r *deploymentRepository) FindByID(ctx context.Context, deploymentID uint) 
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	return r.toDeploymentModel(sqlcDeployment)
+	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
+		row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
 }
 
 // FindLatestByProjectID finds the most recent deployment for a project
@@ -133,7 +199,7 @@ func (r *deploymentRepository) FindLatestByProjectID(ctx context.Context, projec
 
 	qtx := r.queriesWithContext(ctx)
 
-	sqlcDeployment, err := qtx.FindLatestDeploymentByProjectID(ctx, uint32(projectID))
+	row, err := qtx.FindLatestDeploymentByProjectID(ctx, uint32(projectID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, projecterrors.ErrDeploymentNotFound
@@ -141,7 +207,8 @@ func (r *deploymentRepository) FindLatestByProjectID(ctx context.Context, projec
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	return r.toDeploymentModel(sqlcDeployment)
+	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
+		row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
 }
 
 // FindByProjectID finds all deployments for a project with pagination
@@ -162,8 +229,9 @@ func (r *deploymentRepository) FindByProjectID(ctx context.Context, projectID ui
 	}
 
 	deployments := make([]*deployment.Deployment, 0, len(sqlcDeployments))
-	for _, sqlcDeployment := range sqlcDeployments {
-		d, err := r.toDeploymentModel(sqlcDeployment)
+	for _, row := range sqlcDeployments {
+		d, err := r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
+			row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -173,19 +241,76 @@ func (r *deploymentRepository) FindByProjectID(ctx context.Context, projectID ui
 	return deployments, nil
 }
 
-// toDeploymentModel converts a sqlc Deployment to a domain Deployment model
-func (r *deploymentRepository) toDeploymentModel(sqlcDeployment sqlc.Deployment) (*deployment.Deployment, error) {
-	status := deploymentStatusFromDB(sqlcDeployment.Status)
+// FindByTektonPipelineRunName finds a deployment by its Tekton PipelineRun name
+func (r *deploymentRepository) FindByTektonPipelineRunName(ctx context.Context, pipelineRunName string) (*deployment.Deployment, error) {
+	if pipelineRunName == "" {
+		return nil, projecterrors.ErrInvalidProjectData
+	}
+
+	qtx := r.queriesWithContext(ctx)
+
+	row, err := qtx.FindDeploymentByTektonPipelineRunName(ctx, toNullString(pipelineRunName))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, projecterrors.ErrDeploymentNotFound
+		}
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
+		row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
+}
+
+// FindActiveDeploymentsByProjectID finds all active (non-completed) deployments for a project
+func (r *deploymentRepository) FindActiveDeploymentsByProjectID(ctx context.Context, projectID uint) ([]*deployment.Deployment, error) {
+	if projectID == 0 {
+		return nil, projecterrors.ErrInvalidProjectData
+	}
+
+	qtx := r.queriesWithContext(ctx)
+
+	sqlcDeployments, err := qtx.FindActiveDeploymentsByProjectID(ctx, uint32(projectID))
+	if err != nil {
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	deployments := make([]*deployment.Deployment, 0, len(sqlcDeployments))
+	for _, row := range sqlcDeployments {
+		d, err := r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
+			row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
+		if err != nil {
+			return nil, err
+		}
+		deployments = append(deployments, d)
+	}
+
+	return deployments, nil
+}
+
+// rowToDeploymentModel converts sqlc query result row to domain Deployment model
+func (r *deploymentRepository) rowToDeploymentModel(
+	deploymentID uint32,
+	projectID uint32,
+	status sqlc.DeploymentsStatus,
+	summary sql.NullString,
+	tektonEventID sql.NullString,
+	tektonPipelineRunName sql.NullString,
+	createdAt time.Time,
+	startedAt sql.NullTime,
+	finishedAt sql.NullTime,
+) (*deployment.Deployment, error) {
+	domainStatus := deploymentStatusFromDB(status)
 
 	d, err := deployment.ReconstructDeployment(
-		uint(sqlcDeployment.DeploymentID),
-		uint(sqlcDeployment.ProjectID),
-		status,
-		fromNullString(sqlcDeployment.Summary),
-		fromNullString(sqlcDeployment.TektonRef),
-		sqlcDeployment.CreatedAt,
-		nullTimeToTime(sqlcDeployment.StartedAt),
-		nullTimeToTime(sqlcDeployment.FinishedAt),
+		uint(deploymentID),
+		uint(projectID),
+		domainStatus,
+		nullStringToStringPtr(summary),
+		nullStringToStringPtr(tektonEventID),
+		nullStringToStringPtr(tektonPipelineRunName),
+		createdAt,
+		nullTimeToTimePtr(startedAt),
+		nullTimeToTimePtr(finishedAt),
 	)
 	if err != nil {
 		return nil, projecterrors.ErrDatabaseOperation
@@ -197,8 +322,14 @@ func (r *deploymentRepository) toDeploymentModel(sqlcDeployment sqlc.Deployment)
 // deploymentStatusToDB converts domain DeploymentStatus to sqlc DeploymentsStatus
 func deploymentStatusToDB(status deployment.DeploymentStatus) sqlc.DeploymentsStatus {
 	switch status {
-	case deployment.DeploymentStatusPending:
-		return sqlc.DeploymentsStatusPending
+	case deployment.DeploymentStatusUntracked:
+		return sqlc.DeploymentsStatusUntracked
+	case deployment.DeploymentStatusBackendTriggerFailed:
+		return sqlc.DeploymentsStatusBackendTriggerFailed
+	case deployment.DeploymentStatusBackendTrackingFailed:
+		return sqlc.DeploymentsStatusBackendTrackingFailed
+	case deployment.DeploymentStatusBackendTrackingLost:
+		return sqlc.DeploymentsStatusBackendTrackingLost
 	case deployment.DeploymentStatusRunning:
 		return sqlc.DeploymentsStatusRunning
 	case deployment.DeploymentStatusSuccess:
@@ -208,15 +339,21 @@ func deploymentStatusToDB(status deployment.DeploymentStatus) sqlc.DeploymentsSt
 	case deployment.DeploymentStatusCancelled:
 		return sqlc.DeploymentsStatusCancelled
 	default:
-		return sqlc.DeploymentsStatusPending
+		return sqlc.DeploymentsStatusUntracked
 	}
 }
 
 // deploymentStatusFromDB converts sqlc DeploymentsStatus to domain DeploymentStatus
 func deploymentStatusFromDB(status sqlc.DeploymentsStatus) deployment.DeploymentStatus {
 	switch status {
-	case sqlc.DeploymentsStatusPending:
-		return deployment.DeploymentStatusPending
+	case sqlc.DeploymentsStatusUntracked:
+		return deployment.DeploymentStatusUntracked
+	case sqlc.DeploymentsStatusBackendTriggerFailed:
+		return deployment.DeploymentStatusBackendTriggerFailed
+	case sqlc.DeploymentsStatusBackendTrackingFailed:
+		return deployment.DeploymentStatusBackendTrackingFailed
+	case sqlc.DeploymentsStatusBackendTrackingLost:
+		return deployment.DeploymentStatusBackendTrackingLost
 	case sqlc.DeploymentsStatusRunning:
 		return deployment.DeploymentStatusRunning
 	case sqlc.DeploymentsStatusSuccess:
@@ -226,7 +363,7 @@ func deploymentStatusFromDB(status sqlc.DeploymentsStatus) deployment.Deployment
 	case sqlc.DeploymentsStatusCancelled:
 		return deployment.DeploymentStatusCancelled
 	default:
-		return deployment.DeploymentStatusPending
+		return deployment.DeploymentStatusUntracked
 	}
 }
 

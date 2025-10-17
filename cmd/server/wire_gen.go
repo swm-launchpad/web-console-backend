@@ -19,13 +19,17 @@ import (
 	handler3 "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	infrastructure2 "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	application2 "github.com/swm-launchpad/web-console-backend/internal/project/application"
+	infrastructure3 "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
+	repository2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	service2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	handler2 "github.com/swm-launchpad/web-console-backend/internal/project/handler"
+	infrastructure4 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
+	"os"
 )
 
 // Injectors from wire.go:
@@ -77,6 +81,19 @@ func InitializeApp() (*App, error) {
 	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService)
 	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager)
 	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService)
+	deploymentRepository := repository.NewDeploymentRepository(db)
+	containerClient := provideContainerClient()
+	tektonClient, err := provideTektonClient()
+	if err != nil {
+		return nil, err
+	}
+	kubeClient, err := provideKubeClient()
+	if err != nil {
+		return nil, err
+	}
+	deployService := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient)
+	deployProjectUseCase := application2.NewDeployProjectUseCase(deployService)
+	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, permissionService)
 	containerRepository := infrastructure2.NewContainerRepository(db)
 	serviceSlugService := service3.NewSlugService(containerRepository)
 	containerService := service3.NewContainerService(containerRepository, serviceSlugService)
@@ -103,7 +120,7 @@ func InitializeApp() (*App, error) {
 	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository)
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, projectHandler, volumeHandler, containerHandler, templateHandler, authMiddleware)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, projectHandler, volumeHandler, deploymentHandler, containerHandler, templateHandler, authMiddleware)
 	app := NewApp(configConfig, db, router)
 	return app, nil
 }
@@ -127,12 +144,86 @@ func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
 
 // provideEmailService creates an email service from config
 func provideEmailService(cfg *config.Config) email.Service {
+
+	host := cfg.Email.Host
+	if host == "" {
+		host = "localhost"
+	}
+	port := cfg.Email.Port
+	if port == 0 {
+		port = 587
+	}
+	from := cfg.Email.From
+	if from == "" {
+		from = "noreply@localhost"
+	}
+	frontendURL := cfg.Frontend.URL
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
+
 	return email.NewService(
-		cfg.Email.Host,
-		cfg.Email.Port,
+		host,
+		port,
 		cfg.Email.Username,
 		cfg.Email.Password,
-		cfg.Email.From,
-		cfg.Frontend.URL,
+		from,
+		frontendURL,
+	)
+}
+
+// provideTektonClient creates a Tekton client from environment variables
+func provideTektonClient() (infrastructure3.TektonClient, error) {
+	return infrastructure4.NewTektonClient()
+}
+
+// provideKubeClient creates a Kubernetes client from environment variables
+func provideKubeClient() (infrastructure3.KubeClient, error) {
+	return infrastructure4.NewKubeClient()
+}
+
+// provideContainerClient creates a container client
+// Note: Currently using MockContainerClient until real implementation is ready
+func provideContainerClient() infrastructure3.ContainerClient {
+	return infrastructure4.NewMockContainerClient()
+}
+
+// provideDeployNamespace provides the deployment namespace from environment
+func provideDeployNamespace() string {
+
+	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
+	if deployNamespace == "" {
+		return "default"
+	}
+	return deployNamespace
+}
+
+// provideDeployService creates a DeployService with all dependencies
+func provideDeployService(
+	txManager db.TxManager,
+	projectRepository repository2.ProjectRepository,
+	deploymentRepo repository2.DeploymentRepository,
+	volumeRepo repository2.VolumeRepository,
+	containerClient infrastructure3.ContainerClient,
+	tektonClient infrastructure3.TektonClient,
+	kubeClient infrastructure3.KubeClient,
+) service2.DeployService {
+	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
+	if deployNamespace == "" {
+		deployNamespace = "default"
+	}
+
+	projectServiceName := ""
+
+	return service2.NewDeployService(
+		txManager,
+		projectRepository,
+		deploymentRepo,
+		volumeRepo,
+		containerClient,
+		tektonClient,
+		kubeClient,
+		deployNamespace,
+		projectServiceName,
 	)
 }

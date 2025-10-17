@@ -23,28 +23,38 @@ func toNullString(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: true}
 }
 
-// fromNullString converts sql.NullString to string
-func fromNullString(n sql.NullString) string {
-	if !n.Valid {
-		return ""
+// stringPtrToNullString converts *string to sql.NullString
+// nil pointer is considered as NULL
+func stringPtrToNullString(s *string) sql.NullString {
+	if s == nil {
+		return sql.NullString{Valid: false}
 	}
-	return n.String
+	return sql.NullString{String: *s, Valid: true}
 }
 
-// timeToNullTime converts time.Time to sql.NullTime
-// Zero time is considered as NULL
-func timeToNullTime(t time.Time) sql.NullTime {
-	if t.IsZero() {
+// nullStringToStringPtr converts sql.NullString to *string
+// NULL is converted to nil pointer
+func nullStringToStringPtr(n sql.NullString) *string {
+	if !n.Valid {
+		return nil
+	}
+	return &n.String
+}
+
+// timePtrToNullTime converts *time.Time to sql.NullTime
+// nil pointer is considered as NULL
+func timePtrToNullTime(t *time.Time) sql.NullTime {
+	if t == nil {
 		return sql.NullTime{Valid: false}
 	}
-	return sql.NullTime{Time: t, Valid: true}
+	return sql.NullTime{Time: *t, Valid: true}
 }
 
-// nullTimeToTime converts sql.NullTime to time.Time
-// NULL is converted to zero time
-func nullTimeToTime(n sql.NullTime) time.Time {
+// nullTimeToTimePtr converts sql.NullTime to *time.Time
+// NULL is converted to nil pointer
+func nullTimeToTimePtr(n sql.NullTime) *time.Time {
 	if !n.Valid {
-		return time.Time{}
+		return nil
 	}
-	return n.Time
+	return &n.Time
 }

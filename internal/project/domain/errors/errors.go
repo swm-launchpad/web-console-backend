@@ -21,6 +21,7 @@ var (
 	ErrCannotDeleteProject        = errors.New("cannot delete project")
 	ErrInvalidStatusTransition    = errors.New("invalid status transition")
 	ErrCannotModifyDeletedProject = errors.New("cannot modify deleted project")
+	ErrProjectAlreadyDeploying    = errors.New("project operation already in progress")
 )
 
 // Permission errors - access control and authorization errors
@@ -95,7 +96,13 @@ var (
 	ErrDatabaseUnavailable        = errors.New("database unavailable")
 	ErrDatabaseOperation          = errors.New("database operation failed")
 	ErrConcurrentModification     = errors.New("concurrent modification detected")
+	ErrContainerConfigNotFound    = errors.New("container configuration not found")
 	ErrKubernetesUnavailable      = errors.New("kubernetes API unavailable")
+	ErrKubeAuthenticationFailed   = errors.New("kubernetes authentication failed")
+	ErrKubeConnectionFailed       = errors.New("kubernetes connection failed")
+	ErrKubeTimeout                = errors.New("kubernetes API timeout")
+	ErrKubePipelineRunNotFound    = errors.New("pipelinerun not found in kubernetes")
+	ErrKubeUnknownError           = errors.New("unknown kubernetes error")
 	ErrTektonUnavailable          = errors.New("tekton API unavailable")
 	ErrTektonAuthenticationFailed = errors.New("tekton API authentication failed")
 	ErrInvalidDeploymentRequest   = errors.New("invalid deployment request")
@@ -117,7 +124,7 @@ var (
 	ErrCannotStartDeployment       = errors.New("cannot start deployment: current status must be pending")
 	ErrCannotCompleteDeployment    = errors.New("cannot complete deployment: current status must be running")
 	ErrCannotFailDeployment        = errors.New("cannot fail deployment: current status must be running")
-	ErrCannotCancelDeployment      = errors.New("cannot cancel deployment: current status must be pending or running")
+	ErrCannotCancelDeployment      = errors.New("cannot cancel deployment: current status must be running")
 	ErrInvalidDeploymentTransition = errors.New("invalid deployment state transition")
 )
 

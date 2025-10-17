@@ -10,18 +10,20 @@ import (
 // Project represents a project aggregate root
 // It manages ProjectUser entities and enforces domain invariants
 type Project struct {
-	projectID uint
-	name      string
-	slug      value.ProjectSlug
-	fqdn      *string
-	status    value.ProjectStatus
-	plan      *string
-	limits    value.ResourceLimits
-	users     []ProjectUser // Aggregate's internal entities
-	isDeleted bool
-	deletedAt *time.Time
-	createdAt time.Time
-	updatedAt time.Time
+	projectID          uint
+	name               string
+	slug               value.ProjectSlug
+	fqdn               *string
+	status             value.ProjectStatus
+	operationStatus    value.ProjectOperationStatus
+	activeDeploymentID *uint // ID of the deployment that currently owns the deploying status
+	plan               *string
+	limits             value.ResourceLimits
+	users              []ProjectUser // Aggregate's internal entities
+	isDeleted          bool
+	deletedAt          *time.Time
+	createdAt          time.Time
+	updatedAt          time.Time
 }
 
 // NewProject creates a new project with an initial owner
@@ -36,14 +38,15 @@ func NewProject(name string, slug value.ProjectSlug, ownerID uint, limits value.
 
 	now := time.Now()
 	project := &Project{
-		name:      name,
-		slug:      slug,
-		status:    value.ProjectStatusActive,
-		limits:    limits,
-		users:     make([]ProjectUser, 0),
-		isDeleted: false,
-		createdAt: now,
-		updatedAt: now,
+		name:            name,
+		slug:            slug,
+		status:          value.ProjectStatusActive,
+		operationStatus: value.ProjectOperationStatusNothing,
+		limits:          limits,
+		users:           make([]ProjectUser, 0),
+		isDeleted:       false,
+		createdAt:       now,
+		updatedAt:       now,
 	}
 
 	// Set optional fields by copying the pointer values
@@ -80,6 +83,8 @@ func ReconstructProject(
 	name string,
 	slug value.ProjectSlug,
 	status value.ProjectStatus,
+	operationStatus value.ProjectOperationStatus,
+	activeDeploymentID *uint,
 	limits value.ResourceLimits,
 	createdAt time.Time,
 	updatedAt time.Time,
@@ -87,16 +92,18 @@ func ReconstructProject(
 	deletedAt *time.Time,
 ) *Project {
 	return &Project{
-		projectID: projectID,
-		name:      name,
-		slug:      slug,
-		status:    status,
-		limits:    limits,
-		users:     make([]ProjectUser, 0), // Will be loaded separately
-		isDeleted: isDeleted,
-		deletedAt: deletedAt,
-		createdAt: createdAt,
-		updatedAt: updatedAt,
+		projectID:          projectID,
+		name:               name,
+		slug:               slug,
+		status:             status,
+		operationStatus:    operationStatus,
+		activeDeploymentID: activeDeploymentID,
+		limits:             limits,
+		users:              make([]ProjectUser, 0), // Will be loaded separately
+		isDeleted:          isDeleted,
+		deletedAt:          deletedAt,
+		createdAt:          createdAt,
+		updatedAt:          updatedAt,
 	}
 }
 
@@ -126,6 +133,20 @@ func (p *Project) FQDN() (string, bool) {
 // Status returns the project status
 func (p *Project) Status() value.ProjectStatus {
 	return p.status
+}
+
+// OperationStatus returns the project operation status
+func (p *Project) OperationStatus() value.ProjectOperationStatus {
+	return p.operationStatus
+}
+
+// ActiveDeploymentID returns the ID of the deployment that currently owns the deploying status
+// Returns (0, false) if no active deployment
+func (p *Project) ActiveDeploymentID() (uint, bool) {
+	if p.activeDeploymentID == nil {
+		return 0, false
+	}
+	return *p.activeDeploymentID, true
 }
 
 // Plan returns the project plan and whether it is set
@@ -453,4 +474,40 @@ func (p *Project) hasOtherOwner(excludeUserID uint) bool {
 func (p *Project) updateTimestamp() {
 	now := time.Now()
 	p.updatedAt = now
+}
+
+// StartDeploy transitions the project to deploying status and records which deployment owns the lock
+// Returns error if project is already in an active operation
+func (p *Project) StartDeploy(deploymentID uint) error {
+	if p.isDeleted {
+		return projecterrors.ErrCannotModifyDeletedProject
+	}
+
+	if p.operationStatus != value.ProjectOperationStatusNothing {
+		return projecterrors.ErrInvalidStatusTransition
+	}
+
+	p.operationStatus = value.ProjectOperationStatusDeploying
+	p.activeDeploymentID = &deploymentID
+	p.updateTimestamp()
+	return nil
+}
+
+// CompleteDeploy resets the operation status to nothing and clears active deployment ID
+// This is called when a deployment completes (success, failure, or cancellation)
+// Returns an error if the deployment ID does not own the lock or if the project is deleted
+func (p *Project) CompleteDeploy(deploymentID uint) error {
+	if p.isDeleted {
+		return projecterrors.ErrCannotModifyDeletedProject
+	}
+
+	// Verify that this deployment owns the lock
+	if p.activeDeploymentID == nil || *p.activeDeploymentID != deploymentID {
+		return projecterrors.ErrInvalidStatusTransition
+	}
+
+	p.operationStatus = value.ProjectOperationStatusNothing
+	p.activeDeploymentID = nil
+	p.updateTimestamp()
+	return nil
 }

@@ -57,9 +57,24 @@ func TestDeploymentStatusConversion(t *testing.T) {
 		expectedDBType string
 	}{
 		{
-			name:           "pending status",
-			domainStatus:   deployment.DeploymentStatusPending,
-			expectedDBType: "pending",
+			name:           "untracked status",
+			domainStatus:   deployment.DeploymentStatusUntracked,
+			expectedDBType: "untracked",
+		},
+		{
+			name:           "backend_trigger_failed status",
+			domainStatus:   deployment.DeploymentStatusBackendTriggerFailed,
+			expectedDBType: "backend_trigger_failed",
+		},
+		{
+			name:           "backend_tracking_failed status",
+			domainStatus:   deployment.DeploymentStatusBackendTrackingFailed,
+			expectedDBType: "backend_tracking_failed",
+		},
+		{
+			name:           "backend_tracking_lost status",
+			domainStatus:   deployment.DeploymentStatusBackendTrackingLost,
+			expectedDBType: "backend_tracking_lost",
 		},
 		{
 			name:           "running status",
@@ -76,15 +91,11 @@ func TestDeploymentStatusConversion(t *testing.T) {
 			domainStatus:   deployment.DeploymentStatusFailed,
 			expectedDBType: "failed",
 		},
-		{
-			name:           "cancelled status",
-			domainStatus:   deployment.DeploymentStatusCancelled,
-			expectedDBType: "cancelled",
-		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Test domain to DB conversion
 			dbStatus := deploymentStatusToDB(tt.domainStatus)
 			assert.Equal(t, tt.expectedDBType, string(dbStatus))
 

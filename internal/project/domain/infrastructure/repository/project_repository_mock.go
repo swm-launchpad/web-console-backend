@@ -59,3 +59,11 @@ func (m *MockProjectRepository) Delete(ctx context.Context, projectID uint) erro
 	args := m.Called(ctx, projectID)
 	return args.Error(0)
 }
+
+func (m *MockProjectRepository) FindProjectsWithActiveOperations(ctx context.Context) ([]*model.Project, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*model.Project), args.Error(1)
+}

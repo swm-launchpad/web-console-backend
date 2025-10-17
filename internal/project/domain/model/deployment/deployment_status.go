@@ -5,14 +5,21 @@ import (
 )
 
 // DeploymentStatus represents the status of a deployment
+// Status is divided into backend-managed states and Tekton-managed states
 type DeploymentStatus string
 
 const (
-	DeploymentStatusPending   DeploymentStatus = "pending"
-	DeploymentStatusRunning   DeploymentStatus = "running"
-	DeploymentStatusSuccess   DeploymentStatus = "success"
-	DeploymentStatusFailed    DeploymentStatus = "failed"
-	DeploymentStatusCancelled DeploymentStatus = "cancelled"
+	// Backend-managed states
+	DeploymentStatusUntracked             DeploymentStatus = "untracked"               // Initial state, not tracked yet
+	DeploymentStatusBackendTriggerFailed  DeploymentStatus = "backend_trigger_failed"  // Backend failed to trigger Tekton
+	DeploymentStatusBackendTrackingFailed DeploymentStatus = "backend_tracking_failed" // Backend failed to track
+	DeploymentStatusBackendTrackingLost   DeploymentStatus = "backend_tracking_lost"   // Backend lost tracking
+
+	// Tekton-managed states
+	DeploymentStatusRunning   DeploymentStatus = "running"   // Tekton: Running
+	DeploymentStatusSuccess   DeploymentStatus = "success"   // Tekton: Success
+	DeploymentStatusFailed    DeploymentStatus = "failed"    // Tekton: Failed
+	DeploymentStatusCancelled DeploymentStatus = "cancelled" // Tekton: Cancelled (user-initiated or system cancellation)
 )
 
 // String returns the string representation of the status
@@ -23,7 +30,10 @@ func (s DeploymentStatus) String() string {
 // IsValid checks if the status is valid
 func (s DeploymentStatus) IsValid() bool {
 	switch s {
-	case DeploymentStatusPending,
+	case DeploymentStatusUntracked,
+		DeploymentStatusBackendTriggerFailed,
+		DeploymentStatusBackendTrackingFailed,
+		DeploymentStatusBackendTrackingLost,
 		DeploymentStatusRunning,
 		DeploymentStatusSuccess,
 		DeploymentStatusFailed,

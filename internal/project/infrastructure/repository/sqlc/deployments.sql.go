@@ -16,23 +16,25 @@ INSERT INTO ` + "`" + `DEPLOYMENTS` + "`" + ` (
     ` + "`" + `project_id` + "`" + `,
     ` + "`" + `status` + "`" + `,
     ` + "`" + `summary` + "`" + `,
-    ` + "`" + `tekton_ref` + "`" + `,
+    ` + "`" + `tekton_event_id` + "`" + `,
+    ` + "`" + `tekton_pipeline_run_name` + "`" + `,
     ` + "`" + `created_at` + "`" + `,
     ` + "`" + `started_at` + "`" + `,
     ` + "`" + `finished_at` + "`" + `
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?
 )
 `
 
 type CreateDeploymentParams struct {
-	ProjectID  uint32            `json:"project_id"`
-	Status     DeploymentsStatus `json:"status"`
-	Summary    sql.NullString    `json:"summary"`
-	TektonRef  sql.NullString    `json:"tekton_ref"`
-	CreatedAt  time.Time         `json:"created_at"`
-	StartedAt  sql.NullTime      `json:"started_at"`
-	FinishedAt sql.NullTime      `json:"finished_at"`
+	ProjectID             uint32            `json:"project_id"`
+	Status                DeploymentsStatus `json:"status"`
+	Summary               sql.NullString    `json:"summary"`
+	TektonEventID         sql.NullString    `json:"tekton_event_id"`
+	TektonPipelineRunName sql.NullString    `json:"tekton_pipeline_run_name"`
+	CreatedAt             time.Time         `json:"created_at"`
+	StartedAt             sql.NullTime      `json:"started_at"`
+	FinishedAt            sql.NullTime      `json:"finished_at"`
 }
 
 func (q *Queries) CreateDeployment(ctx context.Context, arg CreateDeploymentParams) (sql.Result, error) {
@@ -40,11 +42,77 @@ func (q *Queries) CreateDeployment(ctx context.Context, arg CreateDeploymentPara
 		arg.ProjectID,
 		arg.Status,
 		arg.Summary,
-		arg.TektonRef,
+		arg.TektonEventID,
+		arg.TektonPipelineRunName,
 		arg.CreatedAt,
 		arg.StartedAt,
 		arg.FinishedAt,
 	)
+}
+
+const findActiveDeploymentsByProjectID = `-- name: FindActiveDeploymentsByProjectID :many
+SELECT
+    ` + "`" + `deployment_id` + "`" + `,
+    ` + "`" + `project_id` + "`" + `,
+    ` + "`" + `status` + "`" + `,
+    ` + "`" + `summary` + "`" + `,
+    ` + "`" + `tekton_event_id` + "`" + `,
+    ` + "`" + `tekton_pipeline_run_name` + "`" + `,
+    ` + "`" + `created_at` + "`" + `,
+    ` + "`" + `started_at` + "`" + `,
+    ` + "`" + `finished_at` + "`" + `
+FROM ` + "`" + `DEPLOYMENTS` + "`" + `
+WHERE ` + "`" + `project_id` + "`" + ` = ?
+AND ` + "`" + `status` + "`" + ` IN ('untracked', 'running', 'backend_tracking_lost')
+ORDER BY ` + "`" + `created_at` + "`" + ` DESC, ` + "`" + `deployment_id` + "`" + ` DESC
+`
+
+type FindActiveDeploymentsByProjectIDRow struct {
+	DeploymentID          uint32            `json:"deployment_id"`
+	ProjectID             uint32            `json:"project_id"`
+	Status                DeploymentsStatus `json:"status"`
+	Summary               sql.NullString    `json:"summary"`
+	TektonEventID         sql.NullString    `json:"tekton_event_id"`
+	TektonPipelineRunName sql.NullString    `json:"tekton_pipeline_run_name"`
+	CreatedAt             time.Time         `json:"created_at"`
+	StartedAt             sql.NullTime      `json:"started_at"`
+	FinishedAt            sql.NullTime      `json:"finished_at"`
+}
+
+// Returns all non-completed deployments for a project.
+// Includes: untracked, running, backend_tracking_lost (recoverable states)
+// Excludes: success, failed, cancelled, backend_trigger_failed, backend_tracking_failed (terminal states)
+func (q *Queries) FindActiveDeploymentsByProjectID(ctx context.Context, projectID uint32) ([]FindActiveDeploymentsByProjectIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, findActiveDeploymentsByProjectID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FindActiveDeploymentsByProjectIDRow{}
+	for rows.Next() {
+		var i FindActiveDeploymentsByProjectIDRow
+		if err := rows.Scan(
+			&i.DeploymentID,
+			&i.ProjectID,
+			&i.Status,
+			&i.Summary,
+			&i.TektonEventID,
+			&i.TektonPipelineRunName,
+			&i.CreatedAt,
+			&i.StartedAt,
+			&i.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const findDeploymentByID = `-- name: FindDeploymentByID :one
@@ -53,7 +121,8 @@ SELECT
     ` + "`" + `project_id` + "`" + `,
     ` + "`" + `status` + "`" + `,
     ` + "`" + `summary` + "`" + `,
-    ` + "`" + `tekton_ref` + "`" + `,
+    ` + "`" + `tekton_event_id` + "`" + `,
+    ` + "`" + `tekton_pipeline_run_name` + "`" + `,
     ` + "`" + `created_at` + "`" + `,
     ` + "`" + `started_at` + "`" + `,
     ` + "`" + `finished_at` + "`" + `
@@ -62,15 +131,73 @@ WHERE ` + "`" + `deployment_id` + "`" + ` = ?
 LIMIT 1
 `
 
-func (q *Queries) FindDeploymentByID(ctx context.Context, deploymentID uint32) (Deployment, error) {
+type FindDeploymentByIDRow struct {
+	DeploymentID          uint32            `json:"deployment_id"`
+	ProjectID             uint32            `json:"project_id"`
+	Status                DeploymentsStatus `json:"status"`
+	Summary               sql.NullString    `json:"summary"`
+	TektonEventID         sql.NullString    `json:"tekton_event_id"`
+	TektonPipelineRunName sql.NullString    `json:"tekton_pipeline_run_name"`
+	CreatedAt             time.Time         `json:"created_at"`
+	StartedAt             sql.NullTime      `json:"started_at"`
+	FinishedAt            sql.NullTime      `json:"finished_at"`
+}
+
+func (q *Queries) FindDeploymentByID(ctx context.Context, deploymentID uint32) (FindDeploymentByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, findDeploymentByID, deploymentID)
-	var i Deployment
+	var i FindDeploymentByIDRow
 	err := row.Scan(
 		&i.DeploymentID,
 		&i.ProjectID,
 		&i.Status,
 		&i.Summary,
-		&i.TektonRef,
+		&i.TektonEventID,
+		&i.TektonPipelineRunName,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+	)
+	return i, err
+}
+
+const findDeploymentByTektonPipelineRunName = `-- name: FindDeploymentByTektonPipelineRunName :one
+SELECT
+    ` + "`" + `deployment_id` + "`" + `,
+    ` + "`" + `project_id` + "`" + `,
+    ` + "`" + `status` + "`" + `,
+    ` + "`" + `summary` + "`" + `,
+    ` + "`" + `tekton_event_id` + "`" + `,
+    ` + "`" + `tekton_pipeline_run_name` + "`" + `,
+    ` + "`" + `created_at` + "`" + `,
+    ` + "`" + `started_at` + "`" + `,
+    ` + "`" + `finished_at` + "`" + `
+FROM ` + "`" + `DEPLOYMENTS` + "`" + `
+WHERE ` + "`" + `tekton_pipeline_run_name` + "`" + ` = ?
+LIMIT 1
+`
+
+type FindDeploymentByTektonPipelineRunNameRow struct {
+	DeploymentID          uint32            `json:"deployment_id"`
+	ProjectID             uint32            `json:"project_id"`
+	Status                DeploymentsStatus `json:"status"`
+	Summary               sql.NullString    `json:"summary"`
+	TektonEventID         sql.NullString    `json:"tekton_event_id"`
+	TektonPipelineRunName sql.NullString    `json:"tekton_pipeline_run_name"`
+	CreatedAt             time.Time         `json:"created_at"`
+	StartedAt             sql.NullTime      `json:"started_at"`
+	FinishedAt            sql.NullTime      `json:"finished_at"`
+}
+
+func (q *Queries) FindDeploymentByTektonPipelineRunName(ctx context.Context, tektonPipelineRunName sql.NullString) (FindDeploymentByTektonPipelineRunNameRow, error) {
+	row := q.db.QueryRowContext(ctx, findDeploymentByTektonPipelineRunName, tektonPipelineRunName)
+	var i FindDeploymentByTektonPipelineRunNameRow
+	err := row.Scan(
+		&i.DeploymentID,
+		&i.ProjectID,
+		&i.Status,
+		&i.Summary,
+		&i.TektonEventID,
+		&i.TektonPipelineRunName,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
@@ -84,7 +211,8 @@ SELECT
     ` + "`" + `project_id` + "`" + `,
     ` + "`" + `status` + "`" + `,
     ` + "`" + `summary` + "`" + `,
-    ` + "`" + `tekton_ref` + "`" + `,
+    ` + "`" + `tekton_event_id` + "`" + `,
+    ` + "`" + `tekton_pipeline_run_name` + "`" + `,
     ` + "`" + `created_at` + "`" + `,
     ` + "`" + `started_at` + "`" + `,
     ` + "`" + `finished_at` + "`" + `
@@ -100,21 +228,34 @@ type FindDeploymentsByProjectIDParams struct {
 	Offset    int32  `json:"offset"`
 }
 
-func (q *Queries) FindDeploymentsByProjectID(ctx context.Context, arg FindDeploymentsByProjectIDParams) ([]Deployment, error) {
+type FindDeploymentsByProjectIDRow struct {
+	DeploymentID          uint32            `json:"deployment_id"`
+	ProjectID             uint32            `json:"project_id"`
+	Status                DeploymentsStatus `json:"status"`
+	Summary               sql.NullString    `json:"summary"`
+	TektonEventID         sql.NullString    `json:"tekton_event_id"`
+	TektonPipelineRunName sql.NullString    `json:"tekton_pipeline_run_name"`
+	CreatedAt             time.Time         `json:"created_at"`
+	StartedAt             sql.NullTime      `json:"started_at"`
+	FinishedAt            sql.NullTime      `json:"finished_at"`
+}
+
+func (q *Queries) FindDeploymentsByProjectID(ctx context.Context, arg FindDeploymentsByProjectIDParams) ([]FindDeploymentsByProjectIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, findDeploymentsByProjectID, arg.ProjectID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Deployment{}
+	items := []FindDeploymentsByProjectIDRow{}
 	for rows.Next() {
-		var i Deployment
+		var i FindDeploymentsByProjectIDRow
 		if err := rows.Scan(
 			&i.DeploymentID,
 			&i.ProjectID,
 			&i.Status,
 			&i.Summary,
-			&i.TektonRef,
+			&i.TektonEventID,
+			&i.TektonPipelineRunName,
 			&i.CreatedAt,
 			&i.StartedAt,
 			&i.FinishedAt,
@@ -138,7 +279,8 @@ SELECT
     ` + "`" + `project_id` + "`" + `,
     ` + "`" + `status` + "`" + `,
     ` + "`" + `summary` + "`" + `,
-    ` + "`" + `tekton_ref` + "`" + `,
+    ` + "`" + `tekton_event_id` + "`" + `,
+    ` + "`" + `tekton_pipeline_run_name` + "`" + `,
     ` + "`" + `created_at` + "`" + `,
     ` + "`" + `started_at` + "`" + `,
     ` + "`" + `finished_at` + "`" + `
@@ -148,15 +290,28 @@ ORDER BY ` + "`" + `created_at` + "`" + ` DESC, ` + "`" + `deployment_id` + "`" 
 LIMIT 1
 `
 
-func (q *Queries) FindLatestDeploymentByProjectID(ctx context.Context, projectID uint32) (Deployment, error) {
+type FindLatestDeploymentByProjectIDRow struct {
+	DeploymentID          uint32            `json:"deployment_id"`
+	ProjectID             uint32            `json:"project_id"`
+	Status                DeploymentsStatus `json:"status"`
+	Summary               sql.NullString    `json:"summary"`
+	TektonEventID         sql.NullString    `json:"tekton_event_id"`
+	TektonPipelineRunName sql.NullString    `json:"tekton_pipeline_run_name"`
+	CreatedAt             time.Time         `json:"created_at"`
+	StartedAt             sql.NullTime      `json:"started_at"`
+	FinishedAt            sql.NullTime      `json:"finished_at"`
+}
+
+func (q *Queries) FindLatestDeploymentByProjectID(ctx context.Context, projectID uint32) (FindLatestDeploymentByProjectIDRow, error) {
 	row := q.db.QueryRowContext(ctx, findLatestDeploymentByProjectID, projectID)
-	var i Deployment
+	var i FindLatestDeploymentByProjectIDRow
 	err := row.Scan(
 		&i.DeploymentID,
 		&i.ProjectID,
 		&i.Status,
 		&i.Summary,
-		&i.TektonRef,
+		&i.TektonEventID,
+		&i.TektonPipelineRunName,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
@@ -169,7 +324,8 @@ UPDATE ` + "`" + `DEPLOYMENTS` + "`" + `
 SET
     ` + "`" + `status` + "`" + ` = ?,
     ` + "`" + `summary` + "`" + ` = ?,
-    ` + "`" + `tekton_ref` + "`" + ` = ?,
+    ` + "`" + `tekton_event_id` + "`" + ` = ?,
+    ` + "`" + `tekton_pipeline_run_name` + "`" + ` = ?,
     ` + "`" + `started_at` + "`" + ` = ?,
     ` + "`" + `finished_at` + "`" + ` = ?
 WHERE
@@ -177,19 +333,21 @@ WHERE
 `
 
 type UpdateDeploymentParams struct {
-	Status       DeploymentsStatus `json:"status"`
-	Summary      sql.NullString    `json:"summary"`
-	TektonRef    sql.NullString    `json:"tekton_ref"`
-	StartedAt    sql.NullTime      `json:"started_at"`
-	FinishedAt   sql.NullTime      `json:"finished_at"`
-	DeploymentID uint32            `json:"deployment_id"`
+	Status                DeploymentsStatus `json:"status"`
+	Summary               sql.NullString    `json:"summary"`
+	TektonEventID         sql.NullString    `json:"tekton_event_id"`
+	TektonPipelineRunName sql.NullString    `json:"tekton_pipeline_run_name"`
+	StartedAt             sql.NullTime      `json:"started_at"`
+	FinishedAt            sql.NullTime      `json:"finished_at"`
+	DeploymentID          uint32            `json:"deployment_id"`
 }
 
 func (q *Queries) UpdateDeployment(ctx context.Context, arg UpdateDeploymentParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateDeployment,
 		arg.Status,
 		arg.Summary,
-		arg.TektonRef,
+		arg.TektonEventID,
+		arg.TektonPipelineRunName,
 		arg.StartedAt,
 		arg.FinishedAt,
 		arg.DeploymentID,

@@ -30,14 +30,12 @@ type KubeClient interface {
 	//   - pipelineRunName: The name of the PipelineRun resource (e.g., "deploy-run-abc123")
 	//
 	// Returns:
-	//   - *dto.PipelineRunStatus: The current status of the PipelineRun
+	//   - *dto.PipelineRun: The current status of the PipelineRun (ProjectID and EventID will be 0/"")
 	//   - error: An error if the operation fails or the PipelineRun is not found
 	//
 	// Possible status values:
-	//   - "Succeeded": PipelineRun completed successfully
-	//   - "Failed": PipelineRun failed
-	//   - "Running": PipelineRun is currently executing
-	//   - "Pending": PipelineRun is waiting to start
+	//   - "True": PipelineRun condition status is True
+	//   - "False": PipelineRun condition status is False
 	//   - "Unknown": Status cannot be determined
 	//
 	// Example usage:
@@ -45,10 +43,10 @@ type KubeClient interface {
 	//   if err != nil {
 	//       return err
 	//   }
-	//   if status.Status == "Succeeded" {
+	//   if status.Status == "True" {
 	//       // Handle successful deployment
 	//   }
-	GetPipelineRunStatus(ctx context.Context, pipelineRunName string) (*dto.PipelineRunStatus, error)
+	GetPipelineRunStatus(ctx context.Context, pipelineRunName string) (*dto.PipelineRun, error)
 
 	// GetPipelineRunLogs retrieves the aggregated logs from all tasks in a PipelineRun.
 	// This is useful for debugging failed deployments or understanding what happened
@@ -93,7 +91,7 @@ type KubeClient interface {
 	//   - projectID: The unique identifier of the project
 	//
 	// Returns:
-	//   - []*dto.PipelineRunInfo: A list of PipelineRun summaries for the project
+	//   - []*dto.PipelineRun: A list of PipelineRun summaries for the project
 	//   - error: An error if the operation fails
 	//
 	// The returned list may be empty if no deployments have been triggered for the project.
@@ -106,5 +104,35 @@ type KubeClient interface {
 	//   for _, run := range runs {
 	//       fmt.Printf("Run: %s, Status: %s\n", run.Name, run.Status)
 	//   }
-	ListPipelineRuns(ctx context.Context, projectID uint) ([]*dto.PipelineRunInfo, error)
+	ListPipelineRuns(ctx context.Context, projectID uint) ([]*dto.PipelineRun, error)
+
+	// FindPipelineRunNameByEventID retrieves the PipelineRun name associated with a Tekton event ID.
+	// This is used to look up a PipelineRun when you have the EventID returned from the Tekton
+	// EventListener but need to query the PipelineRun's status or logs.
+	//
+	// The EventID is stored in the "tekton.dev/triggers-eventid" label on PipelineRun resources.
+	// This label is automatically set by the Tekton EventListener when a PipelineRun is created.
+	//
+	// If multiple PipelineRuns are found with the same EventID (which should not normally happen),
+	// this method returns the most recently created one based on startTime.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - eventID: The Tekton event ID (e.g., "abc-123-xyz")
+	//
+	// Returns:
+	//   - string: The name of the PipelineRun resource
+	//   - error: An error if the operation fails or no PipelineRun is found with the given EventID
+	//
+	// Possible errors:
+	//   - ErrKubePipelineRunNotFound: No PipelineRun found with the given EventID
+	//   - ErrKubernetesUnavailable: Kubernetes API is not available or the request failed
+	//
+	// Example usage:
+	//   name, err := client.FindPipelineRunNameByEventID(ctx, "abc-123-xyz")
+	//   if err != nil {
+	//       return err
+	//   }
+	//   status, err := client.GetPipelineRunStatus(ctx, name)
+	FindPipelineRunNameByEventID(ctx context.Context, eventID string) (string, error)
 }

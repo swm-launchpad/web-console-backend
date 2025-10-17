@@ -28,4 +28,14 @@ type DeploymentRepository interface {
 	// Returns an empty slice if no deployments exist
 	// Deployments are ordered by created_at DESC (newest first)
 	FindByProjectID(ctx context.Context, projectID uint, limit, offset int) ([]*deployment.Deployment, error)
+
+	// FindByTektonPipelineRunName finds a deployment by its Tekton PipelineRun name
+	// Used for tracking deployment status from Tekton events
+	// Returns ErrDeploymentNotFound if the deployment does not exist
+	FindByTektonPipelineRunName(ctx context.Context, pipelineRunName string) (*deployment.Deployment, error)
+
+	// FindActiveDeploymentsByProjectID finds all active (non-completed) deployments for a project
+	// Active means status is untracked or running
+	// Returns an empty slice if no active deployments exist
+	FindActiveDeploymentsByProjectID(ctx context.Context, projectID uint) ([]*deployment.Deployment, error)
 }
