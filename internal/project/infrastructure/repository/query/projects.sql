@@ -4,15 +4,15 @@
 INSERT INTO PROJECTS (
     name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetProjectByID :one
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE project_id = ? AND is_deleted = FALSE;
@@ -21,7 +21,7 @@ WHERE project_id = ? AND is_deleted = FALSE;
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE project_id = ? AND is_deleted = FALSE
@@ -31,7 +31,7 @@ FOR UPDATE;
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE slug = ? AND is_deleted = FALSE;
@@ -40,7 +40,7 @@ WHERE slug = ? AND is_deleted = FALSE;
 UPDATE PROJECTS SET
     name = ?, fqdn = ?, status = ?, plan = ?,
     cpu_limit = ?, memory_limit = ?, disk_limit = ?, traffic_limit = ?,
-    project_operation_status = ?,
+    project_operation_status = ?, active_deployment_id = ?,
     updated_at = ?
 WHERE project_id = ? AND is_deleted = FALSE;
 
@@ -55,7 +55,7 @@ WHERE project_id = ?;
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE is_deleted = FALSE
@@ -66,7 +66,7 @@ LIMIT ? OFFSET ?;
 SELECT DISTINCT
     p.project_id, p.name, p.slug, p.fqdn, p.status, p.plan,
     p.cpu_limit, p.memory_limit, p.disk_limit, p.traffic_limit,
-    p.project_operation_status,
+    p.project_operation_status, p.active_deployment_id,
     p.created_at, p.updated_at, p.deleted_at, p.is_deleted
 FROM PROJECTS p
 JOIN PROJECT_USER pu ON p.project_id = pu.project_id
@@ -79,7 +79,7 @@ ORDER BY p.created_at DESC;
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE is_deleted = FALSE

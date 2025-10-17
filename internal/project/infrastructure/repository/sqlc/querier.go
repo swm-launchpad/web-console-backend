@@ -28,6 +28,9 @@ type Querier interface {
 	ExistsByNameAndUserID(ctx context.Context, arg ExistsByNameAndUserIDParams) (bool, error)
 	ExistsBySlug(ctx context.Context, slug string) (bool, error)
 	ExistsVolumeByName(ctx context.Context, arg ExistsVolumeByNameParams) (bool, error)
+	// Returns all non-completed deployments for a project.
+	// Includes: untracked, running, backend_tracking_lost (recoverable states)
+	// Excludes: success, failed, cancelled, backend_trigger_failed, backend_tracking_failed (terminal states)
 	FindActiveDeploymentsByProjectID(ctx context.Context, projectID uint32) ([]FindActiveDeploymentsByProjectIDRow, error)
 	FindDeploymentByID(ctx context.Context, deploymentID uint32) (FindDeploymentByIDRow, error)
 	FindDeploymentByTektonPipelineRunName(ctx context.Context, tektonPipelineRunName sql.NullString) (FindDeploymentByTektonPipelineRunNameRow, error)

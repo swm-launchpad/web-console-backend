@@ -164,19 +164,20 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint, userI
 			return projecterrors.ErrProjectAlreadyDeploying
 		}
 
-		// Change project status to deploying
-		if err := proj.StartDeploying(); err != nil {
+		// Create deployment record with status 'untracked' FIRST
+		// We need the deployment ID before setting it on the project
+		d = deployment.NewDeployment(projectID)
+
+		if err := s.deploymentRepo.Create(txCtx, d); err != nil {
+			return err
+		}
+
+		// Change project status to deploying and record which deployment owns it
+		if err := proj.StartDeploy(d.DeploymentID); err != nil {
 			return err
 		}
 
 		if err := s.projectRepo.Save(txCtx, proj); err != nil {
-			return err
-		}
-
-		// Create deployment record with status 'untracked'
-		d = deployment.NewDeployment(projectID)
-
-		if err := s.deploymentRepo.Create(txCtx, d); err != nil {
 			return err
 		}
 
@@ -285,14 +286,29 @@ func (s *deployService) RefreshDeploymentStatus(ctx context.Context, deploymentI
 		var err error
 		pipelineRunName, err = s.kubeClient.FindPipelineRunNameByEventID(ctx, eventID)
 		if err != nil {
-			// PipelineRun not created yet by Tekton or other error
-			createdAt := d.CreatedAt()
-			if time.Since(createdAt) > 5*time.Minute {
-				// If more than 5 minutes have passed since deployment creation, mark as tracking failed
-				msg := fmt.Sprintf("PipelineRun not found for EventID %s after 5 minutes", eventID)
-				s.handleDeployFailure(ctx, uint(d.ProjectID()), uint(deploymentID), deployment.DeploymentStatusBackendTrackingFailed, &msg)
+			// Check if the error is a "not found" error or a transient connectivity/auth issue
+			if errors.Is(err, projecterrors.ErrKubePipelineRunNotFound) {
+				// PipelineRun truly does not exist - only mark as terminal failure after 5 minute grace period
+				// This allows time for Tekton to create the PipelineRun (async operation)
+				createdAt := d.CreatedAt()
+				if time.Since(createdAt) > 5*time.Minute {
+					// If more than 5 minutes have passed, mark as tracking failed (terminal)
+					msg := fmt.Sprintf("PipelineRun not found for EventID %s after 5 minutes", eventID)
+					s.handleDeployFailure(ctx, uint(d.ProjectID()), uint(deploymentID), deployment.DeploymentStatusBackendTrackingFailed, &msg)
+				}
+				return nil, fmt.Errorf("pipeline run not found for event %s: %w", eventID, err)
 			}
-			return nil, fmt.Errorf("pipeline run not found for event %s: %w", eventID, err)
+
+			// Other errors (connection/authentication issues) are transient and retriable
+			// Update deployment to tracking_lost status (not terminal) and allow retry
+			msg := fmt.Sprintf("Failed to find PipelineRun by EventID %s: %v", eventID, err)
+			if err := d.UpdateBackendStatus(deployment.DeploymentStatusBackendTrackingLost, &msg); err != nil {
+				return nil, fmt.Errorf("failed to update deployment status: %w", err)
+			}
+			if err := s.deploymentRepo.Save(ctx, d); err != nil {
+				return nil, fmt.Errorf("failed to save deployment: %w", err)
+			}
+			return nil, err
 		}
 
 		// Try to update deployment with pipeline run name and running status
@@ -349,7 +365,7 @@ func (s *deployService) buildTektonRequest(
 	// Build deployment config
 	deploymentConfig := dto.DeploymentConfig{
 		ProjectID:    projectIDStr,
-		ServiceName:  s.projectServiceName,
+		ServiceName:  proj.Slug().String(), // Use project slug for per-project resource isolation in Kubernetes
 		Namespace:    s.deployNamespace,
 		StableWindow: 180, // constant: 180 seconds
 		ConfigMaps:   containerConfig.ConfigMaps,
@@ -417,20 +433,28 @@ func (s *deployService) handleDeployFailure(
 			return fmt.Errorf("failed to find project: %w", err)
 		}
 
-		// Only reset if still in deploying state
-		// This prevents wiping out a new deployment that already started
+		// Only reset if THIS deployment owns the project lock
+		// This prevents wiping out a new deployment B that already started after deployment A failed
 		if proj.OperationStatus() == value.ProjectOperationStatusDeploying {
-			if err := proj.CompleteOperation(); err != nil {
-				return fmt.Errorf("failed to complete operation: %w", err)
+			if err := proj.CompleteDeploy(deploymentID); err != nil {
+				// CompleteDeploy returns ErrInvalidStatusTransition if deployment doesn't own the lock
+				// This is expected in race conditions, so we log and continue
+				if errors.Is(err, projecterrors.ErrInvalidStatusTransition) {
+					activeDeploymentID, hasActive := proj.ActiveDeploymentID()
+					fmt.Printf("INFO: Project %d owned by different deployment (status=%s, active_deployment=%v), skipping cleanup for deployment %d\n",
+						projectID, proj.OperationStatus(), activeDeploymentID, deploymentID)
+					if hasActive && activeDeploymentID != deploymentID {
+						fmt.Printf("WARNING: Race condition detected - deployment %d tried to cleanup but deployment %d owns the project\n",
+							deploymentID, activeDeploymentID)
+					}
+				} else {
+					return fmt.Errorf("failed to complete operation: %w", err)
+				}
 			}
 
 			if err := s.projectRepo.Save(txCtx, proj); err != nil {
 				return fmt.Errorf("failed to save project: %w", err)
 			}
-		} else {
-			// Status already changed by another operation - skip cleanup
-			fmt.Printf("INFO: Project %d status is %s (not deploying), skipping cleanup for deployment %d\n",
-				projectID, proj.OperationStatus(), deploymentID)
 		}
 
 		return nil
@@ -466,16 +490,17 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 					return err
 				}
 			}
-
-			// Update to running status
-			var summaryPtr *string
-			if status.Message != "" {
-				summaryPtr = &status.Message
-			}
-			if err := d.UpdateRunningStatus(summaryPtr, status.StartTime); err != nil {
-				return err
-			}
 		}
+
+		// Update to running status
+		var summaryPtr *string
+		if status.Message != "" {
+			summaryPtr = &status.Message
+		}
+		if err := d.UpdateRunningStatus(summaryPtr, status.StartTime); err != nil {
+			return err
+		}
+
 		// Save deployment only (no transaction needed for non-terminal states)
 		return s.deploymentRepo.Save(ctx, d)
 	}
@@ -508,18 +533,27 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 				return fmt.Errorf("failed to find project: %w", err)
 			}
 
-			// Only reset if still in deploying state
+			// Only reset if THIS deployment owns the project lock
 			if proj.OperationStatus() == value.ProjectOperationStatusDeploying {
-				if err := proj.CompleteOperation(); err != nil {
-					return fmt.Errorf("failed to complete operation: %w", err)
+				if err := proj.CompleteDeploy(d.DeploymentID); err != nil {
+					// CompleteDeploy returns ErrInvalidStatusTransition if deployment doesn't own the lock
+					// This is expected in race conditions, so we log and continue
+					if errors.Is(err, projecterrors.ErrInvalidStatusTransition) {
+						activeDeploymentID, hasActive := proj.ActiveDeploymentID()
+						fmt.Printf("INFO: Project %d owned by different deployment (status=%s, active_deployment=%v), skipping reset for deployment %d\n",
+							d.ProjectID(), proj.OperationStatus(), activeDeploymentID, d.DeploymentID)
+						if hasActive && activeDeploymentID != d.DeploymentID {
+							fmt.Printf("WARNING: Race condition avoided - deployment %d tried to reset but deployment %d owns the project\n",
+								d.DeploymentID, activeDeploymentID)
+						}
+					} else {
+						return fmt.Errorf("failed to complete operation: %w", err)
+					}
 				}
 
 				if err := s.projectRepo.Save(txCtx, proj); err != nil {
 					return fmt.Errorf("failed to save project: %w", err)
 				}
-			} else {
-				fmt.Printf("INFO: Project %d status is %s (not deploying), skipping reset for deployment %d\n",
-					d.ProjectID(), proj.OperationStatus(), d.DeploymentID)
 			}
 
 			return nil
@@ -565,18 +599,27 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 				return fmt.Errorf("failed to find project: %w", err)
 			}
 
-			// Only reset if still in deploying state
+			// Only reset if THIS deployment owns the project lock
 			if proj.OperationStatus() == value.ProjectOperationStatusDeploying {
-				if err := proj.CompleteOperation(); err != nil {
-					return fmt.Errorf("failed to complete operation: %w", err)
+				if err := proj.CompleteDeploy(d.DeploymentID); err != nil {
+					// CompleteDeploy returns ErrInvalidStatusTransition if deployment doesn't own the lock
+					// This is expected in race conditions, so we log and continue
+					if errors.Is(err, projecterrors.ErrInvalidStatusTransition) {
+						activeDeploymentID, hasActive := proj.ActiveDeploymentID()
+						fmt.Printf("INFO: Project %d owned by different deployment (status=%s, active_deployment=%v), skipping reset for deployment %d\n",
+							d.ProjectID(), proj.OperationStatus(), activeDeploymentID, d.DeploymentID)
+						if hasActive && activeDeploymentID != d.DeploymentID {
+							fmt.Printf("WARNING: Race condition avoided - deployment %d tried to reset but deployment %d owns the project\n",
+								d.DeploymentID, activeDeploymentID)
+						}
+					} else {
+						return fmt.Errorf("failed to complete operation: %w", err)
+					}
 				}
 
 				if err := s.projectRepo.Save(txCtx, proj); err != nil {
 					return fmt.Errorf("failed to save project: %w", err)
 				}
-			} else {
-				fmt.Printf("INFO: Project %d status is %s (not deploying), skipping reset for deployment %d\n",
-					d.ProjectID(), proj.OperationStatus(), d.DeploymentID)
 			}
 
 			return nil

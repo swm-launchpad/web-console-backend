@@ -63,7 +63,7 @@ SELECT
     ` + "`" + `finished_at` + "`" + `
 FROM ` + "`" + `DEPLOYMENTS` + "`" + `
 WHERE ` + "`" + `project_id` + "`" + ` = ?
-AND ` + "`" + `status` + "`" + ` IN ('untracked', 'running')
+AND ` + "`" + `status` + "`" + ` IN ('untracked', 'running', 'backend_tracking_lost')
 ORDER BY ` + "`" + `created_at` + "`" + ` DESC, ` + "`" + `deployment_id` + "`" + ` DESC
 `
 
@@ -79,6 +79,9 @@ type FindActiveDeploymentsByProjectIDRow struct {
 	FinishedAt            sql.NullTime      `json:"finished_at"`
 }
 
+// Returns all non-completed deployments for a project.
+// Includes: untracked, running, backend_tracking_lost (recoverable states)
+// Excludes: success, failed, cancelled, backend_trigger_failed, backend_tracking_failed (terminal states)
 func (q *Queries) FindActiveDeploymentsByProjectID(ctx context.Context, projectID uint32) ([]FindActiveDeploymentsByProjectIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, findActiveDeploymentsByProjectID, projectID)
 	if err != nil {

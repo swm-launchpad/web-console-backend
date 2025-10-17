@@ -87,6 +87,9 @@ WHERE `tekton_pipeline_run_name` = ?
 LIMIT 1;
 
 -- name: FindActiveDeploymentsByProjectID :many
+-- Returns all non-completed deployments for a project.
+-- Includes: untracked, running, backend_tracking_lost (recoverable states)
+-- Excludes: success, failed, cancelled, backend_trigger_failed, backend_tracking_failed (terminal states)
 SELECT
     `deployment_id`,
     `project_id`,
@@ -99,5 +102,5 @@ SELECT
     `finished_at`
 FROM `DEPLOYMENTS`
 WHERE `project_id` = ?
-AND `status` IN ('untracked', 'running')
+AND `status` IN ('untracked', 'running', 'backend_tracking_lost')
 ORDER BY `created_at` DESC, `deployment_id` DESC;

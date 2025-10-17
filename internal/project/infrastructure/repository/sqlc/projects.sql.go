@@ -28,9 +28,9 @@ const createProject = `-- name: CreateProject :execresult
 INSERT INTO PROJECTS (
     name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateProjectParams struct {
@@ -44,6 +44,7 @@ type CreateProjectParams struct {
 	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
 	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	ActiveDeploymentID     sql.NullInt32                  `json:"active_deployment_id"`
 	CreatedAt              time.Time                      `json:"created_at"`
 	UpdatedAt              sql.NullTime                   `json:"updated_at"`
 }
@@ -61,6 +62,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (s
 		arg.DiskLimit,
 		arg.TrafficLimit,
 		arg.ProjectOperationStatus,
+		arg.ActiveDeploymentID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -196,7 +198,7 @@ const findProjectsWithActiveOperations = `-- name: FindProjectsWithActiveOperati
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE is_deleted = FALSE
@@ -216,6 +218,7 @@ type FindProjectsWithActiveOperationsRow struct {
 	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
 	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	ActiveDeploymentID     sql.NullInt32                  `json:"active_deployment_id"`
 	CreatedAt              time.Time                      `json:"created_at"`
 	UpdatedAt              sql.NullTime                   `json:"updated_at"`
 	DeletedAt              sql.NullTime                   `json:"deleted_at"`
@@ -243,6 +246,7 @@ func (q *Queries) FindProjectsWithActiveOperations(ctx context.Context) ([]FindP
 			&i.DiskLimit,
 			&i.TrafficLimit,
 			&i.ProjectOperationStatus,
+			&i.ActiveDeploymentID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -306,7 +310,7 @@ const getProjectByID = `-- name: GetProjectByID :one
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE project_id = ? AND is_deleted = FALSE
@@ -324,6 +328,7 @@ type GetProjectByIDRow struct {
 	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
 	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	ActiveDeploymentID     sql.NullInt32                  `json:"active_deployment_id"`
 	CreatedAt              time.Time                      `json:"created_at"`
 	UpdatedAt              sql.NullTime                   `json:"updated_at"`
 	DeletedAt              sql.NullTime                   `json:"deleted_at"`
@@ -345,6 +350,7 @@ func (q *Queries) GetProjectByID(ctx context.Context, projectID uint32) (GetProj
 		&i.DiskLimit,
 		&i.TrafficLimit,
 		&i.ProjectOperationStatus,
+		&i.ActiveDeploymentID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -357,7 +363,7 @@ const getProjectByIDForUpdate = `-- name: GetProjectByIDForUpdate :one
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE project_id = ? AND is_deleted = FALSE
@@ -376,6 +382,7 @@ type GetProjectByIDForUpdateRow struct {
 	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
 	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	ActiveDeploymentID     sql.NullInt32                  `json:"active_deployment_id"`
 	CreatedAt              time.Time                      `json:"created_at"`
 	UpdatedAt              sql.NullTime                   `json:"updated_at"`
 	DeletedAt              sql.NullTime                   `json:"deleted_at"`
@@ -397,6 +404,7 @@ func (q *Queries) GetProjectByIDForUpdate(ctx context.Context, projectID uint32)
 		&i.DiskLimit,
 		&i.TrafficLimit,
 		&i.ProjectOperationStatus,
+		&i.ActiveDeploymentID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -409,7 +417,7 @@ const getProjectBySlug = `-- name: GetProjectBySlug :one
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE slug = ? AND is_deleted = FALSE
@@ -427,6 +435,7 @@ type GetProjectBySlugRow struct {
 	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
 	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	ActiveDeploymentID     sql.NullInt32                  `json:"active_deployment_id"`
 	CreatedAt              time.Time                      `json:"created_at"`
 	UpdatedAt              sql.NullTime                   `json:"updated_at"`
 	DeletedAt              sql.NullTime                   `json:"deleted_at"`
@@ -448,6 +457,7 @@ func (q *Queries) GetProjectBySlug(ctx context.Context, slug string) (GetProject
 		&i.DiskLimit,
 		&i.TrafficLimit,
 		&i.ProjectOperationStatus,
+		&i.ActiveDeploymentID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
@@ -579,7 +589,7 @@ const listProjects = `-- name: ListProjects :many
 SELECT
     project_id, name, slug, fqdn, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
-    project_operation_status,
+    project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
 FROM PROJECTS
 WHERE is_deleted = FALSE
@@ -604,6 +614,7 @@ type ListProjectsRow struct {
 	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
 	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	ActiveDeploymentID     sql.NullInt32                  `json:"active_deployment_id"`
 	CreatedAt              time.Time                      `json:"created_at"`
 	UpdatedAt              sql.NullTime                   `json:"updated_at"`
 	DeletedAt              sql.NullTime                   `json:"deleted_at"`
@@ -631,6 +642,7 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]L
 			&i.DiskLimit,
 			&i.TrafficLimit,
 			&i.ProjectOperationStatus,
+			&i.ActiveDeploymentID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -653,7 +665,7 @@ const listProjectsByUserID = `-- name: ListProjectsByUserID :many
 SELECT DISTINCT
     p.project_id, p.name, p.slug, p.fqdn, p.status, p.plan,
     p.cpu_limit, p.memory_limit, p.disk_limit, p.traffic_limit,
-    p.project_operation_status,
+    p.project_operation_status, p.active_deployment_id,
     p.created_at, p.updated_at, p.deleted_at, p.is_deleted
 FROM PROJECTS p
 JOIN PROJECT_USER pu ON p.project_id = pu.project_id
@@ -675,6 +687,7 @@ type ListProjectsByUserIDRow struct {
 	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
 	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	ActiveDeploymentID     sql.NullInt32                  `json:"active_deployment_id"`
 	CreatedAt              time.Time                      `json:"created_at"`
 	UpdatedAt              sql.NullTime                   `json:"updated_at"`
 	DeletedAt              sql.NullTime                   `json:"deleted_at"`
@@ -702,6 +715,7 @@ func (q *Queries) ListProjectsByUserID(ctx context.Context, userID uint32) ([]Li
 			&i.DiskLimit,
 			&i.TrafficLimit,
 			&i.ProjectOperationStatus,
+			&i.ActiveDeploymentID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -749,7 +763,7 @@ const updateProject = `-- name: UpdateProject :execresult
 UPDATE PROJECTS SET
     name = ?, fqdn = ?, status = ?, plan = ?,
     cpu_limit = ?, memory_limit = ?, disk_limit = ?, traffic_limit = ?,
-    project_operation_status = ?,
+    project_operation_status = ?, active_deployment_id = ?,
     updated_at = ?
 WHERE project_id = ? AND is_deleted = FALSE
 `
@@ -764,6 +778,7 @@ type UpdateProjectParams struct {
 	DiskLimit              sql.NullInt32                  `json:"disk_limit"`
 	TrafficLimit           sql.NullInt64                  `json:"traffic_limit"`
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	ActiveDeploymentID     sql.NullInt32                  `json:"active_deployment_id"`
 	UpdatedAt              sql.NullTime                   `json:"updated_at"`
 	ProjectID              uint32                         `json:"project_id"`
 }
@@ -779,6 +794,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (s
 		arg.DiskLimit,
 		arg.TrafficLimit,
 		arg.ProjectOperationStatus,
+		arg.ActiveDeploymentID,
 		arg.UpdatedAt,
 		arg.ProjectID,
 	)

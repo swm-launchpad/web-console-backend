@@ -24,6 +24,7 @@ func createTestProjectForDeploy(projectID uint, operationStatus value.ProjectOpe
 		*slug,
 		value.ProjectStatusActive,
 		operationStatus,
+		nil, // activeDeploymentID
 		*limits,
 		now,
 		now,
@@ -73,7 +74,7 @@ func TestDeployService_buildTektonRequest(t *testing.T) {
 	assert.NotNil(t, request)
 	assert.Equal(t, "false", request.DryRun)
 	assert.Equal(t, "1", request.DeploymentConfigJSON.ProjectID)
-	assert.Equal(t, "test-service", request.DeploymentConfigJSON.ServiceName)
+	assert.Equal(t, "test-project", request.DeploymentConfigJSON.ServiceName) // Should use project slug, not hardcoded service name
 	assert.Equal(t, "test-namespace", request.DeploymentConfigJSON.Namespace)
 	assert.Equal(t, 180, request.DeploymentConfigJSON.StableWindow)
 	assert.Len(t, request.DeploymentConfigJSON.Containers, 1)

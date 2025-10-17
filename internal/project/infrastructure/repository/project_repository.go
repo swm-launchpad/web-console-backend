@@ -41,6 +41,7 @@ func (r *projectRepository) Create(ctx context.Context, project *model.Project) 
 		DiskLimit:              sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
 		TrafficLimit:           sql.NullInt64{Int64: int64(project.Limits().TrafficLimit()), Valid: true},
 		ProjectOperationStatus: projectOperationStatusToDB(project.OperationStatus()),
+		ActiveDeploymentID:     uintBoolToNullInt32(project.ActiveDeploymentID()),
 		CreatedAt:              project.CreatedAt(),
 		UpdatedAt:              sql.NullTime{Time: project.UpdatedAt(), Valid: !project.UpdatedAt().IsZero()},
 	}
@@ -93,6 +94,7 @@ func (r *projectRepository) Save(ctx context.Context, project *model.Project) er
 		DiskLimit:              sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
 		TrafficLimit:           sql.NullInt64{Int64: int64(project.Limits().TrafficLimit()), Valid: true},
 		ProjectOperationStatus: projectOperationStatusToDB(project.OperationStatus()),
+		ActiveDeploymentID:     uintBoolToNullInt32(project.ActiveDeploymentID()),
 		UpdatedAt:              sql.NullTime{Time: project.UpdatedAt(), Valid: !project.UpdatedAt().IsZero()},
 		ProjectID:              uint32(project.ProjectID()),
 	}
@@ -210,7 +212,8 @@ func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*mode
 	project, err := r.rowToDomainProject(
 		row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
 		row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
-		row.ProjectOperationStatus, row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+		row.ProjectOperationStatus, row.ActiveDeploymentID,
+		row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
 	)
 	if err != nil {
 		return nil, err
@@ -243,7 +246,8 @@ func (r *projectRepository) FindByIDForUpdate(ctx context.Context, projectID uin
 	project, err := r.rowToDomainProject(
 		row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
 		row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
-		row.ProjectOperationStatus, row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+		row.ProjectOperationStatus, row.ActiveDeploymentID,
+		row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
 	)
 	if err != nil {
 		return nil, err
@@ -302,7 +306,8 @@ func (r *projectRepository) FindByUserID(ctx context.Context, userID uint) ([]*m
 		project, err := r.rowToDomainProject(
 			row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
 			row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
-			row.ProjectOperationStatus, row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+			row.ProjectOperationStatus, row.ActiveDeploymentID,
+			row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
 		)
 		if err != nil {
 			return nil, err
@@ -371,7 +376,8 @@ func (r *projectRepository) FindProjectsWithActiveOperations(ctx context.Context
 		project, err := r.rowToDomainProject(
 			row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
 			row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
-			row.ProjectOperationStatus, row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+			row.ProjectOperationStatus, row.ActiveDeploymentID,
+			row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
 		)
 		if err != nil {
 			return nil, err
@@ -421,6 +427,7 @@ func (r *projectRepository) rowToDomainProject(
 	diskLimit sql.NullInt32,
 	trafficLimit sql.NullInt64,
 	operationStatus sqlc.ProjectsProjectOperationStatus,
+	activeDeploymentID sql.NullInt32,
 	createdAt time.Time,
 	updatedAt sql.NullTime,
 	deletedAt sql.NullTime,
@@ -454,12 +461,20 @@ func (r *projectRepository) rowToDomainProject(
 	// Convert operation status from DB
 	domainOperationStatus := projectOperationStatusFromDB(operationStatus)
 
+	// Convert active_deployment_id from DB
+	var domainActiveDeploymentID *uint
+	if activeDeploymentID.Valid {
+		deploymentID := uint(activeDeploymentID.Int32)
+		domainActiveDeploymentID = &deploymentID
+	}
+
 	project := model.ReconstructProject(
 		uint(projectID),
 		name,
 		*slug,
 		value.ProjectStatus(status),
 		domainOperationStatus,
+		domainActiveDeploymentID,
 		*limits,
 		createdAt,
 		finalUpdatedAt,
@@ -593,4 +608,13 @@ func fromNullTime(n sql.NullTime) *time.Time {
 		return nil
 	}
 	return &n.Time
+}
+
+// uintBoolToNullInt32 converts (uint, bool) to sql.NullInt32
+// Used for optional uint fields like ActiveDeploymentID
+func uintBoolToNullInt32(val uint, ok bool) sql.NullInt32 {
+	if !ok {
+		return sql.NullInt32{Valid: false}
+	}
+	return sql.NullInt32{Int32: int32(val), Valid: true}
 }

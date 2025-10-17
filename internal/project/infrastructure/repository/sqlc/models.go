@@ -503,6 +503,8 @@ type Project struct {
 	IsDeleted    bool           `json:"is_deleted"`
 	// Current operation status of the project
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
+	// ID of the deployment that currently owns the deploying status
+	ActiveDeploymentID sql.NullInt32 `json:"active_deployment_id"`
 }
 
 type ProjectUser struct {

@@ -218,6 +218,58 @@ func TestDeployment_UpdateRunningStatus(t *testing.T) {
 		assert.False(t, exists)
 	})
 
+	t.Run("idempotent update when already running (summary update)", func(t *testing.T) {
+		deployment := NewDeployment(123)
+
+		// First update: untracked -> running
+		firstSummary := "Starting deployment"
+		firstStartedAt := time.Now()
+		err := deployment.UpdateRunningStatus(&firstSummary, &firstStartedAt)
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
+
+		// Second update: running -> running (idempotent, summary update)
+		secondSummary := "Building image"
+		err = deployment.UpdateRunningStatus(&secondSummary, nil)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
+
+		// Summary should be updated to new value
+		s, exists := deployment.Summary()
+		assert.True(t, exists)
+		assert.Equal(t, secondSummary, s)
+
+		// StartedAt should remain the first value (not overwritten when nil)
+		st, exists := deployment.StartedAt()
+		assert.True(t, exists)
+		assert.Equal(t, firstStartedAt, st)
+	})
+
+	t.Run("idempotent update when already running (no change)", func(t *testing.T) {
+		deployment := NewDeployment(123)
+
+		// First update: untracked -> running
+		summary := "running"
+		startedAt := time.Now()
+		err := deployment.UpdateRunningStatus(&summary, &startedAt)
+		require.NoError(t, err)
+
+		// Second update: running -> running (no actual change)
+		err = deployment.UpdateRunningStatus(&summary, &startedAt)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
+
+		s, exists := deployment.Summary()
+		assert.True(t, exists)
+		assert.Equal(t, summary, s)
+
+		st, exists := deployment.StartedAt()
+		assert.True(t, exists)
+		assert.Equal(t, startedAt, st)
+	})
+
 	t.Run("cannot update if already completed", func(t *testing.T) {
 		deployment := NewDeployment(123)
 		msg := "error"

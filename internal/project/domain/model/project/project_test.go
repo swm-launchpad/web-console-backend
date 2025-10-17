@@ -489,68 +489,49 @@ func TestProject_OperationStatus(t *testing.T) {
 		assert.Equal(t, value.ProjectOperationStatusNothing, project.OperationStatus())
 	})
 
-	t.Run("성공: StartDeploying - nothing에서 deploying으로 전환", func(t *testing.T) {
+	t.Run("성공: StartDeploy - nothing에서 deploying으로 전환", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("my-project")
 		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
 
-		err := project.StartDeploying()
+		err := project.StartDeploy(1)
 
 		require.NoError(t, err)
 		assert.Equal(t, value.ProjectOperationStatusDeploying, project.OperationStatus())
 	})
 
-	t.Run("실패: StartDeploying - 이미 deploying 상태일 때", func(t *testing.T) {
+	t.Run("실패: StartDeploy - 이미 deploying 상태일 때", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("my-project")
 		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
-		_ = project.StartDeploying()
+		_ = project.StartDeploy(1)
 
-		err := project.StartDeploying()
+		err := project.StartDeploy(2)
 
 		assert.Error(t, err)
 		assert.Equal(t, value.ProjectOperationStatusDeploying, project.OperationStatus())
 	})
 
-	t.Run("성공: StartBuilding - nothing에서 building으로 전환", func(t *testing.T) {
+	t.Run("성공: CompleteDeploy - deploying에서 nothing으로 전환", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("my-project")
 		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		deploymentID := uint(1)
+		_ = project.StartDeploy(deploymentID)
 
-		err := project.StartBuilding()
+		err := project.CompleteDeploy(deploymentID)
 
 		require.NoError(t, err)
-		assert.Equal(t, value.ProjectOperationStatusBuilding, project.OperationStatus())
+		assert.Equal(t, value.ProjectOperationStatusNothing, project.OperationStatus())
 	})
 
-	t.Run("실패: StartBuilding - 이미 deploying 상태일 때", func(t *testing.T) {
+	t.Run("실패: CompleteDeploy - 다른 deployment가 lock을 소유할 때", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("my-project")
 		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
-		_ = project.StartDeploying()
+		deploymentID := uint(1)
+		_ = project.StartDeploy(deploymentID)
 
-		err := project.StartBuilding()
+		err := project.CompleteDeploy(uint(2)) // 다른 deployment ID로 시도
 
 		assert.Error(t, err)
 		assert.Equal(t, value.ProjectOperationStatusDeploying, project.OperationStatus())
-	})
-
-	t.Run("성공: CompleteOperation - deploying에서 nothing으로 전환", func(t *testing.T) {
-		slug, _ := value.NewProjectSlug("my-project")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
-		_ = project.StartDeploying()
-
-		err := project.CompleteOperation()
-
-		require.NoError(t, err)
-		assert.Equal(t, value.ProjectOperationStatusNothing, project.OperationStatus())
-	})
-
-	t.Run("성공: ResetOperationStatus - 어떤 상태에서든 nothing으로 강제 전환", func(t *testing.T) {
-		slug, _ := value.NewProjectSlug("my-project")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
-		_ = project.StartDeploying()
-
-		err := project.ResetOperationStatus()
-
-		require.NoError(t, err)
-		assert.Equal(t, value.ProjectOperationStatusNothing, project.OperationStatus())
 	})
 
 	t.Run("실패: 삭제된 프로젝트의 operation status 변경", func(t *testing.T) {
@@ -558,7 +539,7 @@ func TestProject_OperationStatus(t *testing.T) {
 		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
 		_ = project.SoftDelete()
 
-		err := project.StartDeploying()
+		err := project.StartDeploy(1)
 
 		assert.Error(t, err)
 	})
