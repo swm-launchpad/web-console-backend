@@ -30,6 +30,7 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrUserNotInProject:      {StatusCode: http.StatusNotFound, Code: "USER_NOT_IN_PROJECT", Message: "User not in project"},
 
 	// Validation errors
+	projecterrors.ErrMissingField:     {StatusCode: http.StatusBadRequest, Code: "MISSING_FIELD", Message: "Required field is missing"},
 	projecterrors.ErrNameRequired:     {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Project name is required"},
 	projecterrors.ErrSlugRequired:     {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Project slug is required"},
 	projecterrors.ErrInvalidSlug:      {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid project slug"},
