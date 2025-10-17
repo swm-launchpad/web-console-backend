@@ -14,15 +14,32 @@ func TestNewDeployment(t *testing.T) {
 
 	deployment := NewDeployment(projectID)
 
-	assert.Equal(t, uint(0), deployment.DeploymentID())
+	assert.Equal(t, uint(0), deployment.DeploymentID)
 	assert.Equal(t, projectID, deployment.ProjectID())
 	assert.Equal(t, DeploymentStatusUntracked, deployment.Status())
-	assert.Empty(t, deployment.Summary())
-	assert.Empty(t, deployment.TektonEventID())
-	assert.Empty(t, deployment.TektonPipelineRunName())
+
+	summary, exists := deployment.Summary()
+	assert.False(t, exists)
+	assert.Equal(t, "", summary)
+
+	eventID, exists := deployment.TektonEventID()
+	assert.False(t, exists)
+	assert.Equal(t, "", eventID)
+
+	runName, exists := deployment.TektonPipelineRunName()
+	assert.False(t, exists)
+	assert.Equal(t, "", runName)
+
 	assert.WithinDuration(t, time.Now(), deployment.CreatedAt(), time.Second)
-	assert.True(t, deployment.StartedAt().IsZero())
-	assert.True(t, deployment.FinishedAt().IsZero())
+
+	startedAt, exists := deployment.StartedAt()
+	assert.False(t, exists)
+	assert.True(t, startedAt.IsZero())
+
+	finishedAt, exists := deployment.FinishedAt()
+	assert.False(t, exists)
+	assert.True(t, finishedAt.IsZero())
+
 	assert.False(t, deployment.IsCompleted())
 }
 
@@ -31,35 +48,57 @@ func TestReconstructDeployment(t *testing.T) {
 		deploymentID := uint(1)
 		projectID := uint(123)
 		status := DeploymentStatusSuccess
-		summary := "Deployment successful"
-		tektonEventID := "event-123"
-		tektonPipelineRunName := "pipeline-run-123"
+		summaryVal := "Deployment successful"
+		summary := &summaryVal
+		eventIDVal := "event-123"
+		eventID := &eventIDVal
+		runNameVal := "pipeline-run-123"
+		runName := &runNameVal
 		createdAt := time.Now().Add(-1 * time.Hour)
-		startedAt := time.Now().Add(-30 * time.Minute)
-		finishedAt := time.Now()
+		startedAtVal := time.Now().Add(-30 * time.Minute)
+		startedAt := &startedAtVal
+		finishedAtVal := time.Now()
+		finishedAt := &finishedAtVal
 
 		deployment, err := ReconstructDeployment(
 			deploymentID,
 			projectID,
 			status,
 			summary,
-			tektonEventID,
-			tektonPipelineRunName,
+			eventID,
+			runName,
 			createdAt,
 			startedAt,
 			finishedAt,
 		)
 
 		require.NoError(t, err)
-		assert.Equal(t, deploymentID, deployment.DeploymentID())
+		assert.Equal(t, deploymentID, deployment.DeploymentID)
 		assert.Equal(t, projectID, deployment.ProjectID())
 		assert.Equal(t, status, deployment.Status())
-		assert.Equal(t, summary, deployment.Summary())
-		assert.Equal(t, tektonEventID, deployment.TektonEventID())
-		assert.Equal(t, tektonPipelineRunName, deployment.TektonPipelineRunName())
+
+		s, exists := deployment.Summary()
+		assert.True(t, exists)
+		assert.Equal(t, summaryVal, s)
+
+		e, exists := deployment.TektonEventID()
+		assert.True(t, exists)
+		assert.Equal(t, eventIDVal, e)
+
+		r, exists := deployment.TektonPipelineRunName()
+		assert.True(t, exists)
+		assert.Equal(t, runNameVal, r)
+
 		assert.Equal(t, createdAt, deployment.CreatedAt())
-		assert.Equal(t, startedAt, deployment.StartedAt())
-		assert.Equal(t, finishedAt, deployment.FinishedAt())
+
+		st, exists := deployment.StartedAt()
+		assert.True(t, exists)
+		assert.Equal(t, startedAtVal, st)
+
+		ft, exists := deployment.FinishedAt()
+		assert.True(t, exists)
+		assert.Equal(t, finishedAtVal, ft)
+
 		assert.True(t, deployment.IsCompleted())
 	})
 
@@ -68,12 +107,12 @@ func TestReconstructDeployment(t *testing.T) {
 			1,
 			123,
 			DeploymentStatus("invalid"),
-			"",
-			"",
-			"",
+			nil,
+			nil,
+			nil,
 			time.Now(),
-			time.Time{},
-			time.Time{},
+			nil,
+			nil,
 		)
 
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentStatus)
@@ -83,251 +122,367 @@ func TestReconstructDeployment(t *testing.T) {
 
 func TestDeployment_SetDeploymentID(t *testing.T) {
 	deployment := NewDeployment(123)
-	assert.Equal(t, uint(0), deployment.DeploymentID())
+	assert.Equal(t, uint(0), deployment.DeploymentID)
 
 	deployment.SetDeploymentID(456)
-	assert.Equal(t, uint(456), deployment.DeploymentID())
+	assert.Equal(t, uint(456), deployment.DeploymentID)
 }
 
-func TestDeployment_MarkAsTriggerFailed(t *testing.T) {
-	t.Run("successful transition from untracked", func(t *testing.T) {
+func TestDeployment_InitTektonInfo(t *testing.T) {
+	t.Run("set both event ID and run name", func(t *testing.T) {
 		deployment := NewDeployment(123)
-		summary := "Failed to trigger Tekton API"
+		eventIDVal := "event-123"
+		eventID := &eventIDVal
+		runNameVal := "pipeline-run-123"
+		runName := &runNameVal
 
-		err := deployment.MarkAsTriggerFailed(summary)
+		err := deployment.InitTektonInfo(eventID, runName)
+
+		require.NoError(t, err)
+		e, exists := deployment.TektonEventID()
+		assert.True(t, exists)
+		assert.Equal(t, eventIDVal, e)
+
+		r, exists := deployment.TektonPipelineRunName()
+		assert.True(t, exists)
+		assert.Equal(t, runNameVal, r)
+	})
+
+	t.Run("set only event ID", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		eventIDVal := "event-456"
+		eventID := &eventIDVal
+
+		err := deployment.InitTektonInfo(eventID, nil)
+
+		require.NoError(t, err)
+		e, exists := deployment.TektonEventID()
+		assert.True(t, exists)
+		assert.Equal(t, eventIDVal, e)
+
+		_, exists = deployment.TektonPipelineRunName()
+		assert.False(t, exists)
+	})
+
+	t.Run("set only run name", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		runNameVal := "pipeline-run-456"
+		runName := &runNameVal
+
+		err := deployment.InitTektonInfo(nil, runName)
+
+		require.NoError(t, err)
+		_, exists := deployment.TektonEventID()
+		assert.False(t, exists)
+
+		r, exists := deployment.TektonPipelineRunName()
+		assert.True(t, exists)
+		assert.Equal(t, runNameVal, r)
+	})
+}
+
+func TestDeployment_UpdateRunningStatus(t *testing.T) {
+	t.Run("successful update with summary and startedAt", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		summaryVal := "running"
+		summary := &summaryVal
+		startedAtVal := time.Now()
+		startedAt := &startedAtVal
+
+		err := deployment.UpdateRunningStatus(summary, startedAt)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
+
+		s, exists := deployment.Summary()
+		assert.True(t, exists)
+		assert.Equal(t, summaryVal, s)
+
+		st, exists := deployment.StartedAt()
+		assert.True(t, exists)
+		assert.Equal(t, startedAtVal, st)
+	})
+
+	t.Run("successful update with nil values", func(t *testing.T) {
+		deployment := NewDeployment(123)
+
+		err := deployment.UpdateRunningStatus(nil, nil)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
+
+		_, exists := deployment.Summary()
+		assert.False(t, exists)
+
+		_, exists = deployment.StartedAt()
+		assert.False(t, exists)
+	})
+
+	t.Run("cannot update if already completed", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		msg := "error"
+		_ = deployment.UpdateBackendStatus(DeploymentStatusBackendTriggerFailed, &msg)
+
+		err := deployment.UpdateRunningStatus(nil, nil)
+
+		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentTransition)
+	})
+}
+
+func TestDeployment_UpdateCompleteStatus(t *testing.T) {
+	t.Run("successful completion", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		summaryVal := "success"
+		summary := &summaryVal
+		finishedAt := time.Now()
+
+		err := deployment.UpdateCompleteStatus(DeploymentStatusSuccess, summary, finishedAt)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
+
+		s, exists := deployment.Summary()
+		assert.True(t, exists)
+		assert.Equal(t, summaryVal, s)
+
+		ft, exists := deployment.FinishedAt()
+		assert.True(t, exists)
+		assert.Equal(t, finishedAt, ft)
+		assert.True(t, deployment.IsCompleted())
+	})
+
+	t.Run("can complete from untracked", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		finishedAt := time.Now()
+
+		err := deployment.UpdateCompleteStatus(DeploymentStatusSuccess, nil, finishedAt)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
+		assert.True(t, deployment.IsCompleted())
+	})
+
+	t.Run("invalid status", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		finishedAt := time.Now()
+
+		err := deployment.UpdateCompleteStatus(DeploymentStatusUntracked, nil, finishedAt)
+
+		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentStatus)
+	})
+
+	t.Run("cannot overwrite completed status with different status", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		finishedAt := time.Now()
+
+		// First complete with success
+		err := deployment.UpdateCompleteStatus(DeploymentStatusSuccess, nil, finishedAt)
+		require.NoError(t, err)
+
+		// Try to overwrite with failed
+		err = deployment.UpdateCompleteStatus(DeploymentStatusFailed, nil, finishedAt)
+
+		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentTransition)
+		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
+	})
+
+	t.Run("can update completed status with same status (idempotent)", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		finishedAt := time.Now()
+
+		// First complete with success
+		err := deployment.UpdateCompleteStatus(DeploymentStatusSuccess, nil, finishedAt)
+		require.NoError(t, err)
+
+		// Update again with same status (idempotent)
+		newFinishedAt := time.Now()
+		err = deployment.UpdateCompleteStatus(DeploymentStatusSuccess, nil, newFinishedAt)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
+	})
+}
+
+func TestDeployment_UpdateBackendStatus(t *testing.T) {
+	t.Run("backend_trigger_failed from untracked", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		summaryVal := "trigger failed"
+		summary := &summaryVal
+
+		before := time.Now()
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTriggerFailed, summary)
+		after := time.Now()
 
 		require.NoError(t, err)
 		assert.Equal(t, DeploymentStatusBackendTriggerFailed, deployment.Status())
-		assert.Equal(t, summary, deployment.Summary())
-		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
+
+		s, exists := deployment.Summary()
+		assert.True(t, exists)
+		assert.Equal(t, summaryVal, s)
+
+		ft, exists := deployment.FinishedAt()
+		assert.True(t, exists)
+		assert.True(t, !ft.Before(before))
+		assert.True(t, !ft.After(after))
 		assert.True(t, deployment.IsCompleted())
 	})
 
-	t.Run("cannot transition from running", func(t *testing.T) {
+	t.Run("backend_tracking_lost from running", func(t *testing.T) {
 		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		summaryVal := "tracking lost"
+		summary := &summaryVal
 
-		err := deployment.MarkAsTriggerFailed("error")
-
-		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentTransition)
-		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
-	})
-}
-
-func TestDeployment_MarkAsTracking(t *testing.T) {
-	t.Run("successful tracking from untracked", func(t *testing.T) {
-		deployment := NewDeployment(123)
-		eventID := "event-123"
-
-		err := deployment.MarkAsTracking(eventID)
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTrackingLost, summary)
 
 		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusUntracked, deployment.Status()) // Status remains untracked
-		assert.Equal(t, eventID, deployment.TektonEventID())
-		assert.False(t, deployment.IsCompleted())
+		assert.Equal(t, DeploymentStatusBackendTrackingLost, deployment.Status())
+		assert.False(t, deployment.IsCompleted()) // backend_tracking_lost is NOT a terminal state
 	})
 
-	t.Run("cannot set tracking from running", func(t *testing.T) {
+	t.Run("invalid status", func(t *testing.T) {
 		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
 
-		err := deployment.MarkAsTracking("event-456")
+		err := deployment.UpdateBackendStatus(DeploymentStatusSuccess, nil)
+
+		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentStatus)
+	})
+
+	t.Run("backend_trigger_failed cannot transition from running", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.UpdateRunningStatus(nil, nil)
+
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTriggerFailed, nil)
 
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentTransition)
-		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
 	})
-}
 
-func TestDeployment_MarkAsTrackingFailed(t *testing.T) {
-	t.Run("successful transition from untracked", func(t *testing.T) {
+	t.Run("backend_tracking_failed can transition from untracked", func(t *testing.T) {
 		deployment := NewDeployment(123)
-		_ = deployment.MarkAsTracking("event-123")
-		summary := "Failed to track within 5 minutes"
+		summaryVal := "tracking failed"
+		summary := &summaryVal
 
-		err := deployment.MarkAsTrackingFailed(summary)
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTrackingFailed, summary)
 
 		require.NoError(t, err)
 		assert.Equal(t, DeploymentStatusBackendTrackingFailed, deployment.Status())
-		assert.Equal(t, summary, deployment.Summary())
-		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
 		assert.True(t, deployment.IsCompleted())
 	})
-}
 
-func TestDeployment_MarkAsTrackingLost(t *testing.T) {
-	t.Run("successful transition from untracked", func(t *testing.T) {
+	t.Run("backend_tracking_failed can transition from running", func(t *testing.T) {
 		deployment := NewDeployment(123)
-		_ = deployment.MarkAsTracking("event-123")
-		summary := "Authentication failed"
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		summaryVal := "tracking failed during running"
+		summary := &summaryVal
 
-		err := deployment.MarkAsTrackingLost(summary)
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTrackingFailed, summary)
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusBackendTrackingFailed, deployment.Status())
+		assert.True(t, deployment.IsCompleted())
+	})
+
+	t.Run("backend_tracking_lost can transition from untracked", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		summaryVal := "tracking lost"
+		summary := &summaryVal
+
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTrackingLost, summary)
 
 		require.NoError(t, err)
 		assert.Equal(t, DeploymentStatusBackendTrackingLost, deployment.Status())
-		assert.Equal(t, summary, deployment.Summary())
-		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
-		assert.True(t, deployment.IsCompleted())
-	})
-
-	t.Run("successful transition from running", func(t *testing.T) {
-		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
-		summary := "PipelineRun not found"
-
-		err := deployment.MarkAsTrackingLost(summary)
-
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusBackendTrackingLost, deployment.Status())
-		assert.Equal(t, summary, deployment.Summary())
-		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
-		assert.True(t, deployment.IsCompleted())
-	})
-
-	t.Run("cannot transition from success", func(t *testing.T) {
-		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
-		_ = deployment.Complete("success")
-
-		err := deployment.MarkAsTrackingLost("error")
-
-		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentTransition)
-		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
-	})
-}
-
-func TestDeployment_MarkAsRunning(t *testing.T) {
-	t.Run("successful transition from untracked", func(t *testing.T) {
-		deployment := NewDeployment(123)
-		_ = deployment.MarkAsTracking("event-123")
-		pipelineRunName := "pipeline-run-123"
-
-		err := deployment.MarkAsRunning(pipelineRunName)
-
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
-		assert.Equal(t, pipelineRunName, deployment.TektonPipelineRunName())
-		assert.WithinDuration(t, time.Now(), deployment.StartedAt(), time.Second)
-		assert.True(t, deployment.FinishedAt().IsZero())
 		assert.False(t, deployment.IsCompleted())
 	})
 
-	t.Run("cannot transition from success", func(t *testing.T) {
+	t.Run("backend_tracking_failed cannot transition from completed", func(t *testing.T) {
 		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
-		_ = deployment.Complete("success")
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		_ = deployment.UpdateCompleteStatus(DeploymentStatusSuccess, nil, time.Now())
 
-		err := deployment.MarkAsRunning("pipeline-run-456")
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTrackingFailed, nil)
 
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentTransition)
-		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
 	})
-}
 
-func TestDeployment_Complete(t *testing.T) {
-	t.Run("successful completion from running", func(t *testing.T) {
+	t.Run("backend_tracking_lost cannot transition from completed", func(t *testing.T) {
 		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
-		summary := "Deployment completed successfully"
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		_ = deployment.UpdateCompleteStatus(DeploymentStatusSuccess, nil, time.Now())
 
-		err := deployment.Complete(summary)
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTrackingLost, nil)
+
+		assert.ErrorIs(t, err, projecterrors.ErrInvalidDeploymentTransition)
+	})
+
+	t.Run("backend_tracking_lost does NOT set finishedAt (recoverable state)", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		summaryVal := "tracking lost"
+		summary := &summaryVal
+
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTrackingLost, summary)
 
 		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
-		assert.Equal(t, summary, deployment.Summary())
-		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
+		assert.Equal(t, DeploymentStatusBackendTrackingLost, deployment.Status())
+
+		// finishedAt should NOT be set for recoverable backend_tracking_lost state
+		_, exists := deployment.FinishedAt()
+		assert.False(t, exists, "backend_tracking_lost should NOT set finishedAt")
+
+		assert.False(t, deployment.IsCompleted())
+	})
+
+	t.Run("backend_tracking_failed DOES set finishedAt (terminal state)", func(t *testing.T) {
+		deployment := NewDeployment(123)
+		_ = deployment.UpdateRunningStatus(nil, nil)
+		summaryVal := "tracking failed"
+		summary := &summaryVal
+
+		before := time.Now()
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTrackingFailed, summary)
+		after := time.Now()
+
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentStatusBackendTrackingFailed, deployment.Status())
+
+		// finishedAt SHOULD be set for terminal backend_tracking_failed state
+		ft, exists := deployment.FinishedAt()
+		assert.True(t, exists, "backend_tracking_failed SHOULD set finishedAt")
+		assert.True(t, !ft.Before(before))
+		assert.True(t, !ft.After(after))
+
 		assert.True(t, deployment.IsCompleted())
 	})
 
-	t.Run("cannot complete from untracked", func(t *testing.T) {
+	t.Run("recovery from backend_tracking_lost to running clears finishedAt", func(t *testing.T) {
 		deployment := NewDeployment(123)
+		_ = deployment.UpdateRunningStatus(nil, nil)
 
-		err := deployment.Complete("success")
-
-		assert.ErrorIs(t, err, projecterrors.ErrCannotCompleteDeployment)
-		assert.Equal(t, DeploymentStatusUntracked, deployment.Status())
-	})
-
-	t.Run("cannot complete from failed", func(t *testing.T) {
-		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
-		_ = deployment.Fail("error occurred")
-
-		err := deployment.Complete("success")
-
-		assert.ErrorIs(t, err, projecterrors.ErrCannotCompleteDeployment)
-		assert.Equal(t, DeploymentStatusFailed, deployment.Status())
-	})
-}
-
-func TestDeployment_Fail(t *testing.T) {
-	t.Run("successful failure from running", func(t *testing.T) {
-		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
-		summary := "Deployment failed due to build error"
-
-		err := deployment.Fail(summary)
-
+		// Simulate network loss - deployment goes to backend_tracking_lost
+		summaryVal := "tracking lost"
+		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTrackingLost, &summaryVal)
 		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusFailed, deployment.Status())
-		assert.Equal(t, summary, deployment.Summary())
-		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
-		assert.True(t, deployment.IsCompleted())
-	})
+		assert.Equal(t, DeploymentStatusBackendTrackingLost, deployment.Status())
 
-	t.Run("cannot fail from untracked", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		// Verify finishedAt is not set
+		_, exists := deployment.FinishedAt()
+		assert.False(t, exists)
 
-		err := deployment.Fail("error")
-
-		assert.ErrorIs(t, err, projecterrors.ErrCannotFailDeployment)
-		assert.Equal(t, DeploymentStatusUntracked, deployment.Status())
-	})
-
-	t.Run("cannot fail from success", func(t *testing.T) {
-		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
-		_ = deployment.Complete("success")
-
-		err := deployment.Fail("error")
-
-		assert.ErrorIs(t, err, projecterrors.ErrCannotFailDeployment)
-		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
-	})
-}
-
-func TestDeployment_Cancel(t *testing.T) {
-	t.Run("successful cancellation from running", func(t *testing.T) {
-		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
-		summary := "Deployment cancelled by user"
-
-		err := deployment.Cancel(summary)
-
+		// Network recovers - deployment returns to running
+		newSummary := "running again"
+		err = deployment.UpdateRunningStatus(&newSummary, nil)
 		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusCancelled, deployment.Status())
-		assert.Equal(t, summary, deployment.Summary())
-		assert.WithinDuration(t, time.Now(), deployment.FinishedAt(), time.Second)
-		assert.True(t, deployment.IsCompleted())
-	})
+		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
 
-	t.Run("cannot cancel from untracked", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		// Verify finishedAt is still not set
+		_, exists = deployment.FinishedAt()
+		assert.False(t, exists, "finishedAt should remain nil after recovery to running")
 
-		err := deployment.Cancel("cancelled")
-
-		assert.ErrorIs(t, err, projecterrors.ErrCannotCancelDeployment)
-		assert.Equal(t, DeploymentStatusUntracked, deployment.Status())
-	})
-
-	t.Run("cannot cancel from success", func(t *testing.T) {
-		deployment := NewDeployment(123)
-		_ = deployment.MarkAsRunning("pipeline-run-123")
-		_ = deployment.Complete("success")
-
-		err := deployment.Cancel("cancelled")
-
-		assert.ErrorIs(t, err, projecterrors.ErrCannotCancelDeployment)
-		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
+		assert.False(t, deployment.IsCompleted())
 	})
 }
 
@@ -345,56 +500,54 @@ func TestDeployment_IsCompleted(t *testing.T) {
 		{
 			name: "running is not completed",
 			setup: func(d *Deployment) {
-				_ = d.MarkAsRunning("pipeline-run")
+				_ = d.UpdateRunningStatus(nil, nil)
 			},
 			completed: false,
 		},
 		{
 			name: "success is completed",
 			setup: func(d *Deployment) {
-				_ = d.MarkAsRunning("pipeline-run")
-				_ = d.Complete("success")
+				_ = d.UpdateRunningStatus(nil, nil)
+				_ = d.UpdateCompleteStatus(DeploymentStatusSuccess, nil, time.Now())
 			},
 			completed: true,
 		},
 		{
 			name: "failed is completed",
 			setup: func(d *Deployment) {
-				_ = d.MarkAsRunning("pipeline-run")
-				_ = d.Fail("error")
+				_ = d.UpdateRunningStatus(nil, nil)
+				_ = d.UpdateCompleteStatus(DeploymentStatusFailed, nil, time.Now())
 			},
 			completed: true,
 		},
 		{
 			name: "cancelled is completed",
 			setup: func(d *Deployment) {
-				_ = d.MarkAsRunning("pipeline-run")
-				_ = d.Cancel("cancelled by user")
+				_ = d.UpdateRunningStatus(nil, nil)
+				_ = d.UpdateCompleteStatus(DeploymentStatusCancelled, nil, time.Now())
 			},
 			completed: true,
 		},
 		{
 			name: "backend_trigger_failed is completed",
 			setup: func(d *Deployment) {
-				_ = d.MarkAsTriggerFailed("trigger failed")
+				_ = d.UpdateBackendStatus(DeploymentStatusBackendTriggerFailed, nil)
 			},
 			completed: true,
 		},
 		{
 			name: "backend_tracking_failed is completed",
 			setup: func(d *Deployment) {
-				_ = d.MarkAsTracking("event-123")
-				_ = d.MarkAsTrackingFailed("tracking failed")
+				_ = d.UpdateBackendStatus(DeploymentStatusBackendTrackingFailed, nil)
 			},
 			completed: true,
 		},
 		{
-			name: "backend_tracking_lost is completed",
+			name: "backend_tracking_lost is NOT completed (can be recovered)",
 			setup: func(d *Deployment) {
-				_ = d.MarkAsTracking("event-123")
-				_ = d.MarkAsTrackingLost("tracking lost")
+				_ = d.UpdateBackendStatus(DeploymentStatusBackendTrackingLost, nil)
 			},
-			completed: true,
+			completed: false,
 		},
 	}
 
@@ -406,93 +559,4 @@ func TestDeployment_IsCompleted(t *testing.T) {
 			assert.Equal(t, tt.completed, deployment.IsCompleted())
 		})
 	}
-}
-
-func TestDeployment_StateTransitions(t *testing.T) {
-	t.Run("full success flow", func(t *testing.T) {
-		deployment := NewDeployment(123)
-
-		// untracked -> tracking (set event ID)
-		err := deployment.MarkAsTracking("event-123")
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusUntracked, deployment.Status())
-		assert.Equal(t, "event-123", deployment.TektonEventID())
-
-		// untracked -> running
-		err = deployment.MarkAsRunning("pipeline-run-123")
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
-		assert.False(t, deployment.IsCompleted())
-
-		// running -> success
-		err = deployment.Complete("Deployment successful")
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusSuccess, deployment.Status())
-		assert.True(t, deployment.IsCompleted())
-	})
-
-	t.Run("full failure flow", func(t *testing.T) {
-		deployment := NewDeployment(123)
-
-		// untracked -> running
-		err := deployment.MarkAsRunning("pipeline-run-123")
-		require.NoError(t, err)
-
-		// running -> failed
-		err = deployment.Fail("Build failed")
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusFailed, deployment.Status())
-		assert.True(t, deployment.IsCompleted())
-	})
-
-	t.Run("backend trigger failure", func(t *testing.T) {
-		deployment := NewDeployment(123)
-
-		// untracked -> backend_trigger_failed
-		err := deployment.MarkAsTriggerFailed("Failed to trigger Tekton")
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusBackendTriggerFailed, deployment.Status())
-		assert.True(t, deployment.IsCompleted())
-	})
-
-	t.Run("backend tracking failure", func(t *testing.T) {
-		deployment := NewDeployment(123)
-
-		// Set event ID
-		_ = deployment.MarkAsTracking("event-123")
-
-		// untracked -> backend_tracking_failed
-		err := deployment.MarkAsTrackingFailed("Failed to track within 5 minutes")
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusBackendTrackingFailed, deployment.Status())
-		assert.True(t, deployment.IsCompleted())
-	})
-
-	t.Run("backend tracking lost", func(t *testing.T) {
-		deployment := NewDeployment(123)
-
-		// Set event ID
-		_ = deployment.MarkAsTracking("event-123")
-
-		// untracked -> backend_tracking_lost
-		err := deployment.MarkAsTrackingLost("Authentication failed")
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusBackendTrackingLost, deployment.Status())
-		assert.True(t, deployment.IsCompleted())
-	})
-
-	t.Run("cancellation flow", func(t *testing.T) {
-		deployment := NewDeployment(123)
-
-		// untracked -> running
-		err := deployment.MarkAsRunning("pipeline-run-123")
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusRunning, deployment.Status())
-
-		// running -> cancelled
-		err = deployment.Cancel("User cancelled deployment")
-		require.NoError(t, err)
-		assert.Equal(t, DeploymentStatusCancelled, deployment.Status())
-		assert.True(t, deployment.IsCompleted())
-	})
 }

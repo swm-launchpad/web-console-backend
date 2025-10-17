@@ -108,15 +108,20 @@ func TestDeployService_updateDeploymentStatus_Running(t *testing.T) {
 
 	d := deployment.NewDeployment(1)
 	d.SetDeploymentID(1)
-	_ = d.MarkAsTracking("event-123")
+	eventID := "event-123"
+	_ = d.InitTektonInfo(&eventID, nil)
 
 	// Simulate Running status
-	err := d.MarkAsRunning("deploy-run-abc")
+	runName := "deploy-run-abc"
+	_ = d.InitTektonInfo(nil, &runName)
+	err := d.UpdateRunningStatus(nil, nil)
 
 	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, deployment.DeploymentStatusRunning, d.Status())
-	assert.Equal(t, "deploy-run-abc", d.TektonPipelineRunName())
+	r, exists := d.TektonPipelineRunName()
+	assert.True(t, exists)
+	assert.Equal(t, "deploy-run-abc", r)
 }
 
 func TestDeployService_updateDeploymentStatus_Success(t *testing.T) {
@@ -124,11 +129,15 @@ func TestDeployService_updateDeploymentStatus_Success(t *testing.T) {
 
 	d := deployment.NewDeployment(1)
 	d.SetDeploymentID(1)
-	_ = d.MarkAsTracking("event-123")
-	_ = d.MarkAsRunning("deploy-run-abc")
+	eventID := "event-123"
+	_ = d.InitTektonInfo(&eventID, nil)
+	runName := "deploy-run-abc"
+	_ = d.InitTektonInfo(nil, &runName)
+	_ = d.UpdateRunningStatus(nil, nil)
 
 	// Simulate Success status
-	err := d.Complete("Deployment succeeded")
+	msg := "Deployment succeeded"
+	err := d.UpdateCompleteStatus(deployment.DeploymentStatusSuccess, &msg, time.Now())
 
 	// Assert
 	assert.NoError(t, err)
@@ -141,11 +150,15 @@ func TestDeployService_updateDeploymentStatus_Failed(t *testing.T) {
 
 	d := deployment.NewDeployment(1)
 	d.SetDeploymentID(1)
-	_ = d.MarkAsTracking("event-123")
-	_ = d.MarkAsRunning("deploy-run-abc")
+	eventID := "event-123"
+	_ = d.InitTektonInfo(&eventID, nil)
+	runName := "deploy-run-abc"
+	_ = d.InitTektonInfo(nil, &runName)
+	_ = d.UpdateRunningStatus(nil, nil)
 
 	// Simulate Failed status
-	err := d.Fail("Task failed: build-and-deploy")
+	msg := "Task failed: build-and-deploy"
+	err := d.UpdateCompleteStatus(deployment.DeploymentStatusFailed, &msg, time.Now())
 
 	// Assert
 	assert.NoError(t, err)
@@ -158,12 +171,17 @@ func TestDeployService_updateDeploymentStatus_AlreadyCompleted(t *testing.T) {
 
 	d := deployment.NewDeployment(1)
 	d.SetDeploymentID(1)
-	_ = d.MarkAsTracking("event-123")
-	_ = d.MarkAsRunning("deploy-run-abc")
-	_ = d.Complete("Already completed")
+	eventID := "event-123"
+	_ = d.InitTektonInfo(&eventID, nil)
+	runName := "deploy-run-abc"
+	_ = d.InitTektonInfo(nil, &runName)
+	_ = d.UpdateRunningStatus(nil, nil)
+	msg := "Already completed"
+	_ = d.UpdateCompleteStatus(deployment.DeploymentStatusSuccess, &msg, time.Now())
 
 	// Try to fail after completion - should return error
-	err := d.Fail("Should not overwrite")
+	failMsg := "Should not overwrite"
+	err := d.UpdateCompleteStatus(deployment.DeploymentStatusFailed, &failMsg, time.Now())
 
 	// Assert
 	assert.Error(t, err)

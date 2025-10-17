@@ -57,7 +57,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 
 		// Then
 		require.NoError(t, err)
-		assert.NotZero(t, d.DeploymentID(), "Deployment ID should be set after creation")
+		assert.NotZero(t, d.DeploymentID, "Deployment ID should be set after creation")
 		assert.Equal(t, deployment.DeploymentStatusUntracked, d.Status())
 	})
 
@@ -70,7 +70,9 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 
 		// When - Start deployment
 		tektonRef := "pipeline-run-123"
-		err = d.MarkAsRunning(tektonRef)
+		_ = d.InitTektonInfo(nil, &tektonRef)
+		startTime := time.Now()
+		err = d.UpdateRunningStatus(nil, &startTime)
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 
@@ -78,11 +80,15 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify by fetching
-		fetched, err := repo.FindByID(ctx, d.DeploymentID())
+		fetched, err := repo.FindByID(ctx, d.DeploymentID)
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusRunning, fetched.Status())
-		assert.Equal(t, tektonRef, fetched.TektonPipelineRunName())
-		assert.False(t, fetched.StartedAt().IsZero())
+		runName, exists := fetched.TektonPipelineRunName()
+		assert.True(t, exists)
+		assert.Equal(t, tektonRef, runName)
+		st, exists := fetched.StartedAt()
+		assert.True(t, exists)
+		assert.False(t, st.IsZero())
 	})
 
 	t.Run("Save - Not found error", func(t *testing.T) {
@@ -105,7 +111,8 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		tektonRef := "pipeline-run-456"
-		err = d.MarkAsRunning(tektonRef)
+		_ = d.InitTektonInfo(nil, &tektonRef)
+		err = d.UpdateRunningStatus(nil, nil)
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 		require.NoError(t, err)
@@ -117,10 +124,12 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify data is still correct
-		fetched, err := repo.FindByID(ctx, d.DeploymentID())
+		fetched, err := repo.FindByID(ctx, d.DeploymentID)
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusRunning, fetched.Status())
-		assert.Equal(t, tektonRef, fetched.TektonPipelineRunName())
+		runName, exists := fetched.TektonPipelineRunName()
+		assert.True(t, exists)
+		assert.Equal(t, tektonRef, runName)
 	})
 
 	t.Run("FindByID - Existing deployment", func(t *testing.T) {
@@ -131,11 +140,11 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// When
-		fetched, err := repo.FindByID(ctx, d.DeploymentID())
+		fetched, err := repo.FindByID(ctx, d.DeploymentID)
 
 		// Then
 		require.NoError(t, err)
-		assert.Equal(t, d.DeploymentID(), fetched.DeploymentID())
+		assert.Equal(t, d.DeploymentID, fetched.DeploymentID)
 		assert.Equal(t, d.ProjectID(), fetched.ProjectID())
 		assert.Equal(t, d.Status(), fetched.Status())
 	})
@@ -170,7 +179,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		// Then
 		require.NoError(t, err)
 		// With ORDER BY created_at DESC, deployment_id DESC, the latest created (highest ID) is returned
-		assert.Equal(t, d3.DeploymentID(), latest.DeploymentID(), "Should return the most recent deployment")
+		assert.Equal(t, d3.DeploymentID, latest.DeploymentID, "Should return the most recent deployment")
 	})
 
 	t.Run("FindLatestByProjectID - Not found", func(t *testing.T) {
@@ -193,7 +202,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 			d := deployment.NewDeployment(pid)
 			err := repo.Create(ctx, d)
 			require.NoError(t, err)
-			deploymentIDs = append(deploymentIDs, d.DeploymentID())
+			deploymentIDs = append(deploymentIDs, d.DeploymentID)
 		}
 
 		// When - Fetch first page (limit 3, offset 0)
@@ -211,9 +220,9 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		assert.Len(t, page2, 2, "Second page should have 2 items")
 
 		// Verify order (newest first by deployment_id DESC) - last created should be first
-		assert.Equal(t, deploymentIDs[4], page1[0].DeploymentID(), "Newest deployment should be first")
-		assert.Equal(t, deploymentIDs[3], page1[1].DeploymentID())
-		assert.Equal(t, deploymentIDs[2], page1[2].DeploymentID())
+		assert.Equal(t, deploymentIDs[4], page1[0].DeploymentID, "Newest deployment should be first")
+		assert.Equal(t, deploymentIDs[3], page1[1].DeploymentID)
+		assert.Equal(t, deploymentIDs[2], page1[2].DeploymentID)
 	})
 
 	t.Run("FindByProjectID - Empty result", func(t *testing.T) {
@@ -237,29 +246,38 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		assert.Equal(t, deployment.DeploymentStatusUntracked, d.Status())
 
 		// When - Start deployment
-		err = d.MarkAsRunning("pipeline-run-123")
+		tektonRef := "pipeline-run-123"
+		_ = d.InitTektonInfo(nil, &tektonRef)
+		err = d.UpdateRunningStatus(nil, nil)
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 		require.NoError(t, err)
 
 		// Then - Verify running status
-		fetched, err := repo.FindByID(ctx, d.DeploymentID())
+		fetched, err := repo.FindByID(ctx, d.DeploymentID)
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusRunning, fetched.Status())
-		assert.Equal(t, "pipeline-run-123", fetched.TektonPipelineRunName())
+		runName, exists := fetched.TektonPipelineRunName()
+		assert.True(t, exists)
+		assert.Equal(t, "pipeline-run-123", runName)
 
 		// When - Complete deployment
-		err = fetched.Complete("Deployment successful")
+		summaryVal := "Deployment successful"
+		err = fetched.UpdateCompleteStatus(deployment.DeploymentStatusSuccess, &summaryVal, time.Now())
 		require.NoError(t, err)
 		err = repo.Save(ctx, fetched)
 		require.NoError(t, err)
 
 		// Then - Verify success status
-		final, err := repo.FindByID(ctx, d.DeploymentID())
+		final, err := repo.FindByID(ctx, d.DeploymentID)
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusSuccess, final.Status())
-		assert.Equal(t, "Deployment successful", final.Summary())
-		assert.False(t, final.FinishedAt().IsZero())
+		summary, exists := final.Summary()
+		assert.True(t, exists)
+		assert.Equal(t, "Deployment successful", summary)
+		finishedAt, exists := final.FinishedAt()
+		assert.True(t, exists)
+		assert.False(t, finishedAt.IsZero())
 		assert.True(t, final.IsCompleted())
 	})
 
@@ -270,25 +288,32 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
 
-		err = d.MarkAsRunning("pipeline-run-456")
+		tektonRef := "pipeline-run-456"
+		_ = d.InitTektonInfo(nil, &tektonRef)
+		err = d.UpdateRunningStatus(nil, nil)
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 		require.NoError(t, err)
 
 		// When - Fail deployment
-		fetched, err := repo.FindByID(ctx, d.DeploymentID())
+		fetched, err := repo.FindByID(ctx, d.DeploymentID)
 		require.NoError(t, err)
-		err = fetched.Fail("Build failed: syntax error")
+		summaryVal := "Build failed: syntax error"
+		err = fetched.UpdateCompleteStatus(deployment.DeploymentStatusFailed, &summaryVal, time.Now())
 		require.NoError(t, err)
 		err = repo.Save(ctx, fetched)
 		require.NoError(t, err)
 
 		// Then - Verify failed status
-		final, err := repo.FindByID(ctx, d.DeploymentID())
+		final, err := repo.FindByID(ctx, d.DeploymentID)
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusFailed, final.Status())
-		assert.Equal(t, "Build failed: syntax error", final.Summary())
-		assert.False(t, final.FinishedAt().IsZero())
+		summary, exists := final.Summary()
+		assert.True(t, exists)
+		assert.Equal(t, "Build failed: syntax error", summary)
+		finishedAt, exists := final.FinishedAt()
+		assert.True(t, exists)
+		assert.False(t, finishedAt.IsZero())
 		assert.True(t, final.IsCompleted())
 	})
 
@@ -300,16 +325,19 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// When - Mark trigger failed immediately
-		err = d.MarkAsTriggerFailed("Failed to trigger")
+		summaryVal := "Failed to trigger"
+		err = d.UpdateBackendStatus(deployment.DeploymentStatusBackendTriggerFailed, &summaryVal)
 		require.NoError(t, err)
 		err = repo.Save(ctx, d)
 		require.NoError(t, err)
 
 		// Then - Verify backend_trigger_failed status
-		fetched, err := repo.FindByID(ctx, d.DeploymentID())
+		fetched, err := repo.FindByID(ctx, d.DeploymentID)
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusBackendTriggerFailed, fetched.Status())
-		assert.Equal(t, "Failed to trigger", fetched.Summary())
+		summary, exists := fetched.Summary()
+		assert.True(t, exists)
+		assert.Equal(t, "Failed to trigger", summary)
 		assert.True(t, fetched.IsCompleted())
 	})
 }

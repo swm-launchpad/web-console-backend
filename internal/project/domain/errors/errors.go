@@ -137,12 +137,3 @@ var (
 	ErrLockRenewalFailed   = errors.New("failed to renew deployment lock")
 	ErrInvalidLockTTL      = errors.New("invalid lock TTL: must be positive duration")
 )
-
-// IsFatalKubeError returns true if the error is a fatal Kubernetes error that should stop monitoring.
-// Fatal errors include authentication failures and configuration issues that won't be resolved by retrying.
-// Retriable errors like connection failures and timeouts return false.
-func IsFatalKubeError(err error) bool {
-	return errors.Is(err, ErrKubeAuthenticationFailed) ||
-		errors.Is(err, ErrKubePipelineRunNotFound) ||
-		errors.Is(err, ErrKubeUnknownError)
-}

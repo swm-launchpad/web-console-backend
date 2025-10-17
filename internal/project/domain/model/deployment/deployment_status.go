@@ -12,8 +12,8 @@ const (
 	// Backend-managed states
 	DeploymentStatusUntracked             DeploymentStatus = "untracked"               // Initial state, not tracked yet
 	DeploymentStatusBackendTriggerFailed  DeploymentStatus = "backend_trigger_failed"  // Backend failed to trigger Tekton
-	DeploymentStatusBackendTrackingFailed DeploymentStatus = "backend_tracking_failed" // Backend failed to track within 5 minutes
-	DeploymentStatusBackendTrackingLost   DeploymentStatus = "backend_tracking_lost"   // Backend lost tracking (fatal errors)
+	DeploymentStatusBackendTrackingFailed DeploymentStatus = "backend_tracking_failed" // Backend failed to track
+	DeploymentStatusBackendTrackingLost   DeploymentStatus = "backend_tracking_lost"   // Backend lost tracking
 
 	// Tekton-managed states
 	DeploymentStatusRunning   DeploymentStatus = "running"   // Tekton: Running
