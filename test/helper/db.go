@@ -90,6 +90,7 @@ func (tdb *TestDB) Migrate() error {
 		"000004_move_fqdn_to_networks.up.sql",
 		"000005_add_initial_templates.up.sql",
 		"000006_refactor_deployment_mechanism.up.sql",
+		"000007_add_active_deployment_tracking.up.sql",
 	}
 
 	for _, migration := range migrations {
