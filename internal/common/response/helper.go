@@ -16,6 +16,11 @@ func Created(c *gin.Context, data interface{}, opt ...func(*response)) {
 	c.JSON(http.StatusCreated, newResponse(data, opt...))
 }
 
+// Accepted sends a 202 Accepted response with data
+func Accepted(c *gin.Context, data interface{}, opt ...func(*response)) {
+	c.JSON(http.StatusAccepted, newResponse(data, opt...))
+}
+
 // Error handles errors with domain-specific mapping, falling back to common errors.
 // domainMapper(optional) is a function that maps errors to ErrorMapping.
 // opt(optional) is a function that adds additional information to the error response.

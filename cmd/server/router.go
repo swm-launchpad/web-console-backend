@@ -21,6 +21,7 @@ type Router struct {
 	passwordResetHandler *userHTTP.PasswordResetHandler
 	projectHandler       *projectHTTP.ProjectHandler
 	volumeHandler        *projectHTTP.VolumeHandler
+	deploymentHandler    *projectHTTP.DeploymentHandler
 	containerHandler     *containerHTTP.ContainerHandler
 	templateHandler      *containerHTTP.TemplateHandler
 	authMiddleware       *middleware.AuthMiddleware
@@ -35,6 +36,7 @@ func NewRouter(
 	passwordResetHandler *userHTTP.PasswordResetHandler,
 	projectHandler *projectHTTP.ProjectHandler,
 	volumeHandler *projectHTTP.VolumeHandler,
+	deploymentHandler *projectHTTP.DeploymentHandler,
 	containerHandler *containerHTTP.ContainerHandler,
 	templateHandler *containerHTTP.TemplateHandler,
 	authMiddleware *middleware.AuthMiddleware,
@@ -59,6 +61,7 @@ func NewRouter(
 		passwordResetHandler: passwordResetHandler,
 		projectHandler:       projectHandler,
 		volumeHandler:        volumeHandler,
+		deploymentHandler:    deploymentHandler,
 		containerHandler:     containerHandler,
 		templateHandler:      templateHandler,
 		authMiddleware:       authMiddleware,
@@ -111,6 +114,9 @@ func (r *Router) Setup() {
 			projects.GET("/:id", r.projectHandler.GetProject)
 			projects.PUT("/:id", r.projectHandler.UpdateProject)
 			projects.DELETE("/:id", r.projectHandler.DeleteProject)
+
+			// Deployment route
+			projects.POST("/:id/deploy", r.deploymentHandler.DeployProject)
 
 			// Container routes under project (RESTful)
 			projects.POST("/:id/containers", r.containerHandler.CreateContainer)

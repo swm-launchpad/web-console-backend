@@ -20,6 +20,7 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrInvalidProjectData:         {StatusCode: http.StatusBadRequest, Code: "INVALID_PROJECT_DATA", Message: "Invalid project data"},
 	projecterrors.ErrProjectNotActive:           {StatusCode: http.StatusForbidden, Code: "PROJECT_NOT_ACTIVE", Message: "Project is not active"},
 	projecterrors.ErrCannotModifyDeletedProject: {StatusCode: http.StatusForbidden, Code: "CANNOT_MODIFY_DELETED_PROJECT", Message: "Cannot modify deleted project"},
+	projecterrors.ErrProjectAlreadyDeploying:    {StatusCode: http.StatusConflict, Code: "PROJECT_ALREADY_DEPLOYING", Message: "Project operation already in progress"},
 
 	// Permission errors
 	projecterrors.ErrPermissionDenied:      {StatusCode: http.StatusForbidden, Code: "PERMISSION_DENIED", Message: "Permission denied"},
@@ -53,8 +54,29 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrMaxVolumesExceeded:      {StatusCode: http.StatusBadRequest, Code: "MAX_VOLUMES_EXCEEDED", Message: "Maximum number of volumes exceeded"},
 
 	// Infrastructure errors
-	projecterrors.ErrDatabaseUnavailable: {StatusCode: http.StatusServiceUnavailable, Code: "DATABASE_UNAVAILABLE", Message: "Service temporarily unavailable"},
-	projecterrors.ErrDatabaseOperation:   {StatusCode: http.StatusInternalServerError, Code: "DATABASE_OPERATION_FAILED", Message: "Database operation failed"},
+	projecterrors.ErrDatabaseUnavailable:        {StatusCode: http.StatusServiceUnavailable, Code: "DATABASE_UNAVAILABLE", Message: "Service temporarily unavailable"},
+	projecterrors.ErrDatabaseOperation:          {StatusCode: http.StatusInternalServerError, Code: "DATABASE_OPERATION_FAILED", Message: "Database operation failed"},
+	projecterrors.ErrContainerConfigNotFound:    {StatusCode: http.StatusInternalServerError, Code: "CONTAINER_CONFIG_NOT_FOUND", Message: "Container configuration not found"},
+	projecterrors.ErrKubernetesUnavailable:      {StatusCode: http.StatusServiceUnavailable, Code: "KUBERNETES_UNAVAILABLE", Message: "Kubernetes API unavailable"},
+	projecterrors.ErrKubeAuthenticationFailed:   {StatusCode: http.StatusInternalServerError, Code: "KUBERNETES_AUTH_FAILED", Message: "Kubernetes authentication failed"},
+	projecterrors.ErrKubeConnectionFailed:       {StatusCode: http.StatusServiceUnavailable, Code: "KUBERNETES_CONNECTION_FAILED", Message: "Kubernetes connection failed"},
+	projecterrors.ErrKubeTimeout:                {StatusCode: http.StatusGatewayTimeout, Code: "KUBERNETES_TIMEOUT", Message: "Kubernetes API timeout"},
+	projecterrors.ErrKubePipelineRunNotFound:    {StatusCode: http.StatusNotFound, Code: "PIPELINERUN_NOT_FOUND", Message: "PipelineRun not found"},
+	projecterrors.ErrKubeUnknownError:           {StatusCode: http.StatusInternalServerError, Code: "KUBERNETES_ERROR", Message: "Kubernetes error"},
+	projecterrors.ErrTektonUnavailable:          {StatusCode: http.StatusServiceUnavailable, Code: "TEKTON_UNAVAILABLE", Message: "Tekton API unavailable"},
+	projecterrors.ErrTektonAuthenticationFailed: {StatusCode: http.StatusInternalServerError, Code: "TEKTON_AUTH_FAILED", Message: "Tekton authentication failed"},
+	projecterrors.ErrInvalidDeploymentRequest:   {StatusCode: http.StatusBadRequest, Code: "INVALID_DEPLOYMENT_REQUEST", Message: "Invalid deployment request"},
+	projecterrors.ErrTektonDeploymentFailed:     {StatusCode: http.StatusInternalServerError, Code: "DEPLOYMENT_TRIGGER_FAILED", Message: "Failed to trigger deployment"},
+	projecterrors.ErrInvalidTektonResponse:      {StatusCode: http.StatusInternalServerError, Code: "INVALID_TEKTON_RESPONSE", Message: "Invalid Tekton response"},
+
+	// Deployment errors
+	projecterrors.ErrDeploymentNotFound:          {StatusCode: http.StatusNotFound, Code: "DEPLOYMENT_NOT_FOUND", Message: "Deployment not found"},
+	projecterrors.ErrInvalidDeploymentStatus:     {StatusCode: http.StatusBadRequest, Code: "INVALID_DEPLOYMENT_STATUS", Message: "Invalid deployment status"},
+	projecterrors.ErrCannotStartDeployment:       {StatusCode: http.StatusConflict, Code: "CANNOT_START_DEPLOYMENT", Message: "Cannot start deployment"},
+	projecterrors.ErrCannotCompleteDeployment:    {StatusCode: http.StatusConflict, Code: "CANNOT_COMPLETE_DEPLOYMENT", Message: "Cannot complete deployment"},
+	projecterrors.ErrCannotFailDeployment:        {StatusCode: http.StatusConflict, Code: "CANNOT_FAIL_DEPLOYMENT", Message: "Cannot fail deployment"},
+	projecterrors.ErrCannotCancelDeployment:      {StatusCode: http.StatusConflict, Code: "CANNOT_CANCEL_DEPLOYMENT", Message: "Cannot cancel deployment"},
+	projecterrors.ErrInvalidDeploymentTransition: {StatusCode: http.StatusConflict, Code: "INVALID_DEPLOYMENT_TRANSITION", Message: "Invalid deployment state transition"},
 }
 
 // mapProjectError provides error mapping for project domain

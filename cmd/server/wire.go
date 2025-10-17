@@ -5,6 +5,7 @@ package main
 
 import (
 	"database/sql"
+	"os"
 
 	"github.com/google/wire"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
@@ -19,8 +20,11 @@ import (
 	containerInfra "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	containerSqlc "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure/sqlc"
 	projectApp "github.com/swm-launchpad/web-console-backend/internal/project/application"
+	projectDomainInfra "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
+	projectDomainRepo "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
+	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	projectSqlc "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
@@ -75,6 +79,63 @@ func provideEmailService(cfg *config.Config) email.Service {
 	)
 }
 
+// provideTektonClient creates a Tekton client from environment variables
+func provideTektonClient() (projectDomainInfra.TektonClient, error) {
+	return projectInfra.NewTektonClient()
+}
+
+// provideKubeClient creates a Kubernetes client from environment variables
+func provideKubeClient() (projectDomainInfra.KubeClient, error) {
+	return projectInfra.NewKubeClient()
+}
+
+// provideContainerClient creates a container client
+// Note: Currently using MockContainerClient until real implementation is ready
+func provideContainerClient() projectDomainInfra.ContainerClient {
+	return projectInfra.NewMockContainerClient()
+}
+
+// provideDeployNamespace provides the deployment namespace from environment
+func provideDeployNamespace() string {
+	// This is used by DeployService to know which namespace to deploy to
+	// Read from same env var as KubeClient
+	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
+	if deployNamespace == "" {
+		return "default"
+	}
+	return deployNamespace
+}
+
+// provideDeployService creates a DeployService with all dependencies
+func provideDeployService(
+	txManager db.TxManager,
+	projectRepository projectDomainRepo.ProjectRepository,
+	deploymentRepo projectDomainRepo.DeploymentRepository,
+	volumeRepo projectDomainRepo.VolumeRepository,
+	containerClient projectDomainInfra.ContainerClient,
+	tektonClient projectDomainInfra.TektonClient,
+	kubeClient projectDomainInfra.KubeClient,
+) projectService.DeployService {
+	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
+	if deployNamespace == "" {
+		deployNamespace = "default"
+	}
+	// projectServiceName is not used in the actual implementation
+	projectServiceName := ""
+
+	return projectService.NewDeployService(
+		txManager,
+		projectRepository,
+		deploymentRepo,
+		volumeRepo,
+		containerClient,
+		tektonClient,
+		kubeClient,
+		deployNamespace,
+		projectServiceName,
+	)
+}
+
 func InitializeApp() (*App, error) {
 	wire.Build(
 		// Config
@@ -105,6 +166,8 @@ func InitializeApp() (*App, error) {
 		application.NewRegisterUserUseCase,
 		application.NewLoginUserUseCase,
 		application.NewGetUserUseCase,
+		application.NewUpdateUserUseCase,
+		application.NewChangePasswordUseCase,
 		application.NewVerifyEmailUseCase,
 		application.NewResendVerificationEmailUseCase,
 		application.NewRequestPasswordResetUseCase,
@@ -113,12 +176,17 @@ func InitializeApp() (*App, error) {
 		// Project infrastructure
 		projectRepo.NewProjectRepository,
 		projectRepo.NewVolumeRepository,
+		projectRepo.NewDeploymentRepository,
+		provideTektonClient,
+		provideKubeClient,
+		provideContainerClient,
 
 		// Project domain services
 		projectService.NewSlugService,
 		projectService.NewProjectService,
 		projectService.NewVolumeService,
 		projectService.NewPermissionService,
+		provideDeployService,
 
 		// Project use cases
 		projectApp.NewCreateProjectUseCase,
@@ -129,6 +197,7 @@ func InitializeApp() (*App, error) {
 		projectApp.NewAddVolumeUseCase,
 		projectApp.NewGetVolumesUseCase,
 		projectApp.NewRemoveVolumeUseCase,
+		projectApp.NewDeployProjectUseCase,
 
 		// Container infrastructure
 		containerInfra.NewContainerRepository,
@@ -166,6 +235,7 @@ func InitializeApp() (*App, error) {
 		userHTTP.NewPasswordResetHandler,
 		projectHTTP.NewProjectHandler,
 		projectHTTP.NewVolumeHandler,
+		projectHTTP.NewDeploymentHandler,
 		containerHTTP.NewContainerHandler,
 		containerHTTP.NewTemplateHandler,
 
