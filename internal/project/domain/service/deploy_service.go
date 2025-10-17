@@ -639,7 +639,7 @@ func (s *deployService) monitorDeployment(ctx context.Context, projectID uint, d
 	}()
 
 	// Polling interval
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
