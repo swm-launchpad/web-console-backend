@@ -24,6 +24,9 @@ type VolumeRepository interface {
 	// ExistsByName checks if a volume with the given name exists in a project
 	ExistsByName(ctx context.Context, projectID uint, name string) (bool, error)
 
+	// ExistsBySlug checks if a volume with the given slug exists
+	ExistsBySlug(ctx context.Context, slug string) (bool, error)
+
 	// Delete removes a volume (physical delete since volumes contain data)
 	Delete(ctx context.Context, volumeID uint) error
 
