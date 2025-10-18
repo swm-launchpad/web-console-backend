@@ -11,6 +11,9 @@ sql:
       - "../../../migration/000006_refactor_deployment_mechanism.up.sql"
       - "../../../migration/000007_add_active_deployment_tracking.up.sql"
       - "../../../migration/000008_add_volume_slug.up.sql"
+      - "../../../migration/000009_add_github_installations.up.sql"
+      - "../../../migration/000010_add_installation_status.up.sql"
+      - "../../../migration/000011_create_oauth_states.up.sql"
     gen:
       go:
         package: "sqlc"

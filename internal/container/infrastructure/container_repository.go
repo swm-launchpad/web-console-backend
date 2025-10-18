@@ -44,6 +44,7 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 		Slug:                   container.Slug().String(),
 		StableWindow:           uint32PtrToNullInt32(container.StableWindow()),
 		TemplateConfig:         templateConfigJSON,
+		GithubInstallationID:   int64PtrToNullInt64(container.GitHubInstallationID()),
 		GitRepositoryUrl:       sql.NullString{String: container.GitConfig().RepositoryURL(), Valid: container.GitConfig().RepositoryURL() != ""},
 		GitBranch:              sql.NullString{String: container.GitConfig().Branch(), Valid: container.GitConfig().Branch() != ""},
 		GitDirectoryPath:       stringPtrToNullString(container.GitConfig().DirectoryPath()),
@@ -150,6 +151,7 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 		StableWindow:           uint32PtrToNullInt32(container.StableWindow()),
 		TemplateID:             uintToNullInt32(container.TemplateID()),
 		TemplateConfig:         templateConfigJSON,
+		GithubInstallationID:   int64PtrToNullInt64(container.GitHubInstallationID()),
 		GitRepositoryUrl:       sql.NullString{String: container.GitConfig().RepositoryURL(), Valid: container.GitConfig().RepositoryURL() != ""},
 		GitBranch:              sql.NullString{String: container.GitConfig().Branch(), Valid: container.GitConfig().Branch() != ""},
 		GitDirectoryPath:       stringPtrToNullString(container.GitConfig().DirectoryPath()),
@@ -724,6 +726,8 @@ func (r *containerRepository) toDomainContainer(sqlcContainer sqlc.Container) (*
 		lastBuiltGitCommitHash = &sqlcContainer.LastBuiltGitCommitHash.String
 	}
 
+	githubInstallationID := nullInt64ToInt64Ptr(sqlcContainer.GithubInstallationID)
+
 	container := model.ReconstructContainer(
 		uint(sqlcContainer.ContainerID),
 		uint(sqlcContainer.ProjectID),
@@ -732,6 +736,7 @@ func (r *containerRepository) toDomainContainer(sqlcContainer sqlc.Container) (*
 		slug,
 		stableWindow,
 		templateConfig,
+		githubInstallationID,
 		gitConfig,
 		gitCommitHash,
 		lastBuiltGitCommitHash,
