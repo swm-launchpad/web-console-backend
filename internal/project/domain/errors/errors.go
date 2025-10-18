@@ -41,6 +41,7 @@ var (
 	ErrInvalidSlug       = errors.New("invalid project slug")
 	ErrSlugTooShort      = errors.New("slug must be at least 3 characters long")
 	ErrSlugTooLong       = errors.New("slug must not exceed 63 characters")
+	ErrSlugInvalidLength = errors.New("slug must be exactly 23 characters")
 	ErrSlugInvalidFormat = errors.New("slug can only contain lowercase letters, numbers, and hyphens")
 	ErrSlugReserved      = errors.New("slug is reserved")
 	ErrInvalidProjectID  = errors.New("invalid project ID")
