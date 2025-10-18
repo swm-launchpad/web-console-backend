@@ -12,14 +12,14 @@ import (
 )
 
 type GitHubHandler struct {
-	connectUseCase          *application.ConnectGitHubUseCase
-	disconnectUseCase       *application.DisconnectGitHubUseCase
-	getInstallationUseCase  *application.GetGitHubInstallationUseCase
-	generateTokenUseCase    *application.GenerateInstallationTokenUseCase
-	listRepositoriesUseCase *application.ListRepositoriesUseCase
-	startOAuthUseCase       *application.StartOAuthUseCase
-	oauthCallbackUseCase    *application.OAuthCallbackUseCase
-	frontendURL             string
+	connectUseCase              *application.ConnectGitHubUseCase
+	disconnectUseCase           *application.DisconnectGitHubUseCase
+	getInstallationUseCase      *application.GetGitHubInstallationUseCase
+	generateTokenUseCase        *application.GenerateInstallationTokenUseCase
+	listRepositoriesUseCase     *application.ListRepositoriesUseCase
+	startInstallationUseCase    *application.StartInstallationUseCase
+	installationCallbackUseCase *application.InstallationCallbackUseCase
+	frontendURL                 string
 }
 
 func NewGitHubHandler(
@@ -28,19 +28,19 @@ func NewGitHubHandler(
 	getInstallationUseCase *application.GetGitHubInstallationUseCase,
 	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
 	listRepositoriesUseCase *application.ListRepositoriesUseCase,
-	startOAuthUseCase *application.StartOAuthUseCase,
-	oauthCallbackUseCase *application.OAuthCallbackUseCase,
+	startInstallationUseCase *application.StartInstallationUseCase,
+	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	frontendURL string,
 ) *GitHubHandler {
 	return &GitHubHandler{
-		connectUseCase:          connectUseCase,
-		disconnectUseCase:       disconnectUseCase,
-		getInstallationUseCase:  getInstallationUseCase,
-		generateTokenUseCase:    generateTokenUseCase,
-		listRepositoriesUseCase: listRepositoriesUseCase,
-		startOAuthUseCase:       startOAuthUseCase,
-		oauthCallbackUseCase:    oauthCallbackUseCase,
-		frontendURL:             frontendURL,
+		connectUseCase:              connectUseCase,
+		disconnectUseCase:           disconnectUseCase,
+		getInstallationUseCase:      getInstallationUseCase,
+		generateTokenUseCase:        generateTokenUseCase,
+		listRepositoriesUseCase:     listRepositoriesUseCase,
+		startInstallationUseCase:    startInstallationUseCase,
+		installationCallbackUseCase: installationCallbackUseCase,
+		frontendURL:                 frontendURL,
 	}
 }
 
@@ -179,16 +179,16 @@ func (h *GitHubHandler) ListRepositories(c *gin.Context) {
 	response.OK(c, output)
 }
 
-// StartOAuth initiates the GitHub OAuth flow
-// GET /api/v1/github/oauth/authorize
-func (h *GitHubHandler) StartOAuth(c *gin.Context) {
+// StartInstallation initiates the GitHub App installation flow
+// GET /api/v1/github/installation/start
+func (h *GitHubHandler) StartInstallation(c *gin.Context) {
 	userID := getUserIDFromContext(c)
 
-	input := application.StartOAuthInput{
+	input := application.StartInstallationInput{
 		UserID: userID,
 	}
 
-	output, err := h.startOAuthUseCase.Execute(c.Request.Context(), input)
+	output, err := h.startInstallationUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
 		response.Error(c, err, mapUserError)
 		return
@@ -197,32 +197,44 @@ func (h *GitHubHandler) StartOAuth(c *gin.Context) {
 	response.OK(c, output)
 }
 
-// OAuthCallback handles the GitHub OAuth callback
-// GET /api/v1/github/oauth/callback
-func (h *GitHubHandler) OAuthCallback(c *gin.Context) {
-	code := c.Query("code")
+// InstallationCallback handles the GitHub App installation callback
+// GET /api/v1/github/installation/callback
+func (h *GitHubHandler) InstallationCallback(c *gin.Context) {
+	// Parse query parameters
+	installationIDStr := c.Query("installation_id")
+	setupAction := c.Query("setup_action")
 	state := c.Query("state")
 
-	if code == "" || state == "" {
-		c.Redirect(302, h.frontendURL+"?error=missing_parameters")
+	// Validate required parameters
+	if installationIDStr == "" || state == "" {
+		c.Redirect(302, h.frontendURL+"/github/callback?error=missing_parameters&popup=true")
 		return
 	}
 
-	input := application.OAuthCallbackInput{
-		Code:  code,
-		State: state,
+	installationID, err := strconv.ParseInt(installationIDStr, 10, 64)
+	if err != nil {
+		c.Redirect(302, h.frontendURL+"/github/callback?error=invalid_installation_id&popup=true")
+		return
 	}
 
-	output, err := h.oauthCallbackUseCase.Execute(c.Request.Context(), input)
+	input := application.InstallationCallbackInput{
+		InstallationID: installationID,
+		SetupAction:    setupAction,
+		State:          state,
+	}
+
+	_, err = h.installationCallbackUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		c.Error(fmt.Errorf("OAuth callback failed: %w", err))
+		_ = c.Error(fmt.Errorf("installation callback failed: %w", err))
 		// Redirect to frontend with error
-		c.Redirect(302, h.frontendURL+"/github/callback?error=oauth_failed")
+		c.Redirect(302, h.frontendURL+"/github/callback?error=installation_failed&popup=true")
 		return
 	}
 
 	// Redirect to frontend callback page with success
-	c.Redirect(302, h.frontendURL+"/github/callback?success=true&count="+strconv.Itoa(len(output.Installations)))
+	// For simplicity, we're counting 1 installation since we process one at a time
+	// Add popup=true to indicate this was opened in a popup window
+	c.Redirect(302, h.frontendURL+"/github/callback?success=true&count=1&popup=true")
 }
 
 // getUserIDFromContext extracts the user ID from the Gin context
