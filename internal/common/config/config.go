@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	Database DatabaseConfig
-	Server   ServerConfig
-	JWT      JWTConfig
-	CORS     CORSConfig
-	Email    EmailConfig
-	Frontend FrontendConfig
+	Database  DatabaseConfig
+	Server    ServerConfig
+	JWT       JWTConfig
+	CORS      CORSConfig
+	Email     EmailConfig
+	Frontend  FrontendConfig
+	GitHubApp GitHubAppConfig
 }
 
 type DatabaseConfig struct {
@@ -54,6 +55,14 @@ type EmailConfig struct {
 
 type FrontendConfig struct {
 	URL string
+}
+
+type GitHubAppConfig struct {
+	AppID           string
+	ClientID        string
+	ClientSecret    string
+	PrivateKeyPath  string
+	InstallationURL string
 }
 
 func Load() (*Config, error) {
@@ -134,6 +143,13 @@ func Load() (*Config, error) {
 		},
 		Frontend: FrontendConfig{
 			URL: getEnv("FRONTEND_URL", "http://localhost:5173"),
+		},
+		GitHubApp: GitHubAppConfig{
+			AppID:           getEnv("GITHUB_APP_ID", ""),
+			ClientID:        getEnv("GITHUB_APP_CLIENT_ID", ""),
+			ClientSecret:    getEnv("GITHUB_APP_CLIENT_SECRET", ""),
+			PrivateKeyPath:  getEnv("GITHUB_APP_PRIVATE_KEY_PATH", ""),
+			InstallationURL: getEnv("GITHUB_APP_INSTALLATION_URL", ""),
 		},
 	}
 
