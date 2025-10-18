@@ -69,9 +69,9 @@ func (m *MockContainerClient) getSingleContainerConfig() *dto.ContainerDeploymen
 // Based on Tekton README example: spring-helloworld + mysql stack.
 // Note: Project metadata (project_id, service_name, namespace, stable_window) are NOT included.
 // Note: ConfigMaps and Volumes are managed at project level, not by ContainerClient.
-// Note: VolumeMounts specify where to mount volumes (mysql-initdb-config, mysql-data) but
+// Note: VolumeMounts specify where to mount volumes (e.g., mysql-data PVC) but
 //
-//	the actual ConfigMaps and Volumes are created at project level.
+//	the actual Volumes are created at project level.
 func (m *MockContainerClient) getMultiContainerConfig() *dto.ContainerDeploymentConfig {
 	domain := "spring-helloworld-stack.launchpad.kr"
 	healthEndpoint := "/"
@@ -113,11 +113,7 @@ func (m *MockContainerClient) getMultiContainerConfig() *dto.ContainerDeployment
 				MemoryLimit:   "1Gi",
 				VolumeMounts: []dto.VolumeMount{
 					{
-						VolumeName: "mysql-initdb-config", // Direct reference to ConfigMap name
-						MountPaths: []string{"/docker-entrypoint-initdb.d"},
-					},
-					{
-						VolumeName: "mysql-data", // Reference to PVC volume name
+						VolumeName: "mysql-data", // Reference to PVC volume slug
 						MountPaths: []string{"/var/lib/mysql"},
 					},
 				},

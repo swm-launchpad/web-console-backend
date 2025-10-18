@@ -85,16 +85,11 @@ func TestMockContainerClient_GetContainerConfig(t *testing.T) {
 		assert.Equal(t, "512Mi", mysql.MemoryRequest)
 		assert.Equal(t, "1Gi", mysql.MemoryLimit)
 
-		// Verify MySQL volume mounts
-		assert.Len(t, mysql.VolumeMounts, 2)
-
-		// ConfigMap mount - references ConfigMap name directly
-		initdbMount := mysql.VolumeMounts[0]
-		assert.Equal(t, "mysql-initdb-config", initdbMount.VolumeName)
-		assert.Equal(t, []string{"/docker-entrypoint-initdb.d"}, initdbMount.MountPaths)
+		// Verify MySQL volume mounts (only PVC volume, no ConfigMap)
+		assert.Len(t, mysql.VolumeMounts, 1)
 
 		// PVC mount - references volume slug
-		dataMount := mysql.VolumeMounts[1]
+		dataMount := mysql.VolumeMounts[0]
 		assert.Equal(t, "mysql-data", dataMount.VolumeName)
 		assert.Equal(t, []string{"/var/lib/mysql"}, dataMount.MountPaths)
 	})
