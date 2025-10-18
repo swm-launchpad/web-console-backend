@@ -111,9 +111,11 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 		for _, mount := range container.Mounts {
 			volumeSlug, exists := volumeMap[mount.VolumeID]
 			if !exists {
-				// Volume not found - skip or error?
-				// Let's skip for now, as the volume might have been deleted
-				continue
+				// Volume referenced in mount not found - this indicates data inconsistency
+				// This should not happen due to foreign key constraints, but if it does (e.g., race condition),
+				// we must fail the deployment rather than silently skip the mount
+				return nil, fmt.Errorf("%w: container '%s' references volume_id %d which does not exist",
+					projecterrors.ErrVolumeMountReferenceNotFound, container.Name, mount.VolumeID)
 			}
 
 			volumeMounts = append(volumeMounts, dto.VolumeMount{
