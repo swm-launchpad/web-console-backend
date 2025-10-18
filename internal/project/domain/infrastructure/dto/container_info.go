@@ -60,16 +60,16 @@ type ContainerInfo struct {
 	VolumeMounts []VolumeMount `json:"volume_mounts"`
 }
 
-// VolumeMount represents a volume mount configuration.
-// It specifies which volume to mount and where to mount it in the container.
+// VolumeMount represents a volume mount configuration from ContainerClient.
+// It contains volume_id which will be mapped to volume_slug at the deployment service layer.
 type VolumeMount struct {
-	// VolumeName is the name of the volume to mount (required)
-	// Can reference either a PVC volume (by slug) or ConfigMap (by name)
-	VolumeName string `json:"volume_name"`
+	// VolumeID is the ID of the volume to mount (required)
+	// This will be mapped to volume slug by deployment service
+	VolumeID uint `json:"volume_id"`
 
-	// MountPaths is the list of paths where the volume will be mounted (required, at least 1)
-	// Example: ["/var/lib/mysql"], ["/docker-entrypoint-initdb.d"]
-	MountPaths []string `json:"mount_paths"`
+	// MountPath is the path where the volume will be mounted (required)
+	// Example: "/var/lib/mysql", "/docker-entrypoint-initdb.d"
+	MountPath string `json:"mount_path"`
 }
 
 // ContainerDeploymentConfig represents container-specific deployment configuration.

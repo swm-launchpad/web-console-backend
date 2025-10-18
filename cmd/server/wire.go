@@ -93,9 +93,8 @@ func provideKubeClient() (projectDomainInfra.KubeClient, error) {
 // provideContainerClient creates a container client
 func provideContainerClient(
 	getContainersUseCase *containerDeployment.GetContainersForDeploymentUseCase,
-	volumeRepo projectDomainRepo.VolumeRepository,
 ) projectDomainInfra.ContainerClient {
-	return projectInfra.NewContainerClient(getContainersUseCase, volumeRepo)
+	return projectInfra.NewContainerClient(getContainersUseCase)
 }
 
 // provideDeployNamespace provides the deployment namespace from environment

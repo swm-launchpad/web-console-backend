@@ -88,7 +88,7 @@ func InitializeApp() (*App, error) {
 	serviceSlugService := service3.NewSlugService(containerRepository)
 	containerService := service3.NewContainerService(containerRepository, serviceSlugService)
 	getContainersForDeploymentUseCase := deployment.NewGetContainersForDeploymentUseCase(containerService)
-	containerClient := provideContainerClient(getContainersForDeploymentUseCase, volumeRepository)
+	containerClient := provideContainerClient(getContainersForDeploymentUseCase)
 	tektonClient, err := provideTektonClient()
 	if err != nil {
 		return nil, err
@@ -188,9 +188,8 @@ func provideKubeClient() (infrastructure3.KubeClient, error) {
 // provideContainerClient creates a container client
 func provideContainerClient(
 	getContainersUseCase *deployment.GetContainersForDeploymentUseCase,
-	volumeRepo repository2.VolumeRepository,
 ) infrastructure3.ContainerClient {
-	return infrastructure4.NewContainerClient(getContainersUseCase, volumeRepo)
+	return infrastructure4.NewContainerClient(getContainersUseCase)
 }
 
 // provideDeployNamespace provides the deployment namespace from environment

@@ -72,7 +72,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 				StableWindow: 180,
 				ConfigMaps:   []dto.ConfigMapInfo{},
 				Volumes:      []dto.VolumeInfo{},
-				Containers: []dto.ContainerInfo{
+				Containers: []dto.TektonContainerInfo{
 					{
 						Name:            "test-container",
 						Domain:          nil,
@@ -87,7 +87,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 						CPULimit:        "1000m",
 						MemoryRequest:   "512Mi",
 						MemoryLimit:     "1Gi",
-						VolumeMounts:    []dto.VolumeMount{},
+						VolumeMounts:    []dto.TektonVolumeMount{},
 					},
 				},
 			},
@@ -438,7 +438,7 @@ func TestTektonClient_FullDeploymentFlow(t *testing.T) {
 			StableWindow: 180,
 			ConfigMaps:   []dto.ConfigMapInfo{},
 			Volumes:      []dto.VolumeInfo{},
-			Containers: []dto.ContainerInfo{
+			Containers: []dto.TektonContainerInfo{
 				{
 					Name:            "test-container",
 					Domain:          nil,
@@ -453,7 +453,7 @@ func TestTektonClient_FullDeploymentFlow(t *testing.T) {
 					CPULimit:        "500m",
 					MemoryRequest:   "256Mi",
 					MemoryLimit:     "512Mi",
-					VolumeMounts:    []dto.VolumeMount{},
+					VolumeMounts:    []dto.TektonVolumeMount{},
 				},
 			},
 		},

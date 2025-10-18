@@ -362,6 +362,18 @@ func (s *deployService) buildTektonRequest(
 	// Volumes - only PVC volumes from VolumeRepository (managed at project level)
 	allVolumes := s.convertVolumesToDTO(volumes)
 
+	// Create volume_id -> volume_slug mapping for container mount resolution
+	volumeMap := make(map[uint]string)
+	for _, vol := range volumes {
+		volumeMap[vol.VolumeID()] = vol.Slug().String()
+	}
+
+	// Convert ContainerInfo to TektonContainerInfo, mapping volume_id to volume_slug
+	tektonContainers, err := s.convertContainersToTektonFormat(containerConfig.Containers, volumeMap)
+	if err != nil {
+		return nil, err
+	}
+
 	// Build deployment config
 	deploymentConfig := dto.DeploymentConfig{
 		ProjectID:    projectIDStr,
@@ -370,13 +382,64 @@ func (s *deployService) buildTektonRequest(
 		StableWindow: 180, // constant: 180 seconds
 		ConfigMaps:   allConfigMaps,
 		Volumes:      allVolumes,
-		Containers:   containerConfig.Containers,
+		Containers:   tektonContainers,
 	}
 
 	return &dto.TektonDeployRequest{
 		DeploymentConfigJSON: deploymentConfig,
 		DryRun:               "false",
 	}, nil
+}
+
+// convertContainersToTektonFormat converts ContainerInfo to TektonContainerInfo,
+// mapping volume_id to volume_slug using the provided volumeMap
+func (s *deployService) convertContainersToTektonFormat(
+	containers []dto.ContainerInfo,
+	volumeMap map[uint]string,
+) ([]dto.TektonContainerInfo, error) {
+	result := make([]dto.TektonContainerInfo, 0, len(containers))
+
+	for _, container := range containers {
+		// Convert volume mounts: map volume_id to volume_slug
+		tektonMounts := make([]dto.TektonVolumeMount, 0, len(container.VolumeMounts))
+		for _, mount := range container.VolumeMounts {
+			volumeSlug, exists := volumeMap[mount.VolumeID]
+			if !exists {
+				// Volume referenced in mount not found - this indicates data inconsistency
+				// This should not happen due to foreign key constraints, but if it does (e.g., race condition),
+				// we must fail the deployment rather than silently skip the mount
+				return nil, fmt.Errorf("%w: container '%s' references volume_id %d which does not exist",
+					projecterrors.ErrVolumeMountReferenceNotFound, container.Name, mount.VolumeID)
+			}
+
+			tektonMounts = append(tektonMounts, dto.TektonVolumeMount{
+				VolumeName: volumeSlug,
+				MountPaths: []string{mount.MountPath},
+			})
+		}
+
+		// Build TektonContainerInfo with all fields from ContainerInfo
+		tektonContainer := dto.TektonContainerInfo{
+			Name:            container.Name,
+			Domain:          container.Domain,
+			HealthCheckType: container.HealthCheckType,
+			HealthEndpoint:  container.HealthEndpoint,
+			Port:            container.Port,
+			HealthPort:      container.HealthPort,
+			ImageName:       container.ImageName,
+			ImageTag:        container.ImageTag,
+			EnvVars:         container.EnvVars,
+			Secrets:         container.Secrets,
+			CPULimit:        container.CPULimit,
+			MemoryRequest:   container.MemoryRequest,
+			MemoryLimit:     container.MemoryLimit,
+			VolumeMounts:    tektonMounts,
+		}
+
+		result = append(result, tektonContainer)
+	}
+
+	return result, nil
 }
 
 // convertVolumesToDTO converts domain volumes to DTO format

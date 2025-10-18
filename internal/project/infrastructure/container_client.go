@@ -8,24 +8,20 @@ import (
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	projectinfra "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 )
 
 // containerClient is the implementation of ContainerClient interface.
 // It fetches actual container configuration from the container bounded context.
 type containerClient struct {
 	getContainersUseCase *containerdeployment.GetContainersForDeploymentUseCase
-	volumeRepo           repository.VolumeRepository
 }
 
 // NewContainerClient creates a new containerClient instance.
 func NewContainerClient(
 	getContainersUseCase *containerdeployment.GetContainersForDeploymentUseCase,
-	volumeRepo repository.VolumeRepository,
 ) projectinfra.ContainerClient {
 	return &containerClient{
 		getContainersUseCase: getContainersUseCase,
-		volumeRepo:           volumeRepo,
 	}
 }
 
@@ -43,18 +39,7 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 		return nil, projecterrors.ErrContainerConfigNotFound
 	}
 
-	// Step 2: Get volumes to create volume_id -> slug mapping
-	volumes, err := c.volumeRepo.FindByProjectID(ctx, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get volumes: %w", err)
-	}
-
-	volumeMap := make(map[uint]string)
-	for _, vol := range volumes {
-		volumeMap[vol.VolumeID()] = vol.Slug().String()
-	}
-
-	// Step 3: Convert to DTO format
+	// Step 2: Convert to DTO format
 	containerInfos := make([]dto.ContainerInfo, 0, len(containersOutput.Containers))
 
 	for _, container := range containersOutput.Containers {
@@ -106,21 +91,13 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 		// MemoryRequest = MemoryLimit (same value)
 		memoryRequest := memoryLimit
 
-		// Volume mounts: convert volume_id to volume_slug
+		// Volume mounts: pass volume_id as-is
+		// The actual volume_id to volume_slug mapping will be done at the deployment service layer
 		volumeMounts := make([]dto.VolumeMount, 0, len(container.Mounts))
 		for _, mount := range container.Mounts {
-			volumeSlug, exists := volumeMap[mount.VolumeID]
-			if !exists {
-				// Volume referenced in mount not found - this indicates data inconsistency
-				// This should not happen due to foreign key constraints, but if it does (e.g., race condition),
-				// we must fail the deployment rather than silently skip the mount
-				return nil, fmt.Errorf("%w: container '%s' references volume_id %d which does not exist",
-					projecterrors.ErrVolumeMountReferenceNotFound, container.Name, mount.VolumeID)
-			}
-
 			volumeMounts = append(volumeMounts, dto.VolumeMount{
-				VolumeName: volumeSlug,
-				MountPaths: []string{mount.MountPath},
+				VolumeID:  mount.VolumeID,
+				MountPath: mount.MountPath,
 			})
 		}
 
