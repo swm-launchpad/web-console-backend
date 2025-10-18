@@ -10,6 +10,7 @@ import (
 	projectmodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	volumemodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
+	volumevalue "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume/value"
 )
 
 // Helper function to create test project for deploy service tests
@@ -88,7 +89,13 @@ func TestDeployService_convertVolumesToDTO(t *testing.T) {
 	service := &deployService{}
 
 	volume1, _ := volumemodel.NewVolume(1, "data-vol", 1024)
+	slug1, _ := volumevalue.NewVolumeSlug("v2025011812000012345678")
+	volume1.SetSlug(slug1)
+
 	volume2, _ := volumemodel.NewVolume(1, "cache-vol", 512)
+	slug2, _ := volumevalue.NewVolumeSlug("v2025011812000087654321")
+	volume2.SetSlug(slug2)
+
 	volumes := []*volumemodel.Volume{volume1, volume2}
 
 	// Act
@@ -96,10 +103,10 @@ func TestDeployService_convertVolumesToDTO(t *testing.T) {
 
 	// Assert
 	assert.Len(t, result, 2)
-	assert.Equal(t, "data-vol", result[0].Name)
+	assert.Equal(t, "v2025011812000012345678", result[0].Name)
 	assert.Equal(t, "pvc", *result[0].Type)
 	assert.Equal(t, "1024Mi", *result[0].Capacity)
-	assert.Equal(t, "cache-vol", result[1].Name)
+	assert.Equal(t, "v2025011812000087654321", result[1].Name)
 	assert.Equal(t, "512Mi", *result[1].Capacity)
 }
 

@@ -386,7 +386,7 @@ func (s *deployService) convertVolumesToDTO(volumes []*volumemodel.Volume) []dto
 		// Convert capacity from Mi to string format (e.g., "1024Mi")
 		capacityStr := fmt.Sprintf("%dMi", v.Capacity())
 		result = append(result, dto.VolumeInfo{
-			Name:     v.Name(),
+			Name:     v.Slug().String(),
 			Type:     &volumeType,
 			Capacity: &capacityStr,
 		})
