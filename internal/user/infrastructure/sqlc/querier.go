@@ -11,8 +11,10 @@ import (
 
 type Querier interface {
 	CreateGitHubInstallation(ctx context.Context, arg CreateGitHubInstallationParams) (sql.Result, error)
+	CreateOAuthState(ctx context.Context, arg CreateOAuthStateParams) (sql.Result, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error)
 	CreateVerificationToken(ctx context.Context, arg CreateVerificationTokenParams) error
+	DeleteExpiredOAuthStates(ctx context.Context) (sql.Result, error)
 	DeleteExpiredTokens(ctx context.Context) error
 	DeleteGitHubInstallation(ctx context.Context, arg DeleteGitHubInstallationParams) (sql.Result, error)
 	DeleteUser(ctx context.Context, arg DeleteUserParams) (sql.Result, error)
@@ -20,15 +22,19 @@ type Querier interface {
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
 	ExistsByInstallationID(ctx context.Context, installationID uint64) (bool, error)
 	ExistsByUsername(ctx context.Context, username string) (bool, error)
+	FindInstallationByIDIncludingRevoked(ctx context.Context, installationID uint64) (FindInstallationByIDIncludingRevokedRow, error)
 	FindLatestTokenByUserAndType(ctx context.Context, arg FindLatestTokenByUserAndTypeParams) (VerificationToken, error)
 	FindTokenByToken(ctx context.Context, token string) (VerificationToken, error)
 	GetGitHubInstallationByID(ctx context.Context, installationID uint64) (GetGitHubInstallationByIDRow, error)
 	GetGitHubInstallationsByUserID(ctx context.Context, userID uint32) ([]GetGitHubInstallationsByUserIDRow, error)
+	GetOAuthStateByState(ctx context.Context, state string) (OauthState, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
 	GetUserByID(ctx context.Context, userID uint32) (GetUserByIDRow, error)
 	GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error)
 	MarkInstallationAsRevoked(ctx context.Context, arg MarkInstallationAsRevokedParams) (sql.Result, error)
+	MarkOAuthStateAsConsumed(ctx context.Context, arg MarkOAuthStateAsConsumedParams) (sql.Result, error)
 	MarkTokenAsUsed(ctx context.Context, arg MarkTokenAsUsedParams) error
+	ReactivateInstallation(ctx context.Context, arg ReactivateInstallationParams) (sql.Result, error)
 	UpdateGitHubInstallation(ctx context.Context, arg UpdateGitHubInstallationParams) (sql.Result, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (sql.Result, error)
 }

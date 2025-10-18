@@ -585,6 +585,15 @@ type Network struct {
 	Fqdn         sql.NullString `json:"fqdn"`
 }
 
+type OauthState struct {
+	State          string        `json:"state"`
+	UserID         uint32        `json:"user_id"`
+	InstallationID sql.NullInt64 `json:"installation_id"`
+	ExpiresAt      time.Time     `json:"expires_at"`
+	CreatedAt      time.Time     `json:"created_at"`
+	ConsumedAt     sql.NullTime  `json:"consumed_at"`
+}
+
 type Project struct {
 	ProjectID    uint32         `json:"project_id"`
 	Name         string         `json:"name"`
