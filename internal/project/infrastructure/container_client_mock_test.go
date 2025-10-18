@@ -88,10 +88,10 @@ func TestMockContainerClient_GetContainerConfig(t *testing.T) {
 		// Verify MySQL volume mounts (only PVC volume, no ConfigMap)
 		assert.Len(t, mysql.VolumeMounts, 1)
 
-		// PVC mount - references volume slug
+		// PVC mount - references volume ID
 		dataMount := mysql.VolumeMounts[0]
-		assert.Equal(t, "mysql-data", dataMount.VolumeName)
-		assert.Equal(t, []string{"/var/lib/mysql"}, dataMount.MountPaths)
+		assert.Equal(t, uint(1), dataMount.VolumeID)
+		assert.Equal(t, "/var/lib/mysql", dataMount.MountPath)
 	})
 
 	t.Run("Project ID not found", func(t *testing.T) {

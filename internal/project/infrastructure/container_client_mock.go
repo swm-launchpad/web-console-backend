@@ -113,8 +113,8 @@ func (m *MockContainerClient) getMultiContainerConfig() *dto.ContainerDeployment
 				MemoryLimit:   "1Gi",
 				VolumeMounts: []dto.VolumeMount{
 					{
-						VolumeName: "mysql-data", // Reference to PVC volume slug
-						MountPaths: []string{"/var/lib/mysql"},
+						VolumeID:  1, // Volume ID (will be mapped to slug by deployment service)
+						MountPath: "/var/lib/mysql",
 					},
 				},
 			},
