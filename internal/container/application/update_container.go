@@ -10,17 +10,19 @@ import (
 )
 
 type UpdateContainerInput struct {
-	ContainerID    uint
-	UserID         uint
-	Name           *string
-	StableWindow   *uint32
-	GitURL         *string
-	GitBranch      *string
-	GitDirectory   *string
-	CPULimit       *uint32
-	MemoryLimit    *uint32
-	TemplateID     *uint
-	TemplateConfig map[string]interface{}
+	ContainerID                uint
+	UserID                     uint
+	Name                       *string
+	StableWindow               *uint32
+	GitURL                     *string
+	GitBranch                  *string
+	GitDirectory               *string
+	GitHubInstallationID       *int64
+	UpdateGitHubInstallationID bool // Flag to indicate whether to update GitHubInstallationID
+	CPULimit                   *uint32
+	MemoryLimit                *uint32
+	TemplateID                 *uint
+	TemplateConfig             map[string]interface{}
 }
 
 type UpdateContainerOutput struct {
@@ -77,6 +79,12 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 		// Update stable window if provided
 		if input.StableWindow != nil {
 			container.SetStableWindow(input.StableWindow)
+		}
+
+		// Update GitHub installation ID if flag is set
+		// This allows explicitly setting to nil (unset) vs not updating at all
+		if input.UpdateGitHubInstallationID {
+			container.SetGitHubInstallationID(input.GitHubInstallationID)
 		}
 
 		// Update git config if provided
