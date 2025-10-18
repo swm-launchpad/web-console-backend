@@ -28,15 +28,21 @@ type VolumeService interface {
 
 // volumeService is the concrete implementation of VolumeService
 type volumeService struct {
-	volumeRepo  repository.VolumeRepository
-	projectRepo repository.ProjectRepository
+	volumeRepo    repository.VolumeRepository
+	projectRepo   repository.ProjectRepository
+	volumeSlugSvc VolumeSlugService
 }
 
 // NewVolumeService creates a new instance of VolumeService
-func NewVolumeService(volumeRepo repository.VolumeRepository, projectRepo repository.ProjectRepository) VolumeService {
+func NewVolumeService(
+	volumeRepo repository.VolumeRepository,
+	projectRepo repository.ProjectRepository,
+	volumeSlugSvc VolumeSlugService,
+) VolumeService {
 	return &volumeService{
-		volumeRepo:  volumeRepo,
-		projectRepo: projectRepo,
+		volumeRepo:    volumeRepo,
+		projectRepo:   projectRepo,
+		volumeSlugSvc: volumeSlugSvc,
 	}
 }
 
@@ -85,6 +91,13 @@ func (s *volumeService) CreateVolume(ctx context.Context, projectID uint, name s
 	if err != nil {
 		return nil, err
 	}
+
+	// Generate unique slug for the volume
+	slug, err := s.volumeSlugSvc.GenerateSlug(ctx)
+	if err != nil {
+		return nil, err
+	}
+	volume.SetSlug(slug)
 
 	// Persist the volume
 	if err := s.volumeRepo.Create(ctx, volume); err != nil {
