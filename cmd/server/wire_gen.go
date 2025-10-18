@@ -77,7 +77,9 @@ func InitializeApp() (*App, error) {
 	getGitHubInstallationUseCase := application.NewGetGitHubInstallationUseCase(gitHubInstallationRepository)
 	generateInstallationTokenUseCase := application.NewGenerateInstallationTokenUseCase(gitHubInstallationRepository, client, txManager)
 	listRepositoriesUseCase := application.NewListRepositoriesUseCase(gitHubInstallationRepository, client)
-	gitHubHandler := handler.NewGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase)
+	startOAuthUseCase := application.NewStartOAuthUseCase(configConfig)
+	oAuthCallbackUseCase := application.NewOAuthCallbackUseCase(configConfig, client, gitHubInstallationRepository, txManager)
+	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, startOAuthUseCase, oAuthCallbackUseCase, configConfig)
 	projectRepository := repository.NewProjectRepository(db)
 	slugService := service2.NewSlugService(projectRepository)
 	projectService := service2.NewProjectService(projectRepository, slugService)
@@ -247,4 +249,27 @@ func provideDeployService(
 // provideGitHubClient creates a GitHub client from config
 func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
 	return github.NewClient(cfg.GitHubApp.AppID, cfg.GitHubApp.PrivateKeyPath)
+}
+
+// provideGitHubHandler creates a GitHub handler with frontend URL
+func provideGitHubHandler(
+	connectUseCase *application.ConnectGitHubUseCase,
+	disconnectUseCase *application.DisconnectGitHubUseCase,
+	getInstallationUseCase *application.GetGitHubInstallationUseCase,
+	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
+	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	startOAuthUseCase *application.StartOAuthUseCase,
+	oauthCallbackUseCase *application.OAuthCallbackUseCase,
+	cfg *config.Config,
+) *handler.GitHubHandler {
+	return handler.NewGitHubHandler(
+		connectUseCase,
+		disconnectUseCase,
+		getInstallationUseCase,
+		generateTokenUseCase,
+		listRepositoriesUseCase,
+		startOAuthUseCase,
+		oauthCallbackUseCase,
+		cfg.Frontend.URL,
+	)
 }

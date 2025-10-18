@@ -144,6 +144,29 @@ func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
 	return github.NewClient(cfg.GitHubApp.AppID, cfg.GitHubApp.PrivateKeyPath)
 }
 
+// provideGitHubHandler creates a GitHub handler with frontend URL
+func provideGitHubHandler(
+	connectUseCase *application.ConnectGitHubUseCase,
+	disconnectUseCase *application.DisconnectGitHubUseCase,
+	getInstallationUseCase *application.GetGitHubInstallationUseCase,
+	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
+	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	startOAuthUseCase *application.StartOAuthUseCase,
+	oauthCallbackUseCase *application.OAuthCallbackUseCase,
+	cfg *config.Config,
+) *userHTTP.GitHubHandler {
+	return userHTTP.NewGitHubHandler(
+		connectUseCase,
+		disconnectUseCase,
+		getInstallationUseCase,
+		generateTokenUseCase,
+		listRepositoriesUseCase,
+		startOAuthUseCase,
+		oauthCallbackUseCase,
+		cfg.Frontend.URL,
+	)
+}
+
 func InitializeApp() (*App, error) {
 	wire.Build(
 		// Config
@@ -189,6 +212,8 @@ func InitializeApp() (*App, error) {
 		application.NewGetGitHubInstallationUseCase,
 		application.NewGenerateInstallationTokenUseCase,
 		application.NewListRepositoriesUseCase,
+		application.NewStartOAuthUseCase,
+		application.NewOAuthCallbackUseCase,
 
 		// Project infrastructure
 		projectRepo.NewProjectRepository,
@@ -252,7 +277,7 @@ func InitializeApp() (*App, error) {
 		userHTTP.NewUserHandler,
 		userHTTP.NewVerificationHandler,
 		userHTTP.NewPasswordResetHandler,
-		userHTTP.NewGitHubHandler,
+		provideGitHubHandler,
 		projectHTTP.NewProjectHandler,
 		projectHTTP.NewVolumeHandler,
 		projectHTTP.NewDeploymentHandler,

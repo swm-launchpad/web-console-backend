@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,9 @@ type GitHubHandler struct {
 	getInstallationUseCase  *application.GetGitHubInstallationUseCase
 	generateTokenUseCase    *application.GenerateInstallationTokenUseCase
 	listRepositoriesUseCase *application.ListRepositoriesUseCase
+	startOAuthUseCase       *application.StartOAuthUseCase
+	oauthCallbackUseCase    *application.OAuthCallbackUseCase
+	frontendURL             string
 }
 
 func NewGitHubHandler(
@@ -24,6 +28,9 @@ func NewGitHubHandler(
 	getInstallationUseCase *application.GetGitHubInstallationUseCase,
 	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
 	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	startOAuthUseCase *application.StartOAuthUseCase,
+	oauthCallbackUseCase *application.OAuthCallbackUseCase,
+	frontendURL string,
 ) *GitHubHandler {
 	return &GitHubHandler{
 		connectUseCase:          connectUseCase,
@@ -31,6 +38,9 @@ func NewGitHubHandler(
 		getInstallationUseCase:  getInstallationUseCase,
 		generateTokenUseCase:    generateTokenUseCase,
 		listRepositoriesUseCase: listRepositoriesUseCase,
+		startOAuthUseCase:       startOAuthUseCase,
+		oauthCallbackUseCase:    oauthCallbackUseCase,
+		frontendURL:             frontendURL,
 	}
 }
 
@@ -167,6 +177,52 @@ func (h *GitHubHandler) ListRepositories(c *gin.Context) {
 	}
 
 	response.OK(c, output)
+}
+
+// StartOAuth initiates the GitHub OAuth flow
+// GET /api/v1/github/oauth/authorize
+func (h *GitHubHandler) StartOAuth(c *gin.Context) {
+	userID := getUserIDFromContext(c)
+
+	input := application.StartOAuthInput{
+		UserID: userID,
+	}
+
+	output, err := h.startOAuthUseCase.Execute(c.Request.Context(), input)
+	if err != nil {
+		response.Error(c, err, mapUserError)
+		return
+	}
+
+	response.OK(c, output)
+}
+
+// OAuthCallback handles the GitHub OAuth callback
+// GET /api/v1/github/oauth/callback
+func (h *GitHubHandler) OAuthCallback(c *gin.Context) {
+	code := c.Query("code")
+	state := c.Query("state")
+
+	if code == "" || state == "" {
+		c.Redirect(302, h.frontendURL+"?error=missing_parameters")
+		return
+	}
+
+	input := application.OAuthCallbackInput{
+		Code:  code,
+		State: state,
+	}
+
+	output, err := h.oauthCallbackUseCase.Execute(c.Request.Context(), input)
+	if err != nil {
+		c.Error(fmt.Errorf("OAuth callback failed: %w", err))
+		// Redirect to frontend with error
+		c.Redirect(302, h.frontendURL+"/github/callback?error=oauth_failed")
+		return
+	}
+
+	// Redirect to frontend callback page with success
+	c.Redirect(302, h.frontendURL+"/github/callback?success=true&count="+strconv.Itoa(len(output.Installations)))
 }
 
 // getUserIDFromContext extracts the user ID from the Gin context

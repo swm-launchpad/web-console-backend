@@ -108,10 +108,18 @@ func (r *Router) Setup() {
 			users.GET("/:id", r.userHandler.GetUserByID)
 		}
 
-		// GitHub routes (protected)
+		// GitHub routes
 		github := v1.Group("/github")
-		github.Use(r.authMiddleware.RequireAuth())
 		{
+			// OAuth routes (public callback, protected authorize)
+			oauth := github.Group("/oauth")
+			{
+				oauth.GET("/authorize", r.authMiddleware.RequireAuth(), r.githubHandler.StartOAuth)
+				oauth.GET("/callback", r.githubHandler.OAuthCallback) // Public - GitHub redirects here
+			}
+
+			// Protected routes
+			github.Use(r.authMiddleware.RequireAuth())
 			github.POST("/connect", r.githubHandler.ConnectGitHub)
 			github.GET("/installations", r.githubHandler.GetInstallations)
 			github.DELETE("/installations/:installation_id", r.githubHandler.DisconnectGitHub)
