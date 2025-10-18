@@ -111,11 +111,11 @@ func (r *Router) Setup() {
 		// GitHub routes
 		github := v1.Group("/github")
 		{
-			// OAuth routes (public callback, protected authorize)
-			oauth := github.Group("/oauth")
+			// Installation routes
+			installation := github.Group("/installation")
 			{
-				oauth.GET("/authorize", r.authMiddleware.RequireAuth(), r.githubHandler.StartOAuth)
-				oauth.GET("/callback", r.githubHandler.OAuthCallback) // Public - GitHub redirects here
+				installation.GET("/start", r.authMiddleware.RequireAuth(), r.githubHandler.StartInstallation)
+				installation.GET("/callback", r.githubHandler.InstallationCallback) // Public - GitHub redirects here
 			}
 
 			// Protected routes

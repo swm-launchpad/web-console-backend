@@ -77,9 +77,9 @@ func InitializeApp() (*App, error) {
 	getGitHubInstallationUseCase := application.NewGetGitHubInstallationUseCase(gitHubInstallationRepository)
 	generateInstallationTokenUseCase := application.NewGenerateInstallationTokenUseCase(gitHubInstallationRepository, client, txManager)
 	listRepositoriesUseCase := application.NewListRepositoriesUseCase(gitHubInstallationRepository, client)
-	startOAuthUseCase := application.NewStartOAuthUseCase(configConfig)
-	oAuthCallbackUseCase := application.NewOAuthCallbackUseCase(configConfig, client, gitHubInstallationRepository, txManager)
-	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, startOAuthUseCase, oAuthCallbackUseCase, configConfig)
+	startInstallationUseCase := application.NewStartInstallationUseCase(configConfig)
+	installationCallbackUseCase := application.NewInstallationCallbackUseCase(configConfig, client, gitHubInstallationRepository, txManager)
+	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, startInstallationUseCase, installationCallbackUseCase, configConfig)
 	projectRepository := repository.NewProjectRepository(db)
 	slugService := service2.NewSlugService(projectRepository)
 	projectService := service2.NewProjectService(projectRepository, slugService)
@@ -258,8 +258,8 @@ func provideGitHubHandler(
 	getInstallationUseCase *application.GetGitHubInstallationUseCase,
 	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
 	listRepositoriesUseCase *application.ListRepositoriesUseCase,
-	startOAuthUseCase *application.StartOAuthUseCase,
-	oauthCallbackUseCase *application.OAuthCallbackUseCase,
+	startInstallationUseCase *application.StartInstallationUseCase,
+	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	cfg *config.Config,
 ) *handler.GitHubHandler {
 	return handler.NewGitHubHandler(
@@ -268,8 +268,8 @@ func provideGitHubHandler(
 		getInstallationUseCase,
 		generateTokenUseCase,
 		listRepositoriesUseCase,
-		startOAuthUseCase,
-		oauthCallbackUseCase,
+		startInstallationUseCase,
+		installationCallbackUseCase,
 		cfg.Frontend.URL,
 	)
 }

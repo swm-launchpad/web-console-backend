@@ -151,8 +151,8 @@ func provideGitHubHandler(
 	getInstallationUseCase *application.GetGitHubInstallationUseCase,
 	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
 	listRepositoriesUseCase *application.ListRepositoriesUseCase,
-	startOAuthUseCase *application.StartOAuthUseCase,
-	oauthCallbackUseCase *application.OAuthCallbackUseCase,
+	startInstallationUseCase *application.StartInstallationUseCase,
+	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	cfg *config.Config,
 ) *userHTTP.GitHubHandler {
 	return userHTTP.NewGitHubHandler(
@@ -161,8 +161,8 @@ func provideGitHubHandler(
 		getInstallationUseCase,
 		generateTokenUseCase,
 		listRepositoriesUseCase,
-		startOAuthUseCase,
-		oauthCallbackUseCase,
+		startInstallationUseCase,
+		installationCallbackUseCase,
 		cfg.Frontend.URL,
 	)
 }
@@ -212,8 +212,8 @@ func InitializeApp() (*App, error) {
 		application.NewGetGitHubInstallationUseCase,
 		application.NewGenerateInstallationTokenUseCase,
 		application.NewListRepositoriesUseCase,
-		application.NewStartOAuthUseCase,
-		application.NewOAuthCallbackUseCase,
+		application.NewStartInstallationUseCase,
+		application.NewInstallationCallbackUseCase,
 
 		// Project infrastructure
 		projectRepo.NewProjectRepository,
