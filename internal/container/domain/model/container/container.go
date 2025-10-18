@@ -51,7 +51,7 @@ const (
 )
 
 // NewContainer creates a new container with initial configuration
-// templateID and templateConfig are optional (pass nil if not needed)
+// templateID, templateConfig, and githubInstallationID are optional (pass nil if not needed)
 func NewContainer(
 	projectID uint,
 	name string,
@@ -60,6 +60,7 @@ func NewContainer(
 	resourceLimits value.ResourceLimits,
 	templateID *uint,
 	templateConfig map[string]interface{},
+	githubInstallationID *int64,
 ) (*Container, error) {
 	if projectID == 0 {
 		return nil, containererrors.ErrInvalidProjectID
@@ -72,20 +73,21 @@ func NewContainer(
 	}
 
 	return &Container{
-		projectID:      projectID,
-		templateID:     templateID,
-		name:           name,
-		slug:           slug,
-		templateConfig: templateConfig,
-		gitConfig:      gitConfig,
-		resourceLimits: resourceLimits,
-		envVars:        make([]EnvVar, 0),
-		networks:       make([]Network, 0),
-		secrets:        make([]Secret, 0),
-		mounts:         make([]Mount, 0),
-		isDeleted:      false,
-		createdAt:      time.Now(),
-		updatedAt:      time.Time{}, // Zero time for new containers (NULL in database)
+		projectID:            projectID,
+		templateID:           templateID,
+		name:                 name,
+		slug:                 slug,
+		templateConfig:       templateConfig,
+		githubInstallationID: githubInstallationID,
+		gitConfig:            gitConfig,
+		resourceLimits:       resourceLimits,
+		envVars:              make([]EnvVar, 0),
+		networks:             make([]Network, 0),
+		secrets:              make([]Secret, 0),
+		mounts:               make([]Mount, 0),
+		isDeleted:            false,
+		createdAt:            time.Now(),
+		updatedAt:            time.Time{}, // Zero time for new containers (NULL in database)
 	}, nil
 }
 
@@ -141,6 +143,12 @@ func (c *Container) ChangeName(name string) error {
 // SetStableWindow sets the stability window time
 func (c *Container) SetStableWindow(window *uint32) {
 	c.stableWindow = window
+	c.updatedAt = time.Now()
+}
+
+// SetGitHubInstallationID sets the GitHub installation ID for private repository access
+func (c *Container) SetGitHubInstallationID(installationID *int64) {
+	c.githubInstallationID = installationID
 	c.updatedAt = time.Now()
 }
 
@@ -593,6 +601,7 @@ func ReconstructContainer(
 	slug value.ContainerSlug,
 	stableWindow *uint32,
 	templateConfig map[string]interface{},
+	githubInstallationID *int64,
 	gitConfig value.GitConfig,
 	gitCommitHash *string,
 	lastBuiltGitCommitHash *string,
@@ -613,6 +622,7 @@ func ReconstructContainer(
 		slug:                   slug,
 		stableWindow:           stableWindow,
 		templateConfig:         templateConfig,
+		githubInstallationID:   githubInstallationID,
 		gitConfig:              gitConfig,
 		gitCommitHash:          gitCommitHash,
 		lastBuiltGitCommitHash: lastBuiltGitCommitHash,
