@@ -35,6 +35,7 @@ type DatabaseConfig struct {
 type ServerConfig struct {
 	Port    string
 	GinMode string
+	BaseURL string // Backend base URL (e.g., http://localhost:8080 or https://api.launchpad.kr)
 }
 
 type JWTConfig struct {
@@ -127,6 +128,7 @@ func Load() (*Config, error) {
 		Server: ServerConfig{
 			Port:    getEnv("PORT", "8080"),
 			GinMode: getEnv("GIN_MODE", "debug"),
+			BaseURL: getEnv("BACKEND_URL", "http://localhost:8080"),
 		},
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", ""),

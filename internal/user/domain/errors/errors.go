@@ -79,4 +79,6 @@ var (
 	ErrUserIDRequired            = errors.New("user ID is required")
 	ErrGitHubTokenGenerateFail   = errors.New("failed to generate GitHub token")
 	ErrGitHubAPIFailed           = errors.New("GitHub API request failed")
+	ErrInvalidState              = errors.New("invalid OAuth state parameter")
+	ErrGitHubOAuthFailed         = errors.New("GitHub OAuth failed")
 )

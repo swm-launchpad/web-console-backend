@@ -55,6 +55,8 @@ var userErrorMap = map[error]response.ErrorMapping{
 	usererrors.ErrUserIDRequired:            {StatusCode: http.StatusBadRequest, Code: "USER_ID_REQUIRED", Message: "User ID is required"},
 	usererrors.ErrGitHubTokenGenerateFail:   {StatusCode: http.StatusInternalServerError, Code: "GITHUB_TOKEN_GENERATION_FAILED", Message: "Failed to generate GitHub token"},
 	usererrors.ErrGitHubAPIFailed:           {StatusCode: http.StatusBadGateway, Code: "GITHUB_API_FAILED", Message: "GitHub API request failed"},
+	usererrors.ErrInvalidState:              {StatusCode: http.StatusBadRequest, Code: "INVALID_STATE", Message: "Invalid OAuth state parameter"},
+	usererrors.ErrGitHubOAuthFailed:         {StatusCode: http.StatusBadGateway, Code: "GITHUB_OAUTH_FAILED", Message: "GitHub OAuth failed"},
 }
 
 // mapUserError provides error mapping for user domain
