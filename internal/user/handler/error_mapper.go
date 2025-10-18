@@ -44,6 +44,17 @@ var userErrorMap = map[error]response.ErrorMapping{
 	// Duplicate errors
 	usererrors.ErrUsernameExists: {StatusCode: http.StatusConflict, Code: "USERNAME_EXISTS", Message: "Username already exists"},
 	usererrors.ErrEmailExists:    {StatusCode: http.StatusConflict, Code: "EMAIL_EXISTS", Message: "Email already exists"},
+
+	// GitHub Installation errors
+	usererrors.ErrInstallationNotFound:      {StatusCode: http.StatusNotFound, Code: "INSTALLATION_NOT_FOUND", Message: "GitHub installation not found"},
+	usererrors.ErrInstallationExists:        {StatusCode: http.StatusConflict, Code: "INSTALLATION_EXISTS", Message: "GitHub installation already exists"},
+	usererrors.ErrInstallationRevoked:       {StatusCode: http.StatusGone, Code: "INSTALLATION_REVOKED", Message: "GitHub installation has been revoked. Please reconnect your GitHub account"},
+	usererrors.ErrInstallationUnauthorized:  {StatusCode: http.StatusForbidden, Code: "INSTALLATION_UNAUTHORIZED", Message: "Unauthorized to access GitHub installation"},
+	usererrors.ErrInvalidInstallationID:     {StatusCode: http.StatusBadRequest, Code: "INVALID_INSTALLATION_ID", Message: "Invalid installation ID"},
+	usererrors.ErrAccountLoginRequired:      {StatusCode: http.StatusBadRequest, Code: "ACCOUNT_LOGIN_REQUIRED", Message: "Account login is required"},
+	usererrors.ErrUserIDRequired:            {StatusCode: http.StatusBadRequest, Code: "USER_ID_REQUIRED", Message: "User ID is required"},
+	usererrors.ErrGitHubTokenGenerateFail:   {StatusCode: http.StatusInternalServerError, Code: "GITHUB_TOKEN_GENERATION_FAILED", Message: "Failed to generate GitHub token"},
+	usererrors.ErrGitHubAPIFailed:           {StatusCode: http.StatusBadGateway, Code: "GITHUB_API_FAILED", Message: "GitHub API request failed"},
 }
 
 // mapUserError provides error mapping for user domain

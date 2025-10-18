@@ -19,6 +19,7 @@ type Router struct {
 	userHandler          *userHTTP.UserHandler
 	verificationHandler  *userHTTP.VerificationHandler
 	passwordResetHandler *userHTTP.PasswordResetHandler
+	githubHandler        *userHTTP.GitHubHandler
 	projectHandler       *projectHTTP.ProjectHandler
 	volumeHandler        *projectHTTP.VolumeHandler
 	deploymentHandler    *projectHTTP.DeploymentHandler
@@ -34,6 +35,7 @@ func NewRouter(
 	userHandler *userHTTP.UserHandler,
 	verificationHandler *userHTTP.VerificationHandler,
 	passwordResetHandler *userHTTP.PasswordResetHandler,
+	githubHandler *userHTTP.GitHubHandler,
 	projectHandler *projectHTTP.ProjectHandler,
 	volumeHandler *projectHTTP.VolumeHandler,
 	deploymentHandler *projectHTTP.DeploymentHandler,
@@ -59,6 +61,7 @@ func NewRouter(
 		userHandler:          userHandler,
 		verificationHandler:  verificationHandler,
 		passwordResetHandler: passwordResetHandler,
+		githubHandler:        githubHandler,
 		projectHandler:       projectHandler,
 		volumeHandler:        volumeHandler,
 		deploymentHandler:    deploymentHandler,
@@ -103,6 +106,17 @@ func (r *Router) Setup() {
 		{
 			users.GET("/me", r.userHandler.GetCurrentUser)
 			users.GET("/:id", r.userHandler.GetUserByID)
+		}
+
+		// GitHub routes (protected)
+		github := v1.Group("/github")
+		github.Use(r.authMiddleware.RequireAuth())
+		{
+			github.POST("/connect", r.githubHandler.ConnectGitHub)
+			github.GET("/installations", r.githubHandler.GetInstallations)
+			github.DELETE("/installations/:installation_id", r.githubHandler.DisconnectGitHub)
+			github.GET("/installations/:installation_id/repositories", r.githubHandler.ListRepositories)
+			github.POST("/token", r.githubHandler.GenerateInstallationToken)
 		}
 
 		// Project routes (protected)

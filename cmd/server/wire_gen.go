@@ -13,6 +13,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
+	"github.com/swm-launchpad/web-console-backend/internal/common/github"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	application3 "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
@@ -66,6 +67,17 @@ func InitializeApp() (*App, error) {
 	requestPasswordResetUseCase := application.NewRequestPasswordResetUseCase(userService, tokenService, emailService, txManager)
 	resetPasswordUseCase := application.NewResetPasswordUseCase(tokenService, authService, userService, txManager)
 	passwordResetHandler := handler.NewPasswordResetHandler(requestPasswordResetUseCase, resetPasswordUseCase)
+	gitHubInstallationRepository := infrastructure.NewGitHubInstallationRepository(db)
+	client, err := provideGitHubClient(configConfig)
+	if err != nil {
+		return nil, err
+	}
+	connectGitHubUseCase := application.NewConnectGitHubUseCase(gitHubInstallationRepository, client, txManager)
+	disconnectGitHubUseCase := application.NewDisconnectGitHubUseCase(gitHubInstallationRepository, txManager)
+	getGitHubInstallationUseCase := application.NewGetGitHubInstallationUseCase(gitHubInstallationRepository)
+	generateInstallationTokenUseCase := application.NewGenerateInstallationTokenUseCase(gitHubInstallationRepository, client, txManager)
+	listRepositoriesUseCase := application.NewListRepositoriesUseCase(gitHubInstallationRepository, client)
+	gitHubHandler := handler.NewGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase)
 	projectRepository := repository.NewProjectRepository(db)
 	slugService := service2.NewSlugService(projectRepository)
 	projectService := service2.NewProjectService(projectRepository, slugService)
@@ -123,7 +135,7 @@ func InitializeApp() (*App, error) {
 	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository)
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, projectHandler, volumeHandler, deploymentHandler, containerHandler, templateHandler, authMiddleware)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, containerHandler, templateHandler, authMiddleware)
 	app := NewApp(configConfig, db, router)
 	return app, nil
 }
@@ -230,4 +242,9 @@ func provideDeployService(
 		deployNamespace,
 		projectServiceName,
 	)
+}
+
+// provideGitHubClient creates a GitHub client from config
+func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
+	return github.NewClient(cfg.GitHubApp.AppID, cfg.GitHubApp.PrivateKeyPath)
 }
