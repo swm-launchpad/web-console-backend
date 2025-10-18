@@ -122,6 +122,7 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 			resourceLimits,
 			input.TemplateID,
 			input.TemplateConfig,
+			input.GitHubInstallationID,
 		)
 		if err != nil {
 			return err

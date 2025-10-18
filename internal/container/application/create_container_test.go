@@ -39,7 +39,7 @@ func TestCreateContainerUseCase_Execute_Success(t *testing.T) {
 
 	mockPermSvc.On("CanUserCreateContainer", ctx, userID, projectID).Return(nil)
 	mockResourceValidationSvc.On("ValidateProjectResourceLimits", ctx, projectID, uint32(1000), uint32(2048), uint(0)).Return(nil)
-	mockContainerService.On("CreateContainer", ctx, projectID, input.Name, mock.Anything, mock.Anything, (*uint)(nil), map[string]interface{}(nil)).Return(mockContainer, nil)
+	mockContainerService.On("CreateContainer", ctx, projectID, input.Name, mock.Anything, mock.Anything, (*uint)(nil), map[string]interface{}(nil), (*int64)(nil)).Return(mockContainer, nil)
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).Return(nil)
 
 	output, err := useCase.Execute(ctx, input)
