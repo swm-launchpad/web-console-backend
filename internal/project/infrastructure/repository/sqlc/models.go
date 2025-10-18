@@ -564,10 +564,11 @@ type VerificationToken struct {
 }
 
 type Volume struct {
-	VolumeID  uint32       `json:"volume_id"`
-	ProjectID uint32       `json:"project_id"`
-	Name      string       `json:"name"`
-	Capacity  uint32       `json:"capacity"`
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt sql.NullTime `json:"updated_at"`
+	VolumeID  uint32         `json:"volume_id"`
+	ProjectID uint32         `json:"project_id"`
+	Name      string         `json:"name"`
+	Capacity  uint32         `json:"capacity"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt sql.NullTime   `json:"updated_at"`
+	Slug      sql.NullString `json:"slug"`
 }
