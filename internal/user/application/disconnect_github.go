@@ -30,6 +30,14 @@ func NewDisconnectGitHubUseCase(
 }
 
 func (uc *DisconnectGitHubUseCase) Execute(ctx context.Context, input DisconnectGitHubInput) error {
+	// Validate input
+	if input.UserID == 0 {
+		return usererrors.ErrUserIDRequired
+	}
+	if input.InstallationID <= 0 {
+		return usererrors.ErrInvalidInstallationID
+	}
+
 	return uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Get installation to verify ownership
 		installation, err := uc.installationRepo.FindByInstallationID(txCtx, input.InstallationID)

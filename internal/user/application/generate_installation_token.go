@@ -39,6 +39,19 @@ func NewGenerateInstallationTokenUseCase(
 }
 
 func (uc *GenerateInstallationTokenUseCase) Execute(ctx context.Context, input GenerateInstallationTokenInput) (*GenerateInstallationTokenOutput, error) {
+	// Validate input
+	if input.UserID == 0 {
+		return nil, usererrors.ErrUserIDRequired
+	}
+	if input.InstallationID <= 0 {
+		return nil, usererrors.ErrInvalidInstallationID
+	}
+
+	// Check if GitHub client is configured
+	if uc.githubClient == nil {
+		return nil, usererrors.ErrGitHubNotConfigured
+	}
+
 	var token string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {

@@ -3,10 +3,9 @@ package application
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth/state"
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/github"
@@ -38,37 +37,70 @@ type InstallationCallbackUseCase struct {
 	config           *config.Config
 	githubClient     *github.Client
 	installationRepo repository.GitHubInstallationRepository
+	stateRepo        repository.OAuthStateRepository
 	txManager        db.TxManager
+	stateValidator   *state.StateValidator
 }
 
 func NewInstallationCallbackUseCase(
 	cfg *config.Config,
 	githubClient *github.Client,
 	installationRepo repository.GitHubInstallationRepository,
+	stateRepo repository.OAuthStateRepository,
 	txManager db.TxManager,
 ) *InstallationCallbackUseCase {
 	return &InstallationCallbackUseCase{
 		config:           cfg,
 		githubClient:     githubClient,
 		installationRepo: installationRepo,
+		stateRepo:        stateRepo,
 		txManager:        txManager,
+		stateValidator:   state.NewStateValidator(cfg.JWT.Secret),
 	}
 }
 
 func (uc *InstallationCallbackUseCase) Execute(ctx context.Context, input InstallationCallbackInput) (*InstallationCallbackOutput, error) {
-	// Validate state format and extract user ID
-	// State format: "base64_random:user_id"
-	parts := strings.Split(input.State, ":")
-	if len(parts) != 2 {
+	// Validate input
+	if input.InstallationID <= 0 {
+		return nil, usererrors.ErrInvalidInstallationID
+	}
+	if input.State == "" {
 		return nil, usererrors.ErrInvalidState
 	}
 
-	userID, err := strconv.ParseUint(parts[1], 10, 32)
+	// Check if GitHub client is configured
+	if uc.githubClient == nil {
+		return nil, usererrors.ErrGitHubNotConfigured
+	}
+
+	// Step 1: Validate HMAC signature
+	userID, err := uc.stateValidator.ValidateState(input.State)
 	if err != nil {
 		return nil, usererrors.ErrInvalidState
 	}
 
-	// Get installation info from GitHub API
+	// Step 2: Verify state exists in database and hasn't been consumed (prevents replay attacks)
+	oauthState, err := uc.stateRepo.FindByState(ctx, input.State)
+	if err != nil {
+		return nil, usererrors.ErrInvalidState
+	}
+
+	// Step 3: Check if state is still valid (not expired, not consumed)
+	if !oauthState.CanBeUsed() {
+		return nil, usererrors.ErrInvalidState
+	}
+
+	// Step 4: Verify user ID from state matches the one in database
+	if oauthState.UserID != userID {
+		return nil, usererrors.ErrInvalidState
+	}
+
+	// Step 5: Mark state as consumed immediately (one-time use)
+	if err := uc.stateRepo.MarkAsConsumed(ctx, input.State, input.InstallationID); err != nil {
+		return nil, fmt.Errorf("failed to consume state: %w", err)
+	}
+
+	// Step 6: Get installation info from GitHub API
 	installationInfo, err := uc.githubClient.GetInstallationInfo(input.InstallationID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", usererrors.ErrGitHubAPIFailed, err)
@@ -78,45 +110,64 @@ func (uc *InstallationCallbackUseCase) Execute(ctx context.Context, input Instal
 
 	// Process installation
 	err = uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
-		// Check if installation already exists
-		exists, err := uc.installationRepo.ExistsByInstallationID(txCtx, input.InstallationID)
+		// Check if installation already exists (including revoked ones)
+		installation, err := uc.installationRepo.FindByInstallationIDIncludingRevoked(txCtx, input.InstallationID)
+		isNew := false
+
 		if err != nil {
-			return fmt.Errorf("failed to check installation existence: %w", err)
-		}
+			// Installation doesn't exist - create new one
+			if err == usererrors.ErrInstallationNotFound {
+				isNew = true
+				installation = &model.GitHubInstallation{
+					InstallationID: input.InstallationID,
+					UserID:         uint(userID),
+					AccountLogin:   installationInfo.Account.Login,
+					AccountType:    model.AccountType(installationInfo.Account.Type),
+					Status:         model.InstallationStatusActive,
+					CreatedAt:      time.Now(),
+				}
 
-		isNew := !exists
-		var installation *model.GitHubInstallation
-
-		if exists {
-			// Update existing installation
-			installation, err = uc.installationRepo.FindByInstallationID(txCtx, input.InstallationID)
-			if err != nil {
+				if err := uc.installationRepo.Create(txCtx, installation); err != nil {
+					return fmt.Errorf("failed to create installation: %w", err)
+				}
+			} else {
 				return fmt.Errorf("failed to find installation: %w", err)
 			}
-
-			// Update installation info
-			installation.AccountLogin = installationInfo.Account.Login
-			installation.AccountType = model.AccountType(installationInfo.Account.Type)
-			installation.Status = model.InstallationStatusActive
-			now := time.Now()
-			installation.UpdatedAt = &now
-
-			if err := uc.installationRepo.Update(txCtx, installation); err != nil {
-				return fmt.Errorf("failed to update installation: %w", err)
-			}
 		} else {
-			// Create new installation
-			installation = &model.GitHubInstallation{
-				InstallationID: input.InstallationID,
-				UserID:         uint(userID),
-				AccountLogin:   installationInfo.Account.Login,
-				AccountType:    model.AccountType(installationInfo.Account.Type),
-				Status:         model.InstallationStatusActive,
-				CreatedAt:      time.Now(),
+			// Installation exists - verify user ownership before proceeding
+			if installation.UserID != userID {
+				return usererrors.ErrInstallationUnauthorized
 			}
 
-			if err := uc.installationRepo.Create(txCtx, installation); err != nil {
-				return fmt.Errorf("failed to create installation: %w", err)
+			// Installation exists and owned by user - reactivate if deleted or revoked
+			if installation.IsDeleted || installation.Status == model.InstallationStatusRevoked {
+				// Reactivate deleted or revoked installation
+				// This restores is_deleted=FALSE, deleted_at=NULL, and status='active'
+				if err := uc.installationRepo.Reactivate(
+					txCtx,
+					input.InstallationID,
+					installationInfo.Account.Login,
+					model.AccountType(installationInfo.Account.Type),
+				); err != nil {
+					return fmt.Errorf("failed to reactivate installation: %w", err)
+				}
+				// Update local installation object for response
+				installation.Status = model.InstallationStatusActive
+				installation.AccountLogin = installationInfo.Account.Login
+				installation.AccountType = model.AccountType(installationInfo.Account.Type)
+				installation.IsDeleted = false
+				installation.DeletedAt = nil
+			} else {
+				// Update active installation
+				installation.AccountLogin = installationInfo.Account.Login
+				installation.AccountType = model.AccountType(installationInfo.Account.Type)
+				installation.Status = model.InstallationStatusActive
+				now := time.Now()
+				installation.UpdatedAt = &now
+
+				if err := uc.installationRepo.Update(txCtx, installation); err != nil {
+					return fmt.Errorf("failed to update installation: %w", err)
+				}
 			}
 		}
 

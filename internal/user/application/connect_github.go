@@ -43,6 +43,19 @@ func NewConnectGitHubUseCase(
 }
 
 func (uc *ConnectGitHubUseCase) Execute(ctx context.Context, input ConnectGitHubInput) (*ConnectGitHubOutput, error) {
+	// Validate input
+	if input.UserID == 0 {
+		return nil, usererrors.ErrUserIDRequired
+	}
+	if input.InstallationID <= 0 {
+		return nil, usererrors.ErrInvalidInstallationID
+	}
+
+	// Check if GitHub client is configured
+	if uc.githubClient == nil {
+		return nil, usererrors.ErrGitHubNotConfigured
+	}
+
 	var output *ConnectGitHubOutput
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {

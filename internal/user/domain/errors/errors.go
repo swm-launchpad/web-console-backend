@@ -80,4 +80,5 @@ var (
 	ErrGitHubTokenGenerateFail  = errors.New("failed to generate GitHub token")
 	ErrGitHubAPIFailed          = errors.New("GitHub API request failed")
 	ErrInvalidState             = errors.New("invalid state parameter")
+	ErrGitHubNotConfigured      = errors.New("GitHub integration is not configured")
 )

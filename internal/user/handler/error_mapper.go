@@ -56,6 +56,7 @@ var userErrorMap = map[error]response.ErrorMapping{
 	usererrors.ErrGitHubTokenGenerateFail:  {StatusCode: http.StatusInternalServerError, Code: "GITHUB_TOKEN_GENERATION_FAILED", Message: "Failed to generate GitHub token"},
 	usererrors.ErrGitHubAPIFailed:          {StatusCode: http.StatusBadGateway, Code: "GITHUB_API_FAILED", Message: "GitHub API request failed"},
 	usererrors.ErrInvalidState:             {StatusCode: http.StatusBadRequest, Code: "INVALID_STATE", Message: "Invalid state parameter"},
+	usererrors.ErrGitHubNotConfigured:      {StatusCode: http.StatusServiceUnavailable, Code: "GITHUB_NOT_CONFIGURED", Message: "GitHub integration is not configured on this server"},
 }
 
 // mapUserError provides error mapping for user domain

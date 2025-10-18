@@ -43,6 +43,19 @@ type ListRepositoriesOutput struct {
 }
 
 func (uc *ListRepositoriesUseCase) Execute(ctx context.Context, input ListRepositoriesInput) (*ListRepositoriesOutput, error) {
+	// Validate input
+	if input.UserID == 0 {
+		return nil, usererrors.ErrUserIDRequired
+	}
+	if input.InstallationID <= 0 {
+		return nil, usererrors.ErrInvalidInstallationID
+	}
+
+	// Check if GitHub client is configured
+	if uc.githubClient == nil {
+		return nil, usererrors.ErrGitHubNotConfigured
+	}
+
 	// Verify the installation belongs to the user
 	installation, err := uc.installationRepo.FindByInstallationID(ctx, input.InstallationID)
 	if err != nil {

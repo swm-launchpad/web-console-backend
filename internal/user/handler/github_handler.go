@@ -53,6 +53,10 @@ type ConnectGitHubRequest struct {
 // POST /api/v1/github/connect
 func (h *GitHubHandler) ConnectGitHub(c *gin.Context) {
 	userID := getUserIDFromContext(c)
+	if userID == 0 {
+		response.Error(c, auth.ErrUnauthorized, mapUserError)
+		return
+	}
 
 	var req ConnectGitHubRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -80,6 +84,10 @@ func (h *GitHubHandler) ConnectGitHub(c *gin.Context) {
 // GET /api/v1/github/installations
 func (h *GitHubHandler) GetInstallations(c *gin.Context) {
 	userID := getUserIDFromContext(c)
+	if userID == 0 {
+		response.Error(c, auth.ErrUnauthorized, mapUserError)
+		return
+	}
 
 	input := application.GetGitHubInstallationInput{
 		UserID: userID,
@@ -98,10 +106,14 @@ func (h *GitHubHandler) GetInstallations(c *gin.Context) {
 // DELETE /api/v1/github/installations/:installation_id
 func (h *GitHubHandler) DisconnectGitHub(c *gin.Context) {
 	userID := getUserIDFromContext(c)
+	if userID == 0 {
+		response.Error(c, auth.ErrUnauthorized, mapUserError)
+		return
+	}
 
 	installationIDStr := c.Param("installation_id")
 	installationID, err := strconv.ParseInt(installationIDStr, 10, 64)
-	if err != nil {
+	if err != nil || installationID <= 0 {
 		response.Error(c, usererrors.ErrInvalidInstallationID, mapUserError)
 		return
 	}
@@ -130,6 +142,10 @@ type GenerateInstallationTokenRequest struct {
 // POST /api/v1/github/token
 func (h *GitHubHandler) GenerateInstallationToken(c *gin.Context) {
 	userID := getUserIDFromContext(c)
+	if userID == 0 {
+		response.Error(c, auth.ErrUnauthorized, mapUserError)
+		return
+	}
 
 	var req GenerateInstallationTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -157,10 +173,14 @@ func (h *GitHubHandler) GenerateInstallationToken(c *gin.Context) {
 // GET /api/v1/github/installations/:installation_id/repositories
 func (h *GitHubHandler) ListRepositories(c *gin.Context) {
 	userID := getUserIDFromContext(c)
+	if userID == 0 {
+		response.Error(c, auth.ErrUnauthorized, mapUserError)
+		return
+	}
 
 	installationIDStr := c.Param("installation_id")
 	installationID, err := strconv.ParseInt(installationIDStr, 10, 64)
-	if err != nil {
+	if err != nil || installationID <= 0 {
 		response.Error(c, usererrors.ErrInvalidInstallationID, mapUserError)
 		return
 	}
@@ -183,6 +203,10 @@ func (h *GitHubHandler) ListRepositories(c *gin.Context) {
 // GET /api/v1/github/installation/start
 func (h *GitHubHandler) StartInstallation(c *gin.Context) {
 	userID := getUserIDFromContext(c)
+	if userID == 0 {
+		response.Error(c, auth.ErrUnauthorized, mapUserError)
+		return
+	}
 
 	input := application.StartInstallationInput{
 		UserID: userID,
@@ -212,7 +236,7 @@ func (h *GitHubHandler) InstallationCallback(c *gin.Context) {
 	}
 
 	installationID, err := strconv.ParseInt(installationIDStr, 10, 64)
-	if err != nil {
+	if err != nil || installationID <= 0 {
 		c.Redirect(302, h.frontendURL+"/github/callback?error=invalid_installation_id&popup=true")
 		return
 	}
