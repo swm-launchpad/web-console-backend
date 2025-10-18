@@ -17,17 +17,18 @@ type VolumeToCreate struct {
 }
 
 type CreateContainerInput struct {
-	ProjectID      uint
-	UserID         uint
-	TemplateID     *uint
-	Name           string
-	GitURL         string
-	GitBranch      string
-	GitDirectory   *string
-	CPULimit       uint32
-	MemoryLimit    uint32
-	TemplateConfig map[string]interface{}
-	Volumes        []VolumeToCreate
+	ProjectID            uint
+	UserID               uint
+	TemplateID           *uint
+	Name                 string
+	GitURL               string
+	GitBranch            string
+	GitDirectory         *string
+	GitHubInstallationID *int64 // Optional: for private repositories
+	CPULimit             uint32
+	MemoryLimit          uint32
+	TemplateConfig       map[string]interface{}
+	Volumes              []VolumeToCreate
 }
 
 type CreateContainerOutput struct {

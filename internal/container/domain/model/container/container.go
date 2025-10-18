@@ -18,6 +18,7 @@ type Container struct {
 	slug                   value.ContainerSlug
 	stableWindow           *uint32
 	templateConfig         map[string]interface{}
+	githubInstallationID   *int64 // GitHub App installation ID for private repos
 	gitConfig              value.GitConfig
 	gitCommitHash          *string // Current/target git commit hash
 	lastBuiltGitCommitHash *string // Last successfully built git commit hash
@@ -96,6 +97,7 @@ func (c *Container) Name() string                           { return c.name }
 func (c *Container) Slug() value.ContainerSlug              { return c.slug }
 func (c *Container) StableWindow() *uint32                  { return c.stableWindow }
 func (c *Container) TemplateConfig() map[string]interface{} { return c.templateConfig }
+func (c *Container) GitHubInstallationID() *int64           { return c.githubInstallationID }
 func (c *Container) GitConfig() value.GitConfig             { return c.gitConfig }
 func (c *Container) LastBuiltGitCommitHash() *string        { return c.lastBuiltGitCommitHash }
 func (c *Container) ResourceLimits() value.ResourceLimits   { return c.resourceLimits }
