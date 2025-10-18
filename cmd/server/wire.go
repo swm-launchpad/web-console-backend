@@ -15,6 +15,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	containerApp "github.com/swm-launchpad/web-console-backend/internal/container/application"
+	containerDeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 	containerService "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	containerInfra "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
@@ -90,9 +91,11 @@ func provideKubeClient() (projectDomainInfra.KubeClient, error) {
 }
 
 // provideContainerClient creates a container client
-// Note: Currently using MockContainerClient until real implementation is ready
-func provideContainerClient() projectDomainInfra.ContainerClient {
-	return projectInfra.NewMockContainerClient()
+func provideContainerClient(
+	getContainersUseCase *containerDeployment.GetContainersForDeploymentUseCase,
+	volumeRepo projectDomainRepo.VolumeRepository,
+) projectDomainInfra.ContainerClient {
+	return projectInfra.NewContainerClient(getContainersUseCase, volumeRepo)
 }
 
 // provideDeployNamespace provides the deployment namespace from environment
@@ -228,6 +231,7 @@ func InitializeApp() (*App, error) {
 		containerApp.NewDeleteMountUseCase,
 		containerApp.NewGetTemplatesUseCase,
 		containerApp.NewGetTemplateUseCase,
+		containerDeployment.NewGetContainersForDeploymentUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,

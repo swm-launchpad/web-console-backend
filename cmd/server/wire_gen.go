@@ -15,6 +15,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	application3 "github.com/swm-launchpad/web-console-backend/internal/container/application"
+	"github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 	service3 "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	handler3 "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	infrastructure2 "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
@@ -83,7 +84,11 @@ func InitializeApp() (*App, error) {
 	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager)
 	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService)
 	deploymentRepository := repository.NewDeploymentRepository(db)
-	containerClient := provideContainerClient()
+	containerRepository := infrastructure2.NewContainerRepository(db)
+	serviceSlugService := service3.NewSlugService(containerRepository)
+	containerService := service3.NewContainerService(containerRepository, serviceSlugService)
+	getContainersForDeploymentUseCase := deployment.NewGetContainersForDeploymentUseCase(containerService)
+	containerClient := provideContainerClient(getContainersForDeploymentUseCase, volumeRepository)
 	tektonClient, err := provideTektonClient()
 	if err != nil {
 		return nil, err
@@ -95,9 +100,6 @@ func InitializeApp() (*App, error) {
 	deployService := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient)
 	deployProjectUseCase := application2.NewDeployProjectUseCase(deployService)
 	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, permissionService)
-	containerRepository := infrastructure2.NewContainerRepository(db)
-	serviceSlugService := service3.NewSlugService(containerRepository)
-	containerService := service3.NewContainerService(containerRepository, serviceSlugService)
 	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository)
 	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository)
 	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, servicePermissionService, resourceValidationService, volumeService, txManager)
@@ -184,9 +186,11 @@ func provideKubeClient() (infrastructure3.KubeClient, error) {
 }
 
 // provideContainerClient creates a container client
-// Note: Currently using MockContainerClient until real implementation is ready
-func provideContainerClient() infrastructure3.ContainerClient {
-	return infrastructure4.NewMockContainerClient()
+func provideContainerClient(
+	getContainersUseCase *deployment.GetContainersForDeploymentUseCase,
+	volumeRepo repository2.VolumeRepository,
+) infrastructure3.ContainerClient {
+	return infrastructure4.NewContainerClient(getContainersUseCase, volumeRepo)
 }
 
 // provideDeployNamespace provides the deployment namespace from environment
