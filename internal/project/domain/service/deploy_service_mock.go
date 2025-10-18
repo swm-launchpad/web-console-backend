@@ -13,8 +13,8 @@ type MockDeployService struct {
 }
 
 // DeployProject mocks the DeployProject method
-func (m *MockDeployService) DeployProject(ctx context.Context, projectID uint, userID uint) (*deployment.Deployment, error) {
-	args := m.Called(ctx, projectID, userID)
+func (m *MockDeployService) DeployProject(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+	args := m.Called(ctx, projectID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

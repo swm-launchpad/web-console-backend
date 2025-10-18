@@ -38,9 +38,8 @@ func (uc *DeployProjectUseCase) Execute(ctx context.Context, input DeployProject
 	// Note: Permission check is performed in the handler to prevent information disclosure
 	// The handler converts permission errors to "not found" errors
 
-	// Deploy project (userID is not needed as permission is already checked in handler)
-	// We pass 0 as userID since it's not used by the service for actual deployment
-	deployment, err := uc.deployService.DeployProject(ctx, input.ProjectID, 0)
+	// Deploy project
+	deployment, err := uc.deployService.DeployProject(ctx, input.ProjectID)
 	if err != nil {
 		return nil, err
 	}

@@ -48,7 +48,6 @@ type DeployService interface {
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control
 	//   - projectID: The unique identifier of the project to deploy
-	//   - userID: The ID of the user initiating the deployment
 	//
 	// Returns:
 	//   - *deployment.Deployment: The created Deployment record with status 'untracked' initially
@@ -62,7 +61,7 @@ type DeployService interface {
 	//   - ErrTektonDeploymentFailed: Tekton rejected the deployment request
 	//
 	// Example usage:
-	//   deployment, err := deployService.DeployProject(ctx, 123, 456)
+	//   deployment, err := deployService.DeployProject(ctx, 123)
 	//   if err != nil {
 	//       return err
 	//   }
@@ -73,7 +72,7 @@ type DeployService interface {
 	//   - Deployment record is created with status 'untracked'
 	//   - Background monitoring goroutine is started
 	//   - On error, project status is reverted to 'nothing' and Deployment is marked as failed
-	DeployProject(ctx context.Context, projectID uint, userID uint) (*deployment.Deployment, error)
+	DeployProject(ctx context.Context, projectID uint) (*deployment.Deployment, error)
 
 	// RefreshDeploymentStatus queries Kubernetes directly to get the latest deployment status
 	// and updates the database accordingly. This is used for "force refresh" scenarios where
@@ -147,7 +146,7 @@ func NewDeployService(
 }
 
 // DeployProject initiates a deployment for the specified project
-func (s *deployService) DeployProject(ctx context.Context, projectID uint, userID uint) (*deployment.Deployment, error) {
+func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
 	// Step 1: Atomically change project status + create deployment in a transaction
 	var d *deployment.Deployment
 	var proj *projectmodel.Project
