@@ -60,10 +60,10 @@ type FrontendConfig struct {
 
 type GitHubAppConfig struct {
 	AppID           string
-	ClientID        string
-	ClientSecret    string
-	PrivateKeyPath  string
-	InstallationURL string
+	ClientID        string // GitHub App Client ID (may be used for future OAuth flows)
+	ClientSecret    string // GitHub App Client Secret (may be used for future OAuth flows)
+	PrivateKeyPath  string // Path to GitHub App private key for JWT authentication
+	InstallationURL string // Base URL for GitHub App installation
 }
 
 func Load() (*Config, error) {
