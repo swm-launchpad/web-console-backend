@@ -5,6 +5,7 @@ import (
 	"time"
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume/value"
 )
 
 // Volume represents a storage volume aggregate root
@@ -13,6 +14,7 @@ type Volume struct {
 	volumeID  uint
 	projectID uint
 	name      string
+	slug      value.VolumeSlug
 	capacity  uint32 // Capacity in Mi (Mebibytes)
 	createdAt time.Time
 	updatedAt time.Time
@@ -31,6 +33,7 @@ const (
 var volumeNamePattern = regexp.MustCompile(`^[a-z]([a-z0-9-]*[a-z0-9])?$`)
 
 // NewVolume creates a new Volume aggregate root
+// The slug will be set by the service layer before persistence
 func NewVolume(projectID uint, name string, capacity uint32) (*Volume, error) {
 	if projectID == 0 {
 		return nil, projecterrors.ErrInvalidProjectID
@@ -53,6 +56,7 @@ func NewVolume(projectID uint, name string, capacity uint32) (*Volume, error) {
 		volumeID:  0, // Will be set by repository
 		projectID: projectID,
 		name:      name,
+		slug:      value.VolumeSlug{}, // Will be set by service layer
 		capacity:  capacity,
 		createdAt: now,
 		updatedAt: time.Time{}, // Zero time for new volumes (NULL in database)
@@ -72,6 +76,11 @@ func (v *Volume) ProjectID() uint {
 // Name returns the volume name
 func (v *Volume) Name() string {
 	return v.name
+}
+
+// Slug returns the volume slug
+func (v *Volume) Slug() value.VolumeSlug {
+	return v.slug
 }
 
 // Capacity returns the volume capacity in Mi (Mebibytes)
@@ -94,12 +103,18 @@ func (v *Volume) SetVolumeID(id uint) {
 	v.volumeID = id
 }
 
+// SetSlug sets the volume slug (typically set by service layer before persistence)
+func (v *Volume) SetSlug(slug value.VolumeSlug) {
+	v.slug = slug
+}
+
 // ReconstructVolume reconstructs a volume from persistence
 // This is used when loading a volume from the database
 func ReconstructVolume(
 	volumeID uint,
 	projectID uint,
 	name string,
+	slug value.VolumeSlug,
 	capacity uint32,
 	createdAt time.Time,
 	updatedAt time.Time,
@@ -108,6 +123,7 @@ func ReconstructVolume(
 		volumeID:  volumeID,
 		projectID: projectID,
 		name:      name,
+		slug:      slug,
 		capacity:  capacity,
 		createdAt: createdAt,
 		updatedAt: updatedAt,
