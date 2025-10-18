@@ -12,6 +12,7 @@ sql:
       - "../../../migration/000007_add_active_deployment_tracking.up.sql"
       - "../../../migration/000008_add_volume_slug.up.sql"
       - "../../../migration/000009_add_github_installations.up.sql"
+      - "../../../migration/000010_add_installation_status.up.sql"
     gen:
       go:
         package: "sqlc"
