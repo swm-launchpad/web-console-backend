@@ -74,8 +74,9 @@ func SetupTestServer(t *testing.T) *TestServer {
 	projectRepository := projectRepo.NewProjectRepository(testDB.DB)
 	volumeRepo := projectRepo.NewVolumeRepository(testDB.DB)
 	slugService := projectService.NewSlugService(projectRepository)
+	volumeSlugService := projectService.NewVolumeSlugService(volumeRepo)
 	projectSvc := projectService.NewProjectService(projectRepository, slugService)
-	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepository)
+	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepository, volumeSlugService)
 	permissionSvc := projectService.NewPermissionService(projectRepository, volumeRepo)
 
 	// Project UseCases
