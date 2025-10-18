@@ -203,7 +203,8 @@ func (c *Client) GetInstallationInfo(installationID int64) (*InstallationInfo, e
 }
 
 // ExchangeCodeForInstallation exchanges an OAuth code for installation details
-func (c *Client) ExchangeCodeForInstallation(code, clientID, clientSecret string) (int64, error) {
+// Returns all installation IDs accessible by the user
+func (c *Client) ExchangeCodeForInstallation(code, clientID, clientSecret string) ([]int64, error) {
 	// Exchange code for access token
 	url := "https://github.com/login/oauth/access_token"
 	payload := map[string]string{
@@ -214,12 +215,12 @@ func (c *Client) ExchangeCodeForInstallation(code, clientID, clientSecret string
 
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return 0, fmt.Errorf("failed to marshal payload: %w", err)
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -227,7 +228,7 @@ func (c *Client) ExchangeCodeForInstallation(code, clientID, clientSecret string
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("failed to exchange code: %w", err)
+		return nil, fmt.Errorf("failed to exchange code: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -236,18 +237,18 @@ func (c *Client) ExchangeCodeForInstallation(code, clientID, clientSecret string
 		Error       string `json:"error"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
-		return 0, fmt.Errorf("failed to decode token response: %w", err)
+		return nil, fmt.Errorf("failed to decode token response: %w", err)
 	}
 
 	if tokenResp.Error != "" {
-		return 0, fmt.Errorf("OAuth error: %s", tokenResp.Error)
+		return nil, fmt.Errorf("OAuth error: %s", tokenResp.Error)
 	}
 
 	// Get user's installations using the access token
 	installationsURL := githubAPIBaseURL + "/user/installations"
 	req, err = http.NewRequest("GET", installationsURL, nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create installations request: %w", err)
+		return nil, fmt.Errorf("failed to create installations request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+tokenResp.AccessToken)
@@ -256,7 +257,7 @@ func (c *Client) ExchangeCodeForInstallation(code, clientID, clientSecret string
 
 	resp, err = c.httpClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get installations: %w", err)
+		return nil, fmt.Errorf("failed to get installations: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -264,15 +265,20 @@ func (c *Client) ExchangeCodeForInstallation(code, clientID, clientSecret string
 		Installations []InstallationInfo `json:"installations"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&installationsResp); err != nil {
-		return 0, fmt.Errorf("failed to decode installations: %w", err)
+		return nil, fmt.Errorf("failed to decode installations: %w", err)
 	}
 
 	if len(installationsResp.Installations) == 0 {
-		return 0, fmt.Errorf("no installations found")
+		return nil, fmt.Errorf("no installations found")
 	}
 
-	// Return the first installation ID
-	return installationsResp.Installations[0].ID, nil
+	// Return all installation IDs
+	installationIDs := make([]int64, len(installationsResp.Installations))
+	for i, installation := range installationsResp.Installations {
+		installationIDs[i] = installation.ID
+	}
+
+	return installationIDs, nil
 }
 
 // Repository represents a GitHub repository
