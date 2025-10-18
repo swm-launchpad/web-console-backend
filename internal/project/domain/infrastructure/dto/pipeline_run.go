@@ -16,7 +16,7 @@ type PipelineRun struct {
 	ProjectID uint
 
 	// EventID is the Tekton event ID that triggered this PipelineRun
-	// Retrieved from the "tekton.dev/triggers-eventid" label on the PipelineRun
+	// Retrieved from the "triggers.tekton.dev/triggers-eventid" label on the PipelineRun
 	// Empty when querying a single PipelineRun status
 	EventID string
 
