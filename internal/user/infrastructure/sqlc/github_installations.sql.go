@@ -80,6 +80,48 @@ func (q *Queries) ExistsByInstallationID(ctx context.Context, installationID uin
 	return installation_exists, err
 }
 
+const findInstallationByIDIncludingRevoked = `-- name: FindInstallationByIDIncludingRevoked :one
+SELECT
+    installation_id, user_id, account_login, account_type, status,
+    cached_token, token_expires_at,
+    is_deleted, deleted_at, created_at, updated_at
+FROM GITHUB_INSTALLATIONS
+WHERE installation_id = ?
+`
+
+type FindInstallationByIDIncludingRevokedRow struct {
+	InstallationID uint64                         `json:"installation_id"`
+	UserID         uint32                         `json:"user_id"`
+	AccountLogin   string                         `json:"account_login"`
+	AccountType    GithubInstallationsAccountType `json:"account_type"`
+	Status         GithubInstallationsStatus      `json:"status"`
+	CachedToken    sql.NullString                 `json:"cached_token"`
+	TokenExpiresAt sql.NullTime                   `json:"token_expires_at"`
+	IsDeleted      bool                           `json:"is_deleted"`
+	DeletedAt      sql.NullTime                   `json:"deleted_at"`
+	CreatedAt      time.Time                      `json:"created_at"`
+	UpdatedAt      sql.NullTime                   `json:"updated_at"`
+}
+
+func (q *Queries) FindInstallationByIDIncludingRevoked(ctx context.Context, installationID uint64) (FindInstallationByIDIncludingRevokedRow, error) {
+	row := q.db.QueryRowContext(ctx, findInstallationByIDIncludingRevoked, installationID)
+	var i FindInstallationByIDIncludingRevokedRow
+	err := row.Scan(
+		&i.InstallationID,
+		&i.UserID,
+		&i.AccountLogin,
+		&i.AccountType,
+		&i.Status,
+		&i.CachedToken,
+		&i.TokenExpiresAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getGitHubInstallationByID = `-- name: GetGitHubInstallationByID :one
 SELECT
     installation_id, user_id, account_login, account_type, status,
@@ -197,6 +239,33 @@ type MarkInstallationAsRevokedParams struct {
 
 func (q *Queries) MarkInstallationAsRevoked(ctx context.Context, arg MarkInstallationAsRevokedParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, markInstallationAsRevoked, arg.UpdatedAt, arg.InstallationID)
+}
+
+const reactivateInstallation = `-- name: ReactivateInstallation :execresult
+UPDATE GITHUB_INSTALLATIONS SET
+    status = 'active',
+    account_login = ?,
+    account_type = ?,
+    is_deleted = FALSE,
+    deleted_at = NULL,
+    updated_at = ?
+WHERE installation_id = ?
+`
+
+type ReactivateInstallationParams struct {
+	AccountLogin   string                         `json:"account_login"`
+	AccountType    GithubInstallationsAccountType `json:"account_type"`
+	UpdatedAt      sql.NullTime                   `json:"updated_at"`
+	InstallationID uint64                         `json:"installation_id"`
+}
+
+func (q *Queries) ReactivateInstallation(ctx context.Context, arg ReactivateInstallationParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, reactivateInstallation,
+		arg.AccountLogin,
+		arg.AccountType,
+		arg.UpdatedAt,
+		arg.InstallationID,
+	)
 }
 
 const updateGitHubInstallation = `-- name: UpdateGitHubInstallation :execresult

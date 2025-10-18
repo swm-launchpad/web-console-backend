@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
@@ -156,8 +157,58 @@ func (r *githubInstallationRepository) ExistsByInstallationID(ctx context.Contex
 	return exists, nil
 }
 
+func (r *githubInstallationRepository) FindByInstallationIDIncludingRevoked(ctx context.Context, installationID int64) (*model.GitHubInstallation, error) {
+	row, err := r.queriesWithContext(ctx).FindInstallationByIDIncludingRevoked(ctx, uint64(installationID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, usererrors.ErrInstallationNotFound
+		}
+		return nil, usererrors.ErrDatabaseUnavailable
+	}
+
+	return &model.GitHubInstallation{
+		InstallationID: int64(row.InstallationID),
+		UserID:         uint(row.UserID),
+		AccountLogin:   row.AccountLogin,
+		AccountType:    model.AccountType(row.AccountType),
+		Status:         model.InstallationStatus(row.Status),
+		CachedToken:    nullStringToPtr(row.CachedToken),
+		TokenExpiresAt: nullTimeToPtr(row.TokenExpiresAt),
+		IsDeleted:      row.IsDeleted,
+		DeletedAt:      nullTimeToPtr(row.DeletedAt),
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      nullTimeToPtr(row.UpdatedAt),
+	}, nil
+}
+
+func (r *githubInstallationRepository) Reactivate(ctx context.Context, installationID int64, accountLogin string, accountType model.AccountType) error {
+	now := time.Now()
+	params := sqlc.ReactivateInstallationParams{
+		AccountLogin:   accountLogin,
+		AccountType:    sqlc.GithubInstallationsAccountType(accountType),
+		UpdatedAt:      toNullTime(&now),
+		InstallationID: uint64(installationID),
+	}
+
+	result, err := r.queriesWithContext(ctx).ReactivateInstallation(ctx, params)
+	if err != nil {
+		return usererrors.ErrDatabaseOperation
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return usererrors.ErrDatabaseOperation
+	}
+
+	if rowsAffected == 0 {
+		return usererrors.ErrInstallationNotFound
+	}
+
+	return nil
+}
+
 func (r *githubInstallationRepository) queriesWithContext(ctx context.Context) *sqlc.Queries {
-	if tx, ok := ctx.Value("tx").(*sql.Tx); ok {
+	if tx, ok := db.GetTx(ctx); ok {
 		return r.queries.WithTx(tx)
 	}
 	return r.queries

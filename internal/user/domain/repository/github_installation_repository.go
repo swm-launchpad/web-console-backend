@@ -28,4 +28,10 @@ type GitHubInstallationRepository interface {
 
 	// ExistsByInstallationID checks if an installation exists
 	ExistsByInstallationID(ctx context.Context, installationID int64) (bool, error)
+
+	// FindByInstallationIDIncludingRevoked retrieves a GitHub installation including revoked ones
+	FindByInstallationIDIncludingRevoked(ctx context.Context, installationID int64) (*model.GitHubInstallation, error)
+
+	// Reactivate reactivates a revoked GitHub installation
+	Reactivate(ctx context.Context, installationID int64, accountLogin string, accountType model.AccountType) error
 }

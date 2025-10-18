@@ -48,3 +48,21 @@ WHERE installation_id = ?;
 
 -- name: ExistsByInstallationID :one
 SELECT EXISTS(SELECT 1 FROM GITHUB_INSTALLATIONS WHERE installation_id = ? AND is_deleted = FALSE AND status = 'active') as installation_exists;
+
+-- name: FindInstallationByIDIncludingRevoked :one
+SELECT
+    installation_id, user_id, account_login, account_type, status,
+    cached_token, token_expires_at,
+    is_deleted, deleted_at, created_at, updated_at
+FROM GITHUB_INSTALLATIONS
+WHERE installation_id = ?;
+
+-- name: ReactivateInstallation :execresult
+UPDATE GITHUB_INSTALLATIONS SET
+    status = 'active',
+    account_login = ?,
+    account_type = ?,
+    is_deleted = FALSE,
+    deleted_at = NULL,
+    updated_at = ?
+WHERE installation_id = ?;
