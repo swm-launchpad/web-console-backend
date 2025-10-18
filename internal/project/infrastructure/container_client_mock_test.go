@@ -44,44 +44,12 @@ func TestMockContainerClient_GetContainerConfig(t *testing.T) {
 
 		// Verify no volume mounts
 		assert.Empty(t, backend.VolumeMounts)
-
-		// Verify no ConfigMaps
-		assert.Empty(t, config.ConfigMaps)
-
-		// Verify no Volumes
-		assert.Empty(t, config.Volumes)
 	})
 
 	t.Run("Project ID 2: Multi-container configuration with MySQL", func(t *testing.T) {
 		config, err := client.GetContainerConfig(ctx, 2)
 		require.NoError(t, err)
 		require.NotNil(t, config)
-
-		// Verify ConfigMaps
-		assert.Len(t, config.ConfigMaps, 1)
-		configMap := config.ConfigMaps[0]
-		assert.Equal(t, "mysql-initdb-config", configMap.Name)
-		assert.Contains(t, configMap.Data, "init.sql")
-		assert.Contains(t, configMap.Data["init.sql"], "CREATE DATABASE IF NOT EXISTS mydb")
-
-		// Verify Volumes
-		assert.Len(t, config.Volumes, 2)
-
-		// First volume: ConfigMap type
-		mysqlInitdb := config.Volumes[0]
-		assert.Equal(t, "mysql-initdb", mysqlInitdb.Name)
-		assert.NotNil(t, mysqlInitdb.Type)
-		assert.Equal(t, "config_map", *mysqlInitdb.Type)
-		assert.NotNil(t, mysqlInitdb.ConfigMapName)
-		assert.Equal(t, "mysql-initdb-config", *mysqlInitdb.ConfigMapName)
-
-		// Second volume: PVC type
-		mysqlData := config.Volumes[1]
-		assert.Equal(t, "mysql-data", mysqlData.Name)
-		assert.NotNil(t, mysqlData.Type)
-		assert.Equal(t, "pvc", *mysqlData.Type)
-		assert.NotNil(t, mysqlData.Capacity)
-		assert.Equal(t, "1Gi", *mysqlData.Capacity)
 
 		// Verify containers
 		assert.Len(t, config.Containers, 2)
@@ -117,14 +85,11 @@ func TestMockContainerClient_GetContainerConfig(t *testing.T) {
 		assert.Equal(t, "512Mi", mysql.MemoryRequest)
 		assert.Equal(t, "1Gi", mysql.MemoryLimit)
 
-		// Verify MySQL volume mounts
-		assert.Len(t, mysql.VolumeMounts, 2)
+		// Verify MySQL volume mounts (only PVC volume, no ConfigMap)
+		assert.Len(t, mysql.VolumeMounts, 1)
 
-		initdbMount := mysql.VolumeMounts[0]
-		assert.Equal(t, "mysql-initdb", initdbMount.VolumeName)
-		assert.Equal(t, []string{"/docker-entrypoint-initdb.d"}, initdbMount.MountPaths)
-
-		dataMount := mysql.VolumeMounts[1]
+		// PVC mount - references volume slug
+		dataMount := mysql.VolumeMounts[0]
 		assert.Equal(t, "mysql-data", dataMount.VolumeName)
 		assert.Equal(t, []string{"/var/lib/mysql"}, dataMount.MountPaths)
 	})

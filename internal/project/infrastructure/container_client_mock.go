@@ -36,13 +36,12 @@ func (m *MockContainerClient) GetContainerConfig(ctx context.Context, projectID 
 // getSingleContainerConfig returns a single container configuration scenario.
 // Based on Tekton README example: spring-helloworld single container.
 // Note: Project metadata (project_id, service_name, namespace, stable_window) are NOT included.
+// Note: ConfigMaps and Volumes are managed at project level, not by ContainerClient.
 func (m *MockContainerClient) getSingleContainerConfig() *dto.ContainerDeploymentConfig {
 	domain := "spring-helloworld.launchpad.kr"
 	healthEndpoint := "/"
 
 	return &dto.ContainerDeploymentConfig{
-		ConfigMaps: []dto.ConfigMapInfo{},
-		Volumes:    []dto.VolumeInfo{},
 		Containers: []dto.ContainerInfo{
 			{
 				Name:            "backend",
@@ -69,35 +68,15 @@ func (m *MockContainerClient) getSingleContainerConfig() *dto.ContainerDeploymen
 // getMultiContainerConfig returns a multi-container configuration scenario.
 // Based on Tekton README example: spring-helloworld + mysql stack.
 // Note: Project metadata (project_id, service_name, namespace, stable_window) are NOT included.
+// Note: ConfigMaps and Volumes are managed at project level, not by ContainerClient.
+// Note: VolumeMounts specify where to mount volumes (e.g., mysql-data PVC) but
+//
+//	the actual Volumes are created at project level.
 func (m *MockContainerClient) getMultiContainerConfig() *dto.ContainerDeploymentConfig {
 	domain := "spring-helloworld-stack.launchpad.kr"
 	healthEndpoint := "/"
-	pvcType := "pvc"
-	configMapType := "config_map"
-	mysqlInitdbConfigMapName := "mysql-initdb-config"
-	mysqlDataCapacity := "1Gi"
 
 	return &dto.ContainerDeploymentConfig{
-		ConfigMaps: []dto.ConfigMapInfo{
-			{
-				Name: mysqlInitdbConfigMapName,
-				Data: map[string]string{
-					"init.sql": "CREATE DATABASE IF NOT EXISTS mydb;\nUSE mydb;\nCREATE TABLE users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(50));",
-				},
-			},
-		},
-		Volumes: []dto.VolumeInfo{
-			{
-				Name:          "mysql-initdb",
-				Type:          &configMapType,
-				ConfigMapName: &mysqlInitdbConfigMapName,
-			},
-			{
-				Name:     "mysql-data",
-				Type:     &pvcType,
-				Capacity: &mysqlDataCapacity,
-			},
-		},
 		Containers: []dto.ContainerInfo{
 			{
 				Name:            "backend",
@@ -134,11 +113,7 @@ func (m *MockContainerClient) getMultiContainerConfig() *dto.ContainerDeployment
 				MemoryLimit:   "1Gi",
 				VolumeMounts: []dto.VolumeMount{
 					{
-						VolumeName: "mysql-initdb",
-						MountPaths: []string{"/docker-entrypoint-initdb.d"},
-					},
-					{
-						VolumeName: "mysql-data",
+						VolumeName: "mysql-data", // Reference to PVC volume slug
 						MountPaths: []string{"/var/lib/mysql"},
 					},
 				},

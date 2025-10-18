@@ -11,6 +11,7 @@ import (
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 )
 
@@ -35,6 +36,7 @@ func (r *volumeRepository) Create(ctx context.Context, volume *model.Volume) err
 	params := sqlc.CreateVolumeParams{
 		ProjectID: uint32(volume.ProjectID()),
 		Name:      volume.Name(),
+		Slug:      sql.NullString{String: volume.Slug().String(), Valid: true},
 		Capacity:  volume.Capacity(),
 		CreatedAt: volume.CreatedAt(),
 	}
@@ -69,7 +71,7 @@ func (r *volumeRepository) FindByID(ctx context.Context, volumeID uint) (*model.
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	return r.toDomainVolume(row), nil
+	return r.toDomainVolumeFromGetRow(row), nil
 }
 
 // FindByProjectID retrieves all volumes for a specific project
@@ -83,7 +85,7 @@ func (r *volumeRepository) FindByProjectID(ctx context.Context, projectID uint) 
 
 	volumes := make([]*model.Volume, 0, len(rows))
 	for _, row := range rows {
-		volumes = append(volumes, r.toDomainVolume(row))
+		volumes = append(volumes, r.toDomainVolumeFromGetByProjectRow(row))
 	}
 
 	return volumes, nil
@@ -106,7 +108,7 @@ func (r *volumeRepository) FindByName(ctx context.Context, projectID uint, name 
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	return r.toDomainVolume(row), nil
+	return r.toDomainVolumeFromGetByNameRow(row), nil
 }
 
 // ExistsByName checks if a volume with the given name exists in a project
@@ -119,6 +121,18 @@ func (r *volumeRepository) ExistsByName(ctx context.Context, projectID uint, nam
 	}
 
 	exists, err := qtx.ExistsVolumeByName(ctx, params)
+	if err != nil {
+		return false, projecterrors.ErrDatabaseOperation
+	}
+
+	return exists, nil
+}
+
+// ExistsBySlug checks if a volume with the given slug exists
+func (r *volumeRepository) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
+	qtx := r.queriesWithContext(ctx)
+
+	exists, err := qtx.ExistsVolumeBySlug(ctx, sql.NullString{String: slug, Valid: true})
 	if err != nil {
 		return false, projecterrors.ErrDatabaseOperation
 	}
@@ -162,7 +176,7 @@ func (r *volumeRepository) List(ctx context.Context, offset, limit int) ([]*mode
 
 	volumes := make([]*model.Volume, 0, len(rows))
 	for _, row := range rows {
-		volumes = append(volumes, r.toDomainVolume(row))
+		volumes = append(volumes, r.toDomainVolumeFromListRow(row))
 	}
 
 	return volumes, nil
@@ -250,17 +264,94 @@ func (r *volumeRepository) queriesWithContext(ctx context.Context) *sqlc.Queries
 	return r.queries
 }
 
-func (r *volumeRepository) toDomainVolume(row sqlc.Volume) *model.Volume {
-	// Handle nullable updated_at
+// Converter methods for different Row types
+
+func (r *volumeRepository) toDomainVolumeFromGetRow(row sqlc.GetVolumeByIDRow) *model.Volume {
 	var updatedAt time.Time
 	if row.UpdatedAt.Valid {
 		updatedAt = row.UpdatedAt.Time
 	}
 
+	var slugStr string
+	if row.Slug.Valid {
+		slugStr = row.Slug.String
+	}
+	slug, _ := value.NewVolumeSlug(slugStr)
+
 	return model.ReconstructVolume(
 		uint(row.VolumeID),
 		uint(row.ProjectID),
 		row.Name,
+		slug,
+		row.Capacity,
+		row.CreatedAt,
+		updatedAt,
+	)
+}
+
+func (r *volumeRepository) toDomainVolumeFromGetByProjectRow(row sqlc.GetVolumesByProjectIDRow) *model.Volume {
+	var updatedAt time.Time
+	if row.UpdatedAt.Valid {
+		updatedAt = row.UpdatedAt.Time
+	}
+
+	var slugStr string
+	if row.Slug.Valid {
+		slugStr = row.Slug.String
+	}
+	slug, _ := value.NewVolumeSlug(slugStr)
+
+	return model.ReconstructVolume(
+		uint(row.VolumeID),
+		uint(row.ProjectID),
+		row.Name,
+		slug,
+		row.Capacity,
+		row.CreatedAt,
+		updatedAt,
+	)
+}
+
+func (r *volumeRepository) toDomainVolumeFromGetByNameRow(row sqlc.GetVolumeByNameRow) *model.Volume {
+	var updatedAt time.Time
+	if row.UpdatedAt.Valid {
+		updatedAt = row.UpdatedAt.Time
+	}
+
+	var slugStr string
+	if row.Slug.Valid {
+		slugStr = row.Slug.String
+	}
+	slug, _ := value.NewVolumeSlug(slugStr)
+
+	return model.ReconstructVolume(
+		uint(row.VolumeID),
+		uint(row.ProjectID),
+		row.Name,
+		slug,
+		row.Capacity,
+		row.CreatedAt,
+		updatedAt,
+	)
+}
+
+func (r *volumeRepository) toDomainVolumeFromListRow(row sqlc.ListVolumesRow) *model.Volume {
+	var updatedAt time.Time
+	if row.UpdatedAt.Valid {
+		updatedAt = row.UpdatedAt.Time
+	}
+
+	var slugStr string
+	if row.Slug.Valid {
+		slugStr = row.Slug.String
+	}
+	slug, _ := value.NewVolumeSlug(slugStr)
+
+	return model.ReconstructVolume(
+		uint(row.VolumeID),
+		uint(row.ProjectID),
+		row.Name,
+		slug,
 		row.Capacity,
 		row.CreatedAt,
 		updatedAt,

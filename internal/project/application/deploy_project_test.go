@@ -28,7 +28,7 @@ func TestDeployProjectUseCase_Execute_Success(t *testing.T) {
 	eventID := "test-event-123"
 	_ = d.InitTektonInfo(&eventID, nil)
 
-	mockDeployService.On("DeployProject", mock.Anything, uint(1), uint(0)).Return(d, nil)
+	mockDeployService.On("DeployProject", mock.Anything, uint(1)).Return(d, nil)
 
 	// Act
 	output, err := useCase.Execute(context.Background(), input)
@@ -56,7 +56,7 @@ func TestDeployProjectUseCase_Execute_ProjectAlreadyDeploying(t *testing.T) {
 		ProjectID: 1,
 	}
 
-	mockDeployService.On("DeployProject", mock.Anything, uint(1), uint(0)).
+	mockDeployService.On("DeployProject", mock.Anything, uint(1)).
 		Return(nil, projecterrors.ErrProjectAlreadyDeploying)
 
 	// Act
@@ -90,7 +90,7 @@ func TestDeployProjectUseCase_Execute_WithOptionalFields(t *testing.T) {
 	startedAt := time.Now()
 	_ = d.UpdateRunningStatus(&summary, &startedAt)
 
-	mockDeployService.On("DeployProject", mock.Anything, uint(1), uint(0)).Return(d, nil)
+	mockDeployService.On("DeployProject", mock.Anything, uint(1)).Return(d, nil)
 
 	// Act
 	output, err := useCase.Execute(context.Background(), input)

@@ -110,7 +110,7 @@ type KubeClient interface {
 	// This is used to look up a PipelineRun when you have the EventID returned from the Tekton
 	// EventListener but need to query the PipelineRun's status or logs.
 	//
-	// The EventID is stored in the "tekton.dev/triggers-eventid" label on PipelineRun resources.
+	// The EventID is stored in the "triggers.tekton.dev/triggers-eventid" label on PipelineRun resources.
 	// This label is automatically set by the Tekton EventListener when a PipelineRun is created.
 	//
 	// If multiple PipelineRuns are found with the same EventID (which should not normally happen),

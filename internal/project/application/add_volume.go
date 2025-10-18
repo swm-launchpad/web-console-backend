@@ -17,6 +17,7 @@ type AddVolumeOutput struct {
 	VolumeID  uint   `json:"volume_id"`
 	ProjectID uint   `json:"project_id"`
 	Name      string `json:"name"`
+	Slug      string `json:"slug"`
 	Capacity  uint32 `json:"capacity"`
 	CreatedAt string `json:"created_at"`
 }
@@ -37,6 +38,7 @@ func (uc *AddVolumeUseCase) Execute(ctx context.Context, input AddVolumeInput) (
 	var volumeID uint
 	var projectID uint
 	var name string
+	var slug string
 	var capacity uint32
 	var createdAt string
 
@@ -51,6 +53,7 @@ func (uc *AddVolumeUseCase) Execute(ctx context.Context, input AddVolumeInput) (
 		volumeID = volume.VolumeID()
 		projectID = volume.ProjectID()
 		name = volume.Name()
+		slug = volume.Slug().String()
 		capacity = volume.Capacity()
 		createdAt = volume.CreatedAt().Format("2006-01-02T15:04:05Z")
 
@@ -66,6 +69,7 @@ func (uc *AddVolumeUseCase) Execute(ctx context.Context, input AddVolumeInput) (
 		VolumeID:  volumeID,
 		ProjectID: projectID,
 		Name:      name,
+		Slug:      slug,
 		Capacity:  capacity,
 		CreatedAt: createdAt,
 	}, nil

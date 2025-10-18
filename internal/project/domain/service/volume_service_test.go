@@ -26,7 +26,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 	t.Run("성공: 유효한 볼륨 생성", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		projectID := uint(1)
 		name := "test-volume"
@@ -61,7 +61,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 	t.Run("성공: 기존 볼륨과 함께 새 볼륨 생성", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		projectID := uint(1)
 		name := "new-volume"
@@ -91,7 +91,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		volume, err := service.CreateVolume(ctx, 0, "test-volume", 1024)
 
@@ -106,7 +106,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		projectID := uint(999)
 
@@ -125,7 +125,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 	t.Run("실패: 중복된 볼륨 이름", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		projectID := uint(1)
 		name := "duplicate-volume"
@@ -151,7 +151,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 	t.Run("실패: 디스크 제한 초과", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		projectID := uint(1)
 		name := "large-volume"
@@ -182,7 +182,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 	t.Run("성공: 명시적 디스크 제한이 있는 경우", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		projectID := uint(1)
 		name := "test-volume"
@@ -216,7 +216,7 @@ func TestVolumeService_GetVolume(t *testing.T) {
 	t.Run("성공: 유효한 ID로 볼륨 조회", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		volumeID := uint(1)
 		expectedVolume, _ := model.NewVolume(1, "test-volume", 1024)
@@ -236,7 +236,7 @@ func TestVolumeService_GetVolume(t *testing.T) {
 	t.Run("실패: VolumeID가 0", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		volume, err := service.GetVolume(ctx, 0)
 
@@ -249,7 +249,7 @@ func TestVolumeService_GetVolume(t *testing.T) {
 	t.Run("실패: 볼륨을 찾을 수 없음", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		volumeID := uint(999)
 
@@ -271,7 +271,7 @@ func TestVolumeService_ListVolumesByProjectID(t *testing.T) {
 	t.Run("성공: 프로젝트의 볼륨 목록 조회", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		projectID := uint(1)
 		volume1, _ := model.NewVolume(projectID, "volume-1", 1024)
@@ -297,7 +297,7 @@ func TestVolumeService_ListVolumesByProjectID(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		volumes, err := service.ListVolumesByProjectID(ctx, 0)
 
@@ -314,7 +314,7 @@ func TestVolumeService_DeleteVolume(t *testing.T) {
 	t.Run("성공: 볼륨 삭제", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		volumeID := uint(1)
 
@@ -335,7 +335,7 @@ func TestVolumeService_DeleteVolume(t *testing.T) {
 	t.Run("실패: VolumeID가 0", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		err := service.DeleteVolume(ctx, 0)
 
@@ -347,7 +347,7 @@ func TestVolumeService_DeleteVolume(t *testing.T) {
 	t.Run("실패: 저장소 삭제 에러", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		volumeID := uint(1)
 		projectID := uint(1)
@@ -374,7 +374,7 @@ func TestVolumeService_DeleteVolumesByProjectID(t *testing.T) {
 	t.Run("성공: 프로젝트의 모든 볼륨 삭제", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		projectID := uint(1)
 
@@ -390,7 +390,7 @@ func TestVolumeService_DeleteVolumesByProjectID(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockVolumeRepo := new(repository.MockVolumeRepository)
 		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewVolumeService(mockVolumeRepo, mockProjectRepo)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
 
 		err := service.DeleteVolumesByProjectID(ctx, 0)
 

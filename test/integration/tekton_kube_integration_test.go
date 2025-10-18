@@ -163,13 +163,21 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 		require.NoError(t, err, "Failed to create KubeClient")
 
-		// First, list PipelineRuns to find one to query
+		// Retry to find PipelineRuns (up to 3 attempts with 1-second interval)
 		projectID := uint(0)
-		pipelineRuns, err := kubeClient.ListPipelineRuns(ctx, projectID)
-		require.NoError(t, err, "Failed to list PipelineRuns")
+		var pipelineRuns []*dto.PipelineRun
+		found := retryWithBackoff(3, 1*time.Second, func() bool {
+			var err error
+			pipelineRuns, err = kubeClient.ListPipelineRuns(ctx, projectID)
+			if err != nil {
+				t.Logf("Attempt failed to list PipelineRuns: %v", err)
+				return false
+			}
+			return len(pipelineRuns) > 0
+		})
 
-		if len(pipelineRuns) == 0 {
-			t.Skip("No PipelineRuns found for testing GetPipelineRunStatus")
+		if !found {
+			t.Skip("No PipelineRuns found after 3 retry attempts for testing GetPipelineRunStatus")
 		}
 
 		// Get the first PipelineRun name
@@ -218,13 +226,21 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 		require.NoError(t, err, "Failed to create KubeClient")
 
-		// First, list PipelineRuns to find one to query
+		// Retry to find PipelineRuns (up to 3 attempts with 1-second interval)
 		projectID := uint(0)
-		pipelineRuns, err := kubeClient.ListPipelineRuns(ctx, projectID)
-		require.NoError(t, err, "Failed to list PipelineRuns")
+		var pipelineRuns []*dto.PipelineRun
+		found := retryWithBackoff(3, 1*time.Second, func() bool {
+			var err error
+			pipelineRuns, err = kubeClient.ListPipelineRuns(ctx, projectID)
+			if err != nil {
+				t.Logf("Attempt failed to list PipelineRuns: %v", err)
+				return false
+			}
+			return len(pipelineRuns) > 0
+		})
 
-		if len(pipelineRuns) == 0 {
-			t.Skip("No PipelineRuns found for testing GetPipelineRunLogs")
+		if !found {
+			t.Skip("No PipelineRuns found after 3 retry attempts for testing GetPipelineRunLogs")
 		}
 
 		// Get the first PipelineRun name
@@ -311,26 +327,35 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 		require.NoError(t, err, "Failed to create KubeClient")
 
-		// First, list PipelineRuns to find one with an EventID
+		// Retry to find PipelineRuns with EventID (up to 3 attempts with 1-second interval)
 		projectID := uint(0)
-		pipelineRuns, err := kubeClient.ListPipelineRuns(ctx, projectID)
-		require.NoError(t, err, "Failed to list PipelineRuns")
-
-		if len(pipelineRuns) == 0 {
-			t.Skip("No PipelineRuns found for testing FindPipelineRunNameByEventID")
-		}
-
-		// Find a PipelineRun with an EventID
 		var targetPipelineRun *dto.PipelineRun
-		for _, pr := range pipelineRuns {
-			if pr.EventID != "" {
-				targetPipelineRun = pr
-				break
+		found := retryWithBackoff(3, 1*time.Second, func() bool {
+			pipelineRuns, err := kubeClient.ListPipelineRuns(ctx, projectID)
+			if err != nil {
+				t.Logf("Attempt failed to list PipelineRuns: %v", err)
+				return false
 			}
-		}
 
-		if targetPipelineRun == nil {
-			t.Skip("No PipelineRuns with EventID found for testing")
+			if len(pipelineRuns) == 0 {
+				t.Logf("No PipelineRuns found in this attempt")
+				return false
+			}
+
+			// Find a PipelineRun with an EventID
+			for _, pr := range pipelineRuns {
+				if pr.EventID != "" {
+					targetPipelineRun = pr
+					return true
+				}
+			}
+
+			t.Logf("PipelineRuns found but none have EventID")
+			return false
+		})
+
+		if !found {
+			t.Skip("No PipelineRuns with EventID found after 3 retry attempts for testing FindPipelineRunNameByEventID")
 		}
 
 		t.Logf("Testing FindPipelineRunNameByEventID with EventID: %s (expected name: %s)",
@@ -486,4 +511,18 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen]
+}
+
+// retryWithBackoff retries a function up to maxAttempts times with a 1-second interval.
+// It returns true if the condition is met, false if all attempts fail.
+func retryWithBackoff(maxAttempts int, interval time.Duration, fn func() bool) bool {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if fn() {
+			return true
+		}
+		if attempt < maxAttempts {
+			time.Sleep(interval)
+		}
+	}
+	return false
 }

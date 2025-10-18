@@ -45,6 +45,11 @@ func (m *MockVolumeRepository) ExistsByName(ctx context.Context, projectID uint,
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *MockVolumeRepository) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
+	args := m.Called(ctx, slug)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *MockVolumeRepository) Delete(ctx context.Context, volumeID uint) error {
 	args := m.Called(ctx, volumeID)
 	return args.Error(0)

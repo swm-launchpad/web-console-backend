@@ -48,7 +48,6 @@ type DeployService interface {
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control
 	//   - projectID: The unique identifier of the project to deploy
-	//   - userID: The ID of the user initiating the deployment
 	//
 	// Returns:
 	//   - *deployment.Deployment: The created Deployment record with status 'untracked' initially
@@ -62,7 +61,7 @@ type DeployService interface {
 	//   - ErrTektonDeploymentFailed: Tekton rejected the deployment request
 	//
 	// Example usage:
-	//   deployment, err := deployService.DeployProject(ctx, 123, 456)
+	//   deployment, err := deployService.DeployProject(ctx, 123)
 	//   if err != nil {
 	//       return err
 	//   }
@@ -73,7 +72,7 @@ type DeployService interface {
 	//   - Deployment record is created with status 'untracked'
 	//   - Background monitoring goroutine is started
 	//   - On error, project status is reverted to 'nothing' and Deployment is marked as failed
-	DeployProject(ctx context.Context, projectID uint, userID uint) (*deployment.Deployment, error)
+	DeployProject(ctx context.Context, projectID uint) (*deployment.Deployment, error)
 
 	// RefreshDeploymentStatus queries Kubernetes directly to get the latest deployment status
 	// and updates the database accordingly. This is used for "force refresh" scenarios where
@@ -147,7 +146,7 @@ func NewDeployService(
 }
 
 // DeployProject initiates a deployment for the specified project
-func (s *deployService) DeployProject(ctx context.Context, projectID uint, userID uint) (*deployment.Deployment, error) {
+func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
 	// Step 1: Atomically change project status + create deployment in a transaction
 	var d *deployment.Deployment
 	var proj *projectmodel.Project
@@ -357,10 +356,11 @@ func (s *deployService) buildTektonRequest(
 	// Convert project ID to string for Tekton API
 	projectIDStr := fmt.Sprintf("%d", proj.ProjectID())
 
-	// Merge container config volumes with dynamically created PVC volumes
-	allVolumes := make([]dto.VolumeInfo, 0)
-	allVolumes = append(allVolumes, containerConfig.Volumes...)
-	allVolumes = append(allVolumes, s.convertVolumesToDTO(volumes)...)
+	// ConfigMaps are managed at project level (not yet implemented)
+	allConfigMaps := []dto.ConfigMapInfo{}
+
+	// Volumes - only PVC volumes from VolumeRepository (managed at project level)
+	allVolumes := s.convertVolumesToDTO(volumes)
 
 	// Build deployment config
 	deploymentConfig := dto.DeploymentConfig{
@@ -368,7 +368,7 @@ func (s *deployService) buildTektonRequest(
 		ServiceName:  proj.Slug().String(), // Use project slug for per-project resource isolation in Kubernetes
 		Namespace:    s.deployNamespace,
 		StableWindow: 180, // constant: 180 seconds
-		ConfigMaps:   containerConfig.ConfigMaps,
+		ConfigMaps:   allConfigMaps,
 		Volumes:      allVolumes,
 		Containers:   containerConfig.Containers,
 	}
@@ -380,15 +380,14 @@ func (s *deployService) buildTektonRequest(
 }
 
 // convertVolumesToDTO converts domain volumes to DTO format
+// Note: volumes array is now PVC-only, type field is no longer used
 func (s *deployService) convertVolumesToDTO(volumes []*volumemodel.Volume) []dto.VolumeInfo {
 	result := make([]dto.VolumeInfo, 0, len(volumes))
 	for _, v := range volumes {
-		volumeType := "pvc"
 		// Convert capacity from Mi to string format (e.g., "1024Mi")
 		capacityStr := fmt.Sprintf("%dMi", v.Capacity())
 		result = append(result, dto.VolumeInfo{
-			Name:     v.Name(),
-			Type:     &volumeType,
+			Name:     v.Slug().String(),
 			Capacity: &capacityStr,
 		})
 	}

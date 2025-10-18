@@ -14,6 +14,7 @@ type VolumeListItem struct {
 	VolumeID  uint   `json:"volume_id"`
 	ProjectID uint   `json:"project_id"`
 	Name      string `json:"name"`
+	Slug      string `json:"slug"`
 	Capacity  uint32 `json:"capacity"`
 	CreatedAt string `json:"created_at"`
 }
@@ -49,6 +50,7 @@ func (uc *GetVolumesUseCase) Execute(ctx context.Context, input GetVolumesInput)
 			VolumeID:  volume.VolumeID(),
 			ProjectID: volume.ProjectID(),
 			Name:      volume.Name(),
+			Slug:      volume.Slug().String(),
 			Capacity:  volume.Capacity(),
 			CreatedAt: volume.CreatedAt().Format("2006-01-02T15:04:05Z"),
 		})

@@ -230,7 +230,7 @@ func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*d
 
 		// Extract EventID from labels
 		labels := pr.GetLabels()
-		if eventID, ok := labels["tekton.dev/triggers-eventid"]; ok {
+		if eventID, ok := labels["triggers.tekton.dev/triggers-eventid"]; ok {
 			pipelineRun.EventID = eventID
 		}
 
@@ -259,14 +259,14 @@ func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*d
 }
 
 // FindPipelineRunNameByEventID retrieves the PipelineRun name associated with a Tekton event ID.
-// It searches for PipelineRuns with the "tekton.dev/triggers-eventid" label matching the given EventID.
+// It searches for PipelineRuns with the "triggers.tekton.dev/triggers-eventid" label matching the given EventID.
 func (k *kubeClient) FindPipelineRunNameByEventID(ctx context.Context, eventID string) (string, error) {
-	// List PipelineRuns with tekton.dev/triggers-eventid label
+	// List PipelineRuns with triggers.tekton.dev/triggers-eventid label
 	pipelineRuns, err := k.dynamicClient.
 		Resource(k.pipelineRunGVR).
 		Namespace(k.namespace).
 		List(ctx, metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("tekton.dev/triggers-eventid=%s", eventID),
+			LabelSelector: fmt.Sprintf("triggers.tekton.dev/triggers-eventid=%s", eventID),
 		})
 
 	if err != nil {

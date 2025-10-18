@@ -2,20 +2,20 @@
 
 -- name: CreateVolume :execresult
 INSERT INTO VOLUMES (
-    project_id, name, capacity,
+    project_id, name, slug, capacity,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, NULL);
+) VALUES (?, ?, ?, ?, ?, NULL);
 
 -- name: GetVolumeByID :one
 SELECT
-    volume_id, project_id, name, capacity,
+    volume_id, project_id, name, slug, capacity,
     created_at, updated_at
 FROM VOLUMES
 WHERE volume_id = ?;
 
 -- name: GetVolumesByProjectID :many
 SELECT
-    volume_id, project_id, name, capacity,
+    volume_id, project_id, name, slug, capacity,
     created_at, updated_at
 FROM VOLUMES
 WHERE project_id = ?
@@ -23,7 +23,7 @@ ORDER BY created_at ASC;
 
 -- name: GetVolumeByName :one
 SELECT
-    volume_id, project_id, name, capacity,
+    volume_id, project_id, name, slug, capacity,
     created_at, updated_at
 FROM VOLUMES
 WHERE project_id = ? AND name = ?;
@@ -34,6 +34,12 @@ SELECT EXISTS(
     WHERE project_id = ? AND name = ?
 ) as volume_exists;
 
+-- name: ExistsVolumeBySlug :one
+SELECT EXISTS(
+    SELECT 1 FROM VOLUMES
+    WHERE slug = ?
+) as volume_exists;
+
 -- name: DeleteVolume :execresult
 DELETE FROM VOLUMES WHERE volume_id = ?;
 
@@ -42,7 +48,7 @@ DELETE FROM VOLUMES WHERE project_id = ?;
 
 -- name: ListVolumes :many
 SELECT
-    volume_id, project_id, name, capacity,
+    volume_id, project_id, name, slug, capacity,
     created_at, updated_at
 FROM VOLUMES
 ORDER BY created_at DESC

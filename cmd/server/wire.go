@@ -183,6 +183,7 @@ func InitializeApp() (*App, error) {
 
 		// Project domain services
 		projectService.NewSlugService,
+		projectService.NewVolumeSlugService,
 		projectService.NewProjectService,
 		projectService.NewVolumeService,
 		projectService.NewPermissionService,
