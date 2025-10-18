@@ -77,8 +77,9 @@ func InitializeApp() (*App, error) {
 	getGitHubInstallationUseCase := application.NewGetGitHubInstallationUseCase(gitHubInstallationRepository)
 	generateInstallationTokenUseCase := application.NewGenerateInstallationTokenUseCase(gitHubInstallationRepository, client, txManager)
 	listRepositoriesUseCase := application.NewListRepositoriesUseCase(gitHubInstallationRepository, client)
-	startInstallationUseCase := application.NewStartInstallationUseCase(configConfig)
-	installationCallbackUseCase := application.NewInstallationCallbackUseCase(configConfig, client, gitHubInstallationRepository, txManager)
+	oAuthStateRepository := infrastructure.NewOAuthStateRepository(db)
+	startInstallationUseCase := application.NewStartInstallationUseCase(configConfig, oAuthStateRepository)
+	installationCallbackUseCase := application.NewInstallationCallbackUseCase(configConfig, client, gitHubInstallationRepository, oAuthStateRepository, txManager)
 	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, startInstallationUseCase, installationCallbackUseCase, configConfig)
 	projectRepository := repository.NewProjectRepository(db)
 	slugService := service2.NewSlugService(projectRepository)
@@ -138,7 +139,7 @@ func InitializeApp() (*App, error) {
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, containerHandler, templateHandler, authMiddleware)
-	app := NewApp(configConfig, db, router)
+	app := NewApp(configConfig, db, router, oAuthStateRepository)
 	return app, nil
 }
 
@@ -247,7 +248,12 @@ func provideDeployService(
 }
 
 // provideGitHubClient creates a GitHub client from config
+// Returns nil if GitHub App credentials are not configured
 func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
+
+	if cfg.GitHubApp.AppID == "" || cfg.GitHubApp.PrivateKeyPath == "" {
+		return nil, nil
+	}
 	return github.NewClient(cfg.GitHubApp.AppID, cfg.GitHubApp.PrivateKeyPath)
 }
 

@@ -140,7 +140,12 @@ func provideDeployService(
 }
 
 // provideGitHubClient creates a GitHub client from config
+// Returns nil if GitHub App credentials are not configured
 func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
+	// GitHub client is optional - return nil if not configured
+	if cfg.GitHubApp.AppID == "" || cfg.GitHubApp.PrivateKeyPath == "" {
+		return nil, nil
+	}
 	return github.NewClient(cfg.GitHubApp.AppID, cfg.GitHubApp.PrivateKeyPath)
 }
 
@@ -191,6 +196,7 @@ func InitializeApp() (*App, error) {
 		infrastructure.NewUserRepository,
 		infrastructure.NewTokenRepository,
 		infrastructure.NewGitHubInstallationRepository,
+		infrastructure.NewOAuthStateRepository,
 
 		// User domain services
 		service.NewUserService,
