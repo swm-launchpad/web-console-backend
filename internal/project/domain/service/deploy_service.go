@@ -356,10 +356,11 @@ func (s *deployService) buildTektonRequest(
 	// Convert project ID to string for Tekton API
 	projectIDStr := fmt.Sprintf("%d", proj.ProjectID())
 
-	// Merge container config volumes with dynamically created PVC volumes
-	allVolumes := make([]dto.VolumeInfo, 0)
-	allVolumes = append(allVolumes, containerConfig.Volumes...)
-	allVolumes = append(allVolumes, s.convertVolumesToDTO(volumes)...)
+	// ConfigMaps are managed at project level (not yet implemented)
+	allConfigMaps := []dto.ConfigMapInfo{}
+
+	// Volumes - only PVC volumes from VolumeRepository (managed at project level)
+	allVolumes := s.convertVolumesToDTO(volumes)
 
 	// Build deployment config
 	deploymentConfig := dto.DeploymentConfig{
@@ -367,7 +368,7 @@ func (s *deployService) buildTektonRequest(
 		ServiceName:  proj.Slug().String(), // Use project slug for per-project resource isolation in Kubernetes
 		Namespace:    s.deployNamespace,
 		StableWindow: 180, // constant: 180 seconds
-		ConfigMaps:   containerConfig.ConfigMaps,
+		ConfigMaps:   allConfigMaps,
 		Volumes:      allVolumes,
 		Containers:   containerConfig.Containers,
 	}
@@ -379,15 +380,14 @@ func (s *deployService) buildTektonRequest(
 }
 
 // convertVolumesToDTO converts domain volumes to DTO format
+// Note: volumes array is now PVC-only, type field is no longer used
 func (s *deployService) convertVolumesToDTO(volumes []*volumemodel.Volume) []dto.VolumeInfo {
 	result := make([]dto.VolumeInfo, 0, len(volumes))
 	for _, v := range volumes {
-		volumeType := "pvc"
 		// Convert capacity from Mi to string format (e.g., "1024Mi")
 		capacityStr := fmt.Sprintf("%dMi", v.Capacity())
 		result = append(result, dto.VolumeInfo{
 			Name:     v.Slug().String(),
-			Type:     &volumeType,
 			Capacity: &capacityStr,
 		})
 	}

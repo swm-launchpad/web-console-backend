@@ -51,20 +51,11 @@ func TestDeployService_buildTektonRequest(t *testing.T) {
 				ImageTag:  "latest",
 			},
 		},
-		ConfigMaps: []dto.ConfigMapInfo{
-			{
-				Name: "app-config",
-				Data: map[string]string{"key": "value"},
-			},
-		},
-		Volumes: []dto.VolumeInfo{
-			{
-				Name: "config-vol",
-			},
-		},
 	}
 
 	volume, _ := volumemodel.NewVolume(1, "data-volume", 1024)
+	slug, _ := volumevalue.NewVolumeSlug("v2025011812000012345678")
+	volume.SetSlug(slug)
 	volumes := []*volumemodel.Volume{volume}
 
 	// Act
@@ -80,8 +71,8 @@ func TestDeployService_buildTektonRequest(t *testing.T) {
 	assert.Equal(t, 180, request.DeploymentConfigJSON.StableWindow)
 	assert.Len(t, request.DeploymentConfigJSON.Containers, 1)
 	assert.Equal(t, "app", request.DeploymentConfigJSON.Containers[0].Name)
-	assert.Len(t, request.DeploymentConfigJSON.ConfigMaps, 1)
-	assert.Len(t, request.DeploymentConfigJSON.Volumes, 2) // 1 from container config + 1 from volumes
+	assert.Empty(t, request.DeploymentConfigJSON.ConfigMaps) // ConfigMaps managed at project level (not yet implemented)
+	assert.Len(t, request.DeploymentConfigJSON.Volumes, 1)   // Only PVC volumes from VolumeRepository
 }
 
 func TestDeployService_convertVolumesToDTO(t *testing.T) {
@@ -103,9 +94,10 @@ func TestDeployService_convertVolumesToDTO(t *testing.T) {
 
 	// Assert
 	assert.Len(t, result, 2)
+	// First volume (data-vol)
 	assert.Equal(t, "v2025011812000012345678", result[0].Name)
-	assert.Equal(t, "pvc", *result[0].Type)
 	assert.Equal(t, "1024Mi", *result[0].Capacity)
+	// Second volume (cache-vol)
 	assert.Equal(t, "v2025011812000087654321", result[1].Name)
 	assert.Equal(t, "512Mi", *result[1].Capacity)
 }

@@ -32,10 +32,10 @@ type DeploymentConfig struct {
 	// StableWindow is the observation period for scale-to-zero decisions in seconds (constant: 180)
 	StableWindow int `json:"stable_window"`
 
-	// ConfigMaps contains ConfigMap configurations (from Container context)
+	// ConfigMaps contains ConfigMap configurations (managed at project level)
 	ConfigMaps []ConfigMapInfo `json:"config_maps"`
 
-	// Volumes contains volume configurations (from Container context)
+	// Volumes contains volume configurations (managed at project level)
 	Volumes []VolumeInfo `json:"volumes"`
 
 	// Containers contains container configurations (from Container context)

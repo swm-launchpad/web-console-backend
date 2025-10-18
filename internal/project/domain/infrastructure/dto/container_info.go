@@ -64,7 +64,7 @@ type ContainerInfo struct {
 // It specifies which volume to mount and where to mount it in the container.
 type VolumeMount struct {
 	// VolumeName is the name of the volume to mount (required)
-	// Must match a volume name in VolumeInfo
+	// Can reference either a PVC volume (by slug) or ConfigMap (by name)
 	VolumeName string `json:"volume_name"`
 
 	// MountPaths is the list of paths where the volume will be mounted (required, at least 1)
@@ -72,48 +72,11 @@ type VolumeMount struct {
 	MountPaths []string `json:"mount_paths"`
 }
 
-// VolumeInfo represents a volume configuration for the deployment.
-// Volumes can be either persistent volume claims (PVC) or ConfigMap references.
-type VolumeInfo struct {
-	// Name is the volume name used in the pod (required)
-	Name string `json:"name"`
-
-	// Type specifies the volume type (optional, default: "pvc")
-	// Valid values: "pvc" (persistent volume claim), "config_map"
-	Type *string `json:"type,omitempty"`
-
-	// Capacity is the volume capacity (required if Type is "pvc" or not specified)
-	// Format: "1Gi", "10Gi"
-	Capacity *string `json:"capacity,omitempty"`
-
-	// ConfigMapName is the ConfigMap name to use (required if Type is "config_map")
-	// Must match a ConfigMap name in ConfigMapInfo
-	ConfigMapName *string `json:"config_map_name,omitempty"`
-}
-
-// ConfigMapInfo represents a Kubernetes ConfigMap configuration.
-// ConfigMaps are used to store non-confidential data in key-value pairs.
-type ConfigMapInfo struct {
-	// Name is the ConfigMap name (required)
-	// The actual Kubernetes resource will be named as "<service_name>-<name>"
-	Name string `json:"name"`
-
-	// Data contains the ConfigMap data as key-value pairs (required)
-	// Supports multi-line strings for file contents
-	Data map[string]string `json:"data"`
-}
-
 // ContainerDeploymentConfig represents container-specific deployment configuration.
 // This is provided by the Container bounded context and contains only container-level settings.
-// Project metadata (project_id, service_name, namespace, stable_window) should come from
-// the Project bounded context.
+// Project metadata (project_id, service_name, namespace, stable_window), ConfigMaps, and Volumes
+// are managed at the Project level, not by ContainerClient.
 type ContainerDeploymentConfig struct {
-	// ConfigMaps contains ConfigMap configurations (required, can be empty array)
-	ConfigMaps []ConfigMapInfo `json:"config_maps"`
-
-	// Volumes contains volume configurations (required, can be empty array)
-	Volumes []VolumeInfo `json:"volumes"`
-
 	// Containers contains container configurations (required, at least 1)
 	Containers []ContainerInfo `json:"containers"`
 }
