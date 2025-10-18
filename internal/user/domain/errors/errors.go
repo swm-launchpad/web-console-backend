@@ -67,3 +67,16 @@ var (
 	ErrEmailNotVerified   = errors.New("email not verified")
 	ErrVerificationFailed = errors.New("verification failed")
 )
+
+// GitHub Installation errors - errors related to GitHub App integration
+var (
+	ErrInstallationNotFound      = errors.New("GitHub installation not found")
+	ErrInstallationExists        = errors.New("GitHub installation already exists")
+	ErrInstallationRevoked       = errors.New("GitHub installation has been revoked or uninstalled")
+	ErrInstallationUnauthorized  = errors.New("unauthorized to access GitHub installation")
+	ErrInvalidInstallationID     = errors.New("invalid installation ID")
+	ErrAccountLoginRequired      = errors.New("account login is required")
+	ErrUserIDRequired            = errors.New("user ID is required")
+	ErrGitHubTokenGenerateFail   = errors.New("failed to generate GitHub token")
+	ErrGitHubAPIFailed           = errors.New("GitHub API request failed")
+)
