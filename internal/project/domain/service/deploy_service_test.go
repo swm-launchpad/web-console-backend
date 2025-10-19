@@ -1,11 +1,17 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 	projectmodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
@@ -446,4 +452,286 @@ func TestDeployService_convertContainersToTektonFormat_EmptyContainerList(t *tes
 	// Assert
 	assert.NoError(t, err)
 	assert.Empty(t, result)
+}
+
+func TestDeployService_GetDeploymentStatus_WithActiveDeployment(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockDeploymentRepo := new(repository.MockDeploymentRepository)
+
+	service := &deployService{
+		projectRepo:    mockProjectRepo,
+		deploymentRepo: mockDeploymentRepo,
+	}
+
+	projectID := uint(1)
+	activeDeploymentID := uint(100)
+
+	// Create project with active deployment
+	slug, _ := value.NewProjectSlug("test-project")
+	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
+	now := time.Now()
+	proj := projectmodel.ReconstructProject(
+		projectID,
+		"Test Project",
+		*slug,
+		value.ProjectStatusActive,
+		value.ProjectOperationStatusDeploying,
+		&activeDeploymentID, // active deployment ID
+		*limits,
+		now,
+		now,
+		false,
+		nil,
+	)
+
+	// Create deployment
+	d := deployment.NewDeployment(projectID)
+	d.SetDeploymentID(activeDeploymentID)
+	eventID := "test-event-123"
+	_ = d.InitTektonInfo(&eventID, nil)
+
+	// Mock expectations
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(proj, nil)
+	mockDeploymentRepo.On("FindByID", ctx, activeDeploymentID).Return(d, nil)
+
+	// Act
+	result, err := service.GetDeploymentStatus(ctx, projectID)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, uint64(activeDeploymentID), uint64(result.DeploymentID))
+	assert.Equal(t, projectID, result.ProjectID())
+	mockProjectRepo.AssertExpectations(t)
+	mockDeploymentRepo.AssertExpectations(t)
+}
+
+func TestDeployService_GetDeploymentStatus_NoActiveDeployment(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockDeploymentRepo := new(repository.MockDeploymentRepository)
+
+	service := &deployService{
+		projectRepo:    mockProjectRepo,
+		deploymentRepo: mockDeploymentRepo,
+	}
+
+	projectID := uint(1)
+
+	// Create project without active deployment
+	slug, _ := value.NewProjectSlug("test-project")
+	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
+	now := time.Now()
+	proj := projectmodel.ReconstructProject(
+		projectID,
+		"Test Project",
+		*slug,
+		value.ProjectStatusActive,
+		value.ProjectOperationStatusNothing,
+		nil, // no active deployment ID
+		*limits,
+		now,
+		now,
+		false,
+		nil,
+	)
+
+	// Create latest deployment
+	d := deployment.NewDeployment(projectID)
+	d.SetDeploymentID(50)
+	eventID := "old-event-123"
+	_ = d.InitTektonInfo(&eventID, nil)
+	summary := "Deployment completed"
+	finishedAt := time.Now()
+	_ = d.UpdateCompleteStatus(deployment.DeploymentStatusSuccess, &summary, finishedAt)
+
+	// Mock expectations - should fall back to latest deployment
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(proj, nil)
+	mockDeploymentRepo.On("FindLatestByProjectID", ctx, projectID).Return(d, nil)
+
+	// Act
+	result, err := service.GetDeploymentStatus(ctx, projectID)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, uint64(50), uint64(result.DeploymentID))
+	assert.True(t, result.IsCompleted())
+	mockProjectRepo.AssertExpectations(t)
+	mockDeploymentRepo.AssertExpectations(t)
+}
+
+func TestDeployService_GetDeploymentStatus_ProjectNotFound(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockDeploymentRepo := new(repository.MockDeploymentRepository)
+
+	service := &deployService{
+		projectRepo:    mockProjectRepo,
+		deploymentRepo: mockDeploymentRepo,
+	}
+
+	projectID := uint(1)
+
+	// Mock expectations
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(nil, projecterrors.ErrProjectNotFound)
+
+	// Act
+	result, err := service.GetDeploymentStatus(ctx, projectID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, projecterrors.ErrProjectNotFound)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+func TestDeployService_RefreshActiveDeployment_Success(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockDeploymentRepo := new(repository.MockDeploymentRepository)
+	mockKubeClient := new(infrastructure.MockKubeClient)
+	txManager := db.NewStubTxManager()
+
+	service := &deployService{
+		txManager:      txManager,
+		projectRepo:    mockProjectRepo,
+		deploymentRepo: mockDeploymentRepo,
+		kubeClient:     mockKubeClient,
+	}
+
+	projectID := uint(1)
+	activeDeploymentID := uint(100)
+
+	// Create project with active deployment
+	slug, _ := value.NewProjectSlug("test-project")
+	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
+	now := time.Now()
+	proj := projectmodel.ReconstructProject(
+		projectID,
+		"Test Project",
+		*slug,
+		value.ProjectStatusActive,
+		value.ProjectOperationStatusDeploying,
+		&activeDeploymentID, // active deployment ID
+		*limits,
+		now,
+		now,
+		false,
+		nil,
+	)
+
+	// Create deployment with Tekton info
+	d := deployment.NewDeployment(projectID)
+	d.SetDeploymentID(activeDeploymentID)
+	eventID := "test-event-123"
+	runName := "test-run-123"
+	_ = d.InitTektonInfo(&eventID, &runName)
+
+	// Create Kubernetes status
+	startTime := time.Now().Add(-5 * time.Minute)
+	finishedTime := time.Now()
+	kubeStatus := &dto.PipelineRun{
+		Name:           runName,
+		Status:         "True",
+		Reason:         "Succeeded",
+		Message:        "All tasks completed",
+		StartTime:      &startTime,
+		CompletionTime: &finishedTime,
+	}
+
+	// Mock expectations
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(proj, nil)
+	mockDeploymentRepo.On("FindByID", ctx, activeDeploymentID).Return(d, nil)
+	mockKubeClient.On("GetPipelineRunStatus", ctx, runName).Return(kubeStatus, nil)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).Return(proj, nil)
+	mockProjectRepo.On("Save", mock.Anything, mock.AnythingOfType("*model.Project")).Return(nil)
+	mockDeploymentRepo.On("Save", mock.Anything, mock.AnythingOfType("*deployment.Deployment")).Return(nil)
+
+	// Act
+	result, err := service.RefreshActiveDeployment(ctx, projectID)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, uint64(activeDeploymentID), uint64(result.DeploymentID))
+	assert.True(t, result.IsCompleted())
+	mockProjectRepo.AssertExpectations(t)
+	mockDeploymentRepo.AssertExpectations(t)
+	mockKubeClient.AssertExpectations(t)
+}
+
+func TestDeployService_RefreshActiveDeployment_NoActiveDeployment(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockDeploymentRepo := new(repository.MockDeploymentRepository)
+
+	service := &deployService{
+		projectRepo:    mockProjectRepo,
+		deploymentRepo: mockDeploymentRepo,
+	}
+
+	projectID := uint(1)
+
+	// Create project without active deployment
+	slug, _ := value.NewProjectSlug("test-project")
+	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
+	now := time.Now()
+	proj := projectmodel.ReconstructProject(
+		projectID,
+		"Test Project",
+		*slug,
+		value.ProjectStatusActive,
+		value.ProjectOperationStatusNothing,
+		nil, // no active deployment ID
+		*limits,
+		now,
+		now,
+		false,
+		nil,
+	)
+
+	// Mock expectations
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(proj, nil)
+
+	// Act
+	result, err := service.RefreshActiveDeployment(ctx, projectID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, projecterrors.ErrDeploymentNotFound)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+func TestDeployService_RefreshActiveDeployment_ProjectNotFound(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockDeploymentRepo := new(repository.MockDeploymentRepository)
+
+	service := &deployService{
+		projectRepo:    mockProjectRepo,
+		deploymentRepo: mockDeploymentRepo,
+	}
+
+	projectID := uint(1)
+
+	// Mock expectations
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(nil, projecterrors.ErrProjectNotFound)
+
+	// Act
+	result, err := service.RefreshActiveDeployment(ctx, projectID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, projecterrors.ErrProjectNotFound)
+	mockProjectRepo.AssertExpectations(t)
 }
