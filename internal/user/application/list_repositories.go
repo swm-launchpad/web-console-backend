@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/github"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
@@ -59,7 +60,13 @@ func (uc *ListRepositoriesUseCase) Execute(ctx context.Context, input ListReposi
 	// Verify the installation belongs to the user
 	installation, err := uc.installationRepo.FindByInstallationID(ctx, input.InstallationID)
 	if err != nil {
-		return nil, usererrors.ErrInstallationNotFound
+		// Only convert to ErrInstallationNotFound if it's actually a not found error
+		// Preserve other errors (database unavailable, etc.)
+		if errors.Is(err, usererrors.ErrInstallationNotFound) {
+			return nil, usererrors.ErrInstallationNotFound
+		}
+		// Wrap infrastructure errors for better debugging
+		return nil, fmt.Errorf("failed to find installation: %w", err)
 	}
 
 	if installation.UserID != input.UserID {

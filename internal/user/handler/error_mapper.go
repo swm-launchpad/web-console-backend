@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
@@ -60,11 +61,19 @@ var userErrorMap = map[error]response.ErrorMapping{
 }
 
 // mapUserError provides error mapping for user domain
+// Uses errors.Is to support wrapped errors
 func mapUserError(err error) (response.ErrorMapping, bool) {
 	if err == nil {
 		return response.ErrorMapping{}, false
 	}
 
-	m, ok := userErrorMap[err]
-	return m, ok
+	// Iterate through error map and use errors.Is for comparison
+	// This supports wrapped errors (e.g., fmt.Errorf("context: %w", err))
+	for domainErr, mapping := range userErrorMap {
+		if errors.Is(err, domainErr) {
+			return mapping, true
+		}
+	}
+
+	return response.ErrorMapping{}, false
 }
