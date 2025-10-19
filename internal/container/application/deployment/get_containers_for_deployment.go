@@ -30,6 +30,7 @@ type DeploymentContainerOutput struct {
 	ContainerID            uint              `json:"container_id"`
 	Name                   string            `json:"name"`
 	Slug                   string            `json:"slug"`
+	GitHubInstallationID   *int64            `json:"github_installation_id,omitempty"`
 	LastBuiltGitCommitHash *string           `json:"last_built_git_commit_hash,omitempty"`
 	CPULimit               *uint32           `json:"cpu_limit,omitempty"`
 	MemoryLimit            *uint32           `json:"memory_limit,omitempty"`
@@ -118,6 +119,7 @@ func (uc *GetContainersForDeploymentUseCase) Execute(ctx context.Context, input 
 			ContainerID:            container.ContainerID(),
 			Name:                   container.Name(),
 			Slug:                   container.Slug().String(),
+			GitHubInstallationID:   container.GitHubInstallationID(),
 			LastBuiltGitCommitHash: container.LastBuiltGitCommitHash(),
 			CPULimit:               container.ResourceLimits().CPULimit(),
 			MemoryLimit:            container.ResourceLimits().MemoryLimit(),
