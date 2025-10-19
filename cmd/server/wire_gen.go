@@ -115,7 +115,7 @@ func InitializeApp() (*App, error) {
 	deployService := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient)
 	deployProjectUseCase := application2.NewDeployProjectUseCase(deployService)
 	getDeploymentUseCase := application2.NewGetDeploymentUseCase(deployService)
-	refreshDeploymentUseCase := application2.NewRefreshDeploymentUseCase(deployService, deploymentRepository)
+	refreshDeploymentUseCase := application2.NewRefreshDeploymentUseCase(deployService)
 	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, getDeploymentUseCase, refreshDeploymentUseCase, permissionService)
 	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository)
 	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository)

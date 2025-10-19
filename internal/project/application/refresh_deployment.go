@@ -2,11 +2,8 @@ package application
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
@@ -27,17 +24,14 @@ type RefreshDeploymentOutput struct {
 }
 
 type RefreshDeploymentUseCase struct {
-	deployService  service.DeployService
-	deploymentRepo repository.DeploymentRepository
+	deployService service.DeployService
 }
 
 func NewRefreshDeploymentUseCase(
 	deployService service.DeployService,
-	deploymentRepo repository.DeploymentRepository,
 ) *RefreshDeploymentUseCase {
 	return &RefreshDeploymentUseCase{
-		deployService:  deployService,
-		deploymentRepo: deploymentRepo,
+		deployService: deployService,
 	}
 }
 
@@ -45,32 +39,9 @@ func (uc *RefreshDeploymentUseCase) Execute(ctx context.Context, input RefreshDe
 	// Note: Permission check is performed in the handler to prevent information disclosure
 	// The handler converts permission errors to "not found" errors
 
-	// Find active deployments for the project
-	// According to the invariant analysis, there should be at most one active deployment per project
-	activeDeployments, err := uc.deploymentRepo.FindActiveDeploymentsByProjectID(ctx, input.ProjectID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check if there are any active deployments
-	if len(activeDeployments) == 0 {
-		// No active deployment - this is a valid state (project is not being deployed)
-		return nil, projecterrors.ErrDeploymentNotFound
-	}
-
-	// Verify invariant: exactly one active deployment per project
-	// This should never happen due to the deployment locking mechanism,
-	// but we check defensively to catch potential bugs
-	if len(activeDeployments) > 1 {
-		// CRITICAL: Invariant violation detected
-		// This indicates a serious bug in the deployment locking mechanism
-		return nil, fmt.Errorf("invariant violation: project %d has %d active deployments (expected at most 1)",
-			input.ProjectID, len(activeDeployments))
-	}
-
-	// Refresh the active deployment status
-	deployment := activeDeployments[0]
-	refreshedDeployment, err := uc.deployService.RefreshDeploymentStatus(ctx, uint64(deployment.DeploymentID))
+	// Refresh the active deployment for the project
+	// This uses project.active_deployment_id internally
+	refreshedDeployment, err := uc.deployService.RefreshActiveDeployment(ctx, input.ProjectID)
 	if err != nil {
 		return nil, err
 	}

@@ -21,17 +21,17 @@ func (m *MockDeployService) DeployProject(ctx context.Context, projectID uint) (
 	return args.Get(0).(*deployment.Deployment), args.Error(1)
 }
 
-// RefreshDeploymentStatus mocks the RefreshDeploymentStatus method
-func (m *MockDeployService) RefreshDeploymentStatus(ctx context.Context, deploymentID uint64) (*deployment.Deployment, error) {
-	args := m.Called(ctx, deploymentID)
+// GetDeploymentStatus mocks the GetDeploymentStatus method
+func (m *MockDeployService) GetDeploymentStatus(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+	args := m.Called(ctx, projectID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*deployment.Deployment), args.Error(1)
 }
 
-// GetDeploymentStatus mocks the GetDeploymentStatus method
-func (m *MockDeployService) GetDeploymentStatus(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+// RefreshActiveDeployment mocks the RefreshActiveDeployment method
+func (m *MockDeployService) RefreshActiveDeployment(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
 	args := m.Called(ctx, projectID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
