@@ -34,4 +34,7 @@ type GitHubInstallationRepository interface {
 
 	// Reactivate reactivates a revoked GitHub installation
 	Reactivate(ctx context.Context, installationID int64, accountLogin string, accountType model.AccountType) error
+
+	// ValidateUserOwnership validates that a user owns an installation and it's active
+	ValidateUserOwnership(ctx context.Context, installationID int64, userID uint) error
 }

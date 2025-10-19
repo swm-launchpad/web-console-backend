@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
+	userinfra "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
 
 func TestUpdateContainerUseCase_Execute_Success(t *testing.T) {
@@ -15,7 +16,8 @@ func TestUpdateContainerUseCase_Execute_Success(t *testing.T) {
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockTxMgr)
+	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -53,7 +55,8 @@ func TestUpdateContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockTxMgr)
+	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -85,7 +88,8 @@ func TestUpdateContainerUseCase_Execute_UnsetGitHubInstallationID(t *testing.T) 
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockTxMgr)
+	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -128,7 +132,8 @@ func TestUpdateContainerUseCase_Execute_SetGitHubInstallationID(t *testing.T) {
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockTxMgr)
+	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -150,6 +155,7 @@ func TestUpdateContainerUseCase_Execute_SetGitHubInstallationID(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
+	mockInstallationRepo.On("ValidateUserOwnership", mock.Anything, newInstallationID, userID).Return(nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).Return(nil)
 
@@ -171,7 +177,8 @@ func TestUpdateContainerUseCase_Execute_NoUpdateGitHubInstallationID(t *testing.
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockTxMgr)
+	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)

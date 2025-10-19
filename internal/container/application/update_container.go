@@ -7,6 +7,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 type UpdateContainerInput struct {
@@ -36,6 +37,7 @@ type UpdateContainerUseCase struct {
 	containerRepo         repository.ContainerRepository
 	permissionSvc         service.PermissionService
 	resourceValidationSvc service.ResourceValidationService
+	installationRepo      userrepository.GitHubInstallationRepository
 	txManager             db.TxManager
 }
 
@@ -43,12 +45,14 @@ func NewUpdateContainerUseCase(
 	containerRepo repository.ContainerRepository,
 	permissionSvc service.PermissionService,
 	resourceValidationSvc service.ResourceValidationService,
+	installationRepo userrepository.GitHubInstallationRepository,
 	txManager db.TxManager,
 ) *UpdateContainerUseCase {
 	return &UpdateContainerUseCase{
 		containerRepo:         containerRepo,
 		permissionSvc:         permissionSvc,
 		resourceValidationSvc: resourceValidationSvc,
+		installationRepo:      installationRepo,
 		txManager:             txManager,
 	}
 }
@@ -84,6 +88,12 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 		// Update GitHub installation ID if flag is set
 		// This allows explicitly setting to nil (unset) vs not updating at all
 		if input.UpdateGitHubInstallationID {
+			// Validate ownership if setting a new installation ID
+			if input.GitHubInstallationID != nil {
+				if err := uc.installationRepo.ValidateUserOwnership(txCtx, *input.GitHubInstallationID, input.UserID); err != nil {
+					return err
+				}
+			}
 			container.SetGitHubInstallationID(input.GitHubInstallationID)
 		}
 

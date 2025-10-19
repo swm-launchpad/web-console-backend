@@ -207,6 +207,24 @@ func (r *githubInstallationRepository) Reactivate(ctx context.Context, installat
 	return nil
 }
 
+func (r *githubInstallationRepository) ValidateUserOwnership(ctx context.Context, installationID int64, userID uint) error {
+	params := sqlc.ValidateInstallationOwnershipParams{
+		InstallationID: uint64(installationID),
+		UserID:         uint32(userID),
+	}
+
+	isValid, err := r.queriesWithContext(ctx).ValidateInstallationOwnership(ctx, params)
+	if err != nil {
+		return usererrors.ErrDatabaseOperation
+	}
+
+	if !isValid {
+		return usererrors.ErrInstallationUnauthorized
+	}
+
+	return nil
+}
+
 func (r *githubInstallationRepository) queriesWithContext(ctx context.Context) *sqlc.Queries {
 	if tx, ok := db.GetTx(ctx); ok {
 		return r.queries.WithTx(tx)

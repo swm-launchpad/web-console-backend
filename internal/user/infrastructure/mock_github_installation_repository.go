@@ -75,3 +75,8 @@ func (m *MockGitHubInstallationRepository) InvalidateToken(ctx context.Context, 
 	args := m.Called(ctx, installationID)
 	return args.Error(0)
 }
+
+func (m *MockGitHubInstallationRepository) ValidateUserOwnership(ctx context.Context, installationID int64, userID uint) error {
+	args := m.Called(ctx, installationID, userID)
+	return args.Error(0)
+}

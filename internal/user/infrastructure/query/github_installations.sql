@@ -66,3 +66,13 @@ UPDATE GITHUB_INSTALLATIONS SET
     deleted_at = NULL,
     updated_at = ?
 WHERE installation_id = ?;
+
+-- name: ValidateInstallationOwnership :one
+SELECT EXISTS(
+    SELECT 1
+    FROM GITHUB_INSTALLATIONS
+    WHERE installation_id = ?
+      AND user_id = ?
+      AND is_deleted = FALSE
+      AND status = 'active'
+) as is_valid;

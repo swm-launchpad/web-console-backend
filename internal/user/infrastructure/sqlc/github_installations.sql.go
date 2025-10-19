@@ -291,3 +291,26 @@ func (q *Queries) UpdateGitHubInstallation(ctx context.Context, arg UpdateGitHub
 		arg.InstallationID,
 	)
 }
+
+const validateInstallationOwnership = `-- name: ValidateInstallationOwnership :one
+SELECT EXISTS(
+    SELECT 1
+    FROM GITHUB_INSTALLATIONS
+    WHERE installation_id = ?
+      AND user_id = ?
+      AND is_deleted = FALSE
+      AND status = 'active'
+) as is_valid
+`
+
+type ValidateInstallationOwnershipParams struct {
+	InstallationID uint64 `json:"installation_id"`
+	UserID         uint32 `json:"user_id"`
+}
+
+func (q *Queries) ValidateInstallationOwnership(ctx context.Context, arg ValidateInstallationOwnershipParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, validateInstallationOwnership, arg.InstallationID, arg.UserID)
+	var is_valid bool
+	err := row.Scan(&is_valid)
+	return is_valid, err
+}

@@ -37,6 +37,7 @@ type Querier interface {
 	ReactivateInstallation(ctx context.Context, arg ReactivateInstallationParams) (sql.Result, error)
 	UpdateGitHubInstallation(ctx context.Context, arg UpdateGitHubInstallationParams) (sql.Result, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (sql.Result, error)
+	ValidateInstallationOwnership(ctx context.Context, arg ValidateInstallationOwnershipParams) (bool, error)
 }
 
 var _ Querier = (*Queries)(nil)
