@@ -247,6 +247,7 @@ func InitializeApp() (*App, error) {
 		projectApp.NewGetVolumesUseCase,
 		projectApp.NewRemoveVolumeUseCase,
 		projectApp.NewDeployProjectUseCase,
+		projectApp.NewRefreshDeploymentUseCase,
 
 		// Container infrastructure
 		containerInfra.NewContainerRepository,
