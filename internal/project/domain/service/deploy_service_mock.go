@@ -29,3 +29,12 @@ func (m *MockDeployService) RefreshDeploymentStatus(ctx context.Context, deploym
 	}
 	return args.Get(0).(*deployment.Deployment), args.Error(1)
 }
+
+// GetDeploymentStatus mocks the GetDeploymentStatus method
+func (m *MockDeployService) GetDeploymentStatus(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+	args := m.Called(ctx, projectID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*deployment.Deployment), args.Error(1)
+}

@@ -139,6 +139,7 @@ func (r *Router) Setup() {
 
 			// Deployment routes
 			projects.POST("/:id/deploy", r.deploymentHandler.DeployProject)
+			projects.GET("/:id/deployments/latest", r.deploymentHandler.GetDeployment)
 			projects.POST("/:id/deployments/refresh", r.deploymentHandler.RefreshDeployment)
 
 			// Container routes under project (RESTful)

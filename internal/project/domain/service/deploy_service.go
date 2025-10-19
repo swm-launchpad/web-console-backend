@@ -105,6 +105,37 @@ type DeployService interface {
 	//   }
 	//   log.Printf("Refreshed status: %s", deployment.Status)
 	RefreshDeploymentStatus(ctx context.Context, deploymentID uint64) (*deployment.Deployment, error)
+
+	// GetDeploymentStatus retrieves the latest deployment status for a project from the database.
+	// This is a lightweight read-only operation that does not interact with Kubernetes.
+	//
+	// Unlike RefreshDeploymentStatus which queries Kubernetes for the latest status,
+	// this method simply returns the current state stored in the database.
+	//
+	// This method is useful when:
+	//   - User wants to check deployment status without triggering a Kubernetes query
+	//   - Frontend polls for status updates periodically
+	//   - Lightweight status checks are needed for UI rendering
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - *deployment.Deployment: The latest deployment record from the database
+	//   - error: An error if the operation fails
+	//
+	// Error cases:
+	//   - ErrDeploymentNotFound: No deployment exists for the project
+	//   - ErrDatabaseOperation: Database query failed
+	//
+	// Example usage:
+	//   deployment, err := deployService.GetDeploymentStatus(ctx, 123)
+	//   if err != nil {
+	//       return err
+	//   }
+	//   log.Printf("Current status: %s", deployment.Status)
+	GetDeploymentStatus(ctx context.Context, projectID uint) (*deployment.Deployment, error)
 }
 
 // deployService implements the DeployService interface
@@ -690,6 +721,13 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 
 	// For unknown statuses, just save deployment
 	return s.deploymentRepo.Save(ctx, d)
+}
+
+// GetDeploymentStatus retrieves the latest deployment status from the database
+func (s *deployService) GetDeploymentStatus(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+	// Simply query the database for the latest deployment
+	// No Kubernetes interaction - lightweight read-only operation
+	return s.deploymentRepo.FindLatestByProjectID(ctx, projectID)
 }
 
 // monitorDeployment monitors a deployment in the background
