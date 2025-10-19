@@ -13,6 +13,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
+	"github.com/swm-launchpad/web-console-backend/internal/common/github"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	application3 "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
@@ -66,6 +67,20 @@ func InitializeApp() (*App, error) {
 	requestPasswordResetUseCase := application.NewRequestPasswordResetUseCase(userService, tokenService, emailService, txManager)
 	resetPasswordUseCase := application.NewResetPasswordUseCase(tokenService, authService, userService, txManager)
 	passwordResetHandler := handler.NewPasswordResetHandler(requestPasswordResetUseCase, resetPasswordUseCase)
+	gitHubInstallationRepository := infrastructure.NewGitHubInstallationRepository(db)
+	client, err := provideGitHubClient(configConfig)
+	if err != nil {
+		return nil, err
+	}
+	connectGitHubUseCase := application.NewConnectGitHubUseCase(gitHubInstallationRepository, client, txManager)
+	disconnectGitHubUseCase := application.NewDisconnectGitHubUseCase(gitHubInstallationRepository, txManager)
+	getGitHubInstallationUseCase := application.NewGetGitHubInstallationUseCase(gitHubInstallationRepository)
+	generateInstallationTokenUseCase := application.NewGenerateInstallationTokenUseCase(gitHubInstallationRepository, client, txManager)
+	listRepositoriesUseCase := application.NewListRepositoriesUseCase(gitHubInstallationRepository, client)
+	oAuthStateRepository := infrastructure.NewOAuthStateRepository(db)
+	startInstallationUseCase := application.NewStartInstallationUseCase(configConfig, oAuthStateRepository)
+	installationCallbackUseCase := application.NewInstallationCallbackUseCase(configConfig, client, gitHubInstallationRepository, oAuthStateRepository, txManager)
+	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, startInstallationUseCase, installationCallbackUseCase, configConfig)
 	projectRepository := repository.NewProjectRepository(db)
 	slugService := service2.NewSlugService(projectRepository)
 	projectService := service2.NewProjectService(projectRepository, slugService)
@@ -102,9 +117,9 @@ func InitializeApp() (*App, error) {
 	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, permissionService)
 	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository)
 	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository)
-	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, servicePermissionService, resourceValidationService, volumeService, txManager)
+	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, servicePermissionService, resourceValidationService, volumeService, gitHubInstallationRepository, txManager)
 	getContainerUseCase := application3.NewGetContainerUseCase(containerRepository, servicePermissionService)
-	updateContainerUseCase := application3.NewUpdateContainerUseCase(containerRepository, servicePermissionService, resourceValidationService, txManager)
+	updateContainerUseCase := application3.NewUpdateContainerUseCase(containerRepository, servicePermissionService, resourceValidationService, gitHubInstallationRepository, txManager)
 	deleteContainerUseCase := application3.NewDeleteContainerUseCase(containerRepository, servicePermissionService, txManager)
 	listContainersUseCase := application3.NewListContainersUseCase(containerRepository, servicePermissionService)
 	addEnvVarUseCase := application3.NewAddEnvVarUseCase(containerRepository, servicePermissionService, txManager)
@@ -123,8 +138,8 @@ func InitializeApp() (*App, error) {
 	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository)
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, projectHandler, volumeHandler, deploymentHandler, containerHandler, templateHandler, authMiddleware)
-	app := NewApp(configConfig, db, router)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, containerHandler, templateHandler, authMiddleware)
+	app := NewApp(configConfig, db, router, oAuthStateRepository)
 	return app, nil
 }
 
@@ -229,5 +244,38 @@ func provideDeployService(
 		kubeClient,
 		deployNamespace,
 		projectServiceName,
+	)
+}
+
+// provideGitHubClient creates a GitHub client from config
+// Returns nil if GitHub App credentials are not configured
+func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
+
+	if cfg.GitHubApp.AppID == "" || cfg.GitHubApp.PrivateKeyPath == "" {
+		return nil, nil
+	}
+	return github.NewClient(cfg.GitHubApp.AppID, cfg.GitHubApp.PrivateKeyPath)
+}
+
+// provideGitHubHandler creates a GitHub handler with frontend URL
+func provideGitHubHandler(
+	connectUseCase *application.ConnectGitHubUseCase,
+	disconnectUseCase *application.DisconnectGitHubUseCase,
+	getInstallationUseCase *application.GetGitHubInstallationUseCase,
+	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
+	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	startInstallationUseCase *application.StartInstallationUseCase,
+	installationCallbackUseCase *application.InstallationCallbackUseCase,
+	cfg *config.Config,
+) *handler.GitHubHandler {
+	return handler.NewGitHubHandler(
+		connectUseCase,
+		disconnectUseCase,
+		getInstallationUseCase,
+		generateTokenUseCase,
+		listRepositoriesUseCase,
+		startInstallationUseCase,
+		installationCallbackUseCase,
+		cfg.Frontend.URL,
 	)
 }

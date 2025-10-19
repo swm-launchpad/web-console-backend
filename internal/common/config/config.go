@@ -11,12 +11,13 @@ import (
 )
 
 type Config struct {
-	Database DatabaseConfig
-	Server   ServerConfig
-	JWT      JWTConfig
-	CORS     CORSConfig
-	Email    EmailConfig
-	Frontend FrontendConfig
+	Database  DatabaseConfig
+	Server    ServerConfig
+	JWT       JWTConfig
+	CORS      CORSConfig
+	Email     EmailConfig
+	Frontend  FrontendConfig
+	GitHubApp GitHubAppConfig
 }
 
 type DatabaseConfig struct {
@@ -34,6 +35,7 @@ type DatabaseConfig struct {
 type ServerConfig struct {
 	Port    string
 	GinMode string
+	BaseURL string // Backend base URL (e.g., http://localhost:8080 or https://api.launchpad.kr)
 }
 
 type JWTConfig struct {
@@ -54,6 +56,14 @@ type EmailConfig struct {
 
 type FrontendConfig struct {
 	URL string
+}
+
+type GitHubAppConfig struct {
+	AppID           string
+	ClientID        string // GitHub App Client ID (may be used for future OAuth flows)
+	ClientSecret    string // GitHub App Client Secret (may be used for future OAuth flows)
+	PrivateKeyPath  string // Path to GitHub App private key for JWT authentication
+	InstallationURL string // Base URL for GitHub App installation
 }
 
 func Load() (*Config, error) {
@@ -118,6 +128,7 @@ func Load() (*Config, error) {
 		Server: ServerConfig{
 			Port:    getEnv("PORT", "8080"),
 			GinMode: getEnv("GIN_MODE", "debug"),
+			BaseURL: getEnv("BACKEND_URL", "http://localhost:8080"),
 		},
 		JWT: JWTConfig{
 			Secret: getEnv("JWT_SECRET", ""),
@@ -134,6 +145,13 @@ func Load() (*Config, error) {
 		},
 		Frontend: FrontendConfig{
 			URL: getEnv("FRONTEND_URL", "http://localhost:5173"),
+		},
+		GitHubApp: GitHubAppConfig{
+			AppID:           getEnv("GITHUB_APP_ID", ""),
+			ClientID:        getEnv("GITHUB_APP_CLIENT_ID", ""),
+			ClientSecret:    getEnv("GITHUB_APP_CLIENT_SECRET", ""),
+			PrivateKeyPath:  getEnv("GITHUB_APP_PRIVATE_KEY_PATH", ""),
+			InstallationURL: getEnv("GITHUB_APP_INSTALLATION_URL", ""),
 		},
 	}
 

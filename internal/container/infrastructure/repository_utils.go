@@ -83,6 +83,20 @@ func nullInt32ToUint32Ptr(n sql.NullInt32) *uint32 {
 	return &val
 }
 
+func int64PtrToNullInt64(i *int64) sql.NullInt64 {
+	if i == nil {
+		return sql.NullInt64{Valid: false}
+	}
+	return sql.NullInt64{Int64: *i, Valid: true}
+}
+
+func nullInt64ToInt64Ptr(n sql.NullInt64) *int64 {
+	if !n.Valid {
+		return nil
+	}
+	return &n.Int64
+}
+
 // Error checking utilities
 
 func isDuplicateError(err error) bool {

@@ -24,6 +24,7 @@ import (
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
+	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userhttp "github.com/swm-launchpad/web-console-backend/internal/user/handler"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
@@ -48,6 +49,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	// 의존성 초기화
 	userRepo := infrastructure.NewUserRepository(testDB.DB)
 	tokenRepo := infrastructure.NewTokenRepository(testDB.DB)
+	installationRepo := infrastructure.NewGitHubInstallationRepository(testDB.DB)
 	jwtUtil := jwt.NewJWTUtil("test-secret")
 	passwordUtil := password.NewPasswordUtil()
 	txManager := db.NewTxManager(testDB.DB)
@@ -98,10 +100,10 @@ func SetupTestServer(t *testing.T) *TestServer {
 	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository)
 
 	// Container UseCases
-	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, txManager)
+	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, installationRepo, txManager)
 	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, containerPermissionSvc)
 	listContainersUseCase := containerApp.NewListContainersUseCase(containerRepo, containerPermissionSvc)
-	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, txManager)
+	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, installationRepo, txManager)
 	deleteContainerUseCase := containerApp.NewDeleteContainerUseCase(containerRepo, containerPermissionSvc, txManager)
 	addEnvVarUseCase := containerApp.NewAddEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
 	updateEnvVarUseCase := containerApp.NewUpdateEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
@@ -382,4 +384,52 @@ func (ts *TestServer) LoginUser(t *testing.T, username, password string) (uint, 
 	token := data["token"].(string)
 
 	return userID, token
+}
+
+// GetGitHubInstallationRepository returns the GitHub installation repository for testing
+func GetGitHubInstallationRepository(testDB *TestDB) userrepository.GitHubInstallationRepository {
+	return infrastructure.NewGitHubInstallationRepository(testDB.DB)
+}
+
+// GetCreateContainerUseCase returns the create container use case for testing
+func GetCreateContainerUseCase(ts *TestServer) *containerApp.CreateContainerUseCase {
+	containerRepo := containerInfra.NewContainerRepository(ts.DB.DB)
+	containerSlugService := containerService.NewSlugService(containerRepo)
+	containerSvc := containerService.NewContainerService(containerRepo, containerSlugService)
+	projectRepository := projectRepo.NewProjectRepository(ts.DB.DB)
+	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository)
+	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository)
+	volumeRepo := projectRepo.NewVolumeRepository(ts.DB.DB)
+	volumeSlugService := projectService.NewVolumeSlugService(volumeRepo)
+	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepository, volumeSlugService)
+	installationRepo := infrastructure.NewGitHubInstallationRepository(ts.DB.DB)
+	txManager := db.NewTxManager(ts.DB.DB)
+
+	return containerApp.NewCreateContainerUseCase(
+		containerSvc,
+		containerRepo,
+		containerPermissionSvc,
+		resourceValidationSvc,
+		volumeSvc,
+		installationRepo,
+		txManager,
+	)
+}
+
+// GetUpdateContainerUseCase returns the update container use case for testing
+func GetUpdateContainerUseCase(ts *TestServer) *containerApp.UpdateContainerUseCase {
+	containerRepo := containerInfra.NewContainerRepository(ts.DB.DB)
+	projectRepository := projectRepo.NewProjectRepository(ts.DB.DB)
+	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository)
+	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository)
+	installationRepo := infrastructure.NewGitHubInstallationRepository(ts.DB.DB)
+	txManager := db.NewTxManager(ts.DB.DB)
+
+	return containerApp.NewUpdateContainerUseCase(
+		containerRepo,
+		containerPermissionSvc,
+		resourceValidationSvc,
+		installationRepo,
+		txManager,
+	)
 }

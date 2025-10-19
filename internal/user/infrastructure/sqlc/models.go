@@ -105,6 +105,90 @@ func (ns NullDeploymentsStatus) Value() (driver.Value, error) {
 	return string(ns.DeploymentsStatus), nil
 }
 
+type GithubInstallationsAccountType string
+
+const (
+	GithubInstallationsAccountTypeUser         GithubInstallationsAccountType = "User"
+	GithubInstallationsAccountTypeOrganization GithubInstallationsAccountType = "Organization"
+)
+
+func (e *GithubInstallationsAccountType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GithubInstallationsAccountType(s)
+	case string:
+		*e = GithubInstallationsAccountType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GithubInstallationsAccountType: %T", src)
+	}
+	return nil
+}
+
+type NullGithubInstallationsAccountType struct {
+	GithubInstallationsAccountType GithubInstallationsAccountType `json:"github_installations_account_type"`
+	Valid                          bool                           `json:"valid"` // Valid is true if GithubInstallationsAccountType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGithubInstallationsAccountType) Scan(value interface{}) error {
+	if value == nil {
+		ns.GithubInstallationsAccountType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GithubInstallationsAccountType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGithubInstallationsAccountType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GithubInstallationsAccountType), nil
+}
+
+type GithubInstallationsStatus string
+
+const (
+	GithubInstallationsStatusActive  GithubInstallationsStatus = "active"
+	GithubInstallationsStatusRevoked GithubInstallationsStatus = "revoked"
+)
+
+func (e *GithubInstallationsStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GithubInstallationsStatus(s)
+	case string:
+		*e = GithubInstallationsStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GithubInstallationsStatus: %T", src)
+	}
+	return nil
+}
+
+type NullGithubInstallationsStatus struct {
+	GithubInstallationsStatus GithubInstallationsStatus `json:"github_installations_status"`
+	Valid                     bool                      `json:"valid"` // Valid is true if GithubInstallationsStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGithubInstallationsStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.GithubInstallationsStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GithubInstallationsStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGithubInstallationsStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GithubInstallationsStatus), nil
+}
+
 type NetworksType string
 
 const (
@@ -441,6 +525,7 @@ type Container struct {
 	UpdatedAt              sql.NullTime    `json:"updated_at"`
 	DeletedAt              sql.NullTime    `json:"deleted_at"`
 	IsDeleted              bool            `json:"is_deleted"`
+	GithubInstallationID   sql.NullInt64   `json:"github_installation_id"`
 }
 
 type Deployment struct {
@@ -466,6 +551,20 @@ type EnvVar struct {
 	UpdatedAt   sql.NullTime   `json:"updated_at"`
 }
 
+type GithubInstallation struct {
+	InstallationID uint64                         `json:"installation_id"`
+	UserID         uint32                         `json:"user_id"`
+	AccountLogin   string                         `json:"account_login"`
+	AccountType    GithubInstallationsAccountType `json:"account_type"`
+	CachedToken    sql.NullString                 `json:"cached_token"`
+	TokenExpiresAt sql.NullTime                   `json:"token_expires_at"`
+	CreatedAt      time.Time                      `json:"created_at"`
+	UpdatedAt      sql.NullTime                   `json:"updated_at"`
+	DeletedAt      sql.NullTime                   `json:"deleted_at"`
+	IsDeleted      bool                           `json:"is_deleted"`
+	Status         GithubInstallationsStatus      `json:"status"`
+}
+
 type Mount struct {
 	ContainerID uint32       `json:"container_id"`
 	VolumeID    uint32       `json:"volume_id"`
@@ -484,6 +583,15 @@ type Network struct {
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    sql.NullTime   `json:"updated_at"`
 	Fqdn         sql.NullString `json:"fqdn"`
+}
+
+type OauthState struct {
+	State          string        `json:"state"`
+	UserID         uint32        `json:"user_id"`
+	InstallationID sql.NullInt64 `json:"installation_id"`
+	ExpiresAt      time.Time     `json:"expires_at"`
+	CreatedAt      time.Time     `json:"created_at"`
+	ConsumedAt     sql.NullTime  `json:"consumed_at"`
 }
 
 type Project struct {

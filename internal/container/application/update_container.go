@@ -7,20 +7,23 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 type UpdateContainerInput struct {
-	ContainerID    uint
-	UserID         uint
-	Name           *string
-	StableWindow   *uint32
-	GitURL         *string
-	GitBranch      *string
-	GitDirectory   *string
-	CPULimit       *uint32
-	MemoryLimit    *uint32
-	TemplateID     *uint
-	TemplateConfig map[string]interface{}
+	ContainerID                uint
+	UserID                     uint
+	Name                       *string
+	StableWindow               *uint32
+	GitURL                     *string
+	GitBranch                  *string
+	GitDirectory               *string
+	GitHubInstallationID       *int64
+	UpdateGitHubInstallationID bool // Flag to indicate whether to update GitHubInstallationID
+	CPULimit                   *uint32
+	MemoryLimit                *uint32
+	TemplateID                 *uint
+	TemplateConfig             map[string]interface{}
 }
 
 type UpdateContainerOutput struct {
@@ -34,6 +37,7 @@ type UpdateContainerUseCase struct {
 	containerRepo         repository.ContainerRepository
 	permissionSvc         service.PermissionService
 	resourceValidationSvc service.ResourceValidationService
+	installationRepo      userrepository.GitHubInstallationRepository
 	txManager             db.TxManager
 }
 
@@ -41,12 +45,14 @@ func NewUpdateContainerUseCase(
 	containerRepo repository.ContainerRepository,
 	permissionSvc service.PermissionService,
 	resourceValidationSvc service.ResourceValidationService,
+	installationRepo userrepository.GitHubInstallationRepository,
 	txManager db.TxManager,
 ) *UpdateContainerUseCase {
 	return &UpdateContainerUseCase{
 		containerRepo:         containerRepo,
 		permissionSvc:         permissionSvc,
 		resourceValidationSvc: resourceValidationSvc,
+		installationRepo:      installationRepo,
 		txManager:             txManager,
 	}
 }
@@ -77,6 +83,18 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 		// Update stable window if provided
 		if input.StableWindow != nil {
 			container.SetStableWindow(input.StableWindow)
+		}
+
+		// Update GitHub installation ID if flag is set
+		// This allows explicitly setting to nil (unset) vs not updating at all
+		if input.UpdateGitHubInstallationID {
+			// Validate ownership if setting a new installation ID
+			if input.GitHubInstallationID != nil {
+				if err := uc.installationRepo.ValidateUserOwnership(txCtx, *input.GitHubInstallationID, input.UserID); err != nil {
+					return err
+				}
+			}
+			container.SetGitHubInstallationID(input.GitHubInstallationID)
 		}
 
 		// Update git config if provided

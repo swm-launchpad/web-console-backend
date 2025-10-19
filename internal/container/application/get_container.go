@@ -39,29 +39,30 @@ type MountOutput struct {
 }
 
 type GetContainerOutput struct {
-	ContainerID       uint                   `json:"container_id"`
-	ProjectID         uint                   `json:"project_id"`
-	TemplateID        uint                   `json:"template_id,omitempty"`
-	Name              string                 `json:"name"`
-	Slug              string                 `json:"slug"`
-	StableWindow      uint32                 `json:"stable_window,omitempty"`
-	TemplateConfig    map[string]interface{} `json:"template_config,omitempty"`
-	GitURL            string                 `json:"git_url"`
-	GitBranch         string                 `json:"git_branch"`
-	GitDirectory      string                 `json:"git_directory,omitempty"`
-	GitCommitHash     string                 `json:"git_commit_hash,omitempty"`
-	LastBuiltCommit   string                 `json:"last_built_commit,omitempty"`
-	CPULimit          uint32                 `json:"cpu_limit"`
-	MemoryLimit       uint32                 `json:"memory_limit"`
-	MonthlyBuildTime  uint32                 `json:"monthly_build_time,omitempty"`
-	MonthlyBuildCount uint32                 `json:"monthly_build_count,omitempty"`
-	MonthlyUptime     string                 `json:"monthly_uptime,omitempty"`
-	EnvVars           []EnvVarOutput         `json:"env_vars"`
-	Networks          []NetworkOutput        `json:"networks"`
-	Secrets           []SecretOutput         `json:"secrets"`
-	Mounts            []MountOutput          `json:"mounts"`
-	CreatedAt         string                 `json:"created_at"`
-	UpdatedAt         string                 `json:"updated_at,omitempty"`
+	ContainerID          uint                   `json:"container_id"`
+	ProjectID            uint                   `json:"project_id"`
+	TemplateID           uint                   `json:"template_id,omitempty"`
+	Name                 string                 `json:"name"`
+	Slug                 string                 `json:"slug"`
+	StableWindow         uint32                 `json:"stable_window,omitempty"`
+	TemplateConfig       map[string]interface{} `json:"template_config,omitempty"`
+	GitURL               string                 `json:"git_url"`
+	GitBranch            string                 `json:"git_branch"`
+	GitDirectory         string                 `json:"git_directory,omitempty"`
+	GitHubInstallationID *int64                 `json:"github_installation_id,omitempty"`
+	GitCommitHash        string                 `json:"git_commit_hash,omitempty"`
+	LastBuiltCommit      string                 `json:"last_built_commit,omitempty"`
+	CPULimit             uint32                 `json:"cpu_limit"`
+	MemoryLimit          uint32                 `json:"memory_limit"`
+	MonthlyBuildTime     uint32                 `json:"monthly_build_time,omitempty"`
+	MonthlyBuildCount    uint32                 `json:"monthly_build_count,omitempty"`
+	MonthlyUptime        string                 `json:"monthly_uptime,omitempty"`
+	EnvVars              []EnvVarOutput         `json:"env_vars"`
+	Networks             []NetworkOutput        `json:"networks"`
+	Secrets              []SecretOutput         `json:"secrets"`
+	Mounts               []MountOutput          `json:"mounts"`
+	CreatedAt            string                 `json:"created_at"`
+	UpdatedAt            string                 `json:"updated_at,omitempty"`
 }
 
 type GetContainerUseCase struct {
@@ -123,6 +124,10 @@ func (uc *GetContainerUseCase) Execute(ctx context.Context, input GetContainerIn
 
 	if gitDir := container.GitConfig().DirectoryPath(); gitDir != nil {
 		output.GitDirectory = *gitDir
+	}
+
+	if installationID := container.GitHubInstallationID(); installationID != nil {
+		output.GitHubInstallationID = installationID
 	}
 
 	if gitCommit := container.GitCommitHash(); gitCommit != nil {

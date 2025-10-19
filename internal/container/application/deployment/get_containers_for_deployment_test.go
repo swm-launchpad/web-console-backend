@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
-	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 )
 
 func TestGetContainersForDeploymentUseCase_Execute_Success(t *testing.T) {
-	mockService := new(service.MockContainerService)
+	mockService := new(infrastructure.MockContainerService)
 	useCase := NewGetContainersForDeploymentUseCase(mockService)
 
 	ctx := context.Background()
@@ -73,7 +73,7 @@ func TestGetContainersForDeploymentUseCase_Execute_Success(t *testing.T) {
 }
 
 func TestGetContainersForDeploymentUseCase_Execute_EmptyList(t *testing.T) {
-	mockService := new(service.MockContainerService)
+	mockService := new(infrastructure.MockContainerService)
 	useCase := NewGetContainersForDeploymentUseCase(mockService)
 
 	ctx := context.Background()
@@ -97,7 +97,7 @@ func TestGetContainersForDeploymentUseCase_Execute_EmptyList(t *testing.T) {
 }
 
 func TestGetContainersForDeploymentUseCase_Execute_ServiceError(t *testing.T) {
-	mockService := new(service.MockContainerService)
+	mockService := new(infrastructure.MockContainerService)
 	useCase := NewGetContainersForDeploymentUseCase(mockService)
 
 	ctx := context.Background()
@@ -118,7 +118,7 @@ func TestGetContainersForDeploymentUseCase_Execute_ServiceError(t *testing.T) {
 }
 
 func TestGetContainersForDeploymentUseCase_Execute_WithNetworkOptionalFields(t *testing.T) {
-	mockService := new(service.MockContainerService)
+	mockService := new(infrastructure.MockContainerService)
 	useCase := NewGetContainersForDeploymentUseCase(mockService)
 
 	ctx := context.Background()
@@ -154,7 +154,7 @@ func TestGetContainersForDeploymentUseCase_Execute_WithNetworkOptionalFields(t *
 }
 
 func TestGetContainersForDeploymentUseCase_Execute_WithMultipleMounts(t *testing.T) {
-	mockService := new(service.MockContainerService)
+	mockService := new(infrastructure.MockContainerService)
 	useCase := NewGetContainersForDeploymentUseCase(mockService)
 
 	ctx := context.Background()
@@ -207,6 +207,7 @@ func createContainerWithAllFields(containerID, projectID uint) *model.Container 
 		slug,
 		nil,
 		nil,
+		nil, // githubInstallationID
 		gitConfig,
 		nil,
 		&commitHash,
@@ -258,6 +259,7 @@ func createContainerWithMinimalFields(containerID, projectID uint) *model.Contai
 		slug,
 		nil,
 		nil,
+		nil, // githubInstallationID
 		gitConfig,
 		nil, // No commit hash
 		nil,
@@ -289,6 +291,7 @@ func createContainerWithNetworkOptionalFields(containerID, projectID uint) *mode
 		slug,
 		nil,
 		nil,
+		nil, // githubInstallationID
 		gitConfig,
 		nil,
 		nil,
@@ -339,6 +342,7 @@ func createContainerWithMultipleMounts(containerID, projectID uint) *model.Conta
 		slug,
 		nil,
 		nil,
+		nil, // githubInstallationID
 		gitConfig,
 		nil,
 		nil,

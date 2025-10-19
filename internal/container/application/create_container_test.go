@@ -9,6 +9,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	projectinfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
+	userinfra "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
 
 func TestCreateContainerUseCase_Execute_Success(t *testing.T) {
@@ -17,8 +18,9 @@ func TestCreateContainerUseCase_Execute_Success(t *testing.T) {
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
 	mockVolumeService := new(projectinfra.MockVolumeService)
+	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockTxMgr)
+	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -39,7 +41,7 @@ func TestCreateContainerUseCase_Execute_Success(t *testing.T) {
 
 	mockPermSvc.On("CanUserCreateContainer", ctx, userID, projectID).Return(nil)
 	mockResourceValidationSvc.On("ValidateProjectResourceLimits", ctx, projectID, uint32(1000), uint32(2048), uint(0)).Return(nil)
-	mockContainerService.On("CreateContainer", ctx, projectID, input.Name, mock.Anything, mock.Anything, (*uint)(nil), map[string]interface{}(nil)).Return(mockContainer, nil)
+	mockContainerService.On("CreateContainer", ctx, projectID, input.Name, mock.Anything, mock.Anything, (*uint)(nil), map[string]interface{}(nil), (*int64)(nil)).Return(mockContainer, nil)
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).Return(nil)
 
 	output, err := useCase.Execute(ctx, input)
@@ -63,8 +65,9 @@ func TestCreateContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
 	mockVolumeService := new(projectinfra.MockVolumeService)
+	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockTxMgr)
+	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	projectID := uint(10)

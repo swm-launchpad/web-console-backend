@@ -12,9 +12,9 @@ import (
 // ContainerService defines the interface for container-related business logic
 type ContainerService interface {
 	// CreateContainer creates a new container with the given parameters
-	// gitConfig and resourceLimits are required, templateID and templateConfig are optional
+	// gitConfig and resourceLimits are required, templateID, templateConfig, and githubInstallationID are optional
 	// slug is automatically generated from name
-	CreateContainer(ctx context.Context, projectID uint, name string, gitConfig value.GitConfig, resourceLimits value.ResourceLimits, templateID *uint, templateConfig map[string]interface{}) (*model.Container, error)
+	CreateContainer(ctx context.Context, projectID uint, name string, gitConfig value.GitConfig, resourceLimits value.ResourceLimits, templateID *uint, templateConfig map[string]interface{}, githubInstallationID *int64) (*model.Container, error)
 
 	// GetContainer retrieves a container by ID
 	GetContainer(ctx context.Context, containerID uint) (*model.Container, error)
@@ -51,8 +51,8 @@ func NewContainerService(containerRepo repository.ContainerRepository, slugServi
 
 // CreateContainer creates a new container with validation
 // slug is automatically generated from name
-// gitConfig and resourceLimits are required, templateID and templateConfig are optional
-func (s *containerService) CreateContainer(ctx context.Context, projectID uint, name string, gitConfig value.GitConfig, resourceLimits value.ResourceLimits, templateID *uint, templateConfig map[string]interface{}) (*model.Container, error) {
+// gitConfig and resourceLimits are required, templateID, templateConfig, and githubInstallationID are optional
+func (s *containerService) CreateContainer(ctx context.Context, projectID uint, name string, gitConfig value.GitConfig, resourceLimits value.ResourceLimits, templateID *uint, templateConfig map[string]interface{}, githubInstallationID *int64) (*model.Container, error) {
 	if projectID == 0 {
 		return nil, containererrors.ErrInvalidProjectID
 	}
@@ -73,7 +73,7 @@ func (s *containerService) CreateContainer(ctx context.Context, projectID uint, 
 	}
 
 	// Create the container aggregate with all fields
-	container, err := model.NewContainer(projectID, name, slug, gitConfig, resourceLimits, templateID, templateConfig)
+	container, err := model.NewContainer(projectID, name, slug, gitConfig, resourceLimits, templateID, templateConfig, githubInstallationID)
 	if err != nil {
 		return nil, err
 	}

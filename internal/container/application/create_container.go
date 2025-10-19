@@ -8,6 +8,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	projectservice "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 )
 
 type VolumeToCreate struct {
@@ -17,17 +18,18 @@ type VolumeToCreate struct {
 }
 
 type CreateContainerInput struct {
-	ProjectID      uint
-	UserID         uint
-	TemplateID     *uint
-	Name           string
-	GitURL         string
-	GitBranch      string
-	GitDirectory   *string
-	CPULimit       uint32
-	MemoryLimit    uint32
-	TemplateConfig map[string]interface{}
-	Volumes        []VolumeToCreate
+	ProjectID            uint
+	UserID               uint
+	TemplateID           *uint
+	Name                 string
+	GitURL               string
+	GitBranch            string
+	GitDirectory         *string
+	GitHubInstallationID *int64 // Optional: for private repositories
+	CPULimit             uint32
+	MemoryLimit          uint32
+	TemplateConfig       map[string]interface{}
+	Volumes              []VolumeToCreate
 }
 
 type CreateContainerOutput struct {
@@ -51,6 +53,7 @@ type CreateContainerUseCase struct {
 	permissionSvc         service.PermissionService
 	resourceValidationSvc service.ResourceValidationService
 	volumeService         projectservice.VolumeService
+	installationRepo      userrepository.GitHubInstallationRepository
 	txManager             db.TxManager
 }
 
@@ -60,6 +63,7 @@ func NewCreateContainerUseCase(
 	permissionSvc service.PermissionService,
 	resourceValidationSvc service.ResourceValidationService,
 	volumeService projectservice.VolumeService,
+	installationRepo userrepository.GitHubInstallationRepository,
 	txManager db.TxManager,
 ) *CreateContainerUseCase {
 	return &CreateContainerUseCase{
@@ -68,6 +72,7 @@ func NewCreateContainerUseCase(
 		permissionSvc:         permissionSvc,
 		resourceValidationSvc: resourceValidationSvc,
 		volumeService:         volumeService,
+		installationRepo:      installationRepo,
 		txManager:             txManager,
 	}
 }
@@ -84,6 +89,13 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 		// Check permission
 		if err := uc.permissionSvc.CanUserCreateContainer(txCtx, input.UserID, input.ProjectID); err != nil {
 			return err
+		}
+
+		// Validate GitHub installation ownership if provided
+		if input.GitHubInstallationID != nil {
+			if err := uc.installationRepo.ValidateUserOwnership(txCtx, *input.GitHubInstallationID, input.UserID); err != nil {
+				return err
+			}
 		}
 
 		// Validate project resource limits
@@ -121,6 +133,7 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 			resourceLimits,
 			input.TemplateID,
 			input.TemplateConfig,
+			input.GitHubInstallationID,
 		)
 		if err != nil {
 			return err

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
@@ -44,14 +45,35 @@ var userErrorMap = map[error]response.ErrorMapping{
 	// Duplicate errors
 	usererrors.ErrUsernameExists: {StatusCode: http.StatusConflict, Code: "USERNAME_EXISTS", Message: "Username already exists"},
 	usererrors.ErrEmailExists:    {StatusCode: http.StatusConflict, Code: "EMAIL_EXISTS", Message: "Email already exists"},
+
+	// GitHub Installation errors
+	usererrors.ErrInstallationNotFound:     {StatusCode: http.StatusNotFound, Code: "INSTALLATION_NOT_FOUND", Message: "GitHub installation not found"},
+	usererrors.ErrInstallationExists:       {StatusCode: http.StatusConflict, Code: "INSTALLATION_EXISTS", Message: "GitHub installation already exists"},
+	usererrors.ErrInstallationRevoked:      {StatusCode: http.StatusGone, Code: "INSTALLATION_REVOKED", Message: "GitHub installation has been revoked. Please reconnect your GitHub account"},
+	usererrors.ErrInstallationUnauthorized: {StatusCode: http.StatusForbidden, Code: "INSTALLATION_UNAUTHORIZED", Message: "Unauthorized to access GitHub installation"},
+	usererrors.ErrInvalidInstallationID:    {StatusCode: http.StatusBadRequest, Code: "INVALID_INSTALLATION_ID", Message: "Invalid installation ID"},
+	usererrors.ErrAccountLoginRequired:     {StatusCode: http.StatusBadRequest, Code: "ACCOUNT_LOGIN_REQUIRED", Message: "Account login is required"},
+	usererrors.ErrUserIDRequired:           {StatusCode: http.StatusBadRequest, Code: "USER_ID_REQUIRED", Message: "User ID is required"},
+	usererrors.ErrGitHubTokenGenerateFail:  {StatusCode: http.StatusInternalServerError, Code: "GITHUB_TOKEN_GENERATION_FAILED", Message: "Failed to generate GitHub token"},
+	usererrors.ErrGitHubAPIFailed:          {StatusCode: http.StatusBadGateway, Code: "GITHUB_API_FAILED", Message: "GitHub API request failed"},
+	usererrors.ErrInvalidState:             {StatusCode: http.StatusBadRequest, Code: "INVALID_STATE", Message: "Invalid state parameter"},
+	usererrors.ErrGitHubNotConfigured:      {StatusCode: http.StatusServiceUnavailable, Code: "GITHUB_NOT_CONFIGURED", Message: "GitHub integration is not configured on this server"},
 }
 
 // mapUserError provides error mapping for user domain
+// Uses errors.Is to support wrapped errors
 func mapUserError(err error) (response.ErrorMapping, bool) {
 	if err == nil {
 		return response.ErrorMapping{}, false
 	}
 
-	m, ok := userErrorMap[err]
-	return m, ok
+	// Iterate through error map and use errors.Is for comparison
+	// This supports wrapped errors (e.g., fmt.Errorf("context: %w", err))
+	for domainErr, mapping := range userErrorMap {
+		if errors.Is(err, domainErr) {
+			return mapping, true
+		}
+	}
+
+	return response.ErrorMapping{}, false
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
+	"github.com/swm-launchpad/web-console-backend/internal/common/github"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	containerApp "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	containerDeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
@@ -138,6 +139,39 @@ func provideDeployService(
 	)
 }
 
+// provideGitHubClient creates a GitHub client from config
+// Returns nil if GitHub App credentials are not configured
+func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
+	// GitHub client is optional - return nil if not configured
+	if cfg.GitHubApp.AppID == "" || cfg.GitHubApp.PrivateKeyPath == "" {
+		return nil, nil
+	}
+	return github.NewClient(cfg.GitHubApp.AppID, cfg.GitHubApp.PrivateKeyPath)
+}
+
+// provideGitHubHandler creates a GitHub handler with frontend URL
+func provideGitHubHandler(
+	connectUseCase *application.ConnectGitHubUseCase,
+	disconnectUseCase *application.DisconnectGitHubUseCase,
+	getInstallationUseCase *application.GetGitHubInstallationUseCase,
+	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
+	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	startInstallationUseCase *application.StartInstallationUseCase,
+	installationCallbackUseCase *application.InstallationCallbackUseCase,
+	cfg *config.Config,
+) *userHTTP.GitHubHandler {
+	return userHTTP.NewGitHubHandler(
+		connectUseCase,
+		disconnectUseCase,
+		getInstallationUseCase,
+		generateTokenUseCase,
+		listRepositoriesUseCase,
+		startInstallationUseCase,
+		installationCallbackUseCase,
+		cfg.Frontend.URL,
+	)
+}
+
 func InitializeApp() (*App, error) {
 	wire.Build(
 		// Config
@@ -155,9 +189,14 @@ func InitializeApp() (*App, error) {
 		// Email service
 		provideEmailService,
 
+		// GitHub client
+		provideGitHubClient,
+
 		// User infrastructure
 		infrastructure.NewUserRepository,
 		infrastructure.NewTokenRepository,
+		infrastructure.NewGitHubInstallationRepository,
+		infrastructure.NewOAuthStateRepository,
 
 		// User domain services
 		service.NewUserService,
@@ -174,6 +213,13 @@ func InitializeApp() (*App, error) {
 		application.NewResendVerificationEmailUseCase,
 		application.NewRequestPasswordResetUseCase,
 		application.NewResetPasswordUseCase,
+		application.NewConnectGitHubUseCase,
+		application.NewDisconnectGitHubUseCase,
+		application.NewGetGitHubInstallationUseCase,
+		application.NewGenerateInstallationTokenUseCase,
+		application.NewListRepositoriesUseCase,
+		application.NewStartInstallationUseCase,
+		application.NewInstallationCallbackUseCase,
 
 		// Project infrastructure
 		projectRepo.NewProjectRepository,
@@ -237,6 +283,7 @@ func InitializeApp() (*App, error) {
 		userHTTP.NewUserHandler,
 		userHTTP.NewVerificationHandler,
 		userHTTP.NewPasswordResetHandler,
+		provideGitHubHandler,
 		projectHTTP.NewProjectHandler,
 		projectHTTP.NewVolumeHandler,
 		projectHTTP.NewDeploymentHandler,

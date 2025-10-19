@@ -40,3 +40,7 @@ coverage.html
 
 # Kubernetes
 **/ca.crt
+
+# Secrets
+secrets/
+*.pem

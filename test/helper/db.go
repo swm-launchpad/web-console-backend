@@ -92,6 +92,7 @@ func (tdb *TestDB) Migrate() error {
 		"000006_refactor_deployment_mechanism.up.sql",
 		"000007_add_active_deployment_tracking.up.sql",
 		"000008_add_volume_slug.up.sql",
+		"000009_add_github_installations.up.sql",
 	}
 
 	for _, migration := range migrations {

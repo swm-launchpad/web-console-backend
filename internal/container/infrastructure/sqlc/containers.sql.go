@@ -49,11 +49,11 @@ const createContainer = `-- name: CreateContainer :execresult
 
 INSERT INTO CONTAINERS (
     project_id, template_id, name, slug, stable_window,
-    template_config, git_repository_url, git_branch, git_directory_path, git_commit_hash,
+    template_config, github_installation_id, git_repository_url, git_branch, git_directory_path, git_commit_hash,
     last_built_git_commit_hash, cpu_limit, memory_limit,
     monthly_build_time, monthly_build_count, monthly_uptime,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateContainerParams struct {
@@ -63,6 +63,7 @@ type CreateContainerParams struct {
 	Slug                   string          `json:"slug"`
 	StableWindow           sql.NullInt32   `json:"stable_window"`
 	TemplateConfig         json.RawMessage `json:"template_config"`
+	GithubInstallationID   sql.NullInt64   `json:"github_installation_id"`
 	GitRepositoryUrl       sql.NullString  `json:"git_repository_url"`
 	GitBranch              sql.NullString  `json:"git_branch"`
 	GitDirectoryPath       sql.NullString  `json:"git_directory_path"`
@@ -86,6 +87,7 @@ func (q *Queries) CreateContainer(ctx context.Context, arg CreateContainerParams
 		arg.Slug,
 		arg.StableWindow,
 		arg.TemplateConfig,
+		arg.GithubInstallationID,
 		arg.GitRepositoryUrl,
 		arg.GitBranch,
 		arg.GitDirectoryPath,
@@ -170,7 +172,7 @@ func (q *Queries) ExistsBySlug(ctx context.Context, arg ExistsBySlugParams) (boo
 }
 
 const getContainerByID = `-- name: GetContainerByID :one
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id
 FROM CONTAINERS
 WHERE container_id = ? AND is_deleted = FALSE
 `
@@ -200,12 +202,13 @@ func (q *Queries) GetContainerByID(ctx context.Context, containerID uint32) (Con
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.IsDeleted,
+		&i.GithubInstallationID,
 	)
 	return i, err
 }
 
 const getContainerByIDForUpdate = `-- name: GetContainerByIDForUpdate :one
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id
 FROM CONTAINERS
 WHERE container_id = ? AND is_deleted = FALSE
 FOR UPDATE
@@ -236,12 +239,13 @@ func (q *Queries) GetContainerByIDForUpdate(ctx context.Context, containerID uin
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.IsDeleted,
+		&i.GithubInstallationID,
 	)
 	return i, err
 }
 
 const getContainerBySlug = `-- name: GetContainerBySlug :one
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id
 FROM CONTAINERS
 WHERE project_id = ? AND slug = ? AND is_deleted = FALSE
 `
@@ -276,6 +280,7 @@ func (q *Queries) GetContainerBySlug(ctx context.Context, arg GetContainerBySlug
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.IsDeleted,
+		&i.GithubInstallationID,
 	)
 	return i, err
 }
@@ -301,7 +306,7 @@ func (q *Queries) GetTotalResourceUsageByProject(ctx context.Context, projectID 
 }
 
 const listContainers = `-- name: ListContainers :many
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id
 FROM CONTAINERS
 WHERE is_deleted = FALSE
 ORDER BY created_at DESC
@@ -344,6 +349,7 @@ func (q *Queries) ListContainers(ctx context.Context, arg ListContainersParams) 
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.IsDeleted,
+			&i.GithubInstallationID,
 		); err != nil {
 			return nil, err
 		}
@@ -359,7 +365,7 @@ func (q *Queries) ListContainers(ctx context.Context, arg ListContainersParams) 
 }
 
 const listContainersByProjectID = `-- name: ListContainersByProjectID :many
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id
 FROM CONTAINERS
 WHERE project_id = ? AND is_deleted = FALSE
 ORDER BY created_at DESC
@@ -396,6 +402,7 @@ func (q *Queries) ListContainersByProjectID(ctx context.Context, projectID uint3
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.IsDeleted,
+			&i.GithubInstallationID,
 		); err != nil {
 			return nil, err
 		}
@@ -413,7 +420,8 @@ func (q *Queries) ListContainersByProjectID(ctx context.Context, projectID uint3
 const updateContainer = `-- name: UpdateContainer :execresult
 UPDATE CONTAINERS SET
     template_id = ?, name = ?, stable_window = ?,
-    template_config = ?, git_repository_url = ?, git_branch = ?, git_directory_path = ?, git_commit_hash = ?,
+    template_config = ?, github_installation_id = ?,
+    git_repository_url = ?, git_branch = ?, git_directory_path = ?, git_commit_hash = ?,
     last_built_git_commit_hash = ?, cpu_limit = ?, memory_limit = ?,
     monthly_build_time = ?, monthly_build_count = ?, monthly_uptime = ?,
     updated_at = ?
@@ -425,6 +433,7 @@ type UpdateContainerParams struct {
 	Name                   string          `json:"name"`
 	StableWindow           sql.NullInt32   `json:"stable_window"`
 	TemplateConfig         json.RawMessage `json:"template_config"`
+	GithubInstallationID   sql.NullInt64   `json:"github_installation_id"`
 	GitRepositoryUrl       sql.NullString  `json:"git_repository_url"`
 	GitBranch              sql.NullString  `json:"git_branch"`
 	GitDirectoryPath       sql.NullString  `json:"git_directory_path"`
@@ -445,6 +454,7 @@ func (q *Queries) UpdateContainer(ctx context.Context, arg UpdateContainerParams
 		arg.Name,
 		arg.StableWindow,
 		arg.TemplateConfig,
+		arg.GithubInstallationID,
 		arg.GitRepositoryUrl,
 		arg.GitBranch,
 		arg.GitDirectoryPath,

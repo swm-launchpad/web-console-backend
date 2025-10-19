@@ -73,17 +73,18 @@ type VolumeToCreate struct {
 
 // CreateContainerRequest represents the request body for creating a container
 type CreateContainerRequest struct {
-	Name           string                 `json:"name" binding:"required"`
-	GitURL         string                 `json:"git_url,omitempty"`
-	GitBranch      string                 `json:"git_branch,omitempty"`
-	GitDirectory   *string                `json:"git_directory,omitempty"`
-	GitSubpath     *string                `json:"git_subpath,omitempty"`
-	CPULimit       *uint32                `json:"cpu_limit,omitempty"`
-	MemoryLimit    *uint32                `json:"memory_limit,omitempty"`
-	DiskLimit      *uint32                `json:"disk_limit,omitempty"`
-	TemplateID     *uint                  `json:"template_id,omitempty"`
-	TemplateConfig map[string]interface{} `json:"template_config,omitempty"`
-	Volumes        []VolumeToCreate       `json:"volumes,omitempty"`
+	Name                 string                 `json:"name" binding:"required"`
+	GitURL               string                 `json:"git_url,omitempty"`
+	GitBranch            string                 `json:"git_branch,omitempty"`
+	GitDirectory         *string                `json:"git_directory,omitempty"`
+	GitSubpath           *string                `json:"git_subpath,omitempty"`
+	GitHubInstallationID *int64                 `json:"github_installation_id,omitempty"`
+	CPULimit             *uint32                `json:"cpu_limit,omitempty"`
+	MemoryLimit          *uint32                `json:"memory_limit,omitempty"`
+	DiskLimit            *uint32                `json:"disk_limit,omitempty"`
+	TemplateID           *uint                  `json:"template_id,omitempty"`
+	TemplateConfig       map[string]interface{} `json:"template_config,omitempty"`
+	Volumes              []VolumeToCreate       `json:"volumes,omitempty"`
 }
 
 // ContainerResponse represents the response for container operations
@@ -147,17 +148,18 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 	}
 
 	input := application.CreateContainerInput{
-		ProjectID:      uint(projectID),
-		UserID:         userID.(uint),
-		Name:           req.Name,
-		GitURL:         req.GitURL,
-		GitBranch:      req.GitBranch,
-		GitDirectory:   gitDirectory,
-		CPULimit:       cpuLimit,
-		MemoryLimit:    memoryLimit,
-		TemplateID:     req.TemplateID,
-		TemplateConfig: req.TemplateConfig,
-		Volumes:        volumes,
+		ProjectID:            uint(projectID),
+		UserID:               userID.(uint),
+		Name:                 req.Name,
+		GitURL:               req.GitURL,
+		GitBranch:            req.GitBranch,
+		GitDirectory:         gitDirectory,
+		GitHubInstallationID: req.GitHubInstallationID,
+		CPULimit:             cpuLimit,
+		MemoryLimit:          memoryLimit,
+		TemplateID:           req.TemplateID,
+		TemplateConfig:       req.TemplateConfig,
+		Volumes:              volumes,
 	}
 
 	output, err := h.createContainerUC.Execute(c.Request.Context(), input)
@@ -215,15 +217,17 @@ func (h *ContainerHandler) GetContainer(c *gin.Context) {
 
 // UpdateContainerRequest represents the request body for updating a container
 type UpdateContainerRequest struct {
-	Name           *string                `json:"name,omitempty"`
-	StableWindow   *uint32                `json:"stable_window,omitempty"`
-	GitURL         *string                `json:"git_url,omitempty"`
-	GitBranch      *string                `json:"git_branch,omitempty"`
-	GitDirectory   *string                `json:"git_directory,omitempty"`
-	CPULimit       *uint32                `json:"cpu_limit,omitempty"`
-	MemoryLimit    *uint32                `json:"memory_limit,omitempty"`
-	TemplateID     *uint                  `json:"template_id,omitempty"`
-	TemplateConfig map[string]interface{} `json:"template_config,omitempty"`
+	Name                      *string                `json:"name,omitempty"`
+	StableWindow              *uint32                `json:"stable_window,omitempty"`
+	GitHubInstallationID      *int64                 `json:"github_installation_id,omitempty"`
+	UnsetGitHubInstallationID bool                   `json:"unset_github_installation_id,omitempty"`
+	GitURL                    *string                `json:"git_url,omitempty"`
+	GitBranch                 *string                `json:"git_branch,omitempty"`
+	GitDirectory              *string                `json:"git_directory,omitempty"`
+	CPULimit                  *uint32                `json:"cpu_limit,omitempty"`
+	MemoryLimit               *uint32                `json:"memory_limit,omitempty"`
+	TemplateID                *uint                  `json:"template_id,omitempty"`
+	TemplateConfig            map[string]interface{} `json:"template_config,omitempty"`
 }
 
 // UpdateContainer handles updating a container
@@ -254,18 +258,34 @@ func (h *ContainerHandler) UpdateContainer(c *gin.Context) {
 		return
 	}
 
+	// Determine GitHubInstallationID to pass to use case
+	var githubInstallationID *int64
+	updateGitHubInstallation := false
+	if req.UnsetGitHubInstallationID {
+		// Explicitly unset - set to nil
+		githubInstallationID = nil
+		updateGitHubInstallation = true
+	} else if req.GitHubInstallationID != nil {
+		// Set to specific value
+		githubInstallationID = req.GitHubInstallationID
+		updateGitHubInstallation = true
+	}
+	// If neither flag is set, don't update (keep existing value)
+
 	input := application.UpdateContainerInput{
-		ContainerID:    uint(containerID),
-		UserID:         userID.(uint),
-		Name:           req.Name,
-		StableWindow:   req.StableWindow,
-		GitURL:         req.GitURL,
-		GitBranch:      req.GitBranch,
-		GitDirectory:   req.GitDirectory,
-		CPULimit:       req.CPULimit,
-		MemoryLimit:    req.MemoryLimit,
-		TemplateID:     req.TemplateID,
-		TemplateConfig: req.TemplateConfig,
+		ContainerID:                uint(containerID),
+		UserID:                     userID.(uint),
+		Name:                       req.Name,
+		StableWindow:               req.StableWindow,
+		GitHubInstallationID:       githubInstallationID,
+		UpdateGitHubInstallationID: updateGitHubInstallation,
+		GitURL:                     req.GitURL,
+		GitBranch:                  req.GitBranch,
+		GitDirectory:               req.GitDirectory,
+		CPULimit:                   req.CPULimit,
+		MemoryLimit:                req.MemoryLimit,
+		TemplateID:                 req.TemplateID,
+		TemplateConfig:             req.TemplateConfig,
 	}
 
 	output, err := h.updateContainerUC.Execute(c.Request.Context(), input)
