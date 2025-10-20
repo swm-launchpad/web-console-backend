@@ -105,7 +105,7 @@ jobs:
 
       - name: Deploy application
         run: |
-          ssh ubuntu@launchpad.kr "cd ~ && sudo ./backend/scripts/deploy.sh latest --org swm-launchpad --repo web-console-backend --env ~/backend/.env --kube-ca-cert ~/backend/kube/ca.crt"
+          ssh ubuntu@launchpad.kr "cd ~ && sudo ./backend/scripts/deploy.sh latest --org swm-launchpad --repo web-console-backend --env ~/backend/.env --kube-ca-from ~/backend/kube/ca.crt --kube-ca-to /etc/kube/ca.crt --github-app-pem-from ~/backend/github/github-app-private-key.pem --github-app-pem-to /etc/github/github-app-private-key.pem"
 
       - name: Health check
         run: |
