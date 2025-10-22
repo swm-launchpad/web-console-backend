@@ -23,7 +23,7 @@ FOR UPDATE;
 -- name: GetContainerBySlug :one
 SELECT *
 FROM CONTAINERS
-WHERE project_id = ? AND slug = ? AND is_deleted = FALSE;
+WHERE slug = ? AND is_deleted = FALSE;
 
 -- name: UpdateContainer :execresult
 UPDATE CONTAINERS SET
@@ -72,7 +72,7 @@ SELECT COUNT(*) as total FROM CONTAINERS WHERE project_id = ? AND is_deleted = F
 SELECT COUNT(*) as total FROM CONTAINERS WHERE template_id = ? AND is_deleted = FALSE;
 
 -- name: ExistsBySlug :one
-SELECT EXISTS(SELECT 1 FROM CONTAINERS WHERE project_id = ? AND slug = ? AND is_deleted = FALSE) as container_exists;
+SELECT EXISTS(SELECT 1 FROM CONTAINERS WHERE slug = ? AND is_deleted = FALSE) as container_exists;
 
 -- name: ExistsByNameAndProjectID :one
 SELECT EXISTS(SELECT 1 FROM CONTAINERS WHERE project_id = ? AND name = ? AND is_deleted = FALSE) as container_exists;

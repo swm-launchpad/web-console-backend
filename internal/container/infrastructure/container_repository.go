@@ -433,15 +433,10 @@ func (r *containerRepository) FindByProjectID(ctx context.Context, projectID uin
 	return containers, nil
 }
 
-func (r *containerRepository) FindBySlug(ctx context.Context, projectID uint, slug string) (*model.Container, error) {
+func (r *containerRepository) FindBySlug(ctx context.Context, slug string) (*model.Container, error) {
 	qtx := r.queriesWithContext(ctx)
 
-	params := sqlc.GetContainerBySlugParams{
-		ProjectID: uint32(projectID),
-		Slug:      slug,
-	}
-
-	sqlcContainer, err := qtx.GetContainerBySlug(ctx, params)
+	sqlcContainer, err := qtx.GetContainerBySlug(ctx, slug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, containererrors.ErrContainerNotFound
@@ -477,13 +472,8 @@ func (r *containerRepository) FindBySlug(ctx context.Context, projectID uint, sl
 	return container, nil
 }
 
-func (r *containerRepository) ExistsBySlug(ctx context.Context, projectID uint, slug string) (bool, error) {
-	params := sqlc.ExistsBySlugParams{
-		ProjectID: uint32(projectID),
-		Slug:      slug,
-	}
-
-	result, err := r.queriesWithContext(ctx).ExistsBySlug(ctx, params)
+func (r *containerRepository) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
+	result, err := r.queriesWithContext(ctx).ExistsBySlug(ctx, slug)
 	if err != nil {
 		return false, containererrors.ErrDatabaseOperation
 	}
