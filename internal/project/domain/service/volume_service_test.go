@@ -33,7 +33,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 		capacity := uint32(1024)
 
 		// Create project with disk limit
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 		diskLimit := uint32(2048)
 		limits, _ := value.NewResourceLimits(100, 128, diskLimit, 128)
@@ -68,7 +68,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 		capacity := uint32(512)
 
 		// Create project with disk limit
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 		diskLimit := uint32(2048)
 		limits, _ := value.NewResourceLimits(100, 128, diskLimit, 128)
@@ -130,7 +130,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 		projectID := uint(1)
 		name := "duplicate-volume"
 
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 
 		mockProjectRepo.On("FindByIDForUpdate", ctx, projectID).Return(project, nil)
@@ -158,7 +158,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 		capacity := uint32(2048)
 
 		// Create project with disk limit
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 		diskLimit := uint32(2048)
 		limits, _ := value.NewResourceLimits(100, 128, diskLimit, 128)
@@ -189,7 +189,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 		capacity := uint32(1024)
 
 		// Create project with explicit disk limit
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 		diskLimit := uint32(2048)
 		limits, _ := value.NewResourceLimits(100, 128, diskLimit, 128)
@@ -279,7 +279,7 @@ func TestVolumeService_ListVolumesByProjectID(t *testing.T) {
 		expectedVolumes := []*model.Volume{volume1, volume2}
 
 		// Project exists check
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project, _ := projectmodel.NewProject("Test Project", *slug, 1, defaultProjectLimits(), nil, nil)
 		project.SetProjectID(projectID)
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
@@ -397,5 +397,111 @@ func TestVolumeService_DeleteVolumesByProjectID(t *testing.T) {
 		assert.Error(t, err)
 
 		mockVolumeRepo.AssertNotCalled(t, "DeleteByProjectID")
+	})
+}
+
+func TestVolumeService_GetVolumeBySlug(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("성공: 유효한 Slug로 볼륨 조회", func(t *testing.T) {
+		mockVolumeRepo := new(repository.MockVolumeRepository)
+		mockProjectRepo := new(repository.MockProjectRepository)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
+
+		slug := "v20250118120000abcd1234"
+		expectedVolume, _ := model.NewVolume(1, "test-volume", 1024)
+		expectedVolume.SetVolumeID(1)
+
+		mockVolumeRepo.On("FindBySlug", ctx, slug).Return(expectedVolume, nil)
+
+		volume, err := service.GetVolumeBySlug(ctx, slug)
+
+		require.NoError(t, err)
+		assert.NotNil(t, volume)
+		assert.Equal(t, expectedVolume, volume)
+
+		mockVolumeRepo.AssertExpectations(t)
+	})
+
+	t.Run("실패: Slug가 너무 짧음 (20자)", func(t *testing.T) {
+		mockVolumeRepo := new(repository.MockVolumeRepository)
+		mockProjectRepo := new(repository.MockProjectRepository)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
+
+		invalidSlug := "v20250118120000abcd" // 20 chars instead of 23
+
+		volume, err := service.GetVolumeBySlug(ctx, invalidSlug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrSlugInvalidLength, err)
+		assert.Nil(t, volume)
+
+		mockVolumeRepo.AssertNotCalled(t, "FindBySlug")
+	})
+
+	t.Run("실패: Slug가 너무 긺 (26자)", func(t *testing.T) {
+		mockVolumeRepo := new(repository.MockVolumeRepository)
+		mockProjectRepo := new(repository.MockProjectRepository)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
+
+		invalidSlug := "v20250118120000abcd123456" // 26 chars instead of 23
+
+		volume, err := service.GetVolumeBySlug(ctx, invalidSlug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrSlugInvalidLength, err)
+		assert.Nil(t, volume)
+
+		mockVolumeRepo.AssertNotCalled(t, "FindBySlug")
+	})
+
+	t.Run("실패: 잘못된 접두사 (p 대신 v)", func(t *testing.T) {
+		mockVolumeRepo := new(repository.MockVolumeRepository)
+		mockProjectRepo := new(repository.MockProjectRepository)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
+
+		invalidSlug := "p20250118120000abcd1234" // Project prefix instead of Volume
+
+		volume, err := service.GetVolumeBySlug(ctx, invalidSlug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrSlugInvalidFormat, err)
+		assert.Nil(t, volume)
+
+		mockVolumeRepo.AssertNotCalled(t, "FindBySlug")
+	})
+
+	t.Run("실패: 잘못된 형식 (타임스탬프 부분에 문자)", func(t *testing.T) {
+		mockVolumeRepo := new(repository.MockVolumeRepository)
+		mockProjectRepo := new(repository.MockProjectRepository)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
+
+		invalidSlug := "v2025abc8120000abcd1234" // Letters in timestamp
+
+		volume, err := service.GetVolumeBySlug(ctx, invalidSlug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrSlugInvalidFormat, err)
+		assert.Nil(t, volume)
+
+		mockVolumeRepo.AssertNotCalled(t, "FindBySlug")
+	})
+
+	t.Run("실패: 볼륨을 찾을 수 없음", func(t *testing.T) {
+		mockVolumeRepo := new(repository.MockVolumeRepository)
+		mockProjectRepo := new(repository.MockProjectRepository)
+		service := NewVolumeService(mockVolumeRepo, mockProjectRepo, &MockVolumeSlugService{})
+
+		slug := "v20250118120000xyz91234"
+
+		mockVolumeRepo.On("FindBySlug", ctx, slug).Return((*model.Volume)(nil), projecterrors.ErrVolumeNotFound)
+
+		volume, err := service.GetVolumeBySlug(ctx, slug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrVolumeNotFound, err)
+		assert.Nil(t, volume)
+
+		mockVolumeRepo.AssertExpectations(t)
 	})
 }

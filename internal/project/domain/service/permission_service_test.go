@@ -26,7 +26,7 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 		projectID := uint(1)
 
 		// Create project with user as owner
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, userID)
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
@@ -109,7 +109,7 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 		projectID := uint(1)
 
 		// Create project with different owner
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1) // Owner is user 1
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
@@ -132,7 +132,7 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 		projectID := uint(1)
 
 		// Create project with owner (only owner role exists)
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, ownerID)
 		// Since only owner role exists, memberID will not be part of the project
 
@@ -160,7 +160,7 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 		projectID := uint(1)
 
 		// Create project with user as owner
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, userID)
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
@@ -182,7 +182,7 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 		projectID := uint(1)
 
 		// Create project with owner (only owner role exists)
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, ownerID)
 		// Since only owner role exists, nonOwnerID will not be part of the project
 
@@ -267,7 +267,7 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 		projectID := uint(1)
 
 		// Create project with different owner
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1) // Owner is user 1
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
@@ -293,7 +293,7 @@ func TestPermissionService_CanUserAddVolume(t *testing.T) {
 		projectID := uint(1)
 
 		// Create project with user as owner
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, userID)
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
@@ -314,7 +314,7 @@ func TestPermissionService_CanUserAddVolume(t *testing.T) {
 		otherUserID := uint(2)
 		projectID := uint(1)
 
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, ownerID)
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
@@ -343,7 +343,7 @@ func TestPermissionService_CanUserRemoveVolume(t *testing.T) {
 		volume, _ := volumemodel.NewVolume(projectID, "test-volume", 1024)
 		volume.SetVolumeID(volumeID)
 
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, userID)
 
 		mockVolumeRepo.On("FindByID", ctx, volumeID).Return(volume, nil)
@@ -400,7 +400,7 @@ func TestPermissionService_CanUserRemoveVolume(t *testing.T) {
 		volume, _ := volumemodel.NewVolume(projectID, "test-volume", 1024)
 		volume.SetVolumeID(volumeID)
 
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, ownerID)
 
 		mockVolumeRepo.On("FindByID", ctx, volumeID).Return(volume, nil)
@@ -431,7 +431,7 @@ func TestPermissionService_CanUserAccessVolume(t *testing.T) {
 		volume, _ := volumemodel.NewVolume(projectID, "test-volume", 1024)
 		volume.SetVolumeID(volumeID)
 
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, userID)
 
 		mockVolumeRepo.On("FindByID", ctx, volumeID).Return(volume, nil)
@@ -488,7 +488,7 @@ func TestPermissionService_CanUserAccessVolume(t *testing.T) {
 		volume, _ := volumemodel.NewVolume(projectID, "test-volume", 1024)
 		volume.SetVolumeID(volumeID)
 
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, ownerID)
 
 		mockVolumeRepo.On("FindByID", ctx, volumeID).Return(volume, nil)
