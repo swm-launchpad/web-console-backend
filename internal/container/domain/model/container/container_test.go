@@ -25,7 +25,7 @@ func defaultResourceLimits() value.ResourceLimits {
 func TestNewContainer_Success(t *testing.T) {
 	projectID := uint(1)
 	name := "Backend API"
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	gitConfig := defaultGitConfig()
 	resourceLimits := defaultResourceLimits()
 
@@ -48,7 +48,7 @@ func TestNewContainer_Success(t *testing.T) {
 func TestNewContainer_WithTemplate(t *testing.T) {
 	projectID := uint(1)
 	name := "Backend API"
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	gitConfig := defaultGitConfig()
 	resourceLimits := defaultResourceLimits()
 	templateID := uint(10)
@@ -66,7 +66,7 @@ func TestNewContainer_WithTemplate(t *testing.T) {
 }
 
 func TestNewContainer_InvalidInputs(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	gitConfig := defaultGitConfig()
 	resourceLimits := defaultResourceLimits()
 
@@ -83,9 +83,9 @@ func TestNewContainer_InvalidInputs(t *testing.T) {
 	})
 
 	t.Run("Name too long", func(t *testing.T) {
-		longName := string(make([]byte, 101))
-		for range longName {
-			longName = "a" + longName[1:]
+		longName := string(make([]byte, 256))
+		for i := range longName {
+			longName = longName[:i] + "a" + longName[i+1:]
 		}
 		container, err := NewContainer(1, longName, slug, gitConfig, resourceLimits, nil, nil, nil)
 		assert.ErrorIs(t, err, containererrors.ErrNameTooLong)
@@ -94,7 +94,7 @@ func TestNewContainer_InvalidInputs(t *testing.T) {
 }
 
 func TestContainer_SetContainerID(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 
 	assert.Equal(t, uint(0), container.ContainerID())
@@ -109,7 +109,7 @@ func TestContainer_SetContainerID(t *testing.T) {
 }
 
 func TestContainer_AddEnvVar(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 	container.SetContainerID(1)
 
@@ -140,7 +140,7 @@ func TestContainer_AddEnvVar(t *testing.T) {
 }
 
 func TestContainer_UpdateEnvVar(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 	container.SetContainerID(1)
 	_, _ = container.AddEnvVar("APP_ENV", "production")
@@ -160,7 +160,7 @@ func TestContainer_UpdateEnvVar(t *testing.T) {
 }
 
 func TestContainer_DeleteEnvVar(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 	container.SetContainerID(1)
 	_, _ = container.AddEnvVar("APP_ENV", "production")
@@ -181,7 +181,7 @@ func TestContainer_DeleteEnvVar(t *testing.T) {
 }
 
 func TestContainer_AddNetwork(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 	container.SetContainerID(1)
 
@@ -217,7 +217,7 @@ func TestContainer_AddNetwork(t *testing.T) {
 }
 
 func TestContainer_DeleteNetwork(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 	container.SetContainerID(1)
 
@@ -242,7 +242,7 @@ func TestContainer_DeleteNetwork(t *testing.T) {
 }
 
 func TestContainer_UpdateGitConfig(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 
 	newGitConfig, _ := value.NewGitConfig("https://github.com/user/new-repo.git", "develop", nil)
@@ -254,7 +254,7 @@ func TestContainer_UpdateGitConfig(t *testing.T) {
 }
 
 func TestContainer_UpdateResourceLimits(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 
 	newCPU := uint32(2000)
@@ -268,7 +268,7 @@ func TestContainer_UpdateResourceLimits(t *testing.T) {
 }
 
 func TestContainer_UpdateTemplateConfig(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 
 	templateID := uint(10)
@@ -285,7 +285,7 @@ func TestContainer_UpdateTemplateConfig(t *testing.T) {
 }
 
 func TestContainer_SoftDelete(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
 
 	t.Run("Success", func(t *testing.T) {
@@ -307,7 +307,7 @@ func TestReconstructContainer(t *testing.T) {
 	containerID := uint(100)
 	projectID := uint(1)
 	name := "Backend API"
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	gitConfig := defaultGitConfig()
 	resourceLimits := defaultResourceLimits()
 
@@ -344,7 +344,7 @@ func TestReconstructContainer_WithGitHubInstallationID(t *testing.T) {
 	containerID := uint(100)
 	projectID := uint(1)
 	name := "Backend API"
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	gitConfig := defaultGitConfig()
 	resourceLimits := defaultResourceLimits()
 	githubInstallationID := int64(12345)
@@ -382,7 +382,7 @@ func TestReconstructContainer_WithGitHubInstallationID(t *testing.T) {
 func TestNewContainer_WithGitHubInstallationID(t *testing.T) {
 	projectID := uint(1)
 	name := "Backend API"
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 	gitConfig := defaultGitConfig()
 	resourceLimits := defaultResourceLimits()
 	githubInstallationID := int64(12345)
@@ -407,7 +407,7 @@ func TestNewContainer_WithGitHubInstallationID(t *testing.T) {
 }
 
 func TestContainer_SetGitHubInstallationID(t *testing.T) {
-	slug, _ := value.NewContainerSlug("backend-api")
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
 
 	// Create a container without GitHub installation ID
 	container, err := NewContainer(

@@ -57,43 +57,54 @@ func TestNewVolume(t *testing.T) {
 		assert.Equal(t, "volume1", volume.Name())
 	})
 
-	t.Run("실패: 대문자로 시작하는 이름", func(t *testing.T) {
+	t.Run("성공: 대문자로 시작하는 이름 (디스플레이용)", func(t *testing.T) {
 		volume, err := NewVolume(1, "Data-volume", 512)
 
-		assert.Nil(t, volume)
-		assert.Equal(t, projecterrors.ErrInvalidVolumeName, err)
+		assert.NotNil(t, volume)
+		assert.NoError(t, err)
 	})
 
-	t.Run("실패: 숫자로 시작하는 이름", func(t *testing.T) {
+	t.Run("성공: 숫자로 시작하는 이름 (디스플레이용)", func(t *testing.T) {
 		volume, err := NewVolume(1, "1-volume", 512)
 
-		assert.Nil(t, volume)
-		assert.Equal(t, projecterrors.ErrInvalidVolumeName, err)
+		assert.NotNil(t, volume)
+		assert.NoError(t, err)
 	})
 
-	t.Run("실패: 하이픈으로 시작하는 이름", func(t *testing.T) {
+	t.Run("성공: 하이픈으로 시작하는 이름 (디스플레이용)", func(t *testing.T) {
 		volume, err := NewVolume(1, "-volume", 512)
 
-		assert.Nil(t, volume)
-		assert.Equal(t, projecterrors.ErrInvalidVolumeName, err)
+		assert.NotNil(t, volume)
+		assert.NoError(t, err)
 	})
 
-	t.Run("실패: 하이픈으로 끝나는 이름", func(t *testing.T) {
+	t.Run("성공: 하이픈으로 끝나는 이름 (디스플레이용)", func(t *testing.T) {
 		volume, err := NewVolume(1, "volume-", 512)
 
-		assert.Nil(t, volume)
-		assert.Equal(t, projecterrors.ErrInvalidVolumeName, err)
+		assert.NotNil(t, volume)
+		assert.NoError(t, err)
 	})
 
-	t.Run("실패: 특수문자 포함 이름", func(t *testing.T) {
+	t.Run("성공: 특수문자 포함 이름 (디스플레이용)", func(t *testing.T) {
 		volume, err := NewVolume(1, "data_volume", 512)
 
-		assert.Nil(t, volume)
-		assert.Equal(t, projecterrors.ErrInvalidVolumeName, err)
+		assert.NotNil(t, volume)
+		assert.NoError(t, err)
 	})
 
-	t.Run("실패: 대문자 포함 이름", func(t *testing.T) {
+	t.Run("성공: 대문자 포함 이름 (디스플레이용)", func(t *testing.T) {
 		volume, err := NewVolume(1, "dataVolume", 512)
+
+		assert.NotNil(t, volume)
+		assert.NoError(t, err)
+	})
+
+	t.Run("실패: 이름이 255자 초과", func(t *testing.T) {
+		longName := string(make([]byte, 256))
+		for i := range longName {
+			longName = longName[:i] + "a" + longName[i+1:]
+		}
+		volume, err := NewVolume(1, longName, 512)
 
 		assert.Nil(t, volume)
 		assert.Equal(t, projecterrors.ErrInvalidVolumeName, err)
