@@ -10,7 +10,7 @@ var (
 	ErrProjectAlreadyExists = errors.New("project already exists")
 	ErrProjectNameExists    = errors.New("project name already exists for this user")
 	ErrProjectUserNotFound  = errors.New("project user not found")
-	ErrSlugAlreadyExists    = errors.New("slug already exists")
+	ErrSlugAlreadyExists    = errors.New("slug already exists (globally unique)")
 )
 
 // Domain errors - business logic violations and domain rule errors
@@ -36,13 +36,16 @@ var (
 
 // Validation errors - input validation and data integrity errors
 var (
-	ErrNameRequired      = errors.New("project name is required")
-	ErrSlugRequired      = errors.New("project slug is required")
-	ErrInvalidSlug       = errors.New("invalid project slug")
-	ErrSlugTooShort      = errors.New("slug must be at least 3 characters long")
+	ErrNameRequired = errors.New("project name is required")
+	ErrNameTooLong  = errors.New("project name must not exceed 255 characters")
+	ErrSlugRequired = errors.New("project slug is required")
+	ErrInvalidSlug  = errors.New("invalid project slug")
+	// Deprecated: ErrSlugTooShort is unreachable with fixed 23-character slug format. Use ErrSlugInvalidLength instead.
+	ErrSlugTooShort = errors.New("slug must be at least 3 characters long")
+	// Deprecated: ErrSlugTooLong is unreachable with fixed 23-character slug format. Use ErrSlugInvalidLength instead.
 	ErrSlugTooLong       = errors.New("slug must not exceed 63 characters")
 	ErrSlugInvalidLength = errors.New("slug must be exactly 23 characters")
-	ErrSlugInvalidFormat = errors.New("slug can only contain lowercase letters, numbers, and hyphens")
+	ErrSlugInvalidFormat = errors.New("slug must follow format: p{timestamp}{random} (23 characters total)")
 	ErrSlugReserved      = errors.New("slug is reserved")
 	ErrInvalidProjectID  = errors.New("invalid project ID")
 	ErrInvalidUserID     = errors.New("invalid user ID")
@@ -83,7 +86,7 @@ var (
 var (
 	ErrVolumeNotFound         = errors.New("volume not found")
 	ErrVolumeNameRequired     = errors.New("volume name is required")
-	ErrInvalidVolumeName      = errors.New("volume name must start with lowercase letter, contain only lowercase letters, numbers, and hyphens, and end with lowercase letter or number")
+	ErrInvalidVolumeName      = errors.New("volume name must not exceed 255 characters")
 	ErrInvalidVolumeID        = errors.New("invalid volume ID")
 	ErrInvalidCapacity        = errors.New("invalid volume capacity")
 	ErrVolumeCapacityTooSmall = errors.New("volume capacity must be at least 128Mi")

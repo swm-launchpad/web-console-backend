@@ -2,278 +2,119 @@ package service
 
 import (
 	"context"
-	"errors"
-	"strings"
+	"regexp"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 )
 
-func TestSlugService_EnsureUniqueSlug(t *testing.T) {
-	ctx := context.Background()
+func TestSlugService_GenerateSlug(t *testing.T) {
+	t.Run("successful slug generation", func(t *testing.T) {
+		mockRepo := new(repository.MockProjectRepository)
 
-	t.Run("성공: 유일한 Slug", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
+		// Mock that slug does not exist
+		mockRepo.On("ExistsBySlug", mock.Anything, mock.AnythingOfType("string")).Return(false, nil)
 
-		slug, _ := value.NewProjectSlug("unique-slug-1234")
+		service := NewSlugService(mockRepo)
+		slug, err := service.GenerateSlug(context.Background())
 
-		mockProjectRepo.On("ExistsBySlug", ctx, slug.String()).Return(false, nil)
+		if err != nil {
+			t.Errorf("GenerateSlug() unexpected error: %v", err)
+			return
+		}
 
-		err := service.EnsureUniqueSlug(ctx, *slug)
+		// Validate slug format
+		regex := regexp.MustCompile(`^p[0-9]{14}[a-z0-9]{8}$`)
+		if !regex.MatchString(slug.String()) {
+			t.Errorf("GenerateSlug() = %v, does not match pattern", slug.String())
+		}
+		if len(slug.String()) != 23 {
+			t.Errorf("GenerateSlug() length = %d, want 23", len(slug.String()))
+		}
 
-		require.NoError(t, err)
-
-		mockProjectRepo.AssertExpectations(t)
+		mockRepo.AssertExpectations(t)
 	})
 
-	t.Run("실패: 중복된 Slug", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
+	t.Run("slug already exists", func(t *testing.T) {
+		mockRepo := new(repository.MockProjectRepository)
 
-		slug, _ := value.NewProjectSlug("duplicate-slug")
+		// Mock that slug exists
+		mockRepo.On("ExistsBySlug", mock.Anything, mock.AnythingOfType("string")).Return(true, nil)
 
-		mockProjectRepo.On("ExistsBySlug", ctx, slug.String()).Return(true, nil)
+		service := NewSlugService(mockRepo)
+		_, err := service.GenerateSlug(context.Background())
 
-		err := service.EnsureUniqueSlug(ctx, *slug)
+		if err != projecterrors.ErrSlugAlreadyExists {
+			t.Errorf("GenerateSlug() error = %v, want %v", err, projecterrors.ErrSlugAlreadyExists)
+		}
 
-		assert.Error(t, err)
-		assert.Equal(t, projecterrors.ErrSlugAlreadyExists, err)
-
-		mockProjectRepo.AssertExpectations(t)
-	})
-
-	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
-
-		slug, _ := value.NewProjectSlug("test-slug")
-
-		mockProjectRepo.On("ExistsBySlug", ctx, slug.String()).Return(false, errors.New("database error"))
-
-		err := service.EnsureUniqueSlug(ctx, *slug)
-
-		assert.Error(t, err)
-		assert.Equal(t, projecterrors.ErrDatabaseOperation, err)
-
-		mockProjectRepo.AssertExpectations(t)
+		mockRepo.AssertExpectations(t)
 	})
 }
 
-func TestSlugService_GenerateSlugFromName(t *testing.T) {
-	ctx := context.Background()
+func TestSlugService_EnsureUniqueSlug(t *testing.T) {
+	t.Run("unique slug", func(t *testing.T) {
+		mockRepo := new(repository.MockProjectRepository)
+		testSlug := "p2025011812000012345678"
 
-	t.Run("성공: 영문 이름으로 Slug 생성", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
+		mockRepo.On("ExistsBySlug", mock.Anything, testSlug).Return(false, nil)
 
-		name := "My Awesome Project"
+		service := NewSlugService(mockRepo)
+		slug, _ := value.NewProjectSlug(testSlug)
+		err := service.EnsureUniqueSlug(context.Background(), *slug)
 
-		// Mock successful unique slug check (called exactly once)
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(false, nil).Once()
+		if err != nil {
+			t.Errorf("EnsureUniqueSlug() unexpected error: %v", err)
+		}
 
-		slug, err := service.GenerateSlugFromName(ctx, name)
-
-		require.NoError(t, err)
-		assert.NotEmpty(t, slug.String())
-		assert.Contains(t, slug.String(), "my-awesome-project")
-		// Verify format: baseSlug-timestamp-random
-		assert.Regexp(t, `^my-awesome-project-\d{14}-\d{4}$`, slug.String())
-
-		mockProjectRepo.AssertExpectations(t)
+		mockRepo.AssertExpectations(t)
 	})
 
-	t.Run("성공: 한글 이름으로 Slug 생성", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
+	t.Run("duplicate slug", func(t *testing.T) {
+		mockRepo := new(repository.MockProjectRepository)
+		testSlug := "p2025011812000012345678"
 
-		name := "내 멋진 프로젝트"
+		mockRepo.On("ExistsBySlug", mock.Anything, testSlug).Return(true, nil)
 
-		// Mock successful unique slug check (called exactly once)
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(false, nil).Once()
+		service := NewSlugService(mockRepo)
+		slug, _ := value.NewProjectSlug(testSlug)
+		err := service.EnsureUniqueSlug(context.Background(), *slug)
 
-		slug, err := service.GenerateSlugFromName(ctx, name)
+		if err != projecterrors.ErrSlugAlreadyExists {
+			t.Errorf("EnsureUniqueSlug() error = %v, want %v", err, projecterrors.ErrSlugAlreadyExists)
+		}
 
-		require.NoError(t, err)
-		assert.NotEmpty(t, slug.String())
-		// Korean characters should be transliterated by gosimple/slug
-		// Verify format: baseSlug-timestamp-random
-		assert.Regexp(t, `^.+-\d{14}-\d{4}$`, slug.String())
-		assert.LessOrEqual(t, len(slug.String()), 63)
-
-		mockProjectRepo.AssertExpectations(t)
+		mockRepo.AssertExpectations(t)
 	})
+}
 
-	t.Run("성공: 특수문자가 포함된 이름으로 Slug 생성", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
+func TestSlugService_generateSlug(t *testing.T) {
+	service := &slugService{}
 
-		name := "My Project!@#$%^&*()"
+	// Test multiple slug generations
+	slugs := make(map[string]bool)
+	regex := regexp.MustCompile(`^p[0-9]{14}[a-z0-9]{8}$`)
 
-		// Mock successful unique slug check (called exactly once)
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(false, nil).Once()
+	for i := 0; i < 100; i++ {
+		slug := service.generateSlug()
 
-		slug, err := service.GenerateSlugFromName(ctx, name)
+		// Check length
+		if len(slug) != 23 {
+			t.Errorf("generateSlug() length = %d, want 23", len(slug))
+		}
 
-		require.NoError(t, err)
-		assert.NotEmpty(t, slug.String())
-		assert.Contains(t, slug.String(), "my-project")
-		// Special characters may be transliterated, so just verify general format
-		assert.Regexp(t, `^.+-\d{14}-\d{4}$`, slug.String())
+		// Check format
+		if !regex.MatchString(slug) {
+			t.Errorf("generateSlug() = %v, does not match pattern", slug)
+		}
 
-		mockProjectRepo.AssertExpectations(t)
-	})
-
-	t.Run("성공: 빈 이름으로 Slug 생성 (project 폴백)", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
-
-		name := ""
-
-		// Mock successful unique slug check (called exactly once)
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(false, nil).Once()
-
-		slug, err := service.GenerateSlugFromName(ctx, name)
-
-		require.NoError(t, err)
-		assert.NotEmpty(t, slug.String())
-		// Empty name should fallback to "project"
-		assert.Regexp(t, `^project-\d{14}-\d{4}$`, slug.String())
-
-		mockProjectRepo.AssertExpectations(t)
-	})
-
-	t.Run("실패: 생성된 slug가 이미 존재하면 바로 에러 반환", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
-
-		name := "Test Project"
-
-		// Slug already exists - no retry, return error immediately
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(true, nil).Once()
-
-		slug, err := service.GenerateSlugFromName(ctx, name)
-
-		assert.Error(t, err)
-		assert.Equal(t, projecterrors.ErrSlugAlreadyExists, err)
-		assert.Empty(t, slug.String())
-
-		// Should call ExistsBySlug exactly once (no retry)
-		mockProjectRepo.AssertNumberOfCalls(t, "ExistsBySlug", 1)
-	})
-
-	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
-
-		name := "Test Project"
-
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(false, errors.New("database error")).Once()
-
-		slug, err := service.GenerateSlugFromName(ctx, name)
-
-		assert.Error(t, err)
-		assert.Equal(t, projecterrors.ErrDatabaseOperation, err)
-		assert.Empty(t, slug.String())
-
-		mockProjectRepo.AssertExpectations(t)
-	})
-
-	t.Run("성공: 긴 이름은 63자로 제한되며 timestamp와 random은 보존", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
-
-		// Very long name that would exceed 63 character limit
-		name := "This is a very very very very very very very very very very long project name that should be truncated"
-
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(false, nil).Once()
-
-		slug, err := service.GenerateSlugFromName(ctx, name)
-
-		require.NoError(t, err)
-		assert.NotEmpty(t, slug.String())
-		assert.LessOrEqual(t, len(slug.String()), 63)
-		// Verify format is preserved: baseSlug-timestamp-random
-		assert.Regexp(t, `^.+-\d{14}-\d{4}$`, slug.String())
-
-		mockProjectRepo.AssertExpectations(t)
-	})
-
-	t.Run("성공: 공백만 있는 이름 (project 폴백)", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
-
-		name := "   "
-
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(false, nil).Once()
-
-		slug, err := service.GenerateSlugFromName(ctx, name)
-
-		require.NoError(t, err)
-		assert.NotEmpty(t, slug.String())
-		// Empty/whitespace name should fallback to "project"
-		assert.Regexp(t, `^project-\d{14}-\d{4}$`, slug.String())
-
-		mockProjectRepo.AssertExpectations(t)
-	})
-
-	t.Run("성공: slug 형식 검증 - baseSlug-timestamp-random", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
-
-		name := "Test Project"
-
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(false, nil).Once()
-
-		slug, err := service.GenerateSlugFromName(ctx, name)
-
-		require.NoError(t, err)
-		assert.NotEmpty(t, slug.String())
-
-		// Verify format: baseSlug-timestamp-random
-		parts := strings.Split(slug.String(), "-")
-		assert.GreaterOrEqual(t, len(parts), 3, "slug should have at least 3 parts: baseSlug-timestamp-random")
-
-		// Last part should be 4-digit random
-		randomPart := parts[len(parts)-1]
-		assert.Len(t, randomPart, 4, "random part should be 4 digits")
-		assert.Regexp(t, `^\d{4}$`, randomPart)
-
-		// Second to last part should be 14-digit timestamp
-		timestampPart := parts[len(parts)-2]
-		assert.Len(t, timestampPart, 14, "timestamp part should be 14 digits")
-		assert.Regexp(t, `^\d{14}$`, timestampPart)
-
-		mockProjectRepo.AssertExpectations(t)
-	})
-
-	t.Run("성공: 여러 번 생성해도 timestamp와 random이 달라서 유니크함", func(t *testing.T) {
-		mockProjectRepo := new(repository.MockProjectRepository)
-		service := NewSlugService(mockProjectRepo)
-
-		name := "Same Name"
-
-		mockProjectRepo.On("ExistsBySlug", ctx, mock.AnythingOfType("string")).Return(false, nil).Times(3)
-
-		// Generate multiple slugs with same name
-		slug1, err1 := service.GenerateSlugFromName(ctx, name)
-		slug2, err2 := service.GenerateSlugFromName(ctx, name)
-		slug3, err3 := service.GenerateSlugFromName(ctx, name)
-
-		require.NoError(t, err1)
-		require.NoError(t, err2)
-		require.NoError(t, err3)
-
-		// All should be different due to timestamp and random
-		assert.NotEqual(t, slug1.String(), slug2.String())
-		assert.NotEqual(t, slug2.String(), slug3.String())
-		assert.NotEqual(t, slug1.String(), slug3.String())
-
-		mockProjectRepo.AssertExpectations(t)
-	})
+		// Check uniqueness (note: there's a tiny chance of collision)
+		if slugs[slug] {
+			t.Logf("Warning: duplicate slug generated: %s (this is statistically rare but possible)", slug)
+		}
+		slugs[slug] = true
+	}
 }

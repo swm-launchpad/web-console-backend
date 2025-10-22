@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/gosimple/slug"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
@@ -17,10 +16,10 @@ type SlugService interface {
 	// EnsureUniqueSlug validates that a slug is unique in the system
 	EnsureUniqueSlug(ctx context.Context, slug value.ProjectSlug) error
 
-	// GenerateSlugFromName generates a slug from project name with timestamp and random suffix
-	// Format: {baseSlug}-{timestamp}-{random}
-	// Uses gosimple/slug for Unicode transliteration (supports Korean)
-	GenerateSlugFromName(ctx context.Context, name string) (value.ProjectSlug, error)
+	// GenerateSlug generates a unique slug for a project
+	// Format: p{timestamp}{random} (23 characters fixed)
+	// Example: p2025011812000012345678
+	GenerateSlug(ctx context.Context) (value.ProjectSlug, error)
 }
 
 // slugService is the concrete implementation of SlugService
@@ -49,12 +48,13 @@ func (s *slugService) EnsureUniqueSlug(ctx context.Context, slug value.ProjectSl
 	return nil
 }
 
-// GenerateSlugFromName generates a slug from project name with timestamp and random suffix
-// Format: {baseSlug}-{timestamp}-{random}
+// GenerateSlug generates a unique slug for a project
+// Format: p{timestamp}{random} (23 characters fixed)
+// Example: p2025011812000012345678
 // No retry logic - returns error immediately if slug already exists
-func (s *slugService) GenerateSlugFromName(ctx context.Context, name string) (value.ProjectSlug, error) {
+func (s *slugService) GenerateSlug(ctx context.Context) (value.ProjectSlug, error) {
 	// Generate slug with timestamp and random suffix
-	generatedSlug := s.generateSlugFromName(name)
+	generatedSlug := s.generateSlug()
 
 	// Validate slug format
 	slugModel, err := value.NewProjectSlug(generatedSlug)
@@ -71,54 +71,35 @@ func (s *slugService) GenerateSlugFromName(ctx context.Context, name string) (va
 	return *slugModel, nil
 }
 
-// generateSlugFromName generates a slug from project name using gosimple/slug library
-// Format: {baseSlug}-{timestamp}-{random}
-// - baseSlug: transliterated from name using gosimple/slug (supports Korean)
+// generateSlug generates a slug in the format: p{timestamp}{random}
+// - p: prefix (1 character)
 // - timestamp: YYYYMMDDHHMMSS (14 digits)
-// - random: 4 digits (1000-9999)
-// - Max length: 63 characters (subdomain constraint)
-func (s *slugService) generateSlugFromName(name string) string {
-	// Use the slug library to handle Unicode transliteration (including Korean)
-	baseSlug := slug.Make(name)
-
-	// If the slug is empty, use "project" as fallback
-	if baseSlug == "" {
-		baseSlug = "project"
-	}
-
+// - random: lowercase alphanumeric (8 characters)
+// - Total: 23 characters (fixed)
+func (s *slugService) generateSlug() string {
 	// Generate timestamp (14 digits: YYYYMMDDHHMMSS)
 	timestamp := time.Now().Format("20060102150405")
 
-	// Generate random 4-digit suffix
+	// Generate random 8-character suffix (lowercase alphanumeric)
 	randomSuffix := s.generateRandomSuffix()
 
-	// Combine: baseSlug-timestamp-random
-	generatedSlug := fmt.Sprintf("%s-%s-%s", baseSlug, timestamp, randomSuffix)
-
-	// Limit length to 63 characters (subdomain constraint)
-	if len(generatedSlug) > 63 {
-		// timestamp(14) + random(4) + hyphens(2) = 20 characters needed
-		maxBaseLength := 63 - 20
-		if maxBaseLength > 0 && len(baseSlug) > maxBaseLength {
-			baseSlug = baseSlug[:maxBaseLength]
-			// Remove trailing hyphen if exists
-			for len(baseSlug) > 0 && baseSlug[len(baseSlug)-1] == '-' {
-				baseSlug = baseSlug[:len(baseSlug)-1]
-			}
-			generatedSlug = fmt.Sprintf("%s-%s-%s", baseSlug, timestamp, randomSuffix)
-		}
-	}
-
-	return generatedSlug
+	// Combine: p + timestamp + random
+	return fmt.Sprintf("p%s%s", timestamp, randomSuffix)
 }
 
-// generateRandomSuffix generates a random suffix for slug uniqueness
+// generateRandomSuffix generates an 8-character lowercase alphanumeric random suffix
 func (s *slugService) generateRandomSuffix() string {
 	// Create a new random source with current time as seed
 	source := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(source)
 
-	// Generate 4-digit random number (1000-9999)
-	randomNum := r.Intn(9000) + 1000
-	return fmt.Sprintf("%d", randomNum)
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	const length = 8
+
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		result[i] = chars[r.Intn(len(chars))]
+	}
+
+	return string(result)
 }
