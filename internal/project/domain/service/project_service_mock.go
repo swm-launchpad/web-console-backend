@@ -28,6 +28,14 @@ func (m *MockProjectService) GetProject(ctx context.Context, projectID uint) (*m
 	return args.Get(0).(*model.Project), args.Error(1)
 }
 
+func (m *MockProjectService) GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error) {
+	args := m.Called(ctx, slug)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Project), args.Error(1)
+}
+
 func (m *MockProjectService) UpdateProject(ctx context.Context, projectID uint, updateFn func(*model.Project) error) (*model.Project, error) {
 	args := m.Called(ctx, projectID, updateFn)
 	if args.Get(0) == nil {
@@ -36,8 +44,21 @@ func (m *MockProjectService) UpdateProject(ctx context.Context, projectID uint, 
 	return args.Get(0).(*model.Project), args.Error(1)
 }
 
+func (m *MockProjectService) UpdateProjectBySlug(ctx context.Context, slug string, updateFn func(*model.Project) error) (*model.Project, error) {
+	args := m.Called(ctx, slug, updateFn)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Project), args.Error(1)
+}
+
 func (m *MockProjectService) DeleteProject(ctx context.Context, projectID uint) error {
 	args := m.Called(ctx, projectID)
+	return args.Error(0)
+}
+
+func (m *MockProjectService) DeleteProjectBySlug(ctx context.Context, slug string) error {
+	args := m.Called(ctx, slug)
 	return args.Error(0)
 }
 

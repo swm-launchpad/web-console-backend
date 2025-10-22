@@ -19,11 +19,20 @@ type ProjectService interface {
 	// GetProject retrieves a project by ID
 	GetProject(ctx context.Context, projectID uint) (*model.Project, error)
 
+	// GetProjectBySlug retrieves a project by slug
+	GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error)
+
 	// UpdateProject updates an existing project
 	UpdateProject(ctx context.Context, projectID uint, updateFn func(*model.Project) error) (*model.Project, error)
 
+	// UpdateProjectBySlug updates an existing project by slug
+	UpdateProjectBySlug(ctx context.Context, slug string, updateFn func(*model.Project) error) (*model.Project, error)
+
 	// DeleteProject soft deletes a project
 	DeleteProject(ctx context.Context, projectID uint) error
+
+	// DeleteProjectBySlug soft deletes a project by slug
+	DeleteProjectBySlug(ctx context.Context, slug string) error
 
 	// ListProjects retrieves all projects for a user
 	ListProjects(ctx context.Context, userID uint) ([]*model.Project, error)
@@ -62,8 +71,8 @@ func (s *projectService) CreateProject(ctx context.Context, name string, ownerID
 		return nil, projecterrors.ErrProjectNameExists
 	}
 
-	// Generate slug from name
-	slug, err := s.slugService.GenerateSlugFromName(ctx, name)
+	// Generate slug
+	slug, err := s.slugService.GenerateSlug(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +106,24 @@ func (s *projectService) GetProject(ctx context.Context, projectID uint) (*model
 	return project, nil
 }
 
+// GetProjectBySlug retrieves a project by slug
+func (s *projectService) GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error) {
+	// Validate slug format before repository lookup
+	// This returns ErrSlugInvalidFormat for malformed slugs (wrong length/prefix)
+	// which maps to 400 Bad Request instead of 404 Not Found
+	_, err := value.NewProjectSlug(slug)
+	if err != nil {
+		return nil, err
+	}
+
+	project, err := s.projectRepo.FindBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
 // UpdateProject updates an existing project
 func (s *projectService) UpdateProject(ctx context.Context, projectID uint, updateFn func(*model.Project) error) (*model.Project, error) {
 	if projectID == 0 {
@@ -122,6 +149,31 @@ func (s *projectService) UpdateProject(ctx context.Context, projectID uint, upda
 	return project, nil
 }
 
+// UpdateProjectBySlug updates an existing project by slug
+func (s *projectService) UpdateProjectBySlug(ctx context.Context, slug string, updateFn func(*model.Project) error) (*model.Project, error) {
+	if slug == "" {
+		return nil, projecterrors.ErrInvalidSlug
+	}
+
+	// Retrieve the project
+	project, err := s.projectRepo.FindBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply the update function
+	if err := updateFn(project); err != nil {
+		return nil, err
+	}
+
+	// Save the updated project
+	if err := s.projectRepo.Save(ctx, project); err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
 // DeleteProject soft deletes a project
 func (s *projectService) DeleteProject(ctx context.Context, projectID uint) error {
 	if projectID == 0 {
@@ -130,6 +182,31 @@ func (s *projectService) DeleteProject(ctx context.Context, projectID uint) erro
 
 	// Retrieve the project
 	project, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		return err
+	}
+
+	// Soft delete the project (also deletes all active users)
+	if err := project.SoftDelete(); err != nil {
+		return err
+	}
+
+	// Save the deleted state
+	if err := s.projectRepo.Save(ctx, project); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteProjectBySlug soft deletes a project by slug
+func (s *projectService) DeleteProjectBySlug(ctx context.Context, slug string) error {
+	if slug == "" {
+		return projecterrors.ErrInvalidSlug
+	}
+
+	// Retrieve the project
+	project, err := s.projectRepo.FindBySlug(ctx, slug)
 	if err != nil {
 		return err
 	}
