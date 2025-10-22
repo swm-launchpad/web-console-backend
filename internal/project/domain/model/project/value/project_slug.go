@@ -2,61 +2,40 @@ package value
 
 import (
 	"regexp"
-	"strings"
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
-// ProjectSlug represents a validated project slug as a value object
+// ProjectSlug represents a URL-friendly project identifier
+// It is a value object that encapsulates slug validation rules
 type ProjectSlug struct {
 	value string
 }
 
 const (
-	slugMinLength = 3
-	slugMaxLength = 63
+	// ProjectSlugLength is the fixed length for project slugs
+	ProjectSlugLength = 23
 )
 
-var (
-	// slugRegex validates slug format: lowercase letters, numbers, and hyphens
-	// Must start with a letter, cannot end with hyphen, no consecutive hyphens
-	slugRegex = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
-)
+var projectSlugRegex = regexp.MustCompile(`^p[0-9]{14}[a-z0-9]{8}$`)
 
 // NewProjectSlug creates a new ProjectSlug with validation
+// Validation rules:
+// - Length: exactly 23 characters
+// - Format: p{timestamp}{random} where timestamp is 14 digits (YYYYMMDDHHMMSS) and random is 8 alphanumeric chars
+// - Example: p2025011812000012345678
 func NewProjectSlug(slug string) (*ProjectSlug, error) {
-	// Convert to lowercase
-	slug = strings.ToLower(strings.TrimSpace(slug))
-
-	ps := &ProjectSlug{value: slug}
-	if err := ps.validate(); err != nil {
-		return nil, err
+	// Length validation
+	if len(slug) != ProjectSlugLength {
+		return nil, projecterrors.ErrSlugInvalidLength
 	}
 
-	return ps, nil
-}
-
-// validate validates the slug format and constraints
-func (s *ProjectSlug) validate() error {
-	// Check if empty
-	if s.value == "" {
-		return projecterrors.ErrSlugRequired
+	// Format validation
+	if !projectSlugRegex.MatchString(slug) {
+		return nil, projecterrors.ErrSlugInvalidFormat
 	}
 
-	// Check length constraints
-	if len(s.value) < slugMinLength {
-		return projecterrors.ErrSlugTooShort
-	}
-	if len(s.value) > slugMaxLength {
-		return projecterrors.ErrSlugTooLong
-	}
-
-	// Check format
-	if !slugRegex.MatchString(s.value) {
-		return projecterrors.ErrSlugInvalidFormat
-	}
-
-	return nil
+	return &ProjectSlug{value: slug}, nil
 }
 
 // String returns the string representation of the slug
