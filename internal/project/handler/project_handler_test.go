@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -36,6 +35,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
 		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
 		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService)
@@ -43,6 +43,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
+			getBySlugUseCase,
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
@@ -56,7 +57,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		// Mock expectations
 		mockProjectService.On("CountProjectsByUserID", ctx, userID).Return(0, nil)
 
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		project := createTestProject(uint(1), projectName, *slug, userID)
 
 		// MVP 정책으로 강제 적용되는 리소스 제한
@@ -105,7 +106,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		data := response["data"].(map[string]interface{})
 		assert.Equal(t, float64(1), data["project_id"])
 		assert.Equal(t, projectName, data["name"])
-		assert.Equal(t, "test-project-1234", data["slug"])
+		assert.Equal(t, "p2025011812000012345678", data["slug"])
 
 		// MVP 정책: FQDN과 Plan이 null이어야 함
 		assert.Empty(t, data["fqdn"])
@@ -130,6 +131,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
 		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
 		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService)
@@ -137,6 +139,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
+			getBySlugUseCase,
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
@@ -172,6 +175,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
 		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
 		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService)
@@ -179,6 +183,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
+			getBySlugUseCase,
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
@@ -240,6 +245,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
 		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
 		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService)
@@ -247,6 +253,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
+			getBySlugUseCase,
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
@@ -257,21 +264,21 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		userID := uint(1)
 		projectID := uint(1)
 
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, userID)
 
-		mockProjectService.On("GetProject", ctx, projectID).Return(project, nil)
+		mockProjectService.On("GetProjectBySlug", ctx, slug.String()).Return(project, nil)
 		mockVolumeService.On("ListVolumesByProjectID", ctx, projectID).Return([]*volumemodel.Volume{}, nil)
 		mockPermissionService.On("CanUserAccessProject", ctx, userID, projectID).Return(nil)
 
 		router := gin.New()
-		router.GET("/projects/:id", func(c *gin.Context) {
+		router.GET("/projects/:slug", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetProject(c)
 		})
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/projects/"+strconv.Itoa(int(projectID)), nil)
+		req, _ := http.NewRequest("GET", "/projects/"+slug.String(), nil)
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -299,6 +306,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
 		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
 		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService)
@@ -306,6 +314,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
+			getBySlugUseCase,
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
@@ -316,21 +325,21 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		userID := uint(1)
 		projectID := uint(1)
 
-		slug, _ := value.NewProjectSlug("test-project")
+		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, uint(2)) // Different owner
 
-		mockProjectService.On("GetProject", ctx, projectID).Return(project, nil)
+		mockProjectService.On("GetProjectBySlug", ctx, slug.String()).Return(project, nil)
 		mockVolumeService.On("ListVolumesByProjectID", ctx, projectID).Return([]*volumemodel.Volume{}, nil)
 		mockPermissionService.On("CanUserAccessProject", ctx, userID, projectID).Return(projecterrors.ErrPermissionDenied)
 
 		router := gin.New()
-		router.GET("/projects/:id", func(c *gin.Context) {
+		router.GET("/projects/:slug", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetProject(c)
 		})
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/projects/"+strconv.Itoa(int(projectID)), nil)
+		req, _ := http.NewRequest("GET", "/projects/"+slug.String(), nil)
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusNotFound, w.Code) // Should return not found for security

@@ -11,12 +11,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
-	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
+	volumemodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
@@ -40,6 +41,7 @@ func TestVolumeHandler_AddVolume(t *testing.T) {
 			getVolumesUseCase,
 			removeVolumeUseCase,
 			mockPermissionService,
+			mockVolumeService,
 		)
 
 		userID := uint(1)
@@ -50,7 +52,7 @@ func TestVolumeHandler_AddVolume(t *testing.T) {
 		// Mock expectations
 		mockPermissionService.On("CanUserAddVolume", ctx, userID, projectID).Return(nil)
 
-		volume, _ := model.NewVolume(projectID, volumeName, capacity)
+		volume, _ := volumemodel.NewVolume(projectID, volumeName, capacity)
 		volume.SetVolumeID(1)
 		mockVolumeService.On("CreateVolume", ctx, projectID, volumeName, capacity).Return(volume, nil)
 
@@ -104,6 +106,7 @@ func TestVolumeHandler_AddVolume(t *testing.T) {
 			getVolumesUseCase,
 			removeVolumeUseCase,
 			mockPermissionService,
+			mockVolumeService,
 		)
 
 		router := gin.New()
@@ -142,6 +145,7 @@ func TestVolumeHandler_AddVolume(t *testing.T) {
 			getVolumesUseCase,
 			removeVolumeUseCase,
 			mockPermissionService,
+			mockVolumeService,
 		)
 
 		userID := uint(1)
@@ -196,6 +200,7 @@ func TestVolumeHandler_GetVolumes(t *testing.T) {
 			getVolumesUseCase,
 			removeVolumeUseCase,
 			mockPermissionService,
+			mockVolumeService,
 		)
 
 		userID := uint(1)
@@ -204,12 +209,12 @@ func TestVolumeHandler_GetVolumes(t *testing.T) {
 		// Mock expectations
 		mockPermissionService.On("CanUserAccessProject", ctx, userID, projectID).Return(nil)
 
-		volume1, _ := model.NewVolume(projectID, "volume1", 1024)
+		volume1, _ := volumemodel.NewVolume(projectID, "volume1", 1024)
 		volume1.SetVolumeID(1)
-		volume2, _ := model.NewVolume(projectID, "volume2", 2048)
+		volume2, _ := volumemodel.NewVolume(projectID, "volume2", 2048)
 		volume2.SetVolumeID(2)
 
-		volumes := []*model.Volume{volume1, volume2}
+		volumes := []*volumemodel.Volume{volume1, volume2}
 		mockVolumeService.On("ListVolumesByProjectID", ctx, projectID).Return(volumes, nil)
 
 		router := gin.New()
@@ -253,6 +258,7 @@ func TestVolumeHandler_GetVolumes(t *testing.T) {
 			getVolumesUseCase,
 			removeVolumeUseCase,
 			mockPermissionService,
+			mockVolumeService,
 		)
 
 		userID := uint(1)
@@ -299,23 +305,32 @@ func TestVolumeHandler_RemoveVolume(t *testing.T) {
 			getVolumesUseCase,
 			removeVolumeUseCase,
 			mockPermissionService,
+			mockVolumeService,
 		)
 
 		userID := uint(1)
 		volumeID := uint(1)
+		volumeSlug := "v2025011812000087654321"
 
-		// Mock expectations
+		// Create a test volume
+		volume := &volumemodel.Volume{}
+		// Mock GetVolumeBySlug to return a volume with the ID
+		mockVolumeService.On("GetVolumeBySlug", ctx, volumeSlug).Return(volume, nil).Once().
+			Run(func(args mock.Arguments) {
+				// Set volume ID for the permission check
+				volume.SetVolumeID(volumeID)
+			})
 		mockPermissionService.On("CanUserRemoveVolume", ctx, userID, volumeID).Return(nil)
 		mockVolumeService.On("DeleteVolume", ctx, volumeID).Return(nil)
 
 		router := gin.New()
-		router.DELETE("/volumes/:id", func(c *gin.Context) {
+		router.DELETE("/volumes/:slug", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.RemoveVolume(c)
 		})
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("DELETE", "/volumes/"+strconv.Itoa(int(volumeID)), nil)
+		req, _ := http.NewRequest("DELETE", "/volumes/"+volumeSlug, nil)
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -346,6 +361,7 @@ func TestVolumeHandler_RemoveVolume(t *testing.T) {
 			getVolumesUseCase,
 			removeVolumeUseCase,
 			mockPermissionService,
+			mockVolumeService,
 		)
 
 		volumeID := uint(1)
@@ -378,22 +394,23 @@ func TestVolumeHandler_RemoveVolume(t *testing.T) {
 			getVolumesUseCase,
 			removeVolumeUseCase,
 			mockPermissionService,
+			mockVolumeService,
 		)
 
 		userID := uint(1)
-		volumeID := uint(999)
+		volumeSlug := "v2025011812000087654321"
 
 		// Mock volume not found
-		mockPermissionService.On("CanUserRemoveVolume", ctx, userID, volumeID).Return(projecterrors.ErrVolumeNotFound)
+		mockVolumeService.On("GetVolumeBySlug", ctx, volumeSlug).Return(nil, projecterrors.ErrVolumeNotFound)
 
 		router := gin.New()
-		router.DELETE("/volumes/:id", func(c *gin.Context) {
+		router.DELETE("/volumes/:slug", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.RemoveVolume(c)
 		})
 
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("DELETE", "/volumes/"+strconv.Itoa(int(volumeID)), nil)
+		req, _ := http.NewRequest("DELETE", "/volumes/"+volumeSlug, nil)
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
