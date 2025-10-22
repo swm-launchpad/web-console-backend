@@ -28,9 +28,9 @@ func setupTestUserAndProject(t *testing.T, testDB *helper.TestDB, userID uint, p
 		userID, username, email, "hashedpassword", "active")
 	require.NoError(t, err)
 
-	// Create project (cpu_limit in millicores: 100-4000; memory in MB: 128-8192; disk in MiB: 128-10240; traffic in MiB: 128-1TB)
+	// Create project with valid 23-character slug (p + 14-digit timestamp + 8-char random)
 	_, err = testDB.DB.Exec("INSERT INTO PROJECTS (project_id, name, slug, status, cpu_limit, memory_limit, disk_limit, traffic_limit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		projectID, "Test Project", "test-project", "active", 2000, 2048, 5120, 10240)
+		projectID, "Test Project", "p20250118120000abc12345", "active", 2000, 2048, 5120, 10240)
 	require.NoError(t, err)
 
 	// Link user to project as owner
@@ -286,7 +286,7 @@ func TestGitHubInstallationSecurity_UpdateContainer_SecurityValidation(t *testin
 	_, err := testServer.DB.DB.Exec(`
 		INSERT INTO CONTAINERS (container_id, project_id, name, slug, git_repository_url, git_branch, cpu_limit, memory_limit, template_config)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		containerID, projectID, "test-container", "test-container", "https://github.com/test/repo", "main", 1000, 512, "{}")
+		containerID, projectID, "test-container", "c20251023020000abc12345", "https://github.com/test/repo", "main", 1000, 512, "{}")
 	require.NoError(t, err)
 
 	// Create GitHub installation for User B
