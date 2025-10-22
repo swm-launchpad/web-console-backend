@@ -8,6 +8,9 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
+	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
+	containerservice "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	projectservice "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
 type ContainerHandler struct {
@@ -26,6 +29,17 @@ type ContainerHandler struct {
 	deleteSecretUC    *application.DeleteSecretUseCase
 	addMountUC        *application.AddMountUseCase
 	deleteMountUC     *application.DeleteMountUseCase
+	projectService    projectservice.ProjectService
+	containerService  containerservice.ContainerService
+}
+
+// Helper method to get container by slug
+func (h *ContainerHandler) getContainerBySlug(c *gin.Context) (*model.Container, error) {
+	slug := c.Param("slug")
+	if slug == "" {
+		return nil, containererrors.ErrMissingField
+	}
+	return h.containerService.GetContainerBySlug(c.Request.Context(), slug)
 }
 
 func NewContainerHandler(
@@ -44,6 +58,8 @@ func NewContainerHandler(
 	deleteSecretUC *application.DeleteSecretUseCase,
 	addMountUC *application.AddMountUseCase,
 	deleteMountUC *application.DeleteMountUseCase,
+	projectService projectservice.ProjectService,
+	containerService containerservice.ContainerService,
 ) *ContainerHandler {
 	return &ContainerHandler{
 		createContainerUC: createContainerUC,
@@ -61,6 +77,8 @@ func NewContainerHandler(
 		deleteSecretUC:    deleteSecretUC,
 		addMountUC:        addMountUC,
 		deleteMountUC:     deleteMountUC,
+		projectService:    projectService,
+		containerService:  containerService,
 	}
 }
 
@@ -107,13 +125,20 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 		return
 	}
 
-	// Get project ID from URL parameter
-	projectIDStr := c.Param("id")
-	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
-	if err != nil {
+	// Get project slug from URL parameter
+	projectSlug := c.Param("slug")
+	if projectSlug == "" {
 		response.Error(c, containererrors.ErrInvalidProjectID, mapContainerError)
 		return
 	}
+
+	// Get container slug from URL
+	project, err := h.projectService.GetProjectBySlug(c.Request.Context(), projectSlug)
+	if err != nil {
+		response.Error(c, err, mapContainerError)
+		return
+	}
+	projectID := project.ProjectID()
 
 	var req CreateContainerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -148,7 +173,7 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 	}
 
 	input := application.CreateContainerInput{
-		ProjectID:            uint(projectID),
+		ProjectID:            projectID,
 		UserID:               userID.(uint),
 		Name:                 req.Name,
 		GitURL:               req.GitURL,
@@ -179,7 +204,7 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 	response.Created(c, resp)
 }
 
-// GetContainer handles fetching a container by ID
+// GetContainer handles fetching a container by slug
 func (h *ContainerHandler) GetContainer(c *gin.Context) {
 	// Get user ID from context
 	userID, exists := c.Get(auth.ContextKeyUserID)
@@ -188,21 +213,22 @@ func (h *ContainerHandler) GetContainer(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
+	// Get container slug from URL
+	containerSlug := c.Param("slug")
+	if containerSlug == "" {
 		response.Error(c, containererrors.ErrMissingField, mapContainerError)
 		return
 	}
 
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	// Get container by slug to get container ID
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
 	input := application.GetContainerInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 	}
 
@@ -239,18 +265,13 @@ func (h *ContainerHandler) UpdateContainer(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	// Get container by slug
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
+	containerID := container.ContainerID()
 
 	var req UpdateContainerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -273,7 +294,7 @@ func (h *ContainerHandler) UpdateContainer(c *gin.Context) {
 	// If neither flag is set, don't update (keep existing value)
 
 	input := application.UpdateContainerInput{
-		ContainerID:                uint(containerID),
+		ContainerID:                containerID,
 		UserID:                     userID.(uint),
 		Name:                       req.Name,
 		StableWindow:               req.StableWindow,
@@ -313,21 +334,14 @@ func (h *ContainerHandler) DeleteContainer(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
 	input := application.DeleteContainerInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 	}
 
@@ -349,16 +363,22 @@ func (h *ContainerHandler) ListContainers(c *gin.Context) {
 		return
 	}
 
-	// Parse project ID from URL parameter
-	projectIDStr := c.Param("id")
-	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
+	// Get project slug from URL parameter
+	projectSlug := c.Param("slug")
+	if projectSlug == "" {
+		response.Error(c, containererrors.ErrInvalidProjectID, mapContainerError)
+		return
+	}
+
+	// Get container slug from URL
+	project, err := h.projectService.GetProjectBySlug(c.Request.Context(), projectSlug)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
 	input := application.ListContainersInput{
-		ProjectID: uint(projectID),
+		ProjectID: project.ProjectID(),
 		UserID:    userID.(uint),
 	}
 
@@ -386,16 +406,9 @@ func (h *ContainerHandler) AddEnvVar(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -406,7 +419,7 @@ func (h *ContainerHandler) AddEnvVar(c *gin.Context) {
 	}
 
 	input := application.AddEnvVarInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 		Key:         req.Key,
 		Value:       req.Value,
@@ -435,16 +448,9 @@ func (h *ContainerHandler) UpdateEnvVar(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -462,7 +468,7 @@ func (h *ContainerHandler) UpdateEnvVar(c *gin.Context) {
 	}
 
 	input := application.UpdateEnvVarInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 		EnvVarKey:   envVarKey,
 		Value:       req.Value,
@@ -486,16 +492,9 @@ func (h *ContainerHandler) DeleteEnvVar(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -507,7 +506,7 @@ func (h *ContainerHandler) DeleteEnvVar(c *gin.Context) {
 	}
 
 	input := application.DeleteEnvVarInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 		Key:         key,
 	}
@@ -539,16 +538,9 @@ func (h *ContainerHandler) AddNetwork(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -559,7 +551,7 @@ func (h *ContainerHandler) AddNetwork(c *gin.Context) {
 	}
 
 	input := application.AddNetworkInput{
-		ContainerID:  uint(containerID),
+		ContainerID:  container.ContainerID(),
 		UserID:       userID.(uint),
 		InternalPort: req.InternalPort,
 		ExternalPort: req.ExternalPort,
@@ -586,16 +578,9 @@ func (h *ContainerHandler) DeleteNetwork(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -608,12 +593,12 @@ func (h *ContainerHandler) DeleteNetwork(c *gin.Context) {
 
 	port, err := strconv.ParseUint(portStr, 10, 16)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
 	input := application.DeleteNetworkInput{
-		ContainerID:  uint(containerID),
+		ContainerID:  container.ContainerID(),
 		UserID:       userID.(uint),
 		InternalPort: uint16(port),
 	}
@@ -636,22 +621,15 @@ func (h *ContainerHandler) ListNetworks(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
 	// Get container to verify ownership and get networks
 	input := application.GetContainerInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 	}
 
@@ -674,22 +652,15 @@ func (h *ContainerHandler) ListEnvVars(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
 	// Get container to verify ownership and get env vars
 	input := application.GetContainerInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 	}
 
@@ -718,16 +689,9 @@ func (h *ContainerHandler) AddSecret(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -738,7 +702,7 @@ func (h *ContainerHandler) AddSecret(c *gin.Context) {
 	}
 
 	input := application.AddSecretInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 		Key:         req.Key,
 		Value:       req.Value,
@@ -767,16 +731,9 @@ func (h *ContainerHandler) UpdateSecret(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -794,7 +751,7 @@ func (h *ContainerHandler) UpdateSecret(c *gin.Context) {
 	}
 
 	input := application.UpdateSecretInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 		Key:         key,
 		Value:       req.Value,
@@ -818,16 +775,9 @@ func (h *ContainerHandler) DeleteSecret(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -839,7 +789,7 @@ func (h *ContainerHandler) DeleteSecret(c *gin.Context) {
 	}
 
 	input := application.DeleteSecretInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 		Key:         key,
 	}
@@ -862,22 +812,15 @@ func (h *ContainerHandler) ListSecrets(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
 	// Get container to verify ownership and get secrets
 	input := application.GetContainerInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 	}
 
@@ -906,16 +849,9 @@ func (h *ContainerHandler) AddMount(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -928,7 +864,7 @@ func (h *ContainerHandler) AddMount(c *gin.Context) {
 
 	// Prepare input
 	input := application.AddMountInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 		VolumeID:    req.VolumeID,
 		MountPath:   req.MountPath,
@@ -952,16 +888,9 @@ func (h *ContainerHandler) DeleteMount(c *gin.Context) {
 		return
 	}
 
-	// Parse container ID from URL
-	containerIDStr := c.Param("id")
-	if containerIDStr == "" {
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	containerID, err := strconv.ParseUint(containerIDStr, 10, 32)
+	container, err := h.getContainerBySlug(c)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
@@ -974,13 +903,13 @@ func (h *ContainerHandler) DeleteMount(c *gin.Context) {
 
 	volumeID, err := strconv.ParseUint(volumeIDStr, 10, 32)
 	if err != nil {
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
+		response.Error(c, err, mapContainerError)
 		return
 	}
 
 	// Prepare input
 	input := application.DeleteMountInput{
-		ContainerID: uint(containerID),
+		ContainerID: container.ContainerID(),
 		UserID:      userID.(uint),
 		VolumeID:    uint(volumeID),
 	}

@@ -31,15 +31,17 @@ var containerErrorMap = map[error]response.ErrorMapping{
 	containererrors.ErrAdminRequired:         {StatusCode: http.StatusForbidden, Code: "ADMIN_REQUIRED", Message: "Admin permission required"},
 
 	// Validation errors
-	containererrors.ErrNameRequired:        {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Container name is required"},
-	containererrors.ErrNameTooLong:         {StatusCode: http.StatusBadRequest, Code: "NAME_TOO_LONG", Message: "Container name must not exceed 100 characters"},
-	containererrors.ErrSlugRequired:        {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Container slug is required"},
-	containererrors.ErrInvalidSlug:         {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid container slug"},
-	containererrors.ErrSlugTooShort:        {StatusCode: http.StatusBadRequest, Code: "SLUG_TOO_SHORT", Message: "Slug must be at least 3 characters long"},
+	containererrors.ErrNameRequired: {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Container name is required"},
+	containererrors.ErrNameTooLong:  {StatusCode: http.StatusBadRequest, Code: "NAME_TOO_LONG", Message: "Container name must not exceed 100 characters"},
+	containererrors.ErrSlugRequired: {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Container slug is required"},
+	containererrors.ErrInvalidSlug:  {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid container slug"},
+	// Deprecated: Unreachable with fixed 23-character slug format
+	containererrors.ErrSlugTooShort: {StatusCode: http.StatusBadRequest, Code: "SLUG_TOO_SHORT", Message: "Slug must be at least 3 characters long"},
+	// Deprecated: Unreachable with fixed 23-character slug format
 	containererrors.ErrSlugTooLong:         {StatusCode: http.StatusBadRequest, Code: "SLUG_TOO_LONG", Message: "Slug must not exceed 63 characters"},
 	containererrors.ErrSlugInvalidFormat:   {StatusCode: http.StatusBadRequest, Code: "SLUG_INVALID_FORMAT", Message: "Slug can only contain lowercase letters, numbers, and hyphens"},
 	containererrors.ErrSlugReserved:        {StatusCode: http.StatusBadRequest, Code: "SLUG_RESERVED", Message: "Slug is reserved"},
-	containererrors.ErrSlugAlreadyExists:   {StatusCode: http.StatusConflict, Code: "SLUG_ALREADY_EXISTS", Message: "Slug already exists in project"},
+	containererrors.ErrSlugAlreadyExists:   {StatusCode: http.StatusConflict, Code: "SLUG_ALREADY_EXISTS", Message: "Slug already exists (globally unique)"},
 	containererrors.ErrContainerNameExists: {StatusCode: http.StatusConflict, Code: "CONTAINER_NAME_EXISTS", Message: "Container name already exists in project"},
 	containererrors.ErrInvalidProjectID:    {StatusCode: http.StatusBadRequest, Code: "INVALID_PROJECT_ID", Message: "Invalid project ID"},
 	containererrors.ErrInvalidContainerID:  {StatusCode: http.StatusBadRequest, Code: "INVALID_CONTAINER_ID", Message: "Invalid container ID"},
