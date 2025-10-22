@@ -45,6 +45,14 @@ func (m *MockProjectRepository) FindByUserID(ctx context.Context, userID uint) (
 	return args.Get(0).([]*model.Project), args.Error(1)
 }
 
+func (m *MockProjectRepository) FindBySlug(ctx context.Context, slug string) (*model.Project, error) {
+	args := m.Called(ctx, slug)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Project), args.Error(1)
+}
+
 func (m *MockProjectRepository) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
 	args := m.Called(ctx, slug)
 	return args.Bool(0), args.Error(1)
