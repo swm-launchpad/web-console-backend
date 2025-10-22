@@ -41,7 +41,6 @@ func TestContainerWithVolume_E2E(t *testing.T) {
 		// Step 2: 프로젝트 생성
 		createProjectReq := map[string]interface{}{
 			"name":          "Container Test Project",
-			"slug":          "container-test-project",
 			"cpu_limit":     4000,
 			"memory_limit":  8192,
 			"disk_limit":    10240,
@@ -59,7 +58,8 @@ func TestContainerWithVolume_E2E(t *testing.T) {
 		require.NoError(t, err)
 
 		projectID := uint(projectResp["data"].(map[string]interface{})["project_id"].(float64))
-		t.Logf("Created project with ID: %d", projectID)
+		projectSlug := projectResp["data"].(map[string]interface{})["slug"].(string)
+		t.Logf("Created project with ID: %d, Slug: %s", projectID, projectSlug)
 
 		// Step 3: 템플릿 목록 조회 (MySQL 템플릿 찾기)
 		w = server.MakeAuthRequest("GET", "/api/v1/templates", nil, token)
@@ -119,7 +119,7 @@ func TestContainerWithVolume_E2E(t *testing.T) {
 			},
 		}
 
-		w = server.MakeAuthRequest("POST", fmt.Sprintf("/api/v1/projects/%d/containers", projectID), createContainerReq, token)
+		w = server.MakeAuthRequest("POST", fmt.Sprintf("/api/v1/projects/%s/containers", projectSlug), createContainerReq, token)
 		if w.Code != http.StatusCreated {
 			t.Logf("Create container failed with status %d: %s", w.Code, w.Body.String())
 		}
@@ -131,7 +131,8 @@ func TestContainerWithVolume_E2E(t *testing.T) {
 
 		containerData := containerResp["data"].(map[string]interface{})
 		containerID := uint(containerData["container_id"].(float64))
-		t.Logf("Created container with ID: %d", containerID)
+		containerSlug := containerData["slug"].(string)
+		t.Logf("Created container with ID: %d, Slug: %s", containerID, containerSlug)
 
 		// Step 6: 볼륨이 자동 생성되었는지 확인
 		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/volumes?project_id=%d", projectID), nil, token)
@@ -146,12 +147,13 @@ func TestContainerWithVolume_E2E(t *testing.T) {
 
 		volume := volumes[0].(map[string]interface{})
 		volumeID := uint(volume["volume_id"].(float64))
+		volumeSlug := volume["slug"].(string)
 		assert.Equal(t, "mysql-data", volume["name"])
 		assert.Equal(t, float64(1024), volume["capacity"])
-		t.Logf("Volume created successfully with ID: %d", volumeID)
+		t.Logf("Volume created successfully with ID: %d, Slug: %s", volumeID, volumeSlug)
 
 		// Step 7: 컨테이너의 마운트 확인 (컨테이너 상세 조회)
-		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/containers/%d", containerID), nil, token)
+		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/containers/%s", containerSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var containerDetailResp map[string]interface{}
@@ -173,7 +175,7 @@ func TestContainerWithVolume_E2E(t *testing.T) {
 		}
 
 		// Step 8: 컨테이너 삭제
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/containers/%d", containerID), nil, token)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/containers/%s", containerSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		// Step 9: 볼륨 삭제 (컨테이너가 삭제되어도 볼륨은 남아있어야 함)
@@ -187,11 +189,11 @@ func TestContainerWithVolume_E2E(t *testing.T) {
 		assert.Equal(t, 1, len(remainingVolumes), "Volume should remain after container deletion")
 
 		// Step 10: 볼륨 삭제
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/volumes/%d", volumeID), nil, token)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/volumes/%s", volumeSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		// Step 11: 프로젝트 삭제
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, token)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
 }
@@ -225,7 +227,6 @@ func TestContainerWithoutVolume_E2E(t *testing.T) {
 		// Step 2: 프로젝트 생성
 		createProjectReq := map[string]interface{}{
 			"name":          "App Test Project",
-			"slug":          "app-test-project",
 			"cpu_limit":     2000,
 			"memory_limit":  4096,
 			"disk_limit":    5120,
@@ -240,6 +241,7 @@ func TestContainerWithoutVolume_E2E(t *testing.T) {
 		require.NoError(t, err)
 
 		projectID := uint(projectResp["data"].(map[string]interface{})["project_id"].(float64))
+		projectSlug := projectResp["data"].(map[string]interface{})["slug"].(string)
 
 		// Step 3: 템플릿 목록 조회 (Node.js 템플릿 찾기)
 		w = server.MakeAuthRequest("GET", "/api/v1/templates", nil, token)
@@ -275,7 +277,7 @@ func TestContainerWithoutVolume_E2E(t *testing.T) {
 			"git_branch":   "main",
 		}
 
-		w = server.MakeAuthRequest("POST", fmt.Sprintf("/api/v1/projects/%d/containers", projectID), createContainerReq, token)
+		w = server.MakeAuthRequest("POST", fmt.Sprintf("/api/v1/projects/%s/containers", projectSlug), createContainerReq, token)
 		if w.Code != http.StatusCreated {
 			t.Logf("Create container failed with status %d: %s", w.Code, w.Body.String())
 		}
@@ -286,7 +288,8 @@ func TestContainerWithoutVolume_E2E(t *testing.T) {
 		require.NoError(t, err)
 
 		containerID := uint(containerResp["data"].(map[string]interface{})["container_id"].(float64))
-		t.Logf("Created container with ID: %d", containerID)
+		containerSlug := containerResp["data"].(map[string]interface{})["slug"].(string)
+		t.Logf("Created container with ID: %d, Slug: %s", containerID, containerSlug)
 
 		// Step 5: 볼륨이 생성되지 않았는지 확인
 		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/volumes?project_id=%d", projectID), nil, token)
@@ -300,11 +303,11 @@ func TestContainerWithoutVolume_E2E(t *testing.T) {
 		assert.Equal(t, 0, len(volumes), "No volumes should be created for non-database templates")
 
 		// Step 6: 컨테이너 삭제
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/containers/%d", containerID), nil, token)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/containers/%s", containerSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		// Step 7: 프로젝트 삭제
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, token)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 	})
 }

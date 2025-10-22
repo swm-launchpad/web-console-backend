@@ -42,7 +42,6 @@ func TestVolumeFlow_E2E(t *testing.T) {
 		// Step 2: 프로젝트 생성
 		createProjectReq := map[string]interface{}{
 			"name":          "Volume Test Project",
-			"slug":          "volume-test-project",
 			"cpu_limit":     1000,
 			"memory_limit":  2048,
 			"disk_limit":    2048,
@@ -61,7 +60,8 @@ func TestVolumeFlow_E2E(t *testing.T) {
 
 		t.Logf("Project response: %+v", projectResp)
 		projectID := uint(projectResp["data"].(map[string]interface{})["project_id"].(float64))
-		t.Logf("Created project with ID: %d", projectID)
+		projectSlug := projectResp["data"].(map[string]interface{})["slug"].(string)
+		t.Logf("Created project with ID: %d, Slug: %s", projectID, projectSlug)
 
 		// Step 3: 볼륨 추가
 		addVolumeReq := map[string]interface{}{
@@ -82,7 +82,8 @@ func TestVolumeFlow_E2E(t *testing.T) {
 
 		volumeData := addVolumeResp["data"].(map[string]interface{})
 		volumeID := uint(volumeData["volume_id"].(float64))
-		t.Logf("Created volume with ID: %d", volumeID)
+		volumeSlug := volumeData["slug"].(string)
+		t.Logf("Created volume with ID: %d, Slug: %s", volumeID, volumeSlug)
 		assert.Equal(t, "data-volume", volumeData["name"])
 		assert.Equal(t, float64(256), volumeData["capacity"])
 
@@ -113,13 +114,13 @@ func TestVolumeFlow_E2E(t *testing.T) {
 			"capacity": 200,
 		}
 
-		w = server.MakeAuthRequest("PUT", fmt.Sprintf("/api/v1/volumes/%d", volumeID), updateVolumeReq, token)
+		w = server.MakeAuthRequest("PUT", fmt.Sprintf("/api/v1/volumes/%s", volumeSlug), updateVolumeReq, token)
 		t.Logf("Update volume response with status %d: %s", w.Code, w.Body.String())
 		// 볼륨 업데이트 엔드포인트가 없어서 404가 반환됨
 		assert.Equal(t, http.StatusNotFound, w.Code, "Volume update endpoint does not exist")
 
 		// Step 7: 프로젝트 상세 조회로 볼륨 확인
-		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, token)
+		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var projectDetailResp map[string]interface{}
@@ -130,7 +131,7 @@ func TestVolumeFlow_E2E(t *testing.T) {
 		assert.Equal(t, 2, len(projectVolumes))
 
 		// Step 8: 볼륨 삭제
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/volumes/%d", volumeID), nil, token)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/volumes/%s", volumeSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var deleteVolumeResp map[string]interface{}
@@ -153,7 +154,7 @@ func TestVolumeFlow_E2E(t *testing.T) {
 		assert.Equal(t, "backup-volume", finalVolumes[0].(map[string]interface{})["name"])
 
 		// Step 10: 프로젝트 삭제 (관련 볼륨도 모두 삭제되어야 함)
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, token)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		// Step 11: 프로젝트가 삭제된 후 볼륨 목록 조회 (볼륨이 모두 삭제되었는지 확인)
@@ -198,7 +199,6 @@ func TestVolumeConstraints_E2E(t *testing.T) {
 
 		createProjectReq := map[string]interface{}{
 			"name":          "Constraint Test Project",
-			"slug":          "constraint-test",
 			"cpu_limit":     1000,
 			"memory_limit":  2048,
 			"disk_limit":    2048,
@@ -208,6 +208,7 @@ func TestVolumeConstraints_E2E(t *testing.T) {
 		var projectResp map[string]interface{}
 		_ = json.Unmarshal(w.Body.Bytes(), &projectResp)
 		projectID := uint(projectResp["data"].(map[string]interface{})["project_id"].(float64))
+		_ = projectResp["data"].(map[string]interface{})["slug"].(string)
 
 		// Test 1: 중복된 볼륨 이름으로 추가 시도 (실패해야 함)
 		addVolumeReq := map[string]interface{}{
@@ -271,15 +272,15 @@ func TestVolumeConstraints_E2E(t *testing.T) {
 		_ = json.Unmarshal(w.Body.Bytes(), &otherResp)
 		otherToken := otherResp["data"].(map[string]interface{})["token"].(string)
 
-		// 볼륨 ID를 가져와서 다른 사용자가 볼륨 수정 시도
+		// 볼륨 slug를 가져와서 다른 사용자가 볼륨 수정 시도
 		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/volumes?project_id=%d", projectID), nil, token)
 		var volumeListResp map[string]interface{}
 		_ = json.Unmarshal(w.Body.Bytes(), &volumeListResp)
 		volumes := volumeListResp["data"].(map[string]interface{})["volumes"].([]interface{})
-		existingVolumeID := uint(volumes[0].(map[string]interface{})["volume_id"].(float64))
+		existingVolumeSlug := volumes[0].(map[string]interface{})["slug"].(string)
 
 		// 다른 사용자가 볼륨 삭제 시도 (권한으로 인해 실패해야 함)
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/volumes/%d", existingVolumeID), nil, otherToken)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/volumes/%s", existingVolumeSlug), nil, otherToken)
 		// 권한이 없으므로 404 Not Found 반환 (정보 노출 방지)
 		assert.Equal(t, http.StatusNotFound, w.Code,
 			"Should return 404 for unauthorized volume access")
