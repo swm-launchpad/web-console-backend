@@ -48,6 +48,7 @@ type Querier interface {
 	GetTotalCapacityByProjectID(ctx context.Context, projectID uint32) (interface{}, error)
 	GetVolumeByID(ctx context.Context, volumeID uint32) (GetVolumeByIDRow, error)
 	GetVolumeByName(ctx context.Context, arg GetVolumeByNameParams) (GetVolumeByNameRow, error)
+	GetVolumeBySlug(ctx context.Context, slug sql.NullString) (GetVolumeBySlugRow, error)
 	GetVolumesByProjectID(ctx context.Context, projectID uint32) ([]GetVolumesByProjectIDRow, error)
 	HardDeleteProjectUsersByProjectID(ctx context.Context, projectID uint32) (sql.Result, error)
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]ListProjectsRow, error)
