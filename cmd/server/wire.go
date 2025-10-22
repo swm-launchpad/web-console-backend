@@ -240,6 +240,7 @@ func InitializeApp() (*App, error) {
 		// Project use cases
 		projectApp.NewCreateProjectUseCase,
 		projectApp.NewGetProjectUseCase,
+		projectApp.NewGetProjectBySlugUseCase,
 		projectApp.NewUpdateProjectUseCase,
 		projectApp.NewDeleteProjectUseCase,
 		projectApp.NewListProjectsUseCase,

@@ -133,18 +133,18 @@ func (r *Router) Setup() {
 		{
 			projects.POST("", r.projectHandler.CreateProject)
 			projects.GET("", r.projectHandler.ListProjects)
-			projects.GET("/:id", r.projectHandler.GetProject)
-			projects.PUT("/:id", r.projectHandler.UpdateProject)
-			projects.DELETE("/:id", r.projectHandler.DeleteProject)
+			projects.GET("/:slug", r.projectHandler.GetProject)
+			projects.PUT("/:slug", r.projectHandler.UpdateProject)
+			projects.DELETE("/:slug", r.projectHandler.DeleteProject)
 
 			// Deployment routes
-			projects.POST("/:id/deploy", r.deploymentHandler.DeployProject)
-			projects.GET("/:id/deployments/latest", r.deploymentHandler.GetDeployment)
-			projects.POST("/:id/deployments/refresh", r.deploymentHandler.RefreshDeployment)
+			projects.POST("/:slug/deploy", r.deploymentHandler.DeployProject)
+			projects.GET("/:slug/deployments/latest", r.deploymentHandler.GetDeployment)
+			projects.POST("/:slug/deployments/refresh", r.deploymentHandler.RefreshDeployment)
 
 			// Container routes under project (RESTful)
-			projects.POST("/:id/containers", r.containerHandler.CreateContainer)
-			projects.GET("/:id/containers", r.containerHandler.ListContainers)
+			projects.POST("/:slug/containers", r.containerHandler.CreateContainer)
+			projects.GET("/:slug/containers", r.containerHandler.ListContainers)
 		}
 
 		// Volume routes (protected)
@@ -153,45 +153,44 @@ func (r *Router) Setup() {
 		{
 			volumes.POST("", r.volumeHandler.AddVolume)
 			volumes.GET("", r.volumeHandler.GetVolumes)
-			volumes.DELETE("/:id", r.volumeHandler.RemoveVolume)
+			volumes.DELETE("/:slug", r.volumeHandler.RemoveVolume)
 		}
 
 		// Container routes (protected)
-		// Note: Container creation and listing are available under /projects/:id/containers
-		// This group handles operations on individual containers by container ID
+		// Container slugs are globally unique, no need for project slug in URL
 		containers := v1.Group("/containers")
 		containers.Use(r.authMiddleware.RequireAuth())
 		{
-			containers.GET("/:id", r.containerHandler.GetContainer)
-			containers.PUT("/:id", r.containerHandler.UpdateContainer)
-			containers.DELETE("/:id", r.containerHandler.DeleteContainer)
+			containers.GET("/:slug", r.containerHandler.GetContainer)
+			containers.PUT("/:slug", r.containerHandler.UpdateContainer)
+			containers.DELETE("/:slug", r.containerHandler.DeleteContainer)
 
 			// Git settings (uses UpdateContainer handler)
-			containers.PUT("/:id/git", r.containerHandler.UpdateContainer)
+			containers.PUT("/:slug/git", r.containerHandler.UpdateContainer)
 
 			// Resource limits (uses UpdateContainer handler)
-			containers.PUT("/:id/resources", r.containerHandler.UpdateContainer)
+			containers.PUT("/:slug/resources", r.containerHandler.UpdateContainer)
 
 			// Environment variables
-			containers.GET("/:id/env-vars", r.containerHandler.ListEnvVars)
-			containers.POST("/:id/env-vars", r.containerHandler.AddEnvVar)
-			containers.PUT("/:id/env-vars/:key", r.containerHandler.UpdateEnvVar)
-			containers.DELETE("/:id/env-vars/:key", r.containerHandler.DeleteEnvVar)
+			containers.GET("/:slug/env-vars", r.containerHandler.ListEnvVars)
+			containers.POST("/:slug/env-vars", r.containerHandler.AddEnvVar)
+			containers.PUT("/:slug/env-vars/:key", r.containerHandler.UpdateEnvVar)
+			containers.DELETE("/:slug/env-vars/:key", r.containerHandler.DeleteEnvVar)
 
 			// Networks
-			containers.GET("/:id/networks", r.containerHandler.ListNetworks)
-			containers.POST("/:id/networks", r.containerHandler.AddNetwork)
-			containers.DELETE("/:id/networks/:port", r.containerHandler.DeleteNetwork)
+			containers.GET("/:slug/networks", r.containerHandler.ListNetworks)
+			containers.POST("/:slug/networks", r.containerHandler.AddNetwork)
+			containers.DELETE("/:slug/networks/:port", r.containerHandler.DeleteNetwork)
 
 			// Secrets
-			containers.GET("/:id/secrets", r.containerHandler.ListSecrets)
-			containers.POST("/:id/secrets", r.containerHandler.AddSecret)
-			containers.PUT("/:id/secrets/:key", r.containerHandler.UpdateSecret)
-			containers.DELETE("/:id/secrets/:key", r.containerHandler.DeleteSecret)
+			containers.GET("/:slug/secrets", r.containerHandler.ListSecrets)
+			containers.POST("/:slug/secrets", r.containerHandler.AddSecret)
+			containers.PUT("/:slug/secrets/:key", r.containerHandler.UpdateSecret)
+			containers.DELETE("/:slug/secrets/:key", r.containerHandler.DeleteSecret)
 
 			// Mounts
-			containers.POST("/:id/mounts", r.containerHandler.AddMount)
-			containers.DELETE("/:id/mounts/:volume_id", r.containerHandler.DeleteMount)
+			containers.POST("/:slug/mounts", r.containerHandler.AddMount)
+			containers.DELETE("/:slug/mounts/:volume_id", r.containerHandler.DeleteMount)
 		}
 
 		// Template routes (public - no auth required)
