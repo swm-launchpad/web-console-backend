@@ -211,6 +211,10 @@ func (p *Project) SetName(name string) error {
 		return projecterrors.ErrNameRequired
 	}
 
+	if len(name) > 255 {
+		return projecterrors.ErrNameTooLong
+	}
+
 	p.name = name
 	p.updateTimestamp()
 	return nil
