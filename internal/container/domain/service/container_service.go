@@ -19,6 +19,9 @@ type ContainerService interface {
 	// GetContainer retrieves a container by ID
 	GetContainer(ctx context.Context, containerID uint) (*model.Container, error)
 
+	// GetContainerBySlug retrieves a container by slug
+	GetContainerBySlug(ctx context.Context, slug string) (*model.Container, error)
+
 	// UpdateContainer updates an existing container
 	UpdateContainer(ctx context.Context, containerID uint, updateFn func(*model.Container) error) (*model.Container, error)
 
@@ -66,8 +69,8 @@ func (s *containerService) CreateContainer(ctx context.Context, projectID uint, 
 		return nil, containererrors.ErrContainerNameExists
 	}
 
-	// Generate slug from name
-	slug, err := s.slugService.GenerateSlugFromName(ctx, projectID, name)
+	// Generate slug
+	slug, err := s.slugService.GenerateSlug(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +96,24 @@ func (s *containerService) GetContainer(ctx context.Context, containerID uint) (
 	}
 
 	container, err := s.containerRepo.FindByID(ctx, containerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return container, nil
+}
+
+// GetContainerBySlug retrieves a container by slug
+func (s *containerService) GetContainerBySlug(ctx context.Context, slug string) (*model.Container, error) {
+	// Validate slug format before repository lookup
+	// This returns ErrSlugInvalidFormat for malformed slugs (wrong length/prefix)
+	// which maps to 400 Bad Request instead of 404 Not Found
+	_, err := value.NewContainerSlug(slug)
+	if err != nil {
+		return nil, err
+	}
+
+	container, err := s.containerRepo.FindBySlug(ctx, slug)
 	if err != nil {
 		return nil, err
 	}

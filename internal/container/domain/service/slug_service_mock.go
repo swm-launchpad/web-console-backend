@@ -11,12 +11,12 @@ type MockSlugService struct {
 	mock.Mock
 }
 
-func (m *MockSlugService) EnsureUniqueSlug(ctx context.Context, projectID uint, slug value.ContainerSlug) error {
-	args := m.Called(ctx, projectID, slug)
+func (m *MockSlugService) EnsureUniqueSlug(ctx context.Context, slug value.ContainerSlug) error {
+	args := m.Called(ctx, slug)
 	return args.Error(0)
 }
 
-func (m *MockSlugService) GenerateSlugFromName(ctx context.Context, projectID uint, name string) (value.ContainerSlug, error) {
-	args := m.Called(ctx, projectID, name)
+func (m *MockSlugService) GenerateSlug(ctx context.Context) (value.ContainerSlug, error) {
+	args := m.Called(ctx)
 	return args.Get(0).(value.ContainerSlug), args.Error(1)
 }
