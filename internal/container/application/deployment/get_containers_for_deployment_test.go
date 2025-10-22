@@ -40,7 +40,7 @@ func TestGetContainersForDeploymentUseCase_Execute_Success(t *testing.T) {
 	c1 := output.Containers[0]
 	assert.Equal(t, uint(1), c1.ContainerID)
 	assert.Equal(t, "container-with-all", c1.Name)
-	assert.Equal(t, "container-with-all-slug", c1.Slug)
+	assert.Equal(t, "c2025011812000011111111", c1.Slug)
 	assert.NotNil(t, c1.LastBuiltGitCommitHash)
 	assert.Equal(t, "abc1234567890", *c1.LastBuiltGitCommitHash)
 	assert.NotNil(t, c1.CPULimit)
@@ -192,7 +192,7 @@ func TestGetContainersForDeploymentUseCase_Execute_WithMultipleMounts(t *testing
 // Helper functions for creating test containers
 
 func createContainerWithAllFields(containerID, projectID uint) *model.Container {
-	slug, _ := value.NewContainerSlug("container-with-all-slug")
+	slug, _ := value.NewContainerSlug("c2025011812000011111111")
 	gitConfig, _ := value.NewGitConfig("https://github.com/test/repo", "main", nil)
 	cpuLimit := uint32(1000)
 	memoryLimit := uint32(2048)
@@ -245,7 +245,7 @@ func createContainerWithAllFields(containerID, projectID uint) *model.Container 
 }
 
 func createContainerWithMinimalFields(containerID, projectID uint) *model.Container {
-	slug, _ := value.NewContainerSlug("minimal-container-slug")
+	slug, _ := value.NewContainerSlug("c2025011812000022222222")
 	gitConfig, _ := value.NewGitConfig("https://github.com/test/repo", "main", nil)
 	cpuLimit := uint32(500)
 	memoryLimit := uint32(1024)
@@ -277,7 +277,7 @@ func createContainerWithMinimalFields(containerID, projectID uint) *model.Contai
 }
 
 func createContainerWithNetworkOptionalFields(containerID, projectID uint) *model.Container {
-	slug, _ := value.NewContainerSlug("network-optional-slug")
+	slug, _ := value.NewContainerSlug("c2025011812000033333333")
 	gitConfig, _ := value.NewGitConfig("https://github.com/test/repo", "main", nil)
 	cpuLimit := uint32(1000)
 	memoryLimit := uint32(2048)
@@ -328,7 +328,7 @@ func createContainerWithNetworkOptionalFields(containerID, projectID uint) *mode
 }
 
 func createContainerWithMultipleMounts(containerID, projectID uint) *model.Container {
-	slug, _ := value.NewContainerSlug("multiple-mounts-slug")
+	slug, _ := value.NewContainerSlug("c2025011812000044444444")
 	gitConfig, _ := value.NewGitConfig("https://github.com/test/repo", "main", nil)
 	cpuLimit := uint32(1000)
 	memoryLimit := uint32(2048)

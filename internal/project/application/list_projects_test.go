@@ -25,8 +25,8 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 			UserID: userID,
 		}
 
-		slug1, _ := value.NewProjectSlug("project-one-1234")
-		slug2, _ := value.NewProjectSlug("project-two-5678")
+		slug1, _ := value.NewProjectSlug("p2025011812000044444444")
+		slug2, _ := value.NewProjectSlug("p2025011812000055555555")
 		projects := []*model.Project{
 			createTestProjectWithVolumes(1, "첫 번째 프로젝트", *slug1, userID),
 			createTestProjectWithVolumes(2, "두 번째 프로젝트", *slug2, userID),
@@ -42,12 +42,12 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 
 		assert.Equal(t, uint(1), output.Projects[0].ProjectID)
 		assert.Equal(t, "첫 번째 프로젝트", output.Projects[0].Name)
-		assert.Equal(t, "project-one-1234", output.Projects[0].Slug)
+		assert.Equal(t, "p2025011812000044444444", output.Projects[0].Slug)
 		assert.Equal(t, "active", output.Projects[0].Status)
 
 		assert.Equal(t, uint(2), output.Projects[1].ProjectID)
 		assert.Equal(t, "두 번째 프로젝트", output.Projects[1].Name)
-		assert.Equal(t, "project-two-5678", output.Projects[1].Slug)
+		assert.Equal(t, "p2025011812000055555555", output.Projects[1].Slug)
 		assert.Equal(t, "active", output.Projects[1].Status)
 
 		mockProjectService.AssertExpectations(t)
@@ -82,7 +82,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 			UserID: userID,
 		}
 
-		slug, _ := value.NewProjectSlug("single-project-9999")
+		slug, _ := value.NewProjectSlug("p2025011812000066666666")
 		projects := []*model.Project{
 			createTestProjectWithVolumes(1, "유일한 프로젝트", *slug, userID),
 		}
@@ -108,7 +108,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 			UserID: userID,
 		}
 
-		slug, _ := value.NewProjectSlug("production-project-1111")
+		slug, _ := value.NewProjectSlug("p2025011812000077777777")
 		project := createTestProjectWithVolumes(1, "운영 프로젝트", *slug, userID)
 
 		fqdn := "my-project.example.com"

@@ -32,7 +32,7 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 			ProjectID: projectID,
 		}
 
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		project := createTestProjectWithVolumes(projectID, "테스트 프로젝트", *slug, 1)
 		volumes := []*volumemodel.Volume{
 			createTestVolume(1, projectID, "test-volume", 1024),
@@ -47,7 +47,7 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, projectID, output.ProjectID)
 		assert.Equal(t, "테스트 프로젝트", output.Name)
-		assert.Equal(t, "test-project-1234", output.Slug)
+		assert.Equal(t, "p2025011812000012345678", output.Slug)
 		assert.Equal(t, "active", output.Status)
 		assert.Len(t, output.Users, 1)
 		assert.Equal(t, uint(1), output.Users[0].UserID)
@@ -71,7 +71,7 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 			ProjectID: projectID,
 		}
 
-		slug, _ := value.NewProjectSlug("empty-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000011111111")
 		project := createTestProjectWithVolumes(projectID, "빈 프로젝트", *slug, 1)
 
 		mockProjectService.On("GetProject", ctx, projectID).Return(project, nil)
@@ -97,7 +97,7 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 			ProjectID: projectID,
 		}
 
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		project := createTestProjectWithVolumes(projectID, "테스트 프로젝트", *slug, 1)
 
 		mockProjectService.On("GetProject", ctx, projectID).Return(project, nil)
