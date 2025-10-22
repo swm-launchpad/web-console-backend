@@ -30,14 +30,10 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrUserNotInProject:      {StatusCode: http.StatusNotFound, Code: "USER_NOT_IN_PROJECT", Message: "User not in project"},
 
 	// Validation errors
-	projecterrors.ErrMissingField:  {StatusCode: http.StatusBadRequest, Code: "MISSING_FIELD", Message: "Required field is missing"},
-	projecterrors.ErrNameRequired:  {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Project name is required"},
-	projecterrors.ErrSlugRequired:  {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Project slug is required"},
-	projecterrors.ErrInvalidSlug:   {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid project slug"},
-	// Deprecated: Unreachable with fixed 23-character slug format
-	projecterrors.ErrSlugTooShort: {StatusCode: http.StatusBadRequest, Code: "SLUG_TOO_SHORT", Message: "Slug must be at least 3 characters long"},
-	// Deprecated: Unreachable with fixed 23-character slug format
-	projecterrors.ErrSlugTooLong:       {StatusCode: http.StatusBadRequest, Code: "SLUG_TOO_LONG", Message: "Slug must not exceed 63 characters"},
+	projecterrors.ErrMissingField: {StatusCode: http.StatusBadRequest, Code: "MISSING_FIELD", Message: "Required field is missing"},
+	projecterrors.ErrNameRequired: {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Project name is required"},
+	projecterrors.ErrSlugRequired:      {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Project slug is required"},
+	projecterrors.ErrInvalidSlug:       {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid project slug"},
 	projecterrors.ErrSlugInvalidLength: {StatusCode: http.StatusBadRequest, Code: "SLUG_INVALID_LENGTH", Message: "Slug must be exactly 23 characters"},
 	projecterrors.ErrSlugInvalidFormat: {StatusCode: http.StatusBadRequest, Code: "SLUG_INVALID_FORMAT", Message: "Slug has invalid format"},
 	projecterrors.ErrInvalidProjectID:  {StatusCode: http.StatusBadRequest, Code: "INVALID_PROJECT_ID", Message: "Invalid project ID"},

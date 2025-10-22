@@ -32,10 +32,10 @@ var (
 
 // Validation errors - input validation and data integrity errors
 var (
-	ErrNameRequired  = errors.New("container name is required")
-	ErrNameTooLong   = errors.New("container name must not exceed 255 characters")
-	ErrSlugRequired  = errors.New("container slug is required")
-	ErrInvalidSlug   = errors.New("invalid container slug")
+	ErrNameRequired      = errors.New("container name is required")
+	ErrNameTooLong       = errors.New("container name must not exceed 255 characters")
+	ErrSlugRequired      = errors.New("container slug is required")
+	ErrInvalidSlug       = errors.New("invalid container slug")
 	ErrSlugInvalidLength = errors.New("slug must be exactly 23 characters")
 	// Deprecated: ErrSlugTooShort is unreachable with fixed 23-character slug format. Use ErrSlugInvalidLength instead.
 	ErrSlugTooShort = errors.New("slug must be at least 3 characters long")
