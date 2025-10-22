@@ -6,6 +6,7 @@ import (
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
+	volumevalue "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume/value"
 )
 
 // VolumeService defines the interface for volume-related business logic
@@ -15,6 +16,9 @@ type VolumeService interface {
 
 	// GetVolume retrieves a volume by ID
 	GetVolume(ctx context.Context, volumeID uint) (*model.Volume, error)
+
+	// GetVolumeBySlug retrieves a volume by slug
+	GetVolumeBySlug(ctx context.Context, slug string) (*model.Volume, error)
 
 	// ListVolumesByProjectID retrieves all volumes for a project
 	ListVolumesByProjectID(ctx context.Context, projectID uint) ([]*model.Volume, error)
@@ -114,6 +118,24 @@ func (s *volumeService) GetVolume(ctx context.Context, volumeID uint) (*model.Vo
 	}
 
 	volume, err := s.volumeRepo.FindByID(ctx, volumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	return volume, nil
+}
+
+// GetVolumeBySlug retrieves a volume by slug
+func (s *volumeService) GetVolumeBySlug(ctx context.Context, slug string) (*model.Volume, error) {
+	// Validate slug format before repository lookup
+	// This returns ErrSlugInvalidFormat for malformed slugs (wrong length/prefix)
+	// which maps to 400 Bad Request instead of 404 Not Found
+	_, err := volumevalue.NewVolumeSlug(slug)
+	if err != nil {
+		return nil, err
+	}
+
+	volume, err := s.volumeRepo.FindBySlug(ctx, slug)
 	if err != nil {
 		return nil, err
 	}
