@@ -9,7 +9,6 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/joho/godotenv"
 )
 
 // TestDB manages test database connection
@@ -22,12 +21,8 @@ type TestDB struct {
 func SetupTestDB(t *testing.T) *TestDB {
 	t.Helper()
 
-	// Load environment variables - use .env.e2e for E2E tests, .env.test for integration tests
-	if os.Getenv("E2E_TEST") == "true" {
-		_ = godotenv.Load(".env.e2e")
-	} else {
-		_ = godotenv.Load(".env.test")
-	}
+	// Load environment variables from .env.test
+	LoadTestEnv(t)
 
 	// Read environment variables
 	host := getEnv("DB_HOST", "localhost")

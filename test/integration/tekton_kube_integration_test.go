@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
+	"github.com/swm-launchpad/web-console-backend/test/helper"
 )
 
 // TestTektonKubeIntegration tests the integration between TektonClient and KubeClient.
@@ -25,19 +25,8 @@ func TestTektonKubeIntegration(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	// Load environment variables
-	// Try multiple paths to find .env.test
-	err := godotenv.Load(".env.test")
-	if err != nil {
-		err = godotenv.Load("../../.env.test")
-	}
-	if err != nil {
-		err = godotenv.Load(".env")
-	}
-	// If all fail, environment variables might already be set - continue anyway
-	if err != nil {
-		t.Logf("Warning: Failed to load .env file: %v (environment variables might already be set)", err)
-	}
+	// Load environment variables from .env.test
+	helper.LoadTestEnv(t)
 
 	// Verify required environment variables
 	requiredEnvVars := []string{
@@ -406,19 +395,8 @@ func TestTektonClient_FullDeploymentFlow(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
-	// Load environment variables
-	// Try multiple paths to find .env.test
-	err := godotenv.Load(".env.test")
-	if err != nil {
-		err = godotenv.Load("../../.env.test")
-	}
-	if err != nil {
-		err = godotenv.Load(".env")
-	}
-	// If all fail, environment variables might already be set - continue anyway
-	if err != nil {
-		t.Logf("Warning: Failed to load .env file: %v (environment variables might already be set)", err)
-	}
+	// Load environment variables from .env.test
+	helper.LoadTestEnv(t)
 
 	ctx := context.Background()
 
