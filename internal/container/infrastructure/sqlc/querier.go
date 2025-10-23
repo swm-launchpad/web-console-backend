@@ -10,6 +10,7 @@ import (
 )
 
 type Querier interface {
+	CountBuildVarsByContainerID(ctx context.Context, containerID uint32) (int64, error)
 	CountContainers(ctx context.Context) (int64, error)
 	CountContainersByProjectID(ctx context.Context, projectID uint32) (int64, error)
 	CountContainersByTemplateID(ctx context.Context, templateID sql.NullInt32) (int64, error)
@@ -17,6 +18,8 @@ type Querier interface {
 	CountMountsByContainerID(ctx context.Context, containerID uint32) (int64, error)
 	CountNetworksByContainerID(ctx context.Context, containerID uint32) (int64, error)
 	CountSecretsByContainerID(ctx context.Context, containerID uint32) (int64, error)
+	// Build Variables CRUD
+	CreateBuildVar(ctx context.Context, arg CreateBuildVarParams) (sql.Result, error)
 	// Containers CRUD
 	CreateContainer(ctx context.Context, arg CreateContainerParams) (sql.Result, error)
 	// Environment Variables CRUD
@@ -27,6 +30,8 @@ type Querier interface {
 	CreateNetwork(ctx context.Context, arg CreateNetworkParams) (sql.Result, error)
 	// Secrets CRUD
 	CreateSecret(ctx context.Context, arg CreateSecretParams) (sql.Result, error)
+	DeleteBuildVar(ctx context.Context, arg DeleteBuildVarParams) (sql.Result, error)
+	DeleteBuildVarsByContainerID(ctx context.Context, containerID uint32) (sql.Result, error)
 	DeleteContainer(ctx context.Context, arg DeleteContainerParams) (sql.Result, error)
 	DeleteContainersByProjectID(ctx context.Context, arg DeleteContainersByProjectIDParams) (sql.Result, error)
 	DeleteEnvVar(ctx context.Context, arg DeleteEnvVarParams) (sql.Result, error)
@@ -46,6 +51,8 @@ type Querier interface {
 	// Templates are read-only and managed directly in the database by administrators
 	FindAllTemplates(ctx context.Context) ([]Template, error)
 	FindTemplateByID(ctx context.Context, templateID uint32) (Template, error)
+	GetBuildVarByKey(ctx context.Context, arg GetBuildVarByKeyParams) (BuildVar, error)
+	GetBuildVarsByContainerID(ctx context.Context, containerID uint32) ([]BuildVar, error)
 	GetContainerByID(ctx context.Context, containerID uint32) (Container, error)
 	GetContainerByIDForUpdate(ctx context.Context, containerID uint32) (Container, error)
 	GetContainerBySlug(ctx context.Context, slug string) (Container, error)
@@ -60,6 +67,7 @@ type Querier interface {
 	GetTotalResourceUsageByProject(ctx context.Context, projectID uint32) (GetTotalResourceUsageByProjectRow, error)
 	ListContainers(ctx context.Context, arg ListContainersParams) ([]Container, error)
 	ListContainersByProjectID(ctx context.Context, projectID uint32) ([]Container, error)
+	UpdateBuildVar(ctx context.Context, arg UpdateBuildVarParams) (sql.Result, error)
 	UpdateContainer(ctx context.Context, arg UpdateContainerParams) (sql.Result, error)
 	UpdateEnvVar(ctx context.Context, arg UpdateEnvVarParams) (sql.Result, error)
 	UpdateNetwork(ctx context.Context, arg UpdateNetworkParams) (sql.Result, error)

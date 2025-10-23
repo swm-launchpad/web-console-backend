@@ -445,3 +445,180 @@ func TestContainer_SetGitHubInstallationID(t *testing.T) {
 	container.SetGitHubInstallationID(nil)
 	assert.Nil(t, container.GitHubInstallationID())
 }
+
+// ============================================================================
+// BuildVar Tests
+// ============================================================================
+
+func TestContainer_AddBuildVar(t *testing.T) {
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
+	container.SetContainerID(1)
+
+	t.Run("Success", func(t *testing.T) {
+		_, err := container.AddBuildVar("NODE_ENV", "production")
+		require.NoError(t, err)
+		assert.Len(t, container.BuildVars(), 1)
+		assert.True(t, container.HasBuildVar("NODE_ENV"))
+	})
+
+	t.Run("Duplicate key", func(t *testing.T) {
+		_, err := container.AddBuildVar("NODE_ENV", "development")
+		assert.ErrorIs(t, err, containererrors.ErrDuplicateBuildVarKey)
+	})
+
+	t.Run("Max build vars exceeded", func(t *testing.T) {
+		// Add 99 more build vars (already have 1)
+		for i := 1; i < MaxBuildVarsPerContainer; i++ {
+			key := "VAR_" + string(rune('A'+i%26)) + string(rune('0'+i/26))
+			_, _ = container.AddBuildVar(key, "value")
+		}
+		assert.Len(t, container.BuildVars(), MaxBuildVarsPerContainer)
+
+		// Try to add one more
+		_, err := container.AddBuildVar("EXTRA_VAR", "value")
+		assert.ErrorIs(t, err, containererrors.ErrMaxBuildVarsExceeded)
+	})
+}
+
+func TestContainer_UpdateBuildVar(t *testing.T) {
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
+	container.SetContainerID(1)
+	_, _ = container.AddBuildVar("NODE_ENV", "production")
+
+	t.Run("Success", func(t *testing.T) {
+		err := container.UpdateBuildVar("NODE_ENV", "development")
+		require.NoError(t, err)
+
+		buildVar, _ := container.GetBuildVar("NODE_ENV")
+		assert.Equal(t, "development", buildVar.Value())
+	})
+
+	t.Run("Build var not found", func(t *testing.T) {
+		err := container.UpdateBuildVar("NONEXISTENT", "value")
+		assert.ErrorIs(t, err, containererrors.ErrBuildVarNotFound)
+	})
+}
+
+func TestContainer_DeleteBuildVar(t *testing.T) {
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
+	container.SetContainerID(1)
+	_, _ = container.AddBuildVar("NODE_ENV", "production")
+	_, _ = container.AddBuildVar("DEBUG", "true")
+
+	t.Run("Success", func(t *testing.T) {
+		err := container.DeleteBuildVar("NODE_ENV")
+		require.NoError(t, err)
+		assert.Len(t, container.BuildVars(), 1)
+		assert.False(t, container.HasBuildVar("NODE_ENV"))
+		assert.True(t, container.HasBuildVar("DEBUG"))
+	})
+
+	t.Run("Build var not found", func(t *testing.T) {
+		err := container.DeleteBuildVar("NONEXISTENT")
+		assert.ErrorIs(t, err, containererrors.ErrBuildVarNotFound)
+	})
+}
+
+// ============================================================================
+// Cross-Type Key Validation Tests
+// ============================================================================
+
+func TestContainer_CrossTypeKeyValidation_EnvVarConflict(t *testing.T) {
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
+	container.SetContainerID(1)
+
+	// Add an environment variable
+	_, err := container.AddEnvVar("API_KEY", "env_value")
+	require.NoError(t, err)
+
+	// Try to add a secret with the same key
+	t.Run("Cannot add secret with existing env var key", func(t *testing.T) {
+		_, err := container.AddSecret("API_KEY", "secret_value")
+		assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+	})
+
+	// Try to add a build var with the same key
+	t.Run("Cannot add build var with existing env var key", func(t *testing.T) {
+		_, err := container.AddBuildVar("API_KEY", "build_value")
+		assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+	})
+}
+
+func TestContainer_CrossTypeKeyValidation_SecretConflict(t *testing.T) {
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
+	container.SetContainerID(1)
+
+	// Add a secret
+	_, err := container.AddSecret("DATABASE_PASSWORD", "secret_value")
+	require.NoError(t, err)
+
+	// Try to add an env var with the same key
+	t.Run("Cannot add env var with existing secret key", func(t *testing.T) {
+		_, err := container.AddEnvVar("DATABASE_PASSWORD", "env_value")
+		assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+	})
+
+	// Try to add a build var with the same key
+	t.Run("Cannot add build var with existing secret key", func(t *testing.T) {
+		_, err := container.AddBuildVar("DATABASE_PASSWORD", "build_value")
+		assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+	})
+}
+
+func TestContainer_CrossTypeKeyValidation_BuildVarConflict(t *testing.T) {
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
+	container.SetContainerID(1)
+
+	// Add a build variable
+	_, err := container.AddBuildVar("BUILD_VERSION", "build_value")
+	require.NoError(t, err)
+
+	// Try to add an env var with the same key
+	t.Run("Cannot add env var with existing build var key", func(t *testing.T) {
+		_, err := container.AddEnvVar("BUILD_VERSION", "env_value")
+		assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+	})
+
+	// Try to add a secret with the same key
+	t.Run("Cannot add secret with existing build var key", func(t *testing.T) {
+		_, err := container.AddSecret("BUILD_VERSION", "secret_value")
+		assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+	})
+}
+
+func TestContainer_CrossTypeKeyValidation_AllThreeTypes(t *testing.T) {
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	container, _ := NewContainer(1, "Backend API", slug, defaultGitConfig(), defaultResourceLimits(), nil, nil, nil)
+	container.SetContainerID(1)
+
+	// Add three different keys, one for each type
+	_, err := container.AddEnvVar("ENV_VAR", "env_value")
+	require.NoError(t, err)
+
+	_, err = container.AddSecret("SECRET_VAR", "secret_value")
+	require.NoError(t, err)
+
+	_, err = container.AddBuildVar("BUILD_VAR", "build_value")
+	require.NoError(t, err)
+
+	// Verify all three exist independently
+	assert.True(t, container.HasEnvVar("ENV_VAR"))
+	assert.True(t, container.HasSecret("SECRET_VAR"))
+	assert.True(t, container.HasBuildVar("BUILD_VAR"))
+
+	// Verify cross-type conflicts are enforced
+	_, err = container.AddEnvVar("SECRET_VAR", "value")
+	assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+
+	_, err = container.AddSecret("BUILD_VAR", "value")
+	assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+
+	_, err = container.AddBuildVar("ENV_VAR", "value")
+	assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+}

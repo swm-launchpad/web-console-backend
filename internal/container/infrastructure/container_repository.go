@@ -83,8 +83,17 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 			CreatedAt:   envVar.CreatedAt(),
 			UpdatedAt:   timeToNullTime(envVar.UpdatedAt()),
 		}
-		if _, err := qtx.CreateEnvVar(ctx, envParams); err != nil {
+		result, err := qtx.CreateEnvVar(ctx, envParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if envVar.EnvVarID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			envVar.SetEnvVarID(uint(id))
 		}
 	}
 
@@ -114,8 +123,40 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 			CreatedAt:   secret.CreatedAt(),
 			UpdatedAt:   timeToNullTime(secret.UpdatedAt()),
 		}
-		if _, err := qtx.CreateSecret(ctx, secretParams); err != nil {
+		result, err := qtx.CreateSecret(ctx, secretParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if secret.SecretID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			secret.SetSecretID(uint(id))
+		}
+	}
+
+	// Save build variables
+	for _, buildVar := range container.BuildVars() {
+		buildVarParams := sqlc.CreateBuildVarParams{
+			ContainerID: uint32(container.ContainerID()),
+			Key:         buildVar.Key(),
+			Value:       sql.NullString{String: buildVar.Value(), Valid: true},
+			CreatedAt:   buildVar.CreatedAt(),
+			UpdatedAt:   timeToNullTime(buildVar.UpdatedAt()),
+		}
+		result, err := qtx.CreateBuildVar(ctx, buildVarParams)
+		if err != nil {
+			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if buildVar.BuildVarID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			buildVar.SetBuildVarID(uint(id))
 		}
 	}
 
@@ -185,8 +226,17 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 			CreatedAt:   envVar.CreatedAt(),
 			UpdatedAt:   timeToNullTime(envVar.UpdatedAt()),
 		}
-		if _, err := qtx.CreateEnvVar(ctx, envParams); err != nil {
+		result, err := qtx.CreateEnvVar(ctx, envParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if envVar.EnvVarID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			envVar.SetEnvVarID(uint(id))
 		}
 	}
 
@@ -224,8 +274,44 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 			CreatedAt:   secret.CreatedAt(),
 			UpdatedAt:   timeToNullTime(secret.UpdatedAt()),
 		}
-		if _, err := qtx.CreateSecret(ctx, secretParams); err != nil {
+		result, err := qtx.CreateSecret(ctx, secretParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if secret.SecretID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			secret.SetSecretID(uint(id))
+		}
+	}
+
+	// Sync build variables
+	if _, err := qtx.DeleteBuildVarsByContainerID(ctx, uint32(container.ContainerID())); err != nil {
+		return containererrors.ErrDatabaseOperation
+	}
+
+	for _, buildVar := range container.BuildVars() {
+		buildVarParams := sqlc.CreateBuildVarParams{
+			ContainerID: uint32(container.ContainerID()),
+			Key:         buildVar.Key(),
+			Value:       sql.NullString{String: buildVar.Value(), Valid: true},
+			CreatedAt:   buildVar.CreatedAt(),
+			UpdatedAt:   timeToNullTime(buildVar.UpdatedAt()),
+		}
+		result, err := qtx.CreateBuildVar(ctx, buildVarParams)
+		if err != nil {
+			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if buildVar.BuildVarID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			buildVar.SetBuildVarID(uint(id))
 		}
 	}
 
@@ -310,6 +396,16 @@ func (r *containerRepository) FindByID(ctx context.Context, containerID uint) (*
 		return nil, err
 	}
 
+	// Load build variables
+	sqlcBuildVars, err := qtx.GetBuildVarsByContainerID(ctx, uint32(containerID))
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, containererrors.ErrDatabaseOperation
+	}
+
+	if err := r.loadBuildVars(container, sqlcBuildVars); err != nil {
+		return nil, err
+	}
+
 	// Load mounts
 	sqlcMounts, err := qtx.GetMountsByContainerID(ctx, uint32(containerID))
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -371,6 +467,16 @@ func (r *containerRepository) FindByIDForUpdate(ctx context.Context, containerID
 		return nil, err
 	}
 
+	// Load build variables
+	sqlcBuildVars, err := qtx.GetBuildVarsByContainerID(ctx, uint32(containerID))
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, containererrors.ErrDatabaseOperation
+	}
+
+	if err := r.loadBuildVars(container, sqlcBuildVars); err != nil {
+		return nil, err
+	}
+
 	// Load mounts
 	sqlcMounts, err := qtx.GetMountsByContainerID(ctx, uint32(containerID))
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -424,6 +530,36 @@ func (r *containerRepository) FindByProjectID(ctx context.Context, projectID uin
 		}
 
 		if err := r.loadNetworks(container, sqlcNetworks); err != nil {
+			return nil, err
+		}
+
+		// Load secrets for each container
+		sqlcSecrets, err := qtx.GetSecretsByContainerID(ctx, uint32(container.ContainerID()))
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, containererrors.ErrDatabaseOperation
+		}
+
+		if err := r.loadSecrets(container, sqlcSecrets); err != nil {
+			return nil, err
+		}
+
+		// Load build variables for each container
+		sqlcBuildVars, err := qtx.GetBuildVarsByContainerID(ctx, uint32(container.ContainerID()))
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, containererrors.ErrDatabaseOperation
+		}
+
+		if err := r.loadBuildVars(container, sqlcBuildVars); err != nil {
+			return nil, err
+		}
+
+		// Load mounts for each container
+		sqlcMounts, err := qtx.GetMountsByContainerID(ctx, uint32(container.ContainerID()))
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, containererrors.ErrDatabaseOperation
+		}
+
+		if err := r.loadMounts(container, sqlcMounts); err != nil {
 			return nil, err
 		}
 
@@ -618,6 +754,19 @@ func (r *containerRepository) loadSecrets(container *model.Container, sqlcSecret
 	return nil
 }
 
+func (r *containerRepository) loadBuildVars(container *model.Container, sqlcBuildVars []sqlc.BuildVar) error {
+	for _, sqlcBuildVar := range sqlcBuildVars {
+		buildVar, err := r.toDomainBuildVarFromRow(sqlcBuildVar)
+		if err != nil {
+			return err
+		}
+		if err := container.AddBuildVarDirect(buildVar); err != nil {
+			return containererrors.ErrDatabaseOperation
+		}
+	}
+	return nil
+}
+
 func (r *containerRepository) loadMounts(container *model.Container, sqlcMounts []sqlc.Mount) error {
 	for _, sqlcMount := range sqlcMounts {
 		mount, err := r.toDomainMount(sqlcMount)
@@ -806,6 +955,18 @@ func (r *containerRepository) toDomainSecret(sqlcSecret sqlc.GetSecretsByContain
 		fromNullTimeOrZero(sqlcSecret.UpdatedAt),
 	)
 	return secret, nil
+}
+
+func (r *containerRepository) toDomainBuildVarFromRow(sqlcBuildVar sqlc.BuildVar) (*model.BuildVar, error) {
+	buildVar := model.ReconstructBuildVar(
+		uint(sqlcBuildVar.BuildVarID),
+		uint(sqlcBuildVar.ContainerID),
+		sqlcBuildVar.Key,
+		nullStringToString(sqlcBuildVar.Value),
+		sqlcBuildVar.CreatedAt,
+		fromNullTimeOrZero(sqlcBuildVar.UpdatedAt),
+	)
+	return buildVar, nil
 }
 
 func (r *containerRepository) toDomainMount(sqlcMount sqlc.Mount) (*model.Mount, error) {

@@ -188,6 +188,12 @@ func (r *Router) Setup() {
 			containers.PUT("/:slug/secrets/:key", r.containerHandler.UpdateSecret)
 			containers.DELETE("/:slug/secrets/:key", r.containerHandler.DeleteSecret)
 
+			// Build Variables
+			containers.GET("/:slug/build-vars", r.containerHandler.ListBuildVars)
+			containers.POST("/:slug/build-vars", r.containerHandler.AddBuildVar)
+			containers.PUT("/:slug/build-vars/:key", r.containerHandler.UpdateBuildVar)
+			containers.DELETE("/:slug/build-vars/:key", r.containerHandler.DeleteBuildVar)
+
 			// Mounts
 			containers.POST("/:slug/mounts", r.containerHandler.AddMount)
 			containers.DELETE("/:slug/mounts/:volume_id", r.containerHandler.DeleteMount)

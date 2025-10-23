@@ -9,7 +9,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/test/helper"
 )
 
-func TestMigration_BuildEnvVars(t *testing.T) {
+func TestMigration_BuildVars(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -17,15 +17,15 @@ func TestMigration_BuildEnvVars(t *testing.T) {
 	testDB := helper.SetupTestDB(t)
 	defer testDB.Cleanup()
 
-	t.Run("BUILD_ENV_VARS table exists with correct schema", func(t *testing.T) {
+	t.Run("BUILD_VARS table exists with correct schema", func(t *testing.T) {
 		// Check table exists
 		var tableName string
-		err := testDB.DB.QueryRow("SHOW TABLES LIKE 'BUILD_ENV_VARS'").Scan(&tableName)
+		err := testDB.DB.QueryRow("SHOW TABLES LIKE 'BUILD_VARS'").Scan(&tableName)
 		require.NoError(t, err)
-		assert.Equal(t, "BUILD_ENV_VARS", tableName)
+		assert.Equal(t, "BUILD_VARS", tableName)
 
 		// Check columns
-		rows, err := testDB.DB.Query("DESCRIBE BUILD_ENV_VARS")
+		rows, err := testDB.DB.Query("DESCRIBE BUILD_VARS")
 		require.NoError(t, err)
 		defer func() {
 			require.NoError(t, rows.Close())
@@ -40,7 +40,7 @@ func TestMigration_BuildEnvVars(t *testing.T) {
 		}
 
 		// Verify columns
-		assert.Contains(t, columns, "build_env_var_id")
+		assert.Contains(t, columns, "build_var_id")
 		assert.Contains(t, columns, "container_id")
 		assert.Contains(t, columns, "key")
 		assert.Contains(t, columns, "value")
@@ -48,13 +48,13 @@ func TestMigration_BuildEnvVars(t *testing.T) {
 		assert.Contains(t, columns, "updated_at")
 
 		// Verify data types
-		assert.Contains(t, columns["build_env_var_id"], "int")
+		assert.Contains(t, columns["build_var_id"], "int")
 		assert.Contains(t, columns["container_id"], "int")
 		assert.Equal(t, "varchar(255)", columns["key"])
 		assert.Equal(t, "text", columns["value"])
 	})
 
-	t.Run("BUILD_ENV_VARS unique constraint works", func(t *testing.T) {
+	t.Run("BUILD_VARS unique constraint works", func(t *testing.T) {
 		// Create test project (slug must be 23 chars: p{timestamp}{random})
 		_, err := testDB.DB.Exec(`
 			INSERT INTO PROJECTS (name, slug, status, project_operation_status)
@@ -71,22 +71,22 @@ func TestMigration_BuildEnvVars(t *testing.T) {
 		require.NoError(t, err)
 		containerID, _ := result.LastInsertId()
 
-		// Insert first build env var
+		// Insert first build var
 		_, err = testDB.DB.Exec(`
-			INSERT INTO BUILD_ENV_VARS (container_id, `+"`key`"+`, value)
+			INSERT INTO BUILD_VARS (container_id, `+"`key`"+`, value)
 			VALUES (?, 'TEST_KEY', 'test_value')
 		`, containerID)
 		require.NoError(t, err)
 
 		// Try to insert duplicate key - should fail
 		_, err = testDB.DB.Exec(`
-			INSERT INTO BUILD_ENV_VARS (container_id, `+"`key`"+`, value)
+			INSERT INTO BUILD_VARS (container_id, `+"`key`"+`, value)
 			VALUES (?, 'TEST_KEY', 'another_value')
 		`, containerID)
 		assert.Error(t, err, "Duplicate key should fail")
 	})
 
-	t.Run("BUILD_ENV_VARS cascade delete works", func(t *testing.T) {
+	t.Run("BUILD_VARS cascade delete works", func(t *testing.T) {
 		// Create test project (slug must be 23 chars)
 		_, err := testDB.DB.Exec(`
 			INSERT INTO PROJECTS (name, slug, status, project_operation_status)
@@ -103,9 +103,9 @@ func TestMigration_BuildEnvVars(t *testing.T) {
 		require.NoError(t, err)
 		containerID, _ := result.LastInsertId()
 
-		// Insert build env var
+		// Insert build var
 		_, err = testDB.DB.Exec(`
-			INSERT INTO BUILD_ENV_VARS (container_id, `+"`key`"+`, value)
+			INSERT INTO BUILD_VARS (container_id, `+"`key`"+`, value)
 			VALUES (?, 'CASCADE_TEST', 'value')
 		`, containerID)
 		require.NoError(t, err)
@@ -114,11 +114,11 @@ func TestMigration_BuildEnvVars(t *testing.T) {
 		_, err = testDB.DB.Exec("DELETE FROM CONTAINERS WHERE container_id = ?", containerID)
 		require.NoError(t, err)
 
-		// Verify build env vars were cascade deleted
+		// Verify build vars were cascade deleted
 		var count int
-		err = testDB.DB.QueryRow("SELECT COUNT(*) FROM BUILD_ENV_VARS WHERE container_id = ?", containerID).Scan(&count)
+		err = testDB.DB.QueryRow("SELECT COUNT(*) FROM BUILD_VARS WHERE container_id = ?", containerID).Scan(&count)
 		require.NoError(t, err)
-		assert.Equal(t, 0, count, "Build env vars should be cascade deleted")
+		assert.Equal(t, 0, count, "Build vars should be cascade deleted")
 	})
 }
 

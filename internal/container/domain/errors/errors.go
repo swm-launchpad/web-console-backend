@@ -91,6 +91,26 @@ var (
 	ErrSecretNotInContainer = errors.New("secret not in container")
 )
 
+// Build variable errors - build-time environment variable errors
+var (
+	ErrBuildVarNotFound       = errors.New("build variable not found")
+	ErrBuildVarKeyRequired    = errors.New("build variable key is required")
+	ErrBuildVarValueRequired  = errors.New("build variable value is required")
+	ErrInvalidBuildVarKey     = errors.New("invalid build variable key")
+	ErrBuildVarKeyTooLong     = errors.New("build variable key is too long")
+	ErrBuildVarValueTooLong   = errors.New("build variable value is too long")
+	ErrDuplicateBuildVarKey   = errors.New("duplicate build variable key")
+	ErrReservedBuildVarKey    = errors.New("reserved build variable key")
+	ErrMaxBuildVarsExceeded   = errors.New("maximum number of build variables exceeded")
+	ErrCannotDeleteBuildVar   = errors.New("cannot delete build variable")
+	ErrBuildVarNotInContainer = errors.New("build variable not in container")
+)
+
+// Cross-type key validation errors - keys must be unique across env_vars, secrets, and build_vars
+var (
+	ErrDuplicateKeyAcrossTypes = errors.New("key already exists in environment variables, secrets, or build variables")
+)
+
 // Network errors - network and port configuration errors
 var (
 	ErrInvalidPort           = errors.New("invalid port number")
