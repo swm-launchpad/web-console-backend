@@ -5,6 +5,7 @@ import (
 
 	autherrors "github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	config "github.com/swm-launchpad/web-console-backend/internal/common/config"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
 // ErrorMapping contains complete error mapping information
@@ -18,6 +19,7 @@ type ErrorMapping struct {
 type ErrorMapper func(error) (ErrorMapping, bool)
 
 // commonErrorMap provides mapping for common/infrastructure errors
+// and frequently used cross-domain errors
 var commonErrorMap = map[error]ErrorMapping{
 	// Auth package errors
 	autherrors.ErrTokenExpired:          {StatusCode: http.StatusUnauthorized, Code: "TOKEN_EXPIRED", Message: "Token expired"},
@@ -35,6 +37,16 @@ var commonErrorMap = map[error]ErrorMapping{
 	config.ErrMissingJWTSecret:    {StatusCode: http.StatusInternalServerError, Code: "MISSING_JWT_SECRET", Message: "Missing JWT secret"},
 	config.ErrInvalidDBConfig:     {StatusCode: http.StatusInternalServerError, Code: "INVALID_DB_CONFIG", Message: "Invalid database configuration"},
 	config.ErrInvalidServerConfig: {StatusCode: http.StatusInternalServerError, Code: "INVALID_SERVER_CONFIG", Message: "Invalid server configuration"},
+
+	// Project domain errors (cross-domain usage)
+	// These errors are used by other bounded contexts (e.g., container, volume handlers)
+	// when they interact with project resources
+	projecterrors.ErrProjectNotFound:   {StatusCode: http.StatusNotFound, Code: "PROJECT_NOT_FOUND", Message: "Project not found"},
+	projecterrors.ErrSlugInvalidLength: {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG_FORMAT", Message: "Invalid slug format"},
+	projecterrors.ErrSlugInvalidFormat: {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG_FORMAT", Message: "Invalid slug format"},
+
+	// Volume errors (part of project domain, used cross-domain)
+	projecterrors.ErrVolumeNotFound: {StatusCode: http.StatusNotFound, Code: "VOLUME_NOT_FOUND", Message: "Volume not found"},
 }
 
 // mapCommonError maps common package errors to ErrorMapping (internal use)
