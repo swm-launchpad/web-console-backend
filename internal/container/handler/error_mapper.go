@@ -65,6 +65,35 @@ var containerErrorMap = map[error]response.ErrorMapping{
 	containererrors.ErrCannotDeleteEnvVar:   {StatusCode: http.StatusBadRequest, Code: "CANNOT_DELETE_ENV_VAR", Message: "Cannot delete environment variable"},
 	containererrors.ErrEnvVarNotInContainer: {StatusCode: http.StatusBadRequest, Code: "ENV_VAR_NOT_IN_CONTAINER", Message: "Environment variable not in container"},
 
+	// Secret errors
+	containererrors.ErrSecretNotFound:       {StatusCode: http.StatusNotFound, Code: "SECRET_NOT_FOUND", Message: "Secret not found"},
+	containererrors.ErrSecretKeyRequired:    {StatusCode: http.StatusBadRequest, Code: "SECRET_KEY_REQUIRED", Message: "Secret key is required"},
+	containererrors.ErrSecretValueRequired:  {StatusCode: http.StatusBadRequest, Code: "SECRET_VALUE_REQUIRED", Message: "Secret value is required"},
+	containererrors.ErrInvalidSecretKey:     {StatusCode: http.StatusBadRequest, Code: "INVALID_SECRET_KEY", Message: "Invalid secret key"},
+	containererrors.ErrSecretKeyTooLong:     {StatusCode: http.StatusBadRequest, Code: "SECRET_KEY_TOO_LONG", Message: "Secret key is too long"},
+	containererrors.ErrSecretValueTooLong:   {StatusCode: http.StatusBadRequest, Code: "SECRET_VALUE_TOO_LONG", Message: "Secret value is too long"},
+	containererrors.ErrDuplicateSecretKey:   {StatusCode: http.StatusConflict, Code: "DUPLICATE_SECRET_KEY", Message: "Duplicate secret key"},
+	containererrors.ErrReservedSecretKey:    {StatusCode: http.StatusBadRequest, Code: "RESERVED_SECRET_KEY", Message: "Reserved secret key"},
+	containererrors.ErrMaxSecretsExceeded:   {StatusCode: http.StatusBadRequest, Code: "MAX_SECRETS_EXCEEDED", Message: "Maximum number of secrets exceeded"},
+	containererrors.ErrCannotDeleteSecret:   {StatusCode: http.StatusBadRequest, Code: "CANNOT_DELETE_SECRET", Message: "Cannot delete secret"},
+	containererrors.ErrSecretNotInContainer: {StatusCode: http.StatusBadRequest, Code: "SECRET_NOT_IN_CONTAINER", Message: "Secret not in container"},
+
+	// Build variable errors
+	containererrors.ErrBuildVarNotFound:       {StatusCode: http.StatusNotFound, Code: "BUILD_VAR_NOT_FOUND", Message: "Build variable not found"},
+	containererrors.ErrBuildVarKeyRequired:    {StatusCode: http.StatusBadRequest, Code: "BUILD_VAR_KEY_REQUIRED", Message: "Build variable key is required"},
+	containererrors.ErrBuildVarValueRequired:  {StatusCode: http.StatusBadRequest, Code: "BUILD_VAR_VALUE_REQUIRED", Message: "Build variable value is required"},
+	containererrors.ErrInvalidBuildVarKey:     {StatusCode: http.StatusBadRequest, Code: "INVALID_BUILD_VAR_KEY", Message: "Invalid build variable key"},
+	containererrors.ErrBuildVarKeyTooLong:     {StatusCode: http.StatusBadRequest, Code: "BUILD_VAR_KEY_TOO_LONG", Message: "Build variable key is too long"},
+	containererrors.ErrBuildVarValueTooLong:   {StatusCode: http.StatusBadRequest, Code: "BUILD_VAR_VALUE_TOO_LONG", Message: "Build variable value is too long"},
+	containererrors.ErrDuplicateBuildVarKey:   {StatusCode: http.StatusConflict, Code: "DUPLICATE_BUILD_VAR_KEY", Message: "Duplicate build variable key"},
+	containererrors.ErrReservedBuildVarKey:    {StatusCode: http.StatusBadRequest, Code: "RESERVED_BUILD_VAR_KEY", Message: "Reserved build variable key"},
+	containererrors.ErrMaxBuildVarsExceeded:   {StatusCode: http.StatusBadRequest, Code: "MAX_BUILD_VARS_EXCEEDED", Message: "Maximum number of build variables exceeded"},
+	containererrors.ErrCannotDeleteBuildVar:   {StatusCode: http.StatusBadRequest, Code: "CANNOT_DELETE_BUILD_VAR", Message: "Cannot delete build variable"},
+	containererrors.ErrBuildVarNotInContainer: {StatusCode: http.StatusBadRequest, Code: "BUILD_VAR_NOT_IN_CONTAINER", Message: "Build variable not in container"},
+
+	// Cross-type key validation errors
+	containererrors.ErrDuplicateKeyAcrossTypes: {StatusCode: http.StatusConflict, Code: "DUPLICATE_KEY_ACROSS_TYPES", Message: "Key already exists in environment variables, secrets, or build variables"},
+
 	// Network errors
 	containererrors.ErrInvalidPort:           {StatusCode: http.StatusBadRequest, Code: "INVALID_PORT", Message: "Invalid port number"},
 	containererrors.ErrInternalPortRequired:  {StatusCode: http.StatusBadRequest, Code: "INTERNAL_PORT_REQUIRED", Message: "Internal port is required"},

@@ -27,6 +27,9 @@ type ContainerHandler struct {
 	addSecretUC       *application.AddSecretUseCase
 	updateSecretUC    *application.UpdateSecretUseCase
 	deleteSecretUC    *application.DeleteSecretUseCase
+	addBuildVarUC     *application.AddBuildVarUseCase
+	updateBuildVarUC  *application.UpdateBuildVarUseCase
+	deleteBuildVarUC  *application.DeleteBuildVarUseCase
 	addMountUC        *application.AddMountUseCase
 	deleteMountUC     *application.DeleteMountUseCase
 	projectService    projectservice.ProjectService
@@ -56,6 +59,9 @@ func NewContainerHandler(
 	addSecretUC *application.AddSecretUseCase,
 	updateSecretUC *application.UpdateSecretUseCase,
 	deleteSecretUC *application.DeleteSecretUseCase,
+	addBuildVarUC *application.AddBuildVarUseCase,
+	updateBuildVarUC *application.UpdateBuildVarUseCase,
+	deleteBuildVarUC *application.DeleteBuildVarUseCase,
 	addMountUC *application.AddMountUseCase,
 	deleteMountUC *application.DeleteMountUseCase,
 	projectService projectservice.ProjectService,
@@ -75,6 +81,9 @@ func NewContainerHandler(
 		addSecretUC:       addSecretUC,
 		updateSecretUC:    updateSecretUC,
 		deleteSecretUC:    deleteSecretUC,
+		addBuildVarUC:     addBuildVarUC,
+		updateBuildVarUC:  updateBuildVarUC,
+		deleteBuildVarUC:  deleteBuildVarUC,
 		addMountUC:        addMountUC,
 		deleteMountUC:     deleteMountUC,
 		projectService:    projectService,
@@ -915,6 +924,170 @@ func (h *ContainerHandler) DeleteMount(c *gin.Context) {
 	}
 
 	output, err := h.deleteMountUC.Execute(c.Request.Context(), input)
+	if err != nil {
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, output)
+}
+
+// ============================================================================
+// Build Variable Handlers
+// ============================================================================
+
+// ListBuildVars handles fetching all build variables for a container
+func (h *ContainerHandler) ListBuildVars(c *gin.Context) {
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Get container to verify ownership and get build variables
+	input := application.GetContainerInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+
+	output, err := h.getContainerUC.Execute(c.Request.Context(), input)
+	if err != nil {
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Return just the build variables
+	response.OK(c, gin.H{"build_vars": output.BuildVars})
+}
+
+// AddBuildVarRequest represents the request body for adding a build variable
+type AddBuildVarRequest struct {
+	Key   string `json:"key" binding:"required"`
+	Value string `json:"value" binding:"required"`
+}
+
+// AddBuildVar handles adding a build variable to a container
+func (h *ContainerHandler) AddBuildVar(c *gin.Context) {
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	var req AddBuildVarRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, containererrors.ErrValidationFailed, mapContainerError)
+		return
+	}
+
+	input := application.AddBuildVarInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+		Key:         req.Key,
+		Value:       req.Value,
+	}
+
+	output, err := h.addBuildVarUC.Execute(c.Request.Context(), input)
+	if err != nil {
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.Created(c, output)
+}
+
+// UpdateBuildVarRequest represents the request body for updating a build variable
+type UpdateBuildVarRequest struct {
+	Value string `json:"value" binding:"required"`
+}
+
+// UpdateBuildVar handles updating a build variable in a container
+func (h *ContainerHandler) UpdateBuildVar(c *gin.Context) {
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Parse build var key from URL
+	buildVarKey := c.Param("key")
+	if buildVarKey == "" {
+		response.Error(c, containererrors.ErrMissingField, mapContainerError)
+		return
+	}
+
+	var req UpdateBuildVarRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, containererrors.ErrValidationFailed, mapContainerError)
+		return
+	}
+
+	input := application.UpdateBuildVarInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+		BuildVarKey: buildVarKey,
+		Value:       req.Value,
+	}
+
+	output, err := h.updateBuildVarUC.Execute(c.Request.Context(), input)
+	if err != nil {
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, output)
+}
+
+// DeleteBuildVar handles deleting a build variable from a container
+func (h *ContainerHandler) DeleteBuildVar(c *gin.Context) {
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Parse build var key from URL
+	key := c.Param("key")
+	if key == "" {
+		response.Error(c, containererrors.ErrMissingField, mapContainerError)
+		return
+	}
+
+	input := application.DeleteBuildVarInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+		Key:         key,
+	}
+
+	output, err := h.deleteBuildVarUC.Execute(c.Request.Context(), input)
 	if err != nil {
 		response.Error(c, err, mapContainerError)
 		return

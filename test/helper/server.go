@@ -114,6 +114,9 @@ func SetupTestServer(t *testing.T) *TestServer {
 	addSecretUseCase := containerApp.NewAddSecretUseCase(containerRepo, containerPermissionSvc, txManager)
 	updateSecretUseCase := containerApp.NewUpdateSecretUseCase(containerRepo, containerPermissionSvc, txManager)
 	deleteSecretUseCase := containerApp.NewDeleteSecretUseCase(containerRepo, containerPermissionSvc, txManager)
+	addBuildVarUseCase := containerApp.NewAddBuildVarUseCase(containerRepo, containerPermissionSvc, txManager)
+	updateBuildVarUseCase := containerApp.NewUpdateBuildVarUseCase(containerRepo, containerPermissionSvc, txManager)
+	deleteBuildVarUseCase := containerApp.NewDeleteBuildVarUseCase(containerRepo, containerPermissionSvc, txManager)
 	addMountUseCase := containerApp.NewAddMountUseCase(containerRepo, containerPermissionSvc, volumeSvc, txManager)
 	deleteMountUseCase := containerApp.NewDeleteMountUseCase(containerRepo, containerPermissionSvc, txManager)
 
@@ -155,6 +158,9 @@ func SetupTestServer(t *testing.T) *TestServer {
 		addSecretUseCase,
 		updateSecretUseCase,
 		deleteSecretUseCase,
+		addBuildVarUseCase,
+		updateBuildVarUseCase,
+		deleteBuildVarUseCase,
 		addMountUseCase,
 		deleteMountUseCase,
 		projectSvc,
