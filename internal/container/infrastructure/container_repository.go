@@ -479,6 +479,36 @@ func (r *containerRepository) FindByProjectID(ctx context.Context, projectID uin
 			return nil, err
 		}
 
+		// Load secrets for each container
+		sqlcSecrets, err := qtx.GetSecretsByContainerID(ctx, uint32(container.ContainerID()))
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, containererrors.ErrDatabaseOperation
+		}
+
+		if err := r.loadSecrets(container, sqlcSecrets); err != nil {
+			return nil, err
+		}
+
+		// Load build variables for each container
+		sqlcBuildVars, err := qtx.GetBuildVarsByContainerID(ctx, uint32(container.ContainerID()))
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, containererrors.ErrDatabaseOperation
+		}
+
+		if err := r.loadBuildVars(container, sqlcBuildVars); err != nil {
+			return nil, err
+		}
+
+		// Load mounts for each container
+		sqlcMounts, err := qtx.GetMountsByContainerID(ctx, uint32(container.ContainerID()))
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, containererrors.ErrDatabaseOperation
+		}
+
+		if err := r.loadMounts(container, sqlcMounts); err != nil {
+			return nil, err
+		}
+
 		containers = append(containers, container)
 	}
 
@@ -672,7 +702,7 @@ func (r *containerRepository) loadSecrets(container *model.Container, sqlcSecret
 
 func (r *containerRepository) loadBuildVars(container *model.Container, sqlcBuildVars []sqlc.BuildVar) error {
 	for _, sqlcBuildVar := range sqlcBuildVars {
-		buildVar, err := r.toDomainBuildVar(sqlcBuildVar)
+		buildVar, err := r.toDomainBuildVarFromRow(sqlcBuildVar)
 		if err != nil {
 			return err
 		}
@@ -873,7 +903,7 @@ func (r *containerRepository) toDomainSecret(sqlcSecret sqlc.GetSecretsByContain
 	return secret, nil
 }
 
-func (r *containerRepository) toDomainBuildVar(sqlcBuildVar sqlc.BuildVar) (*model.BuildVar, error) {
+func (r *containerRepository) toDomainBuildVarFromRow(sqlcBuildVar sqlc.BuildVar) (*model.BuildVar, error) {
 	buildVar := model.ReconstructBuildVar(
 		uint(sqlcBuildVar.BuildVarID),
 		uint(sqlcBuildVar.ContainerID),

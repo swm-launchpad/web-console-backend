@@ -74,8 +74,8 @@ func (q *Queries) DeleteBuildVarsByContainerID(ctx context.Context, containerID 
 
 const getBuildVarByKey = `-- name: GetBuildVarByKey :one
 SELECT
-    build_var_id, container_id, ` + "`" + `key` + "`" + `, value,
-    created_at, updated_at
+    container_id, ` + "`" + `key` + "`" + `, value,
+    created_at, updated_at, build_var_id
 FROM BUILD_VARS
 WHERE container_id = ? AND ` + "`" + `key` + "`" + ` = ?
 `
@@ -89,20 +89,20 @@ func (q *Queries) GetBuildVarByKey(ctx context.Context, arg GetBuildVarByKeyPara
 	row := q.db.QueryRowContext(ctx, getBuildVarByKey, arg.ContainerID, arg.Key)
 	var i BuildVar
 	err := row.Scan(
-		&i.BuildVarID,
 		&i.ContainerID,
 		&i.Key,
 		&i.Value,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BuildVarID,
 	)
 	return i, err
 }
 
 const getBuildVarsByContainerID = `-- name: GetBuildVarsByContainerID :many
 SELECT
-    build_var_id, container_id, ` + "`" + `key` + "`" + `, value,
-    created_at, updated_at
+    container_id, ` + "`" + `key` + "`" + `, value,
+    created_at, updated_at, build_var_id
 FROM BUILD_VARS
 WHERE container_id = ?
 ORDER BY ` + "`" + `key` + "`" + ` ASC
@@ -118,12 +118,12 @@ func (q *Queries) GetBuildVarsByContainerID(ctx context.Context, containerID uin
 	for rows.Next() {
 		var i BuildVar
 		if err := rows.Scan(
-			&i.BuildVarID,
 			&i.ContainerID,
 			&i.Key,
 			&i.Value,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.BuildVarID,
 		); err != nil {
 			return nil, err
 		}

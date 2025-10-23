@@ -495,15 +495,6 @@ func (ns NullVerificationTokensTokenType) Value() (driver.Value, error) {
 	return string(ns.VerificationTokensTokenType), nil
 }
 
-type BuildEnvVar struct {
-	BuildEnvVarID uint32         `json:"build_env_var_id"`
-	ContainerID   uint32         `json:"container_id"`
-	Key           string         `json:"key"`
-	Value         sql.NullString `json:"value"`
-	CreatedAt     time.Time      `json:"created_at"`
-	UpdatedAt     sql.NullTime   `json:"updated_at"`
-}
-
 type BuildHistory struct {
 	BuildHistoryID uint32         `json:"build_history_id"`
 	ContainerID    uint32         `json:"container_id"`
@@ -521,12 +512,12 @@ type BuildHistory struct {
 }
 
 type BuildVar struct {
-	BuildVarID  uint32         `json:"build_var_id"`
 	ContainerID uint32         `json:"container_id"`
 	Key         string         `json:"key"`
 	Value       sql.NullString `json:"value"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   sql.NullTime   `json:"updated_at"`
+	BuildVarID  uint32         `json:"build_var_id"`
 }
 
 type Container struct {

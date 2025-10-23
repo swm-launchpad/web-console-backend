@@ -8,16 +8,16 @@ INSERT INTO BUILD_VARS (
 
 -- name: GetBuildVarsByContainerID :many
 SELECT
-    build_var_id, container_id, `key`, value,
-    created_at, updated_at
+    container_id, `key`, value,
+    created_at, updated_at, build_var_id
 FROM BUILD_VARS
 WHERE container_id = ?
 ORDER BY `key` ASC;
 
 -- name: GetBuildVarByKey :one
 SELECT
-    build_var_id, container_id, `key`, value,
-    created_at, updated_at
+    container_id, `key`, value,
+    created_at, updated_at, build_var_id
 FROM BUILD_VARS
 WHERE container_id = ? AND `key` = ?;
 

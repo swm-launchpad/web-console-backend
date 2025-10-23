@@ -19,6 +19,7 @@ sql:
       - "../../../../migration/000014_add_build_env_vars.up.sql"
       - "../../../../migration/000015_modify_containers_for_build.up.sql"
       - "../../../../migration/000016_refactor_build_history.up.sql"
+      - "../../../../migration/000017_rename_build_env_vars_to_build_vars.up.sql"
     gen:
       go:
         package: "sqlc"
