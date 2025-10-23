@@ -15,11 +15,15 @@ import (
 type BuildHistoryStatus string
 
 const (
-	BuildHistoryStatusPending   BuildHistoryStatus = "pending"
-	BuildHistoryStatusRunning   BuildHistoryStatus = "running"
-	BuildHistoryStatusSuccess   BuildHistoryStatus = "success"
-	BuildHistoryStatusFailed    BuildHistoryStatus = "failed"
-	BuildHistoryStatusCancelled BuildHistoryStatus = "cancelled"
+	BuildHistoryStatusUntracked             BuildHistoryStatus = "untracked"
+	BuildHistoryStatusBackendTriggerFailed  BuildHistoryStatus = "backend_trigger_failed"
+	BuildHistoryStatusBackendTrackingFailed BuildHistoryStatus = "backend_tracking_failed"
+	BuildHistoryStatusBackendTrackingLost   BuildHistoryStatus = "backend_tracking_lost"
+	BuildHistoryStatusRunning               BuildHistoryStatus = "running"
+	BuildHistoryStatusSuccess               BuildHistoryStatus = "success"
+	BuildHistoryStatusFailed                BuildHistoryStatus = "failed"
+	BuildHistoryStatusCancelled             BuildHistoryStatus = "cancelled"
+	BuildHistoryStatusSkipped               BuildHistoryStatus = "skipped"
 )
 
 func (e *BuildHistoryStatus) Scan(src interface{}) error {
@@ -491,16 +495,29 @@ func (ns NullVerificationTokensTokenType) Value() (driver.Value, error) {
 	return string(ns.VerificationTokensTokenType), nil
 }
 
+type BuildEnvVar struct {
+	BuildEnvVarID uint32         `json:"build_env_var_id"`
+	ContainerID   uint32         `json:"container_id"`
+	Key           string         `json:"key"`
+	Value         sql.NullString `json:"value"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     sql.NullTime   `json:"updated_at"`
+}
+
 type BuildHistory struct {
-	BuildHistoryID uint32             `json:"build_history_id"`
-	ContainerID    uint32             `json:"container_id"`
-	Status         BuildHistoryStatus `json:"status"`
-	Summary        sql.NullString     `json:"summary"`
-	TektonRef      sql.NullString     `json:"tekton_ref"`
-	GitCommitHash  sql.NullString     `json:"git_commit_hash"`
-	CreatedAt      time.Time          `json:"created_at"`
-	StartedAt      sql.NullTime       `json:"started_at"`
-	FinishedAt     sql.NullTime       `json:"finished_at"`
+	BuildHistoryID uint32         `json:"build_history_id"`
+	ContainerID    uint32         `json:"container_id"`
+	Summary        sql.NullString `json:"summary"`
+	CreatedAt      time.Time      `json:"created_at"`
+	StartedAt      sql.NullTime   `json:"started_at"`
+	FinishedAt     sql.NullTime   `json:"finished_at"`
+	// Tekton event ID from API response
+	TektonEventID sql.NullString `json:"tekton_event_id"`
+	// Tekton PipelineRun name
+	TektonPipelineRunName sql.NullString     `json:"tekton_pipeline_run_name"`
+	Status                BuildHistoryStatus `json:"status"`
+	// Latest commit hash from Tekton build result
+	GitCommitHash sql.NullString `json:"git_commit_hash"`
 }
 
 type Container struct {
@@ -508,7 +525,6 @@ type Container struct {
 	ProjectID              uint32          `json:"project_id"`
 	TemplateID             sql.NullInt32   `json:"template_id"`
 	Name                   string          `json:"name"`
-	Slug                   string          `json:"slug"`
 	StableWindow           sql.NullInt32   `json:"stable_window"`
 	TemplateConfig         json.RawMessage `json:"template_config"`
 	GitRepositoryUrl       sql.NullString  `json:"git_repository_url"`
@@ -526,6 +542,9 @@ type Container struct {
 	DeletedAt              sql.NullTime    `json:"deleted_at"`
 	IsDeleted              bool            `json:"is_deleted"`
 	GithubInstallationID   sql.NullInt64   `json:"github_installation_id"`
+	Slug                   string          `json:"slug"`
+	// Indicates whether build is required (set to true when build parameters change)
+	NeedsBuild bool `json:"needs_build"`
 }
 
 type Deployment struct {
@@ -597,7 +616,6 @@ type OauthState struct {
 type Project struct {
 	ProjectID    uint32         `json:"project_id"`
 	Name         string         `json:"name"`
-	Slug         string         `json:"slug"`
 	Fqdn         sql.NullString `json:"fqdn"`
 	Status       ProjectsStatus `json:"status"`
 	Plan         sql.NullString `json:"plan"`
@@ -613,6 +631,7 @@ type Project struct {
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
 	// ID of the deployment that currently owns the deploying status
 	ActiveDeploymentID sql.NullInt32 `json:"active_deployment_id"`
+	Slug               string        `json:"slug"`
 }
 
 type ProjectUser struct {
