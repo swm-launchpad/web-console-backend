@@ -12,17 +12,23 @@ import (
 )
 
 type DeploymentHandler struct {
-	deployProjectUseCase *application.DeployProjectUseCase
-	permissionService    service.PermissionService
+	deployProjectUseCase     *application.DeployProjectUseCase
+	getDeploymentUseCase     *application.GetDeploymentUseCase
+	refreshDeploymentUseCase *application.RefreshDeploymentUseCase
+	permissionService        service.PermissionService
 }
 
 func NewDeploymentHandler(
 	deployProjectUseCase *application.DeployProjectUseCase,
+	getDeploymentUseCase *application.GetDeploymentUseCase,
+	refreshDeploymentUseCase *application.RefreshDeploymentUseCase,
 	permissionService service.PermissionService,
 ) *DeploymentHandler {
 	return &DeploymentHandler{
-		deployProjectUseCase: deployProjectUseCase,
-		permissionService:    permissionService,
+		deployProjectUseCase:     deployProjectUseCase,
+		getDeploymentUseCase:     getDeploymentUseCase,
+		refreshDeploymentUseCase: refreshDeploymentUseCase,
+		permissionService:        permissionService,
 	}
 }
 
@@ -67,4 +73,92 @@ func (h *DeploymentHandler) DeployProject(c *gin.Context) {
 	}
 
 	response.Accepted(c, output)
+}
+
+// GetDeployment handles GET /api/v1/projects/:id/deployments/latest
+// This endpoint retrieves the latest deployment status from the database (lightweight query)
+func (h *DeploymentHandler) GetDeployment(c *gin.Context) {
+	// Get user ID from context (set by auth middleware)
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		response.Error(c, auth.ErrUnauthorized, mapProjectError)
+		return
+	}
+
+	// Parse project ID from URL
+	projectIDStr := c.Param("id")
+	if projectIDStr == "" {
+		response.Error(c, projecterrors.ErrMissingField, mapProjectError)
+		return
+	}
+
+	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
+	if err != nil {
+		response.Error(c, projecterrors.ErrInvalidProjectID, mapProjectError)
+		return
+	}
+
+	// Check user permission for project access
+	// Return project not found instead of permission denied to prevent information disclosure
+	if err := h.permissionService.CanUserAccessProject(c.Request.Context(), userID.(uint), uint(projectID)); err != nil {
+		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
+		return
+	}
+
+	// Execute use case
+	input := application.GetDeploymentInput{
+		ProjectID: uint(projectID),
+	}
+
+	output, err := h.getDeploymentUseCase.Execute(c.Request.Context(), input)
+	if err != nil {
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	response.OK(c, output)
+}
+
+// RefreshDeployment handles POST /api/v1/projects/:id/deployments/refresh
+// This endpoint queries Kubernetes for the latest deployment status and updates the database
+func (h *DeploymentHandler) RefreshDeployment(c *gin.Context) {
+	// Get user ID from context (set by auth middleware)
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		response.Error(c, auth.ErrUnauthorized, mapProjectError)
+		return
+	}
+
+	// Parse project ID from URL
+	projectIDStr := c.Param("id")
+	if projectIDStr == "" {
+		response.Error(c, projecterrors.ErrMissingField, mapProjectError)
+		return
+	}
+
+	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
+	if err != nil {
+		response.Error(c, projecterrors.ErrInvalidProjectID, mapProjectError)
+		return
+	}
+
+	// Check user permission for project access
+	// Return project not found instead of permission denied to prevent information disclosure
+	if err := h.permissionService.CanUserModifyProject(c.Request.Context(), userID.(uint), uint(projectID)); err != nil {
+		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
+		return
+	}
+
+	// Execute use case
+	input := application.RefreshDeploymentInput{
+		ProjectID: uint(projectID),
+	}
+
+	output, err := h.refreshDeploymentUseCase.Execute(c.Request.Context(), input)
+	if err != nil {
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	response.OK(c, output)
 }

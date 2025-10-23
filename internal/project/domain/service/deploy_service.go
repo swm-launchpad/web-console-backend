@@ -74,37 +74,69 @@ type DeployService interface {
 	//   - On error, project status is reverted to 'nothing' and Deployment is marked as failed
 	DeployProject(ctx context.Context, projectID uint) (*deployment.Deployment, error)
 
-	// RefreshDeploymentStatus queries Kubernetes directly to get the latest deployment status
-	// and updates the database accordingly. This is used for "force refresh" scenarios where
-	// the user wants the most up-to-date status immediately, rather than waiting for the
-	// periodic background monitoring.
+	// GetDeploymentStatus retrieves the latest deployment status for a project from the database.
+	// This is a lightweight read-only operation that does not interact with Kubernetes.
+	//
+	// This method simply returns the current state stored in the database without
+	// making any external API calls.
 	//
 	// This method is useful when:
-	//   - User clicks a "Refresh" button in the UI
-	//   - Frontend needs immediate status for critical decisions
-	//   - Background monitoring has not updated status for some time
+	//   - User wants to check deployment status without triggering a Kubernetes query
+	//   - Frontend polls for status updates periodically
+	//   - Lightweight status checks are needed for UI rendering
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and timeout control
-	//   - deploymentID: The unique identifier of the deployment to refresh
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - *deployment.Deployment: The latest deployment record from the database
+	//   - error: An error if the operation fails
+	//
+	// Error cases:
+	//   - ErrDeploymentNotFound: No deployment exists for the project
+	//   - ErrDatabaseOperation: Database query failed
+	//
+	// Example usage:
+	//   deployment, err := deployService.GetDeploymentStatus(ctx, 123)
+	//   if err != nil {
+	//       return err
+	//   }
+	//   log.Printf("Current status: %s", deployment.Status)
+	GetDeploymentStatus(ctx context.Context, projectID uint) (*deployment.Deployment, error)
+
+	// RefreshActiveDeployment queries Kubernetes for the active deployment of a project
+	// and updates the database accordingly. This method uses project.active_deployment_id
+	// to identify which deployment to refresh.
+	//
+	// This method takes a projectID and uses the deployment locking mechanism
+	// to find the active deployment.
+	//
+	// This method is useful when:
+	//   - User wants to force refresh the current deployment
+	//   - Frontend needs immediate status update via project ID
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
 	//
 	// Returns:
 	//   - *deployment.Deployment: The updated Deployment with latest status from Kubernetes
 	//   - error: An error if the operation fails
 	//
 	// Error cases:
-	//   - ErrDeploymentNotFound: Deployment does not exist in database
+	//   - ErrProjectNotFound: Project does not exist
+	//   - ErrDeploymentNotFound: No active deployment for the project
 	//   - ErrKubePipelineRunNotFound: PipelineRun no longer exists in Kubernetes
 	//   - ErrKubeConnectionFailed: Cannot connect to Kubernetes API
-	//   - ErrKubeAuthFailed: Authentication to Kubernetes failed
 	//
 	// Example usage:
-	//   deployment, err := deployService.RefreshDeploymentStatus(ctx, 789)
+	//   deployment, err := deployService.RefreshActiveDeployment(ctx, 123)
 	//   if err != nil {
 	//       return err
 	//   }
 	//   log.Printf("Refreshed status: %s", deployment.Status)
-	RefreshDeploymentStatus(ctx context.Context, deploymentID uint64) (*deployment.Deployment, error)
+	RefreshActiveDeployment(ctx context.Context, projectID uint) (*deployment.Deployment, error)
 }
 
 // deployService implements the DeployService interface
@@ -242,8 +274,8 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*dep
 	return d, nil
 }
 
-// RefreshDeploymentStatus queries Kubernetes for the latest status and updates the database
-func (s *deployService) RefreshDeploymentStatus(ctx context.Context, deploymentID uint64) (*deployment.Deployment, error) {
+// refreshDeploymentStatus queries Kubernetes for the latest status and updates the database
+func (s *deployService) refreshDeploymentStatus(ctx context.Context, deploymentID uint64) (*deployment.Deployment, error) {
 	// Load deployment
 	d, err := s.deploymentRepo.FindByID(ctx, uint(deploymentID))
 	if err != nil {
@@ -692,6 +724,44 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 	return s.deploymentRepo.Save(ctx, d)
 }
 
+// GetDeploymentStatus retrieves the latest deployment status from the database
+func (s *deployService) GetDeploymentStatus(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+	// Load project to check active_deployment_id
+	proj, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// If there's an active deployment, return that one
+	if activeDeploymentID, hasActive := proj.ActiveDeploymentID(); hasActive {
+		return s.deploymentRepo.FindByID(ctx, activeDeploymentID)
+	}
+
+	// Otherwise, return the latest deployment (including completed ones)
+	// This allows users to see the last deployment status even after it completes
+	return s.deploymentRepo.FindLatestByProjectID(ctx, projectID)
+}
+
+// RefreshActiveDeployment queries Kubernetes for the active deployment and updates the database
+func (s *deployService) RefreshActiveDeployment(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+	// Load project to check active_deployment_id
+	proj, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if there's an active deployment
+	activeDeploymentID, hasActive := proj.ActiveDeploymentID()
+	if !hasActive {
+		// No active deployment - this means project is not being deployed
+		// This is not an error state, just means there's nothing to refresh
+		return nil, projecterrors.ErrDeploymentNotFound
+	}
+
+	// Refresh the active deployment by querying Kubernetes
+	return s.refreshDeploymentStatus(ctx, uint64(activeDeploymentID))
+}
+
 // monitorDeployment monitors a deployment in the background
 func (s *deployService) monitorDeployment(ctx context.Context, projectID uint, deploymentID uint) {
 	defer func() {
@@ -709,7 +779,7 @@ func (s *deployService) monitorDeployment(ctx context.Context, projectID uint, d
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			d, _ := s.RefreshDeploymentStatus(ctx, uint64(deploymentID))
+			d, _ := s.refreshDeploymentStatus(ctx, uint64(deploymentID))
 
 			if d != nil && d.IsCompleted() {
 				// Deployment completed - exit monitoring

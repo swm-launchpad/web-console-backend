@@ -93,6 +93,8 @@ func (tdb *TestDB) Migrate() error {
 		"000007_add_active_deployment_tracking.up.sql",
 		"000008_add_volume_slug.up.sql",
 		"000009_add_github_installations.up.sql",
+		"000010_add_installation_status.up.sql",
+		"000011_create_oauth_states.up.sql",
 	}
 
 	for _, migration := range migrations {
@@ -105,7 +107,8 @@ func (tdb *TestDB) Migrate() error {
 		// Execute schema
 		_, err = tdb.DB.Exec(string(schema))
 		if err != nil {
-			return fmt.Errorf("failed to execute schema %s: %w", migration, err)
+			// Log the error with more context
+			return fmt.Errorf("failed to execute migration %s: %w", migration, err)
 		}
 	}
 
