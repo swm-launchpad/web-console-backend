@@ -33,6 +33,12 @@ type SecretOutput struct {
 	Value    string `json:"value"`
 }
 
+type BuildVarOutput struct {
+	BuildVarID uint   `json:"build_var_id"`
+	Key        string `json:"key"`
+	Value      string `json:"value"`
+}
+
 type MountOutput struct {
 	VolumeID  uint   `json:"volume_id"`
 	MountPath string `json:"mount_path"`
@@ -60,6 +66,7 @@ type GetContainerOutput struct {
 	EnvVars              []EnvVarOutput         `json:"env_vars"`
 	Networks             []NetworkOutput        `json:"networks"`
 	Secrets              []SecretOutput         `json:"secrets"`
+	BuildVars            []BuildVarOutput       `json:"build_vars"`
 	Mounts               []MountOutput          `json:"mounts"`
 	CreatedAt            string                 `json:"created_at"`
 	UpdatedAt            string                 `json:"updated_at,omitempty"`
@@ -102,6 +109,7 @@ func (uc *GetContainerUseCase) Execute(ctx context.Context, input GetContainerIn
 		EnvVars:     make([]EnvVarOutput, 0),
 		Networks:    make([]NetworkOutput, 0),
 		Secrets:     make([]SecretOutput, 0),
+		BuildVars:   make([]BuildVarOutput, 0),
 		Mounts:      make([]MountOutput, 0),
 		CreatedAt:   container.CreatedAt().Format("2006-01-02T15:04:05Z"),
 	}
@@ -191,6 +199,15 @@ func (uc *GetContainerUseCase) Execute(ctx context.Context, input GetContainerIn
 			SecretID: secret.SecretID(),
 			Key:      secret.Key(),
 			Value:    secret.Value(),
+		})
+	}
+
+	// Map build variables
+	for _, buildVar := range container.BuildVars() {
+		output.BuildVars = append(output.BuildVars, BuildVarOutput{
+			BuildVarID: buildVar.BuildVarID(),
+			Key:        buildVar.Key(),
+			Value:      buildVar.Value(),
 		})
 	}
 
