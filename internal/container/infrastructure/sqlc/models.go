@@ -520,6 +520,15 @@ type BuildHistory struct {
 	GitCommitHash sql.NullString `json:"git_commit_hash"`
 }
 
+type BuildVar struct {
+	BuildVarID  uint32         `json:"build_var_id"`
+	ContainerID uint32         `json:"container_id"`
+	Key         string         `json:"key"`
+	Value       sql.NullString `json:"value"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   sql.NullTime   `json:"updated_at"`
+}
+
 type Container struct {
 	ContainerID            uint32          `json:"container_id"`
 	ProjectID              uint32          `json:"project_id"`
