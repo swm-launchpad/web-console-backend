@@ -4,10 +4,10 @@
 INSERT INTO CONTAINERS (
     project_id, template_id, name, slug, stable_window,
     template_config, github_installation_id, git_repository_url, git_branch, git_directory_path, git_commit_hash,
-    last_built_git_commit_hash, cpu_limit, memory_limit,
+    last_built_git_commit_hash, needs_build, cpu_limit, memory_limit,
     monthly_build_time, monthly_build_count, monthly_uptime,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetContainerByID :one
 SELECT *

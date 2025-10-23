@@ -211,6 +211,7 @@ func createContainerWithAllFields(containerID, projectID uint) *model.Container 
 		gitConfig,
 		nil,
 		&commitHash,
+		false, // needsBuild
 		resourceLimits,
 		nil,
 		nil,
@@ -263,6 +264,7 @@ func createContainerWithMinimalFields(containerID, projectID uint) *model.Contai
 		gitConfig,
 		nil, // No commit hash
 		nil,
+		false, // needsBuild
 		resourceLimits,
 		nil,
 		nil,
@@ -295,6 +297,7 @@ func createContainerWithNetworkOptionalFields(containerID, projectID uint) *mode
 		gitConfig,
 		nil,
 		nil,
+		false, // needsBuild
 		resourceLimits,
 		nil,
 		nil,
@@ -346,6 +349,7 @@ func createContainerWithMultipleMounts(containerID, projectID uint) *model.Conta
 		gitConfig,
 		nil,
 		nil,
+		false, // needsBuild
 		resourceLimits,
 		nil,
 		nil,

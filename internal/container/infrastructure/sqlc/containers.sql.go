@@ -50,10 +50,10 @@ const createContainer = `-- name: CreateContainer :execresult
 INSERT INTO CONTAINERS (
     project_id, template_id, name, slug, stable_window,
     template_config, github_installation_id, git_repository_url, git_branch, git_directory_path, git_commit_hash,
-    last_built_git_commit_hash, cpu_limit, memory_limit,
+    last_built_git_commit_hash, needs_build, cpu_limit, memory_limit,
     monthly_build_time, monthly_build_count, monthly_uptime,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateContainerParams struct {
@@ -69,6 +69,7 @@ type CreateContainerParams struct {
 	GitDirectoryPath       sql.NullString  `json:"git_directory_path"`
 	GitCommitHash          sql.NullString  `json:"git_commit_hash"`
 	LastBuiltGitCommitHash sql.NullString  `json:"last_built_git_commit_hash"`
+	NeedsBuild             bool            `json:"needs_build"`
 	CpuLimit               sql.NullInt32   `json:"cpu_limit"`
 	MemoryLimit            sql.NullInt32   `json:"memory_limit"`
 	MonthlyBuildTime       sql.NullInt32   `json:"monthly_build_time"`
@@ -93,6 +94,7 @@ func (q *Queries) CreateContainer(ctx context.Context, arg CreateContainerParams
 		arg.GitDirectoryPath,
 		arg.GitCommitHash,
 		arg.LastBuiltGitCommitHash,
+		arg.NeedsBuild,
 		arg.CpuLimit,
 		arg.MemoryLimit,
 		arg.MonthlyBuildTime,

@@ -35,6 +35,7 @@ func createMockContainer(containerID, projectID uint) *model.Container {
 		gitConfig,
 		nil,
 		nil,
+		true, // needsBuild
 		resourceLimits,
 		nil,
 		nil,
@@ -74,6 +75,7 @@ func createMockDeletedContainer(containerID, projectID uint) *model.Container {
 		gitConfig,
 		nil,
 		nil,
+		true, // needsBuild
 		resourceLimits,
 		nil,
 		nil,
@@ -168,6 +170,7 @@ func createMockContainerWithOptionalFields(
 		gitConfig,
 		nil,
 		nil,
+		true, // needsBuild
 		resourceLimits,
 		nil,
 		nil,
