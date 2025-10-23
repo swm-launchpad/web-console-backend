@@ -14,6 +14,11 @@ sql:
       - "../../../migration/000009_add_github_installations.up.sql"
       - "../../../migration/000010_add_installation_status.up.sql"
       - "../../../migration/000011_create_oauth_states.up.sql"
+      - "../../../migration/000012_update_slug_columns.up.sql"
+      - "../../../migration/000013_fix_container_slug_index.up.sql"
+      - "../../../migration/000014_add_build_env_vars.up.sql"
+      - "../../../migration/000015_modify_containers_for_build.up.sql"
+      - "../../../migration/000016_refactor_build_history.up.sql"
     gen:
       go:
         package: "sqlc"

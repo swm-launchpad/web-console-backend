@@ -30,7 +30,7 @@ UPDATE CONTAINERS SET
     template_id = ?, name = ?, stable_window = ?,
     template_config = ?, github_installation_id = ?,
     git_repository_url = ?, git_branch = ?, git_directory_path = ?, git_commit_hash = ?,
-    last_built_git_commit_hash = ?, cpu_limit = ?, memory_limit = ?,
+    last_built_git_commit_hash = ?, needs_build = ?, cpu_limit = ?, memory_limit = ?,
     monthly_build_time = ?, monthly_build_count = ?, monthly_uptime = ?,
     updated_at = ?
 WHERE container_id = ? AND is_deleted = FALSE;

@@ -15,11 +15,15 @@ import (
 type BuildHistoryStatus string
 
 const (
-	BuildHistoryStatusPending   BuildHistoryStatus = "pending"
-	BuildHistoryStatusRunning   BuildHistoryStatus = "running"
-	BuildHistoryStatusSuccess   BuildHistoryStatus = "success"
-	BuildHistoryStatusFailed    BuildHistoryStatus = "failed"
-	BuildHistoryStatusCancelled BuildHistoryStatus = "cancelled"
+	BuildHistoryStatusUntracked             BuildHistoryStatus = "untracked"
+	BuildHistoryStatusBackendTriggerFailed  BuildHistoryStatus = "backend_trigger_failed"
+	BuildHistoryStatusBackendTrackingFailed BuildHistoryStatus = "backend_tracking_failed"
+	BuildHistoryStatusBackendTrackingLost   BuildHistoryStatus = "backend_tracking_lost"
+	BuildHistoryStatusRunning               BuildHistoryStatus = "running"
+	BuildHistoryStatusSuccess               BuildHistoryStatus = "success"
+	BuildHistoryStatusFailed                BuildHistoryStatus = "failed"
+	BuildHistoryStatusCancelled             BuildHistoryStatus = "cancelled"
+	BuildHistoryStatusSkipped               BuildHistoryStatus = "skipped"
 )
 
 func (e *BuildHistoryStatus) Scan(src interface{}) error {
@@ -103,6 +107,90 @@ func (ns NullDeploymentsStatus) Value() (driver.Value, error) {
 		return nil, nil
 	}
 	return string(ns.DeploymentsStatus), nil
+}
+
+type GithubInstallationsAccountType string
+
+const (
+	GithubInstallationsAccountTypeUser         GithubInstallationsAccountType = "User"
+	GithubInstallationsAccountTypeOrganization GithubInstallationsAccountType = "Organization"
+)
+
+func (e *GithubInstallationsAccountType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GithubInstallationsAccountType(s)
+	case string:
+		*e = GithubInstallationsAccountType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GithubInstallationsAccountType: %T", src)
+	}
+	return nil
+}
+
+type NullGithubInstallationsAccountType struct {
+	GithubInstallationsAccountType GithubInstallationsAccountType `json:"github_installations_account_type"`
+	Valid                          bool                           `json:"valid"` // Valid is true if GithubInstallationsAccountType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGithubInstallationsAccountType) Scan(value interface{}) error {
+	if value == nil {
+		ns.GithubInstallationsAccountType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GithubInstallationsAccountType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGithubInstallationsAccountType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GithubInstallationsAccountType), nil
+}
+
+type GithubInstallationsStatus string
+
+const (
+	GithubInstallationsStatusActive  GithubInstallationsStatus = "active"
+	GithubInstallationsStatusRevoked GithubInstallationsStatus = "revoked"
+)
+
+func (e *GithubInstallationsStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GithubInstallationsStatus(s)
+	case string:
+		*e = GithubInstallationsStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GithubInstallationsStatus: %T", src)
+	}
+	return nil
+}
+
+type NullGithubInstallationsStatus struct {
+	GithubInstallationsStatus GithubInstallationsStatus `json:"github_installations_status"`
+	Valid                     bool                      `json:"valid"` // Valid is true if GithubInstallationsStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGithubInstallationsStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.GithubInstallationsStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GithubInstallationsStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGithubInstallationsStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GithubInstallationsStatus), nil
 }
 
 type NetworksType string
@@ -407,16 +495,29 @@ func (ns NullVerificationTokensTokenType) Value() (driver.Value, error) {
 	return string(ns.VerificationTokensTokenType), nil
 }
 
+type BuildEnvVar struct {
+	BuildEnvVarID uint32         `json:"build_env_var_id"`
+	ContainerID   uint32         `json:"container_id"`
+	Key           string         `json:"key"`
+	Value         sql.NullString `json:"value"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     sql.NullTime   `json:"updated_at"`
+}
+
 type BuildHistory struct {
-	BuildHistoryID uint32             `json:"build_history_id"`
-	ContainerID    uint32             `json:"container_id"`
-	Status         BuildHistoryStatus `json:"status"`
-	Summary        sql.NullString     `json:"summary"`
-	TektonRef      sql.NullString     `json:"tekton_ref"`
-	GitCommitHash  sql.NullString     `json:"git_commit_hash"`
-	CreatedAt      time.Time          `json:"created_at"`
-	StartedAt      sql.NullTime       `json:"started_at"`
-	FinishedAt     sql.NullTime       `json:"finished_at"`
+	BuildHistoryID uint32         `json:"build_history_id"`
+	ContainerID    uint32         `json:"container_id"`
+	Summary        sql.NullString `json:"summary"`
+	CreatedAt      time.Time      `json:"created_at"`
+	StartedAt      sql.NullTime   `json:"started_at"`
+	FinishedAt     sql.NullTime   `json:"finished_at"`
+	// Tekton event ID from API response
+	TektonEventID sql.NullString `json:"tekton_event_id"`
+	// Tekton PipelineRun name
+	TektonPipelineRunName sql.NullString     `json:"tekton_pipeline_run_name"`
+	Status                BuildHistoryStatus `json:"status"`
+	// Latest commit hash from Tekton build result
+	GitCommitHash sql.NullString `json:"git_commit_hash"`
 }
 
 type Container struct {
@@ -424,7 +525,6 @@ type Container struct {
 	ProjectID              uint32          `json:"project_id"`
 	TemplateID             sql.NullInt32   `json:"template_id"`
 	Name                   string          `json:"name"`
-	Slug                   string          `json:"slug"`
 	StableWindow           sql.NullInt32   `json:"stable_window"`
 	TemplateConfig         json.RawMessage `json:"template_config"`
 	GitRepositoryUrl       sql.NullString  `json:"git_repository_url"`
@@ -441,6 +541,10 @@ type Container struct {
 	UpdatedAt              sql.NullTime    `json:"updated_at"`
 	DeletedAt              sql.NullTime    `json:"deleted_at"`
 	IsDeleted              bool            `json:"is_deleted"`
+	GithubInstallationID   sql.NullInt64   `json:"github_installation_id"`
+	Slug                   string          `json:"slug"`
+	// Indicates whether build is required (set to true when build parameters change)
+	NeedsBuild bool `json:"needs_build"`
 }
 
 type Deployment struct {
@@ -466,6 +570,20 @@ type EnvVar struct {
 	UpdatedAt   sql.NullTime   `json:"updated_at"`
 }
 
+type GithubInstallation struct {
+	InstallationID uint64                         `json:"installation_id"`
+	UserID         uint32                         `json:"user_id"`
+	AccountLogin   string                         `json:"account_login"`
+	AccountType    GithubInstallationsAccountType `json:"account_type"`
+	CachedToken    sql.NullString                 `json:"cached_token"`
+	TokenExpiresAt sql.NullTime                   `json:"token_expires_at"`
+	CreatedAt      time.Time                      `json:"created_at"`
+	UpdatedAt      sql.NullTime                   `json:"updated_at"`
+	DeletedAt      sql.NullTime                   `json:"deleted_at"`
+	IsDeleted      bool                           `json:"is_deleted"`
+	Status         GithubInstallationsStatus      `json:"status"`
+}
+
 type Mount struct {
 	ContainerID uint32       `json:"container_id"`
 	VolumeID    uint32       `json:"volume_id"`
@@ -486,10 +604,18 @@ type Network struct {
 	Fqdn         sql.NullString `json:"fqdn"`
 }
 
+type OauthState struct {
+	State          string        `json:"state"`
+	UserID         uint32        `json:"user_id"`
+	InstallationID sql.NullInt64 `json:"installation_id"`
+	ExpiresAt      time.Time     `json:"expires_at"`
+	CreatedAt      time.Time     `json:"created_at"`
+	ConsumedAt     sql.NullTime  `json:"consumed_at"`
+}
+
 type Project struct {
 	ProjectID    uint32         `json:"project_id"`
 	Name         string         `json:"name"`
-	Slug         string         `json:"slug"`
 	Fqdn         sql.NullString `json:"fqdn"`
 	Status       ProjectsStatus `json:"status"`
 	Plan         sql.NullString `json:"plan"`
@@ -505,6 +631,7 @@ type Project struct {
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
 	// ID of the deployment that currently owns the deploying status
 	ActiveDeploymentID sql.NullInt32 `json:"active_deployment_id"`
+	Slug               string        `json:"slug"`
 }
 
 type ProjectUser struct {

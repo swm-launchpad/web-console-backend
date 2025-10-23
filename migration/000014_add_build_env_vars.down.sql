@@ -1,0 +1,3 @@
+-- Rollback: Drop BUILD_ENV_VARS table
+
+DROP TABLE IF EXISTS `BUILD_ENV_VARS`;
