@@ -97,6 +97,86 @@ func TestMapCommonError(t *testing.T) {
 			wantCode:       "VOLUME_NOT_FOUND",
 			wantMessage:    "Volume not found",
 		},
+		{
+			name:           "ErrVolumeNameRequired",
+			err:            projecterrors.ErrVolumeNameRequired,
+			wantFound:      true,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "VOLUME_NAME_REQUIRED",
+			wantMessage:    "Volume name is required",
+		},
+		{
+			name:           "ErrInvalidVolumeName",
+			err:            projecterrors.ErrInvalidVolumeName,
+			wantFound:      true,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "INVALID_VOLUME_NAME",
+			wantMessage:    "Volume name must not exceed 255 characters",
+		},
+		{
+			name:           "ErrInvalidVolumeID",
+			err:            projecterrors.ErrInvalidVolumeID,
+			wantFound:      true,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "INVALID_VOLUME_ID",
+			wantMessage:    "Invalid volume ID",
+		},
+		{
+			name:           "ErrInvalidCapacity",
+			err:            projecterrors.ErrInvalidCapacity,
+			wantFound:      true,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "INVALID_CAPACITY",
+			wantMessage:    "Invalid volume capacity",
+		},
+		{
+			name:           "ErrVolumeCapacityTooSmall",
+			err:            projecterrors.ErrVolumeCapacityTooSmall,
+			wantFound:      true,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "VOLUME_CAPACITY_TOO_SMALL",
+			wantMessage:    "Volume capacity must be at least 128Mi",
+		},
+		{
+			name:           "ErrVolumeCapacityExceeded",
+			err:            projecterrors.ErrVolumeCapacityExceeded,
+			wantFound:      true,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "VOLUME_CAPACITY_EXCEEDED",
+			wantMessage:    "Volume capacity exceeds maximum allowed (2048Mi)",
+		},
+		{
+			name:           "ErrDuplicateVolumeName",
+			err:            projecterrors.ErrDuplicateVolumeName,
+			wantFound:      true,
+			wantStatusCode: http.StatusConflict,
+			wantCode:       "DUPLICATE_VOLUME_NAME",
+			wantMessage:    "Volume name already exists in project",
+		},
+		{
+			name:           "ErrMaxVolumesExceeded",
+			err:            projecterrors.ErrMaxVolumesExceeded,
+			wantFound:      true,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "MAX_VOLUMES_EXCEEDED",
+			wantMessage:    "Maximum number of volumes exceeded",
+		},
+		{
+			name:           "ErrVolumeDiskLimitExceeded",
+			err:            projecterrors.ErrVolumeDiskLimitExceeded,
+			wantFound:      true,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "VOLUME_DISK_LIMIT_EXCEEDED",
+			wantMessage:    "Volume capacity exceeds project disk limit",
+		},
+		{
+			name:           "ErrInvalidProjectID",
+			err:            projecterrors.ErrInvalidProjectID,
+			wantFound:      true,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "INVALID_PROJECT_ID",
+			wantMessage:    "Invalid project ID",
+		},
 
 		// Unmapped error
 		{
@@ -150,7 +230,8 @@ func TestMapCommonError(t *testing.T) {
 func TestCrossDomainErrorMapping(t *testing.T) {
 	// This test verifies the fix for the issue where ContainerHandler
 	// calls ProjectService.GetProjectBySlug and receives project domain errors
-	// that need to be properly mapped to HTTP responses
+	// that need to be properly mapped to HTTP responses.
+	// It also tests volume creation errors when ContainerHandler creates volumes.
 
 	tests := []struct {
 		name           string
@@ -158,11 +239,18 @@ func TestCrossDomainErrorMapping(t *testing.T) {
 		wantStatusCode int
 		wantCode       string
 	}{
+		// Project errors used cross-domain
 		{
 			name:           "Project not found should return 404",
 			err:            projecterrors.ErrProjectNotFound,
 			wantStatusCode: http.StatusNotFound,
 			wantCode:       "PROJECT_NOT_FOUND",
+		},
+		{
+			name:           "Invalid project ID should return 400",
+			err:            projecterrors.ErrInvalidProjectID,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "INVALID_PROJECT_ID",
 		},
 		{
 			name:           "Invalid slug length should return 400",
@@ -176,11 +264,43 @@ func TestCrossDomainErrorMapping(t *testing.T) {
 			wantStatusCode: http.StatusBadRequest,
 			wantCode:       "INVALID_SLUG_FORMAT",
 		},
+
+		// Volume errors used cross-domain (e.g., CreateContainerUseCase calls VolumeService.CreateVolume)
 		{
 			name:           "Volume not found should return 404",
 			err:            projecterrors.ErrVolumeNotFound,
 			wantStatusCode: http.StatusNotFound,
 			wantCode:       "VOLUME_NOT_FOUND",
+		},
+		{
+			name:           "Duplicate volume name should return 409",
+			err:            projecterrors.ErrDuplicateVolumeName,
+			wantStatusCode: http.StatusConflict,
+			wantCode:       "DUPLICATE_VOLUME_NAME",
+		},
+		{
+			name:           "Volume capacity too small should return 400",
+			err:            projecterrors.ErrVolumeCapacityTooSmall,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "VOLUME_CAPACITY_TOO_SMALL",
+		},
+		{
+			name:           "Volume capacity exceeded should return 400",
+			err:            projecterrors.ErrVolumeCapacityExceeded,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "VOLUME_CAPACITY_EXCEEDED",
+		},
+		{
+			name:           "Volume disk limit exceeded should return 400",
+			err:            projecterrors.ErrVolumeDiskLimitExceeded,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "VOLUME_DISK_LIMIT_EXCEEDED",
+		},
+		{
+			name:           "Invalid volume name should return 400",
+			err:            projecterrors.ErrInvalidVolumeName,
+			wantStatusCode: http.StatusBadRequest,
+			wantCode:       "INVALID_VOLUME_NAME",
 		},
 	}
 

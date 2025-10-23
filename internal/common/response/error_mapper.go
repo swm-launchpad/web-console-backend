@@ -44,9 +44,20 @@ var commonErrorMap = map[error]ErrorMapping{
 	projecterrors.ErrProjectNotFound:   {StatusCode: http.StatusNotFound, Code: "PROJECT_NOT_FOUND", Message: "Project not found"},
 	projecterrors.ErrSlugInvalidLength: {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG_FORMAT", Message: "Invalid slug format"},
 	projecterrors.ErrSlugInvalidFormat: {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG_FORMAT", Message: "Invalid slug format"},
+	projecterrors.ErrInvalidProjectID:  {StatusCode: http.StatusBadRequest, Code: "INVALID_PROJECT_ID", Message: "Invalid project ID"},
 
 	// Volume errors (part of project domain, used cross-domain)
-	projecterrors.ErrVolumeNotFound: {StatusCode: http.StatusNotFound, Code: "VOLUME_NOT_FOUND", Message: "Volume not found"},
+	// These errors can occur when container handlers create volumes or interact with volume resources
+	projecterrors.ErrVolumeNotFound:          {StatusCode: http.StatusNotFound, Code: "VOLUME_NOT_FOUND", Message: "Volume not found"},
+	projecterrors.ErrVolumeNameRequired:      {StatusCode: http.StatusBadRequest, Code: "VOLUME_NAME_REQUIRED", Message: "Volume name is required"},
+	projecterrors.ErrInvalidVolumeName:       {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_NAME", Message: "Volume name must not exceed 255 characters"},
+	projecterrors.ErrInvalidVolumeID:         {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_ID", Message: "Invalid volume ID"},
+	projecterrors.ErrInvalidCapacity:         {StatusCode: http.StatusBadRequest, Code: "INVALID_CAPACITY", Message: "Invalid volume capacity"},
+	projecterrors.ErrVolumeCapacityTooSmall:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_CAPACITY_TOO_SMALL", Message: "Volume capacity must be at least 128Mi"},
+	projecterrors.ErrVolumeCapacityExceeded:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_CAPACITY_EXCEEDED", Message: "Volume capacity exceeds maximum allowed (2048Mi)"},
+	projecterrors.ErrDuplicateVolumeName:     {StatusCode: http.StatusConflict, Code: "DUPLICATE_VOLUME_NAME", Message: "Volume name already exists in project"},
+	projecterrors.ErrMaxVolumesExceeded:      {StatusCode: http.StatusBadRequest, Code: "MAX_VOLUMES_EXCEEDED", Message: "Maximum number of volumes exceeded"},
+	projecterrors.ErrVolumeDiskLimitExceeded: {StatusCode: http.StatusBadRequest, Code: "VOLUME_DISK_LIMIT_EXCEEDED", Message: "Volume capacity exceeds project disk limit"},
 }
 
 // mapCommonError maps common package errors to ErrorMapping (internal use)
