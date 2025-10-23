@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	userinfra "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
@@ -15,9 +16,10 @@ func TestUpdateContainerUseCase_Execute_Success(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
+	buildChangeDetector := service.NewBuildChangeDetector()
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -54,9 +56,10 @@ func TestUpdateContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
+	buildChangeDetector := service.NewBuildChangeDetector()
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -87,9 +90,10 @@ func TestUpdateContainerUseCase_Execute_UnsetGitHubInstallationID(t *testing.T) 
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
+	buildChangeDetector := service.NewBuildChangeDetector()
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -131,9 +135,10 @@ func TestUpdateContainerUseCase_Execute_SetGitHubInstallationID(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
+	buildChangeDetector := service.NewBuildChangeDetector()
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -176,9 +181,10 @@ func TestUpdateContainerUseCase_Execute_NoUpdateGitHubInstallationID(t *testing.
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
+	buildChangeDetector := service.NewBuildChangeDetector()
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr)
 
 	ctx := context.Background()
 	containerID := uint(1)

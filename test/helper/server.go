@@ -99,12 +99,13 @@ func SetupTestServer(t *testing.T) *TestServer {
 	containerSvc := containerService.NewContainerService(containerRepo, containerSlugService)
 	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository)
 	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository)
+	buildChangeDetector := containerService.NewBuildChangeDetector()
 
 	// Container UseCases
 	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, installationRepo, txManager)
 	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, containerPermissionSvc)
 	listContainersUseCase := containerApp.NewListContainersUseCase(containerRepo, containerPermissionSvc)
-	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, installationRepo, txManager)
+	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, buildChangeDetector, installationRepo, txManager)
 	deleteContainerUseCase := containerApp.NewDeleteContainerUseCase(containerRepo, containerPermissionSvc, txManager)
 	addEnvVarUseCase := containerApp.NewAddEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
 	updateEnvVarUseCase := containerApp.NewUpdateEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
@@ -430,6 +431,7 @@ func GetUpdateContainerUseCase(ts *TestServer) *containerApp.UpdateContainerUseC
 	projectRepository := projectRepo.NewProjectRepository(ts.DB.DB)
 	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository)
 	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository)
+	buildChangeDetector := containerService.NewBuildChangeDetector()
 	installationRepo := infrastructure.NewGitHubInstallationRepository(ts.DB.DB)
 	txManager := db.NewTxManager(ts.DB.DB)
 
@@ -437,6 +439,7 @@ func GetUpdateContainerUseCase(ts *TestServer) *containerApp.UpdateContainerUseC
 		containerRepo,
 		containerPermissionSvc,
 		resourceValidationSvc,
+		buildChangeDetector,
 		installationRepo,
 		txManager,
 	)
