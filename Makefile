@@ -9,16 +9,16 @@ COVERAGE_HTML=coverage.html
 BUILD_FLAGS=-v
 LDFLAGS=-ldflags="-s -w"
 
-.PHONY: setup install-tools fmt fmt-check vet lint tidy tidy-check unit-test integration-test e2e-test test-all test-coverage deps build run dev clean wire help
+.PHONY: setup install-tools fmt fmt-check vet lint tidy tidy-check unit-test integration-test e2e-test integration-e2e-test test-all check test-coverage build dev clean wire help
 
 setup: install-tools
 install-tools:
 	@echo "Installing development tools..."
 	go mod download
-	go install github.com/air-verse/air@v1.62.0
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.4.0
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
 	go install github.com/google/wire/cmd/wire@v0.7.0
+	go install -tags 'mysql' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.0
 
 fmt:
 	@echo "Formatting code..."
@@ -64,25 +64,14 @@ unit-test:
 	go test -v -race ./... -short
 	@echo "Done"
 
-# Additional commands from LP-247
-deps:
-	@echo "Downloading dependencies..."
-	go mod download
-	go mod verify
-	@echo "Done"
-
 build:
 	@echo "Building $(BINARY_NAME)..."
 	go build $(BUILD_FLAGS) $(LDFLAGS) -o $(BINARY_PATH) $(MAIN_PATH)
 	@echo "Done"
 
-run:
+dev:
 	@echo "Running server..."
 	go run $(MAIN_PATH)
-
-dev:
-	@echo "Running server with hot reload..."
-	air
 
 clean:
 	@echo "Cleaning up..."
@@ -91,20 +80,64 @@ clean:
 	@echo "Done"
 
 integration-test:
+	@echo "Starting test database..."
+	@docker-compose --env-file .env.test -f docker-compose.test.yml up -d --wait
 	@echo "Running integration tests..."
-	go test ./test/integration/... -v -race -timeout 60s
-	@echo "Done"
+	@go test ./test/integration/... -v -race -timeout 60s; \
+	EXIT_CODE=$$?; \
+	echo "Stopping test database..."; \
+	docker-compose --env-file .env.test -f docker-compose.test.yml down; \
+	exit $$EXIT_CODE
 
 e2e-test:
+	@echo "Starting test database..."
+	@docker-compose --env-file .env.test -f docker-compose.test.yml up -d --wait
 	@echo "Running E2E tests..."
-	go test ./test/e2e/... -v -race -timeout 120s
-	@echo "Done"
+	@go test ./test/e2e/... -v -race -timeout 120s; \
+	EXIT_CODE=$$?; \
+	echo "Stopping test database..."; \
+	docker-compose --env-file .env.test -f docker-compose.test.yml down; \
+	exit $$EXIT_CODE
 
-test-all: unit-test integration-test e2e-test
+integration-e2e-test:
+	@echo "Starting test database..."
+	@docker-compose --env-file .env.test -f docker-compose.test.yml up -d --wait
+	@echo "Running integration tests..."
+	@go test ./test/integration/... -v -race -timeout 60s; \
+	INTEGRATION_EXIT=$$?; \
+	echo ""; \
+	echo "Running E2E tests..."; \
+	go test ./test/e2e/... -v -race -timeout 120s; \
+	E2E_EXIT=$$?; \
+	echo "Stopping test database..."; \
+	docker-compose --env-file .env.test -f docker-compose.test.yml down; \
+	if [ $$INTEGRATION_EXIT -ne 0 ]; then exit $$INTEGRATION_EXIT; fi; \
+	exit $$E2E_EXIT
+
+test-all: unit-test integration-e2e-test
+
+check:
+	@echo "=========================================="
+	@echo "Running full CI/CD check pipeline..."
+	@echo "=========================================="
+	@$(MAKE) fmt-check
+	@echo ""
+	@$(MAKE) vet
+	@echo ""
+	@$(MAKE) lint
+	@echo ""
+	@$(MAKE) tidy-check
+	@echo ""
+	@$(MAKE) unit-test
+	@echo ""
+	@$(MAKE) integration-e2e-test
+	@echo "=========================================="
+	@echo "All checks passed successfully!"
+	@echo "=========================================="
 
 test-coverage:
-	@echo "Running tests with coverage..."
-	go test ./... -v -race -coverprofile=$(COVERAGE_FILE) -covermode=atomic
+	@echo "Running unit tests with coverage..."
+	go test ./... -v -race -short -coverprofile=$(COVERAGE_FILE) -covermode=atomic
 	go tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_HTML)
 	@echo "Coverage report generated: $(COVERAGE_HTML)"
 	@go tool cover -func=$(COVERAGE_FILE) | grep total | awk '{print "Total Coverage: " $$3}'
@@ -127,12 +160,12 @@ help:
 	@echo "  unit-test    - Run unit tests"
 	@echo "  integration-test - Run integration tests"
 	@echo "  e2e-test     - Run E2E tests"
+	@echo "  integration-e2e-test - Run integration and E2E tests with single DB instance"
 	@echo "  test-all     - Run all tests"
+	@echo "  check        - Run full CI/CD check pipeline (fmt-check, vet, lint, tidy-check, unit-test, integration-e2e-test)"
 	@echo "  test-coverage - Run tests with coverage report"
-	@echo "  deps         - Download and verify dependencies"
 	@echo "  build        - Build the binary"
-	@echo "  run          - Run the application"
-	@echo "  dev          - Run with hot reload"
+	@echo "  dev          - Run the application"
 	@echo "  clean        - Clean build artifacts"
 	@echo "  wire         - Generate wire dependencies"
 	@echo "  help         - Show this help message"

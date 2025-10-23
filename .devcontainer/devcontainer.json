@@ -8,6 +8,9 @@
       "version": "1.25.1"
     },
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    },
     "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
 
@@ -31,10 +34,11 @@
         "streetsidesoftware.code-spell-checker",
         "Anthropic.claude-code",
         "MS-CEINTL.vscode-language-pack-ko",
-        "cschlosser.doxdocgen"
+        "cschlosser.doxdocgen",
+        "ms-vscode.makefile-tools"
       ]
     }
   },
 
-  "postCreateCommand": "make setup"
+  "postCreateCommand": "bash /workspace/web-console-backend/.devcontainer/post-create.sh"
 }
