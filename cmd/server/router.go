@@ -124,6 +124,7 @@ func (r *Router) Setup() {
 			github.GET("/installations", r.githubHandler.GetInstallations)
 			github.DELETE("/installations/:installation_id", r.githubHandler.DisconnectGitHub)
 			github.GET("/installations/:installation_id/repositories", r.githubHandler.ListRepositories)
+			github.GET("/installations/:installation_id/repositories/:repo/branches", r.githubHandler.ListBranches)
 			github.POST("/token", r.githubHandler.GenerateInstallationToken)
 		}
 

@@ -17,6 +17,7 @@ type GitHubHandler struct {
 	getInstallationUseCase      *application.GetGitHubInstallationUseCase
 	generateTokenUseCase        *application.GenerateInstallationTokenUseCase
 	listRepositoriesUseCase     *application.ListRepositoriesUseCase
+	listBranchesUseCase         *application.ListGitHubBranchesUseCase
 	startInstallationUseCase    *application.StartInstallationUseCase
 	installationCallbackUseCase *application.InstallationCallbackUseCase
 	frontendURL                 string
@@ -28,6 +29,7 @@ func NewGitHubHandler(
 	getInstallationUseCase *application.GetGitHubInstallationUseCase,
 	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
 	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	listBranchesUseCase *application.ListGitHubBranchesUseCase,
 	startInstallationUseCase *application.StartInstallationUseCase,
 	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	frontendURL string,
@@ -38,6 +40,7 @@ func NewGitHubHandler(
 		getInstallationUseCase:      getInstallationUseCase,
 		generateTokenUseCase:        generateTokenUseCase,
 		listRepositoriesUseCase:     listRepositoriesUseCase,
+		listBranchesUseCase:         listBranchesUseCase,
 		startInstallationUseCase:    startInstallationUseCase,
 		installationCallbackUseCase: installationCallbackUseCase,
 		frontendURL:                 frontendURL,
@@ -259,6 +262,49 @@ func (h *GitHubHandler) InstallationCallback(c *gin.Context) {
 	// For simplicity, we're counting 1 installation since we process one at a time
 	// Add popup=true to indicate this was opened in a popup window
 	c.Redirect(302, h.frontendURL+"/github/callback?success=true&count=1&popup=true")
+}
+
+// ListBranches lists all branches for a repository
+// GET /api/v1/github/installations/:installation_id/repositories/:repo/branches
+func (h *GitHubHandler) ListBranches(c *gin.Context) {
+	userID := getUserIDFromContext(c)
+	if userID == 0 {
+		response.Error(c, auth.ErrUnauthorized, mapUserError)
+		return
+	}
+
+	// Extract path parameters
+	installationIDStr := c.Param("installation_id")
+	repo := c.Param("repo")
+
+	// Validate installation_id
+	installationID, err := strconv.ParseInt(installationIDStr, 10, 64)
+	if err != nil || installationID <= 0 {
+		response.Error(c, usererrors.ErrInvalidInstallationID, mapUserError)
+		return
+	}
+
+	// Validate repo
+	if repo == "" {
+		response.Error(c, usererrors.ErrValidationFailed, mapUserError, response.WithDetails(map[string]interface{}{
+			"message": "Repository name is required",
+		}))
+		return
+	}
+
+	input := application.ListGitHubBranchesInput{
+		UserID:         userID,
+		InstallationID: installationID,
+		Repo:           repo,
+	}
+
+	output, err := h.listBranchesUseCase.Execute(c.Request.Context(), input)
+	if err != nil {
+		response.Error(c, err, mapUserError)
+		return
+	}
+
+	response.OK(c, output)
 }
 
 // getUserIDFromContext extracts the user ID from the Gin context

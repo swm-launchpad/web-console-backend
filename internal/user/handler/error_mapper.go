@@ -58,6 +58,9 @@ var userErrorMap = map[error]response.ErrorMapping{
 	usererrors.ErrGitHubAPIFailed:          {StatusCode: http.StatusBadGateway, Code: "GITHUB_API_FAILED", Message: "GitHub API request failed"},
 	usererrors.ErrInvalidState:             {StatusCode: http.StatusBadRequest, Code: "INVALID_STATE", Message: "Invalid state parameter"},
 	usererrors.ErrGitHubNotConfigured:      {StatusCode: http.StatusServiceUnavailable, Code: "GITHUB_NOT_CONFIGURED", Message: "GitHub integration is not configured on this server"},
+	usererrors.ErrRepositoryNotFound:       {StatusCode: http.StatusNotFound, Code: "REPOSITORY_NOT_FOUND", Message: "Repository not found"},
+	usererrors.ErrRepositoryForbidden:      {StatusCode: http.StatusForbidden, Code: "REPOSITORY_FORBIDDEN", Message: "Access to repository forbidden"},
+	usererrors.ErrRepositoryNameRequired:   {StatusCode: http.StatusBadRequest, Code: "REPOSITORY_NAME_REQUIRED", Message: "Repository name is required"},
 }
 
 // mapUserError provides error mapping for user domain

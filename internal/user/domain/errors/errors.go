@@ -81,4 +81,7 @@ var (
 	ErrGitHubAPIFailed          = errors.New("GitHub API request failed")
 	ErrInvalidState             = errors.New("invalid state parameter")
 	ErrGitHubNotConfigured      = errors.New("GitHub integration is not configured")
+	ErrRepositoryNotFound       = errors.New("repository not found")
+	ErrRepositoryForbidden      = errors.New("access to repository forbidden")
+	ErrRepositoryNameRequired   = errors.New("repository name is required")
 )

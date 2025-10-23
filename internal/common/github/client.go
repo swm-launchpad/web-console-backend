@@ -291,6 +291,19 @@ type Repository struct {
 	CloneURL string `json:"clone_url"`
 }
 
+// Branch represents a GitHub repository branch
+type Branch struct {
+	Name      string       `json:"name"`
+	Commit    BranchCommit `json:"commit"`
+	Protected bool         `json:"protected"`
+}
+
+// BranchCommit represents commit information for a branch
+type BranchCommit struct {
+	SHA string `json:"sha"`
+	URL string `json:"url"`
+}
+
 // ListRepositories lists all repositories accessible by the installation
 func (c *Client) ListRepositories(installationID int64) ([]Repository, error) {
 	// Create installation access token
@@ -329,6 +342,60 @@ func (c *Client) ListRepositories(installationID int64) ([]Repository, error) {
 	}
 
 	return repoResp.Repositories, nil
+}
+
+// ListBranches lists all branches for a repository
+// Uses installation token for authentication
+// Returns up to 100 branches (GitHub API limit with per_page parameter)
+func (c *Client) ListBranches(installationID int64, owner, repo string) ([]Branch, error) {
+	// Create installation access token
+	token, err := c.CreateInstallationToken(installationID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Request to list branches
+	url := fmt.Sprintf("%s/repos/%s/%s/branches?per_page=100", githubAPIBaseURL, owner, repo)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token.Token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list branches: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Handle error status codes
+	if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusNotFound:
+			return nil, fmt.Errorf("%w: repository %s/%s not found", ErrRepositoryNotFound, owner, repo)
+		case http.StatusForbidden:
+			return nil, fmt.Errorf("%w: access to repository %s/%s forbidden", ErrRepositoryForbidden, owner, repo)
+		case http.StatusGone:
+			return nil, fmt.Errorf("%w: installation has been revoked", ErrInstallationRevoked)
+		default:
+			return nil, fmt.Errorf("failed to list branches: status %d, body: %s", resp.StatusCode, string(body))
+		}
+	}
+
+	var branches []Branch
+	if err := json.Unmarshal(body, &branches); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return branches, nil
 }
 
 // IsTokenExpired checks if a token has expired or will expire within the buffer time
