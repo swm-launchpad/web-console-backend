@@ -31,11 +31,11 @@ var containerErrorMap = map[error]response.ErrorMapping{
 	containererrors.ErrAdminRequired:         {StatusCode: http.StatusForbidden, Code: "ADMIN_REQUIRED", Message: "Admin permission required"},
 
 	// Validation errors
-	containererrors.ErrNameRequired: {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Container name is required"},
-	containererrors.ErrNameTooLong:  {StatusCode: http.StatusBadRequest, Code: "NAME_TOO_LONG", Message: "Container name must not exceed 100 characters"},
-	containererrors.ErrSlugRequired:      {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Container slug is required"},
-	containererrors.ErrInvalidSlug:       {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid container slug"},
-	containererrors.ErrSlugInvalidFormat: {StatusCode: http.StatusBadRequest, Code: "SLUG_INVALID_FORMAT", Message: "Slug can only contain lowercase letters, numbers, and hyphens"},
+	containererrors.ErrNameRequired:        {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Container name is required"},
+	containererrors.ErrNameTooLong:         {StatusCode: http.StatusBadRequest, Code: "NAME_TOO_LONG", Message: "Container name must not exceed 100 characters"},
+	containererrors.ErrSlugRequired:        {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Container slug is required"},
+	containererrors.ErrInvalidSlug:         {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid container slug"},
+	containererrors.ErrSlugInvalidFormat:   {StatusCode: http.StatusBadRequest, Code: "SLUG_INVALID_FORMAT", Message: "Slug can only contain lowercase letters, numbers, and hyphens"},
 	containererrors.ErrSlugReserved:        {StatusCode: http.StatusBadRequest, Code: "SLUG_RESERVED", Message: "Slug is reserved"},
 	containererrors.ErrSlugAlreadyExists:   {StatusCode: http.StatusConflict, Code: "SLUG_ALREADY_EXISTS", Message: "Slug already exists (globally unique)"},
 	containererrors.ErrContainerNameExists: {StatusCode: http.StatusConflict, Code: "CONTAINER_NAME_EXISTS", Message: "Container name already exists in project"},
