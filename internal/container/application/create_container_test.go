@@ -50,7 +50,7 @@ func TestCreateContainerUseCase_Execute_Success(t *testing.T) {
 	assert.NotNil(t, output)
 	assert.Equal(t, containerID, output.ContainerID)
 	assert.Equal(t, projectID, output.ProjectID)
-	assert.Equal(t, "test-container", output.Name)
+	assert.Equal(t, "Test Container", output.Name)
 	assert.NotEmpty(t, output.Slug)
 	assert.NotEmpty(t, output.CreatedAt)
 

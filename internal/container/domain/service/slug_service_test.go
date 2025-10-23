@@ -6,14 +6,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
-	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
+	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 )
 
 func TestSlugService_GenerateSlug(t *testing.T) {
 	t.Run("successful slug generation", func(t *testing.T) {
-		mockRepo := new(repository.MockProjectRepository)
+		mockRepo := new(repository.MockContainerRepository)
 
 		// Mock that slug does not exist
 		mockRepo.On("ExistsBySlug", mock.Anything, mock.AnythingOfType("string")).Return(false, nil)
@@ -27,7 +27,7 @@ func TestSlugService_GenerateSlug(t *testing.T) {
 		}
 
 		// Validate slug format
-		regex := regexp.MustCompile(`^p[0-9]{14}[a-z0-9]{8}$`)
+		regex := regexp.MustCompile(`^c[0-9]{14}[a-z0-9]{8}$`)
 		if !regex.MatchString(slug.String()) {
 			t.Errorf("GenerateSlug() = %v, does not match pattern", slug.String())
 		}
@@ -39,7 +39,7 @@ func TestSlugService_GenerateSlug(t *testing.T) {
 	})
 
 	t.Run("slug already exists", func(t *testing.T) {
-		mockRepo := new(repository.MockProjectRepository)
+		mockRepo := new(repository.MockContainerRepository)
 
 		// Mock that slug exists
 		mockRepo.On("ExistsBySlug", mock.Anything, mock.AnythingOfType("string")).Return(true, nil)
@@ -47,8 +47,8 @@ func TestSlugService_GenerateSlug(t *testing.T) {
 		service := NewSlugService(mockRepo)
 		_, err := service.GenerateSlug(context.Background())
 
-		if err != projecterrors.ErrSlugAlreadyExists {
-			t.Errorf("GenerateSlug() error = %v, want %v", err, projecterrors.ErrSlugAlreadyExists)
+		if err != containererrors.ErrSlugAlreadyExists {
+			t.Errorf("GenerateSlug() error = %v, want %v", err, containererrors.ErrSlugAlreadyExists)
 		}
 
 		mockRepo.AssertExpectations(t)
@@ -57,14 +57,14 @@ func TestSlugService_GenerateSlug(t *testing.T) {
 
 func TestSlugService_EnsureUniqueSlug(t *testing.T) {
 	t.Run("unique slug", func(t *testing.T) {
-		mockRepo := new(repository.MockProjectRepository)
-		testSlug := "p2025011812000012345678"
+		mockRepo := new(repository.MockContainerRepository)
+		testSlug := "c2025011812000012345678"
 
 		mockRepo.On("ExistsBySlug", mock.Anything, testSlug).Return(false, nil)
 
 		service := NewSlugService(mockRepo)
-		slug, _ := value.NewProjectSlug(testSlug)
-		err := service.EnsureUniqueSlug(context.Background(), *slug)
+		slug, _ := value.NewContainerSlug(testSlug)
+		err := service.EnsureUniqueSlug(context.Background(), slug)
 
 		if err != nil {
 			t.Errorf("EnsureUniqueSlug() unexpected error: %v", err)
@@ -74,17 +74,17 @@ func TestSlugService_EnsureUniqueSlug(t *testing.T) {
 	})
 
 	t.Run("duplicate slug", func(t *testing.T) {
-		mockRepo := new(repository.MockProjectRepository)
-		testSlug := "p2025011812000012345678"
+		mockRepo := new(repository.MockContainerRepository)
+		testSlug := "c2025011812000012345678"
 
 		mockRepo.On("ExistsBySlug", mock.Anything, testSlug).Return(true, nil)
 
 		service := NewSlugService(mockRepo)
-		slug, _ := value.NewProjectSlug(testSlug)
-		err := service.EnsureUniqueSlug(context.Background(), *slug)
+		slug, _ := value.NewContainerSlug(testSlug)
+		err := service.EnsureUniqueSlug(context.Background(), slug)
 
-		if err != projecterrors.ErrSlugAlreadyExists {
-			t.Errorf("EnsureUniqueSlug() error = %v, want %v", err, projecterrors.ErrSlugAlreadyExists)
+		if err != containererrors.ErrSlugAlreadyExists {
+			t.Errorf("EnsureUniqueSlug() error = %v, want %v", err, containererrors.ErrSlugAlreadyExists)
 		}
 
 		mockRepo.AssertExpectations(t)
@@ -96,7 +96,7 @@ func TestSlugService_generateSlug(t *testing.T) {
 
 	// Test multiple slug generations
 	slugs := make(map[string]bool)
-	regex := regexp.MustCompile(`^p[0-9]{14}[a-z0-9]{8}$`)
+	regex := regexp.MustCompile(`^c[0-9]{14}[a-z0-9]{8}$`)
 
 	for i := 0; i < 100; i++ {
 		slug := service.generateSlug()

@@ -16,7 +16,7 @@ func (m *MockSlugService) EnsureUniqueSlug(ctx context.Context, slug value.Proje
 	return args.Error(0)
 }
 
-func (m *MockSlugService) GenerateSlugFromName(ctx context.Context, name string) (value.ProjectSlug, error) {
-	args := m.Called(ctx, name)
+func (m *MockSlugService) GenerateSlug(ctx context.Context) (value.ProjectSlug, error) {
+	args := m.Called(ctx)
 	return args.Get(0).(value.ProjectSlug), args.Error(1)
 }

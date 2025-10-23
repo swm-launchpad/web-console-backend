@@ -36,7 +36,7 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 			TrafficLimit: trafficLimit,
 		}
 
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		project := createTestProjectWithLimits(1, input.Name, *slug, input.OwnerID, &cpuLimit, &memoryLimit, &diskLimit, &trafficLimit)
 
 		// Prepare expected limits
@@ -78,7 +78,7 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 			TrafficLimit: trafficLimit,
 		}
 
-		slug, _ := value.NewProjectSlug("minimal-limits-project-5678")
+		slug, _ := value.NewProjectSlug("p2025011812000022222222")
 		project := createTestProjectWithLimits(2, input.Name, *slug, input.OwnerID, &cpuLimit, &memoryLimit, &diskLimit, &trafficLimit)
 
 		// Expected limits with minimum values
@@ -121,7 +121,7 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 			TrafficLimit: trafficLimit,
 		}
 
-		slug, _ := value.NewProjectSlug("project-with-fqdn-plan-3456")
+		slug, _ := value.NewProjectSlug("p2025011812000033333333")
 		project := createTestProjectWithLimits(3, input.Name, *slug, input.OwnerID, &cpuLimit, &memoryLimit, &diskLimit, &trafficLimit)
 		// Set FQDN and Plan
 		_ = project.SetFQDN(fqdn)

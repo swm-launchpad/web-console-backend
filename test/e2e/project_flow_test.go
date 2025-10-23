@@ -68,7 +68,8 @@ func TestProjectFlow_E2E(t *testing.T) {
 
 		// 기본 필드 검증
 		assert.Equal(t, "Test Project", projectData["name"])
-		assert.Contains(t, projectSlug, "test-project") // slug에는 uniqueness를 위한 suffix가 포함됨
+		assert.Len(t, projectSlug, 23, "Slug should be 23 characters") // slug 길이 검증
+		assert.Equal(t, "p", string(projectSlug[0]), "Slug should start with 'p'")
 
 		// MVP 정책 검증: FQDN과 Plan은 null이어야 함 (Frontend에서 보내도 무시됨)
 		assert.Empty(t, projectData["fqdn"])
@@ -98,8 +99,8 @@ func TestProjectFlow_E2E(t *testing.T) {
 		projects := listResp["data"].(map[string]interface{})["projects"].([]interface{})
 		assert.Greater(t, len(projects), 0)
 
-		// Step 4: 프로젝트 상세 조회 (by ID)
-		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, token)
+		// Step 4: 프로젝트 상세 조회 (by slug)
+		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var getResp map[string]interface{}
@@ -130,7 +131,7 @@ func TestProjectFlow_E2E(t *testing.T) {
 			"traffic_limit": 524288,
 		}
 
-		w = server.MakeAuthRequest("PUT", fmt.Sprintf("/api/v1/projects/%d", projectID), updateProjectReq, token)
+		w = server.MakeAuthRequest("PUT", fmt.Sprintf("/api/v1/projects/%s", projectSlug), updateProjectReq, token)
 		if w.Code != http.StatusOK {
 			t.Logf("Update project failed with status %d: %s", w.Code, w.Body.String())
 		}
@@ -152,7 +153,7 @@ func TestProjectFlow_E2E(t *testing.T) {
 		assert.Equal(t, float64(1048576), updatedData["traffic_limit"])
 
 		// Step 7: 프로젝트 삭제
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, token)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var deleteResp map[string]interface{}
@@ -163,7 +164,7 @@ func TestProjectFlow_E2E(t *testing.T) {
 		assert.Equal(t, "Project deleted successfully", deleteResp["data"].(map[string]interface{})["message"])
 
 		// Step 8: 삭제된 프로젝트 조회 시도 (실패해야 함)
-		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, token)
+		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 }
@@ -213,6 +214,7 @@ func TestProjectWithVolumesCascadeDelete_E2E(t *testing.T) {
 		require.NoError(t, err)
 
 		projectID := uint(projectResp["data"].(map[string]interface{})["project_id"].(float64))
+		projectSlug := projectResp["data"].(map[string]interface{})["slug"].(string)
 
 		// Step 3: 여러 개의 볼륨 추가
 		volumeNames := []string{"volume1", "volume2", "volume3"}
@@ -250,7 +252,7 @@ func TestProjectWithVolumesCascadeDelete_E2E(t *testing.T) {
 		assert.Equal(t, 3, len(volumes), "Should have 3 volumes before deletion")
 
 		// Step 5: 프로젝트 삭제
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, token)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var deleteResp map[string]interface{}
@@ -261,7 +263,7 @@ func TestProjectWithVolumesCascadeDelete_E2E(t *testing.T) {
 		assert.Equal(t, "Project deleted successfully", deleteResp["data"].(map[string]interface{})["message"])
 
 		// Step 6: 프로젝트가 삭제되었는지 확인
-		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, token)
+		w = server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 
 		// Step 7: 볼륨이 모두 삭제되었는지 확인 (중요: 캐스케이드 삭제 검증)
@@ -329,20 +331,21 @@ func TestProjectPermissions_E2E(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, w.Code)
 		var createResp map[string]interface{}
 		_ = json.Unmarshal(w.Body.Bytes(), &createResp)
-		projectID := uint(createResp["data"].(map[string]interface{})["project_id"].(float64))
+		_ = uint(createResp["data"].(map[string]interface{})["project_id"].(float64))
+		projectSlug := createResp["data"].(map[string]interface{})["slug"].(string)
 
 		// Other 사용자가 프로젝트 수정 시도 (실패해야 함)
 		updateReq := map[string]interface{}{
 			"cpu_limit": 2000,
 		}
-		w = server.MakeAuthRequest("PUT", fmt.Sprintf("/api/v1/projects/%d", projectID), updateReq, otherToken)
+		w = server.MakeAuthRequest("PUT", fmt.Sprintf("/api/v1/projects/%s", projectSlug), updateReq, otherToken)
 		// 권한 체크로 인해 403 Forbidden 또는 404 Not Found 응답을 받아야 함
 		// (프로젝트를 찾지 못하거나 권한이 없으면 404)
 		assert.True(t, w.Code == http.StatusForbidden || w.Code == http.StatusNotFound,
 			"Expected 403 or 404, got %d", w.Code)
 
 		// Other 사용자가 프로젝트 삭제 시도 (실패해야 함)
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%d", projectID), nil, otherToken)
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, otherToken)
 		// 권한 체크로 인해 403 Forbidden 또는 404 Not Found 응답을 받아야 함
 		assert.True(t, w.Code == http.StatusForbidden || w.Code == http.StatusNotFound,
 			"Expected 403 or 404, got %d", w.Code)
@@ -432,7 +435,20 @@ func TestProjectLimit_E2E(t *testing.T) {
 			"Error message should mention project limit, got: %s", errorMessage)
 
 		// Step 4: 프로젝트 하나 삭제 후 다시 생성 (성공해야 함)
-		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%d", projectIDs[0]), nil, token)
+		// First get the slug for projectIDs[0]
+		w = server.MakeAuthRequest("GET", "/api/v1/projects", nil, token)
+		var projectsListResp map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &projectsListResp)
+		projects := projectsListResp["data"].(map[string]interface{})["projects"].([]interface{})
+		var firstProjectSlug string
+		for _, p := range projects {
+			proj := p.(map[string]interface{})
+			if uint(proj["project_id"].(float64)) == projectIDs[0] {
+				firstProjectSlug = proj["slug"].(string)
+				break
+			}
+		}
+		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%s", firstProjectSlug), nil, token)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		// 다시 프로젝트 생성 시도 (이제 성공해야 함)

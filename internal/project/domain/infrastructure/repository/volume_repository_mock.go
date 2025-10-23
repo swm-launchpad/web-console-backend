@@ -40,6 +40,14 @@ func (m *MockVolumeRepository) FindByName(ctx context.Context, projectID uint, n
 	return args.Get(0).(*model.Volume), args.Error(1)
 }
 
+func (m *MockVolumeRepository) FindBySlug(ctx context.Context, slug string) (*model.Volume, error) {
+	args := m.Called(ctx, slug)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Volume), args.Error(1)
+}
+
 func (m *MockVolumeRepository) ExistsByName(ctx context.Context, projectID uint, name string) (bool, error) {
 	args := m.Called(ctx, projectID, name)
 	return args.Bool(0), args.Error(1)

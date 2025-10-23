@@ -29,6 +29,10 @@ type ProjectRepository interface {
 	// Returns only projects where the user is an active member
 	FindByUserID(ctx context.Context, userID uint) ([]*model.Project, error)
 
+	// FindBySlug retrieves a project by its slug
+	// Should return the complete aggregate with all ProjectUsers
+	FindBySlug(ctx context.Context, slug string) (*model.Project, error)
+
 	// ExistsBySlug checks if a project with the given slug exists
 	ExistsBySlug(ctx context.Context, slug string) (bool, error)
 

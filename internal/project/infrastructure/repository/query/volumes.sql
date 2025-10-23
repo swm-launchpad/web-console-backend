@@ -28,6 +28,13 @@ SELECT
 FROM VOLUMES
 WHERE project_id = ? AND name = ?;
 
+-- name: GetVolumeBySlug :one
+SELECT
+    volume_id, project_id, name, slug, capacity,
+    created_at, updated_at
+FROM VOLUMES
+WHERE slug = ?;
+
 -- name: ExistsVolumeByName :one
 SELECT EXISTS(
     SELECT 1 FROM VOLUMES

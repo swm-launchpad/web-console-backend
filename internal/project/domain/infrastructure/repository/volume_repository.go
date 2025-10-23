@@ -21,6 +21,9 @@ type VolumeRepository interface {
 	// FindByName retrieves a volume by project ID and name
 	FindByName(ctx context.Context, projectID uint, name string) (*model.Volume, error)
 
+	// FindBySlug retrieves a volume by its slug
+	FindBySlug(ctx context.Context, slug string) (*model.Volume, error)
+
 	// ExistsByName checks if a volume with the given name exists in a project
 	ExistsByName(ctx context.Context, projectID uint, name string) (bool, error)
 

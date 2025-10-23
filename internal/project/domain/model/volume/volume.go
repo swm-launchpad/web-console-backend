@@ -1,7 +1,6 @@
 package model
 
 import (
-	"regexp"
 	"time"
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
@@ -26,14 +25,9 @@ const (
 	MaxVolumeCapacity = 2048 // 2048Mi (2GiB) maximum - Business rule: volume capacity limit
 )
 
-// volumeNamePattern defines the valid volume name format
-// - Must start with a lowercase letter
-// - Can contain lowercase letters, numbers, and hyphens
-// - Must end with a lowercase letter or number
-var volumeNamePattern = regexp.MustCompile(`^[a-z]([a-z0-9-]*[a-z0-9])?$`)
-
 // NewVolume creates a new Volume aggregate root
 // The slug will be set by the service layer before persistence
+// Note: Volume name is for display purposes and has relaxed validation
 func NewVolume(projectID uint, name string, capacity uint32) (*Volume, error) {
 	if projectID == 0 {
 		return nil, projecterrors.ErrInvalidProjectID
@@ -41,7 +35,8 @@ func NewVolume(projectID uint, name string, capacity uint32) (*Volume, error) {
 	if name == "" {
 		return nil, projecterrors.ErrVolumeNameRequired
 	}
-	if !volumeNamePattern.MatchString(name) {
+	// Name is for display purposes, allow up to 255 characters with any printable characters
+	if len(name) > 255 {
 		return nil, projecterrors.ErrInvalidVolumeName
 	}
 	if capacity < MinVolumeCapacity {

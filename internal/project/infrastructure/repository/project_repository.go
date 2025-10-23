@@ -266,6 +266,40 @@ func (r *projectRepository) FindByIDForUpdate(ctx context.Context, projectID uin
 	return project, nil
 }
 
+func (r *projectRepository) FindBySlug(ctx context.Context, slug string) (*model.Project, error) {
+	// Get project by slug
+	row, err := r.queriesWithContext(ctx).GetProjectBySlug(ctx, slug)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, projecterrors.ErrProjectNotFound
+		}
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	// Convert to domain model
+	project, err := r.rowToDomainProject(
+		row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+		row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
+		row.ProjectOperationStatus, row.ActiveDeploymentID,
+		row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Load project users
+	sqlcUsers, err := r.queriesWithContext(ctx).GetProjectUsersByProjectID(ctx, row.ProjectID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	if err := r.loadProjectUsers(project, sqlcUsers); err != nil {
+		return nil, err
+	}
+
+	return project, nil
+}
+
 func (r *projectRepository) FindByUserID(ctx context.Context, userID uint) ([]*model.Project, error) {
 	qtx := r.queriesWithContext(ctx)
 

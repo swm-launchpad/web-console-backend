@@ -36,7 +36,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 			Name:      stringPtr("새로운 프로젝트 이름"),
 		}
 
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		updatedProject := createTestProjectWithVolumes(1, "새로운 프로젝트 이름", *slug, 1)
 		// Note: SetUpdatedAt doesn't exist in the model, updatedAt is managed internally
 
@@ -48,7 +48,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, uint(1), output.ProjectID)
 		assert.Equal(t, "새로운 프로젝트 이름", output.Name)
-		assert.Equal(t, "test-project-1234", output.Slug)
+		assert.Equal(t, "p2025011812000012345678", output.Slug)
 		assert.NotEmpty(t, output.UpdatedAt)
 
 		mockProjectService.AssertExpectations(t)
@@ -64,7 +64,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 			Plan:      stringPtr("premium"),
 		}
 
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		updatedProject := createTestProjectWithVolumes(1, "테스트 프로젝트", *slug, 1)
 		_ = updatedProject.SetFQDN(*input.FQDN)
 		_ = updatedProject.SetPlan(*input.Plan)
@@ -91,7 +91,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 			Status:    stringPtr("running"),
 		}
 
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		updatedProject := createTestProjectWithVolumes(1, "테스트 프로젝트", *slug, 1)
 		_ = updatedProject.SetStatus(value.ProjectStatusActive)
 		// Note: SetUpdatedAt doesn't exist in the model, updatedAt is managed internally
@@ -119,7 +119,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 			TrafficLimit: uint32Ptr(1000000),
 		}
 
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		updatedProject := createTestProjectWithVolumes(1, "테스트 프로젝트", *slug, 1)
 
 		// Update resource limits
@@ -158,7 +158,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 			TrafficLimit: uint32Ptr(2000000),
 		}
 
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		updatedProject := createTestProjectWithVolumes(1, "완전히 새로운 프로젝트", *slug, 1)
 		_ = updatedProject.SetFQDN(*input.FQDN)
 		_ = updatedProject.SetPlan(*input.Plan)

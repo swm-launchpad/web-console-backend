@@ -111,6 +111,20 @@ func (r *volumeRepository) FindByName(ctx context.Context, projectID uint, name 
 	return r.toDomainVolumeFromGetByNameRow(row), nil
 }
 
+func (r *volumeRepository) FindBySlug(ctx context.Context, slug string) (*model.Volume, error) {
+	qtx := r.queriesWithContext(ctx)
+
+	row, err := qtx.GetVolumeBySlug(ctx, sql.NullString{String: slug, Valid: true})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, projecterrors.ErrVolumeNotFound
+		}
+		return nil, projecterrors.ErrDatabaseOperation
+	}
+
+	return r.toDomainVolumeFromGetBySlugRow(row), nil
+}
+
 // ExistsByName checks if a volume with the given name exists in a project
 func (r *volumeRepository) ExistsByName(ctx context.Context, projectID uint, name string) (bool, error) {
 	qtx := r.queriesWithContext(ctx)
@@ -313,6 +327,29 @@ func (r *volumeRepository) toDomainVolumeFromGetByProjectRow(row sqlc.GetVolumes
 }
 
 func (r *volumeRepository) toDomainVolumeFromGetByNameRow(row sqlc.GetVolumeByNameRow) *model.Volume {
+	var updatedAt time.Time
+	if row.UpdatedAt.Valid {
+		updatedAt = row.UpdatedAt.Time
+	}
+
+	var slugStr string
+	if row.Slug.Valid {
+		slugStr = row.Slug.String
+	}
+	slug, _ := value.NewVolumeSlug(slugStr)
+
+	return model.ReconstructVolume(
+		uint(row.VolumeID),
+		uint(row.ProjectID),
+		row.Name,
+		slug,
+		row.Capacity,
+		row.CreatedAt,
+		updatedAt,
+	)
+}
+
+func (r *volumeRepository) toDomainVolumeFromGetBySlugRow(row sqlc.GetVolumeBySlugRow) *model.Volume {
 	var updatedAt time.Time
 	if row.UpdatedAt.Valid {
 		updatedAt = row.UpdatedAt.Time

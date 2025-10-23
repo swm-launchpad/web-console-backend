@@ -21,18 +21,20 @@ const (
 )
 
 type ProjectHandler struct {
-	createProjectUseCase *application.CreateProjectUseCase
-	getProjectUseCase    *application.GetProjectUseCase
-	updateProjectUseCase *application.UpdateProjectUseCase
-	deleteProjectUseCase *application.DeleteProjectUseCase
-	listProjectsUseCase  *application.ListProjectsUseCase
-	permissionService    service.PermissionService
-	projectService       service.ProjectService
+	createProjectUseCase    *application.CreateProjectUseCase
+	getProjectUseCase       *application.GetProjectUseCase
+	getProjectBySlugUseCase *application.GetProjectBySlugUseCase
+	updateProjectUseCase    *application.UpdateProjectUseCase
+	deleteProjectUseCase    *application.DeleteProjectUseCase
+	listProjectsUseCase     *application.ListProjectsUseCase
+	permissionService       service.PermissionService
+	projectService          service.ProjectService
 }
 
 func NewProjectHandler(
 	createProjectUseCase *application.CreateProjectUseCase,
 	getProjectUseCase *application.GetProjectUseCase,
+	getProjectBySlugUseCase *application.GetProjectBySlugUseCase,
 	updateProjectUseCase *application.UpdateProjectUseCase,
 	deleteProjectUseCase *application.DeleteProjectUseCase,
 	listProjectsUseCase *application.ListProjectsUseCase,
@@ -40,13 +42,14 @@ func NewProjectHandler(
 	projectService service.ProjectService,
 ) *ProjectHandler {
 	return &ProjectHandler{
-		createProjectUseCase: createProjectUseCase,
-		getProjectUseCase:    getProjectUseCase,
-		updateProjectUseCase: updateProjectUseCase,
-		deleteProjectUseCase: deleteProjectUseCase,
-		listProjectsUseCase:  listProjectsUseCase,
-		permissionService:    permissionService,
-		projectService:       projectService,
+		createProjectUseCase:    createProjectUseCase,
+		getProjectUseCase:       getProjectUseCase,
+		getProjectBySlugUseCase: getProjectBySlugUseCase,
+		updateProjectUseCase:    updateProjectUseCase,
+		deleteProjectUseCase:    deleteProjectUseCase,
+		listProjectsUseCase:     listProjectsUseCase,
+		permissionService:       permissionService,
+		projectService:          projectService,
 	}
 }
 
@@ -54,7 +57,7 @@ func NewProjectHandler(
 // MVP 단계: FQDN, Plan 입력은 무시되고 nil로 강제됨
 // 리소스 제한 입력은 무시되고 MVP 고정값으로 강제됨
 type CreateProjectRequest struct {
-	Name         string  `json:"name" binding:"required,min=1,max=100"`
+	Name         string  `json:"name" binding:"required,min=1,max=255"`
 	FQDN         *string `json:"fqdn,omitempty"`
 	Plan         *string `json:"plan,omitempty"`
 	CPULimit     uint32  `json:"cpu_limit" binding:"required,min=100,max=4000"`
@@ -113,16 +116,9 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 	response.Created(c, output)
 }
 
-// GetProject handles GET /api/v1/projects/:id
+// GetProject handles GET /api/v1/projects/:slug
 func (h *ProjectHandler) GetProject(c *gin.Context) {
-	projectIDStr := c.Param("id")
-
-	// Parse ID
-	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
-	if err != nil {
-		response.Error(c, projecterrors.ErrInvalidProjectID, mapProjectError)
-		return
-	}
+	slug := c.Param("slug")
 
 	// Check user permission for project access
 	userID, exists := c.Get(auth.ContextKeyUserID)
@@ -132,10 +128,10 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 	}
 
 	// Execute the use case
-	input := application.GetProjectInput{
-		ProjectID: uint(projectID),
+	input := application.GetProjectBySlugInput{
+		Slug: slug,
 	}
-	output, err := h.getProjectUseCase.Execute(c.Request.Context(), input)
+	output, err := h.getProjectBySlugUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
 		response.Error(c, err, mapProjectError)
 		return
@@ -156,7 +152,7 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 // MVP 단계: FQDN, Plan 입력은 무시되고 nil로 강제됨
 // 리소스 제한 입력은 무시되고 MVP 고정값으로 강제됨
 type UpdateProjectRequest struct {
-	Name         *string `json:"name,omitempty" binding:"omitempty,min=1,max=100"`
+	Name         *string `json:"name,omitempty" binding:"omitempty,min=1,max=255"`
 	FQDN         *string `json:"fqdn,omitempty"`
 	Plan         *string `json:"plan,omitempty"`
 	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=100,max=4000"`
@@ -167,12 +163,7 @@ type UpdateProjectRequest struct {
 
 // UpdateProject handles PUT /api/v1/projects/:id
 func (h *ProjectHandler) UpdateProject(c *gin.Context) {
-	projectIDStr := c.Param("id")
-	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
-	if err != nil {
-		response.Error(c, projecterrors.ErrInvalidProjectID, mapProjectError)
-		return
-	}
+	slug := c.Param("slug")
 
 	var req UpdateProjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -189,29 +180,36 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	if err := h.permissionService.CanUserModifyProject(c.Request.Context(), userID.(uint), uint(projectID)); err != nil {
+	// Get project by slug first to check permission
+	project, err := h.projectService.GetProjectBySlug(c.Request.Context(), slug)
+	if err != nil {
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	if err := h.permissionService.CanUserModifyProject(c.Request.Context(), userID.(uint), project.ProjectID()); err != nil {
 		// Return project not found instead of permission denied to prevent information disclosure
 		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
 		return
 	}
 
 	// MVP 정책: FQDN, Plan, 리소스 제한 강제 적용 (Frontend 입력 무시)
-	// Status는 업데이트 불가 (nil로 설정)
+	// Use UpdateProjectUseCase with transaction wrapper
 	cpuLimit := uint32(MVPForcedCPULimit)
 	memoryLimit := uint32(MVPForcedMemoryLimit)
 	diskLimit := uint32(MVPForcedDiskLimit)
 	trafficLimit := uint32(MVPForcedTrafficLimit)
 
 	input := application.UpdateProjectInput{
-		ProjectID:    uint(projectID),
-		Name:         req.Name,      // MVP: Name 업데이트 허용
-		Status:       nil,           // MVP: Status 업데이트 불가
-		FQDN:         nil,           // MVP: FQDN not allowed (force null)
-		Plan:         nil,           // MVP: Plan not allowed (force null)
-		CPULimit:     &cpuLimit,     // MVP: force CPU limit
-		MemoryLimit:  &memoryLimit,  // MVP: force memory limit
-		DiskLimit:    &diskLimit,    // MVP: force disk limit
-		TrafficLimit: &trafficLimit, // MVP: force traffic limit (1TB)
+		ProjectID:    project.ProjectID(),
+		Name:         req.Name,
+		FQDN:         nil,           // MVP: FQDN not allowed
+		Plan:         nil,           // MVP: Plan not allowed
+		CPULimit:     &cpuLimit,     // MVP: 1000m = 1 CPU core
+		MemoryLimit:  &memoryLimit,  // MVP: 2048Mi = 2Gi
+		DiskLimit:    &diskLimit,    // MVP: 2048Mi = 2Gi
+		TrafficLimit: &trafficLimit, // MVP: 1TB = 1048576Mi
+		Status:       nil,           // Status update not allowed
 	}
 
 	output, err := h.updateProjectUseCase.Execute(c.Request.Context(), input)
@@ -223,14 +221,9 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	response.OK(c, output)
 }
 
-// DeleteProject handles DELETE /api/v1/projects/:id
+// DeleteProject handles DELETE /api/v1/projects/:slug
 func (h *ProjectHandler) DeleteProject(c *gin.Context) {
-	projectIDStr := c.Param("id")
-	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
-	if err != nil {
-		response.Error(c, projecterrors.ErrInvalidProjectID, mapProjectError)
-		return
-	}
+	slug := c.Param("slug")
 
 	// Check user permission for project deletion
 	userID, exists := c.Get(auth.ContextKeyUserID)
@@ -239,14 +232,22 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 		return
 	}
 
-	if err := h.permissionService.CanUserModifyProject(c.Request.Context(), userID.(uint), uint(projectID)); err != nil {
+	// Get project by slug first to check permission
+	project, err := h.projectService.GetProjectBySlug(c.Request.Context(), slug)
+	if err != nil {
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	if err := h.permissionService.CanUserModifyProject(c.Request.Context(), userID.(uint), project.ProjectID()); err != nil {
 		// Return project not found instead of permission denied to prevent information disclosure
 		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
 		return
 	}
 
+	// Use DeleteProjectUseCase which properly handles cascade deletion of volumes
 	input := application.DeleteProjectInput{
-		ProjectID: uint(projectID),
+		ProjectID: project.ProjectID(),
 	}
 
 	output, err := h.deleteProjectUseCase.Execute(c.Request.Context(), input)

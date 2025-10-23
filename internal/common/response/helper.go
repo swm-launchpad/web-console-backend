@@ -21,6 +21,11 @@ func Accepted(c *gin.Context, data interface{}, opt ...func(*response)) {
 	c.JSON(http.StatusAccepted, newResponse(data, opt...))
 }
 
+// NoContent sends a 204 No Content response
+func NoContent(c *gin.Context) {
+	c.Status(http.StatusNoContent)
+}
+
 // Error handles errors with domain-specific mapping, falling back to common errors.
 // domainMapper(optional) is a function that maps errors to ErrorMapping.
 // opt(optional) is a function that adds additional information to the error response.

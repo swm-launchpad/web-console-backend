@@ -95,6 +95,8 @@ func (tdb *TestDB) Migrate() error {
 		"000009_add_github_installations.up.sql",
 		"000010_add_installation_status.up.sql",
 		"000011_create_oauth_states.up.sql",
+		"000012_update_slug_columns.up.sql",
+		"000013_fix_container_slug_index.up.sql",
 	}
 
 	for _, migration := range migrations {

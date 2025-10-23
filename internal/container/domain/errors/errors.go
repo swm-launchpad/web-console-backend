@@ -32,15 +32,18 @@ var (
 
 // Validation errors - input validation and data integrity errors
 var (
-	ErrNameRequired        = errors.New("container name is required")
-	ErrNameTooLong         = errors.New("container name must not exceed 100 characters")
-	ErrSlugRequired        = errors.New("container slug is required")
-	ErrInvalidSlug         = errors.New("invalid container slug")
-	ErrSlugTooShort        = errors.New("slug must be at least 3 characters long")
+	ErrNameRequired      = errors.New("container name is required")
+	ErrNameTooLong       = errors.New("container name must not exceed 255 characters")
+	ErrSlugRequired      = errors.New("container slug is required")
+	ErrInvalidSlug       = errors.New("invalid container slug")
+	ErrSlugInvalidLength = errors.New("slug must be exactly 23 characters")
+	// Deprecated: ErrSlugTooShort is unreachable with fixed 23-character slug format. Use ErrSlugInvalidLength instead.
+	ErrSlugTooShort = errors.New("slug must be at least 3 characters long")
+	// Deprecated: ErrSlugTooLong is unreachable with fixed 23-character slug format. Use ErrSlugInvalidLength instead.
 	ErrSlugTooLong         = errors.New("slug must not exceed 63 characters")
-	ErrSlugInvalidFormat   = errors.New("slug can only contain lowercase letters, numbers, and hyphens")
+	ErrSlugInvalidFormat   = errors.New("slug must follow format: c{timestamp}{random} (23 characters total)")
 	ErrSlugReserved        = errors.New("slug is reserved")
-	ErrSlugAlreadyExists   = errors.New("slug already exists in project")
+	ErrSlugAlreadyExists   = errors.New("slug already exists (globally unique)")
 	ErrContainerNameExists = errors.New("container name already exists in project")
 	ErrInvalidProjectID    = errors.New("invalid project ID")
 	ErrInvalidContainerID  = errors.New("invalid container ID")

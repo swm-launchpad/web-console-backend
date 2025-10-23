@@ -84,6 +84,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	// Project UseCases
 	createProjectUseCase := projectApp.NewCreateProjectUseCase(projectSvc, txManager)
 	getProjectUseCase := projectApp.NewGetProjectUseCase(projectSvc, volumeSvc)
+	getProjectBySlugUseCase := projectApp.NewGetProjectBySlugUseCase(projectSvc, volumeSvc)
 	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, txManager)
 	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, txManager)
 	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc)
@@ -126,6 +127,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	projectHandler := projectHTTP.NewProjectHandler(
 		createProjectUseCase,
 		getProjectUseCase,
+		getProjectBySlugUseCase,
 		updateProjectUseCase,
 		deleteProjectUseCase,
 		listProjectsUseCase,
@@ -137,6 +139,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 		getVolumesUseCase,
 		removeVolumeUseCase,
 		permissionSvc,
+		volumeSvc,
 	)
 	containerHandler := containerHTTP.NewContainerHandler(
 		createContainerUseCase,
@@ -154,6 +157,8 @@ func SetupTestServer(t *testing.T) *TestServer {
 		deleteSecretUseCase,
 		addMountUseCase,
 		deleteMountUseCase,
+		projectSvc,
+		containerSvc,
 	)
 	templateHandler := containerHTTP.NewTemplateHandler(
 		getTemplatesUseCase,
@@ -191,9 +196,13 @@ func SetupTestServer(t *testing.T) *TestServer {
 	{
 		projects.POST("", projectHandler.CreateProject)
 		projects.GET("", projectHandler.ListProjects)
-		projects.GET("/:id", projectHandler.GetProject)
-		projects.PUT("/:id", projectHandler.UpdateProject)
-		projects.DELETE("/:id", projectHandler.DeleteProject)
+		projects.GET("/:slug", projectHandler.GetProject)
+		projects.PUT("/:slug", projectHandler.UpdateProject)
+		projects.DELETE("/:slug", projectHandler.DeleteProject)
+
+		// Container routes under project (RESTful)
+		projects.POST("/:slug/containers", containerHandler.CreateContainer)
+		projects.GET("/:slug/containers", containerHandler.ListContainers)
 	}
 
 	// Volume routes (protected)
@@ -202,47 +211,40 @@ func SetupTestServer(t *testing.T) *TestServer {
 	{
 		volumes.POST("", volumeHandler.AddVolume)
 		volumes.GET("", volumeHandler.GetVolumes)
-		volumes.DELETE("/:id", volumeHandler.RemoveVolume)
+		volumes.DELETE("/:slug", volumeHandler.RemoveVolume)
 	}
 
-	// Container routes (protected)
-	// Note: We support both nested and top-level container routes
-	projects.POST("/:id/containers", containerHandler.CreateContainer)
-
+	// Container routes (protected, slug-based)
 	containers := v1.Group("/containers")
 	containers.Use(authMiddleware.RequireAuth())
 	{
-		containers.GET("", containerHandler.ListContainers)
-		containers.GET("/:id", containerHandler.GetContainer)
-		containers.PUT("/:id", containerHandler.UpdateContainer)
-		containers.DELETE("/:id", containerHandler.DeleteContainer)
+		containers.GET("/:slug", containerHandler.GetContainer)
+		containers.PUT("/:slug", containerHandler.UpdateContainer)
+		containers.DELETE("/:slug", containerHandler.DeleteContainer)
 
-		// Git settings (uses UpdateContainer handler)
-		containers.PUT("/:id/git", containerHandler.UpdateContainer)
+		// Git settings
+		containers.PUT("/:slug/git", containerHandler.UpdateContainer)
 
-		// Resource limits (uses UpdateContainer handler)
-		containers.PUT("/:id/resources", containerHandler.UpdateContainer)
+		// Resource limits
+		containers.PUT("/:slug/resources", containerHandler.UpdateContainer)
 
 		// Environment variables
-		containers.GET("/:id/env-vars", containerHandler.ListEnvVars)
-		containers.POST("/:id/env-vars", containerHandler.AddEnvVar)
-		containers.PUT("/:id/env-vars/:key", containerHandler.UpdateEnvVar)
-		containers.DELETE("/:id/env-vars/:key", containerHandler.DeleteEnvVar)
+		containers.POST("/:slug/env-vars", containerHandler.AddEnvVar)
+		containers.PUT("/:slug/env-vars/:key", containerHandler.UpdateEnvVar)
+		containers.DELETE("/:slug/env-vars/:key", containerHandler.DeleteEnvVar)
 
 		// Networks
-		containers.GET("/:id/networks", containerHandler.ListNetworks)
-		containers.POST("/:id/networks", containerHandler.AddNetwork)
-		containers.DELETE("/:id/networks/:port", containerHandler.DeleteNetwork)
+		containers.POST("/:slug/networks", containerHandler.AddNetwork)
+		containers.DELETE("/:slug/networks/:port", containerHandler.DeleteNetwork)
 
 		// Secrets
-		containers.GET("/:id/secrets", containerHandler.ListSecrets)
-		containers.POST("/:id/secrets", containerHandler.AddSecret)
-		containers.PUT("/:id/secrets/:key", containerHandler.UpdateSecret)
-		containers.DELETE("/:id/secrets/:key", containerHandler.DeleteSecret)
+		containers.POST("/:slug/secrets", containerHandler.AddSecret)
+		containers.PUT("/:slug/secrets/:key", containerHandler.UpdateSecret)
+		containers.DELETE("/:slug/secrets/:key", containerHandler.DeleteSecret)
 
 		// Mounts
-		containers.POST("/:id/mounts", containerHandler.AddMount)
-		containers.DELETE("/:id/mounts/:volume_id", containerHandler.DeleteMount)
+		containers.POST("/:slug/mounts", containerHandler.AddMount)
+		containers.DELETE("/:slug/mounts/:volume_id", containerHandler.DeleteMount)
 	}
 
 	// Template routes (protected)

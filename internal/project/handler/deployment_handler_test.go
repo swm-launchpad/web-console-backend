@@ -14,6 +14,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
+	projectmodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
@@ -25,6 +26,7 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
@@ -36,6 +38,7 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
@@ -52,19 +55,24 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		_ = d.UpdateRunningStatus(&summary, &startedAt)
 
 		// Mock expectations
+		// Mock GetProjectBySlug
+		mockProject := &projectmodel.Project{}
+		mockProject.SetProjectID(projectID)
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "p20250118120000abc12345").Return(mockProject, nil)
+
 		mockPermissionService.On("CanUserAccessProject", ctx, userID, projectID).Return(nil)
 		mockDeployService.On("GetDeploymentStatus", ctx, projectID).Return(d, nil)
 
 		// Setup router
 		router := gin.New()
-		router.GET("/api/v1/projects/:id/deployments/latest", func(c *gin.Context) {
+		router.GET("/api/v1/projects/:slug/deployments/latest", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetDeployment(c)
 		})
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/api/v1/projects/1/deployments/latest", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/projects/p20250118120000abc12345/deployments/latest", nil)
 		router.ServeHTTP(w, req)
 
 		// Assertions
@@ -77,6 +85,7 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
@@ -88,24 +97,30 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
 		projectID := uint(1)
 
 		// Mock expectations - permission denied
+		// Mock GetProjectBySlug
+		mockProject := &projectmodel.Project{}
+		mockProject.SetProjectID(projectID)
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "p20250118120000abc12345").Return(mockProject, nil)
+
 		mockPermissionService.On("CanUserAccessProject", ctx, userID, projectID).Return(projecterrors.ErrPermissionDenied)
 
 		// Setup router
 		router := gin.New()
-		router.GET("/api/v1/projects/:id/deployments/latest", func(c *gin.Context) {
+		router.GET("/api/v1/projects/:slug/deployments/latest", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetDeployment(c)
 		})
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/api/v1/projects/1/deployments/latest", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/projects/p20250118120000abc12345/deployments/latest", nil)
 		router.ServeHTTP(w, req)
 
 		// Assertions - should return not found instead of permission denied to prevent information disclosure
@@ -117,6 +132,7 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
@@ -128,25 +144,31 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
 		projectID := uint(1)
 
 		// Mock expectations
+		// Mock GetProjectBySlug
+		mockProject := &projectmodel.Project{}
+		mockProject.SetProjectID(projectID)
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "p20250118120000abc12345").Return(mockProject, nil)
+
 		mockPermissionService.On("CanUserAccessProject", ctx, userID, projectID).Return(nil)
 		mockDeployService.On("GetDeploymentStatus", ctx, projectID).Return(nil, projecterrors.ErrDeploymentNotFound)
 
 		// Setup router
 		router := gin.New()
-		router.GET("/api/v1/projects/:id/deployments/latest", func(c *gin.Context) {
+		router.GET("/api/v1/projects/:slug/deployments/latest", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetDeployment(c)
 		})
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/api/v1/projects/1/deployments/latest", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/projects/p20250118120000abc12345/deployments/latest", nil)
 		router.ServeHTTP(w, req)
 
 		// Assertions
@@ -159,6 +181,7 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
@@ -170,15 +193,16 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		// Setup router - no user in context
 		router := gin.New()
-		router.GET("/api/v1/projects/:id/deployments/latest", handler.GetDeployment)
+		router.GET("/api/v1/projects/:slug/deployments/latest", handler.GetDeployment)
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/api/v1/projects/1/deployments/latest", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/projects/p20250118120000abc12345/deployments/latest", nil)
 		router.ServeHTTP(w, req)
 
 		// Assertions
@@ -189,6 +213,10 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
+
+		// Mock GetProjectBySlug to return error for invalid slug
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "invalid").Return(nil, projecterrors.ErrSlugInvalidFormat)
 
 		// Create use cases
 		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
@@ -200,13 +228,14 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
 
 		// Setup router
 		router := gin.New()
-		router.GET("/api/v1/projects/:id/deployments/latest", func(c *gin.Context) {
+		router.GET("/api/v1/projects/:slug/deployments/latest", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetDeployment(c)
 		})
@@ -218,6 +247,7 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 
 		// Assertions
 		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockProjectService.AssertExpectations(t)
 	})
 }
 
@@ -229,6 +259,7 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
@@ -240,6 +271,7 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
@@ -256,19 +288,24 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		_ = d.UpdateRunningStatus(&summary, &startedAt)
 
 		// Mock expectations
+		// Mock GetProjectBySlug
+		mockProject := &projectmodel.Project{}
+		mockProject.SetProjectID(projectID)
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "p20250118120000abc12345").Return(mockProject, nil)
+
 		mockPermissionService.On("CanUserModifyProject", ctx, userID, projectID).Return(nil)
 		mockDeployService.On("RefreshActiveDeployment", ctx, projectID).Return(d, nil)
 
 		// Setup router
 		router := gin.New()
-		router.POST("/api/v1/projects/:id/deployments/refresh", func(c *gin.Context) {
+		router.POST("/api/v1/projects/:slug/deployments/refresh", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.RefreshDeployment(c)
 		})
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/api/v1/projects/1/deployments/refresh", nil)
+		req, _ := http.NewRequest("POST", "/api/v1/projects/p20250118120000abc12345/deployments/refresh", nil)
 		router.ServeHTTP(w, req)
 
 		// Assertions
@@ -281,6 +318,7 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
@@ -292,24 +330,30 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
 		projectID := uint(1)
 
 		// Mock expectations - permission denied (needs modify, not just access)
+		// Mock GetProjectBySlug
+		mockProject := &projectmodel.Project{}
+		mockProject.SetProjectID(projectID)
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "p20250118120000abc12345").Return(mockProject, nil)
+
 		mockPermissionService.On("CanUserModifyProject", ctx, userID, projectID).Return(projecterrors.ErrPermissionDenied)
 
 		// Setup router
 		router := gin.New()
-		router.POST("/api/v1/projects/:id/deployments/refresh", func(c *gin.Context) {
+		router.POST("/api/v1/projects/:slug/deployments/refresh", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.RefreshDeployment(c)
 		})
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/api/v1/projects/1/deployments/refresh", nil)
+		req, _ := http.NewRequest("POST", "/api/v1/projects/p20250118120000abc12345/deployments/refresh", nil)
 		router.ServeHTTP(w, req)
 
 		// Assertions - should return not found instead of permission denied
@@ -321,6 +365,7 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
@@ -332,25 +377,31 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
 		projectID := uint(1)
 
 		// Mock expectations
+		// Mock GetProjectBySlug
+		mockProject := &projectmodel.Project{}
+		mockProject.SetProjectID(projectID)
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "p20250118120000abc12345").Return(mockProject, nil)
+
 		mockPermissionService.On("CanUserModifyProject", ctx, userID, projectID).Return(nil)
 		mockDeployService.On("RefreshActiveDeployment", ctx, projectID).Return(nil, projecterrors.ErrDeploymentNotFound)
 
 		// Setup router
 		router := gin.New()
-		router.POST("/api/v1/projects/:id/deployments/refresh", func(c *gin.Context) {
+		router.POST("/api/v1/projects/:slug/deployments/refresh", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.RefreshDeployment(c)
 		})
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/api/v1/projects/1/deployments/refresh", nil)
+		req, _ := http.NewRequest("POST", "/api/v1/projects/p20250118120000abc12345/deployments/refresh", nil)
 		router.ServeHTTP(w, req)
 
 		// Assertions
@@ -363,6 +414,7 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
@@ -374,15 +426,16 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		// Setup router - no user in context
 		router := gin.New()
-		router.POST("/api/v1/projects/:id/deployments/refresh", handler.RefreshDeployment)
+		router.POST("/api/v1/projects/:slug/deployments/refresh", handler.RefreshDeployment)
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/api/v1/projects/1/deployments/refresh", nil)
+		req, _ := http.NewRequest("POST", "/api/v1/projects/p20250118120000abc12345/deployments/refresh", nil)
 		router.ServeHTTP(w, req)
 
 		// Assertions
@@ -393,6 +446,10 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
+
+		// Mock GetProjectBySlug to return error for invalid slug
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "invalid").Return(nil, projecterrors.ErrSlugInvalidFormat)
 
 		// Create use cases
 		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
@@ -404,13 +461,14 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
 
 		// Setup router
 		router := gin.New()
-		router.POST("/api/v1/projects/:id/deployments/refresh", func(c *gin.Context) {
+		router.POST("/api/v1/projects/:slug/deployments/refresh", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.RefreshDeployment(c)
 		})
@@ -422,6 +480,7 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 
 		// Assertions
 		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockProjectService.AssertExpectations(t)
 	})
 }
 
@@ -433,6 +492,7 @@ func TestDeploymentHandler_PermissionDifference(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
@@ -444,6 +504,7 @@ func TestDeploymentHandler_PermissionDifference(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
@@ -453,19 +514,24 @@ func TestDeploymentHandler_PermissionDifference(t *testing.T) {
 		d.SetDeploymentID(100)
 
 		// Mock expectations - uses CanUserAccessProject
+		// Mock GetProjectBySlug
+		mockProject := &projectmodel.Project{}
+		mockProject.SetProjectID(projectID)
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "p20250118120000abc12345").Return(mockProject, nil)
+
 		mockPermissionService.On("CanUserAccessProject", ctx, userID, projectID).Return(nil)
 		mockDeployService.On("GetDeploymentStatus", ctx, projectID).Return(d, nil)
 
 		// Setup router
 		router := gin.New()
-		router.GET("/api/v1/projects/:id/deployments/latest", func(c *gin.Context) {
+		router.GET("/api/v1/projects/:slug/deployments/latest", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.GetDeployment(c)
 		})
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/api/v1/projects/1/deployments/latest", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/projects/p20250118120000abc12345/deployments/latest", nil)
 		router.ServeHTTP(w, req)
 
 		// Verify CanUserAccessProject was called (not CanUserModifyProject)
@@ -477,6 +543,7 @@ func TestDeploymentHandler_PermissionDifference(t *testing.T) {
 		// Setup mocks
 		mockDeployService := new(service.MockDeployService)
 		mockPermissionService := new(service.MockPermissionService)
+		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
 		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
@@ -488,6 +555,7 @@ func TestDeploymentHandler_PermissionDifference(t *testing.T) {
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
+			mockProjectService,
 		)
 
 		userID := uint(1)
@@ -497,19 +565,24 @@ func TestDeploymentHandler_PermissionDifference(t *testing.T) {
 		d.SetDeploymentID(100)
 
 		// Mock expectations - uses CanUserModifyProject
+		// Mock GetProjectBySlug
+		mockProject := &projectmodel.Project{}
+		mockProject.SetProjectID(projectID)
+		mockProjectService.On("GetProjectBySlug", mock.Anything, "p20250118120000abc12345").Return(mockProject, nil)
+
 		mockPermissionService.On("CanUserModifyProject", ctx, userID, projectID).Return(nil)
 		mockDeployService.On("RefreshActiveDeployment", ctx, projectID).Return(d, nil)
 
 		// Setup router
 		router := gin.New()
-		router.POST("/api/v1/projects/:id/deployments/refresh", func(c *gin.Context) {
+		router.POST("/api/v1/projects/:slug/deployments/refresh", func(c *gin.Context) {
 			c.Set(auth.ContextKeyUserID, userID)
 			handler.RefreshDeployment(c)
 		})
 
 		// Make request
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/api/v1/projects/1/deployments/refresh", nil)
+		req, _ := http.NewRequest("POST", "/api/v1/projects/p20250118120000abc12345/deployments/refresh", nil)
 		router.ServeHTTP(w, req)
 
 		// Verify CanUserModifyProject was called (not CanUserAccessProject)

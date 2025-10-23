@@ -63,7 +63,7 @@ ORDER BY created_at DESC
 LIMIT ? OFFSET ?;
 
 -- name: ListProjectsByUserID :many
-SELECT DISTINCT
+SELECT
     p.project_id, p.name, p.slug, p.fqdn, p.status, p.plan,
     p.cpu_limit, p.memory_limit, p.disk_limit, p.traffic_limit,
     p.project_operation_status, p.active_deployment_id,

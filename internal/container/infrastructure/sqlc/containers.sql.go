@@ -156,16 +156,11 @@ func (q *Queries) ExistsByNameAndProjectID(ctx context.Context, arg ExistsByName
 }
 
 const existsBySlug = `-- name: ExistsBySlug :one
-SELECT EXISTS(SELECT 1 FROM CONTAINERS WHERE project_id = ? AND slug = ? AND is_deleted = FALSE) as container_exists
+SELECT EXISTS(SELECT 1 FROM CONTAINERS WHERE slug = ? AND is_deleted = FALSE) as container_exists
 `
 
-type ExistsBySlugParams struct {
-	ProjectID uint32 `json:"project_id"`
-	Slug      string `json:"slug"`
-}
-
-func (q *Queries) ExistsBySlug(ctx context.Context, arg ExistsBySlugParams) (bool, error) {
-	row := q.db.QueryRowContext(ctx, existsBySlug, arg.ProjectID, arg.Slug)
+func (q *Queries) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
+	row := q.db.QueryRowContext(ctx, existsBySlug, slug)
 	var container_exists bool
 	err := row.Scan(&container_exists)
 	return container_exists, err
@@ -247,16 +242,11 @@ func (q *Queries) GetContainerByIDForUpdate(ctx context.Context, containerID uin
 const getContainerBySlug = `-- name: GetContainerBySlug :one
 SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id
 FROM CONTAINERS
-WHERE project_id = ? AND slug = ? AND is_deleted = FALSE
+WHERE slug = ? AND is_deleted = FALSE
 `
 
-type GetContainerBySlugParams struct {
-	ProjectID uint32 `json:"project_id"`
-	Slug      string `json:"slug"`
-}
-
-func (q *Queries) GetContainerBySlug(ctx context.Context, arg GetContainerBySlugParams) (Container, error) {
-	row := q.db.QueryRowContext(ctx, getContainerBySlug, arg.ProjectID, arg.Slug)
+func (q *Queries) GetContainerBySlug(ctx context.Context, slug string) (Container, error) {
+	row := q.db.QueryRowContext(ctx, getContainerBySlug, slug)
 	var i Container
 	err := row.Scan(
 		&i.ContainerID,

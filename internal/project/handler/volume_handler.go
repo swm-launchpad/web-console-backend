@@ -16,6 +16,7 @@ type VolumeHandler struct {
 	getVolumesUseCase   *application.GetVolumesUseCase
 	removeVolumeUseCase *application.RemoveVolumeUseCase
 	permissionService   service.PermissionService
+	volumeService       service.VolumeService
 }
 
 func NewVolumeHandler(
@@ -23,19 +24,21 @@ func NewVolumeHandler(
 	getVolumesUseCase *application.GetVolumesUseCase,
 	removeVolumeUseCase *application.RemoveVolumeUseCase,
 	permissionService service.PermissionService,
+	volumeService service.VolumeService,
 ) *VolumeHandler {
 	return &VolumeHandler{
 		addVolumeUseCase:    addVolumeUseCase,
 		getVolumesUseCase:   getVolumesUseCase,
 		removeVolumeUseCase: removeVolumeUseCase,
 		permissionService:   permissionService,
+		volumeService:       volumeService,
 	}
 }
 
 // AddVolumeRequest represents the request body for volume creation
 type AddVolumeRequest struct {
 	ProjectID uint   `json:"project_id" binding:"required"`
-	Name      string `json:"name" binding:"required,min=1,max=63"`         // 영소문자로 시작, 영소문자/숫자/하이픈 사용, 영소문자/숫자로 종료
+	Name      string `json:"name" binding:"required,min=1,max=255"`        // Display name, allows up to 255 characters
 	Capacity  uint32 `json:"capacity" binding:"required,min=128,max=2048"` // 128-2048 Mi
 }
 
@@ -119,14 +122,9 @@ func (h *VolumeHandler) GetVolumes(c *gin.Context) {
 	response.OK(c, output)
 }
 
-// RemoveVolume handles DELETE /api/v1/volumes/:id
+// RemoveVolume handles DELETE /api/v1/volumes/:slug
 func (h *VolumeHandler) RemoveVolume(c *gin.Context) {
-	volumeIDStr := c.Param("id")
-	volumeID, err := strconv.ParseUint(volumeIDStr, 10, 32)
-	if err != nil {
-		response.Error(c, projecterrors.ErrInvalidVolumeID, mapProjectError)
-		return
-	}
+	slug := c.Param("slug")
 
 	// Check user permission for the volume's project
 	userID, exists := c.Get(auth.ContextKeyUserID)
@@ -135,14 +133,21 @@ func (h *VolumeHandler) RemoveVolume(c *gin.Context) {
 		return
 	}
 
-	if err := h.permissionService.CanUserRemoveVolume(c.Request.Context(), userID.(uint), uint(volumeID)); err != nil {
+	// Get volume by slug first to get volume ID for permission check
+	volume, err := h.volumeService.GetVolumeBySlug(c.Request.Context(), slug)
+	if err != nil {
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	if err := h.permissionService.CanUserRemoveVolume(c.Request.Context(), userID.(uint), volume.VolumeID()); err != nil {
 		// Return volume not found instead of permission denied to prevent information disclosure
 		response.Error(c, projecterrors.ErrVolumeNotFound, mapProjectError)
 		return
 	}
 
 	input := application.RemoveVolumeInput{
-		VolumeID: uint(volumeID),
+		VolumeID: volume.VolumeID(),
 	}
 
 	output, err := h.removeVolumeUseCase.Execute(c.Request.Context(), input)

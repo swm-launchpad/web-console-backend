@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 
+	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
@@ -19,6 +20,7 @@ type ProjectUserOutput struct {
 type VolumeOutput struct {
 	VolumeID  uint   `json:"volume_id"`
 	Name      string `json:"name"`
+	Slug      string `json:"slug"`
 	Capacity  uint32 `json:"capacity"`
 	CreatedAt string `json:"created_at"`
 }
@@ -59,6 +61,12 @@ func (uc *GetProjectUseCase) Execute(ctx context.Context, input GetProjectInput)
 		return nil, err
 	}
 
+	return buildProjectOutput(ctx, project, uc.volumeService)
+}
+
+// buildProjectOutput is a shared helper function to build GetProjectOutput from a project domain model
+// This eliminates code duplication between GetProjectUseCase and GetProjectBySlugUseCase
+func buildProjectOutput(ctx context.Context, project *model.Project, volumeService service.VolumeService) (*GetProjectOutput, error) {
 	// Build output
 	output := &GetProjectOutput{
 		ProjectID:    project.ProjectID(),
@@ -93,7 +101,7 @@ func (uc *GetProjectUseCase) Execute(ctx context.Context, input GetProjectInput)
 	}
 
 	// Add volumes from VolumeService
-	volumes, err := uc.volumeService.ListVolumesByProjectID(ctx, project.ProjectID())
+	volumes, err := volumeService.ListVolumesByProjectID(ctx, project.ProjectID())
 	if err != nil {
 		return nil, err
 	}
@@ -102,6 +110,7 @@ func (uc *GetProjectUseCase) Execute(ctx context.Context, input GetProjectInput)
 		output.Volumes = append(output.Volumes, VolumeOutput{
 			VolumeID:  volume.VolumeID(),
 			Name:      volume.Name(),
+			Slug:      volume.Slug().String(),
 			Capacity:  volume.Capacity(),
 			CreatedAt: volume.CreatedAt().Format("2006-01-02T15:04:05Z"),
 		})

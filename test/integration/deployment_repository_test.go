@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -14,6 +15,18 @@ import (
 	"github.com/swm-launchpad/web-console-backend/test/helper"
 )
 
+// generateValidProjectSlug generates a valid project slug for testing
+// Format: p{timestamp}{random} (23 chars total)
+func generateValidProjectSlug() string {
+	timestamp := time.Now().Format("20060102150405")
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	random := make([]byte, 8)
+	for i := range random {
+		random[i] = charset[rand.Intn(len(charset))]
+	}
+	return fmt.Sprintf("p%s%s", timestamp, string(random))
+}
+
 // createTestProject creates a test project for integration tests
 func createTestProject(t *testing.T, testDB *helper.TestDB) uint {
 	t.Helper()
@@ -23,8 +36,8 @@ func createTestProject(t *testing.T, testDB *helper.TestDB) uint {
 		VALUES (?, ?, 'active', 'nothing', 1000, 2048, 2048, 1048576, NOW())
 	`
 
-	// Use nanosecond timestamp for unique slugs
-	slug := fmt.Sprintf("test-project-%d", time.Now().UnixNano())
+	// Generate a valid project slug (format: p{timestamp}{random})
+	slug := generateValidProjectSlug()
 	result, err := testDB.DB.Exec(query, "Test Project", slug)
 	require.NoError(t, err)
 

@@ -193,6 +193,39 @@ func (q *Queries) GetVolumeByName(ctx context.Context, arg GetVolumeByNameParams
 	return i, err
 }
 
+const getVolumeBySlug = `-- name: GetVolumeBySlug :one
+SELECT
+    volume_id, project_id, name, slug, capacity,
+    created_at, updated_at
+FROM VOLUMES
+WHERE slug = ?
+`
+
+type GetVolumeBySlugRow struct {
+	VolumeID  uint32         `json:"volume_id"`
+	ProjectID uint32         `json:"project_id"`
+	Name      string         `json:"name"`
+	Slug      sql.NullString `json:"slug"`
+	Capacity  uint32         `json:"capacity"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt sql.NullTime   `json:"updated_at"`
+}
+
+func (q *Queries) GetVolumeBySlug(ctx context.Context, slug sql.NullString) (GetVolumeBySlugRow, error) {
+	row := q.db.QueryRowContext(ctx, getVolumeBySlug, slug)
+	var i GetVolumeBySlugRow
+	err := row.Scan(
+		&i.VolumeID,
+		&i.ProjectID,
+		&i.Name,
+		&i.Slug,
+		&i.Capacity,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getVolumesByProjectID = `-- name: GetVolumesByProjectID :many
 SELECT
     volume_id, project_id, name, slug, capacity,

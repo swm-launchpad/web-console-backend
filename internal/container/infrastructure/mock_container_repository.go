@@ -52,8 +52,8 @@ func (m *MockContainerRepository) FindByProjectID(ctx context.Context, projectID
 }
 
 // FindBySlug mocks the FindBySlug method
-func (m *MockContainerRepository) FindBySlug(ctx context.Context, projectID uint, slug string) (*model.Container, error) {
-	args := m.Called(ctx, projectID, slug)
+func (m *MockContainerRepository) FindBySlug(ctx context.Context, slug string) (*model.Container, error) {
+	args := m.Called(ctx, slug)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -61,8 +61,8 @@ func (m *MockContainerRepository) FindBySlug(ctx context.Context, projectID uint
 }
 
 // ExistsBySlug mocks the ExistsBySlug method
-func (m *MockContainerRepository) ExistsBySlug(ctx context.Context, projectID uint, slug string) (bool, error) {
-	args := m.Called(ctx, projectID, slug)
+func (m *MockContainerRepository) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
+	args := m.Called(ctx, slug)
 	return args.Bool(0), args.Error(1)
 }
 

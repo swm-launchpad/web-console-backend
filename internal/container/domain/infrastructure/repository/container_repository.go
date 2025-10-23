@@ -29,13 +29,13 @@ type ContainerRepository interface {
 	// Returns only containers that are not soft deleted
 	FindByProjectID(ctx context.Context, projectID uint) ([]*model.Container, error)
 
-	// FindBySlug retrieves a container by project ID and slug
-	// Slug is unique within a project
-	FindBySlug(ctx context.Context, projectID uint, slug string) (*model.Container, error)
+	// FindBySlug retrieves a container by slug
+	// Slug is globally unique
+	FindBySlug(ctx context.Context, slug string) (*model.Container, error)
 
-	// ExistsBySlug checks if a container with the given slug exists in the project
+	// ExistsBySlug checks if a container with the given slug exists
 	// Used for slug uniqueness validation
-	ExistsBySlug(ctx context.Context, projectID uint, slug string) (bool, error)
+	ExistsBySlug(ctx context.Context, slug string) (bool, error)
 
 	// ExistsByNameAndProjectID checks if a container with the given name exists in the project
 	// Used for name uniqueness validation within a project

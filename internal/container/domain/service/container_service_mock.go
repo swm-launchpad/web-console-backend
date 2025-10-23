@@ -28,6 +28,14 @@ func (m *MockContainerService) GetContainer(ctx context.Context, containerID uin
 	return args.Get(0).(*model.Container), args.Error(1)
 }
 
+func (m *MockContainerService) GetContainerBySlug(ctx context.Context, slug string) (*model.Container, error) {
+	args := m.Called(ctx, slug)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Container), args.Error(1)
+}
+
 func (m *MockContainerService) UpdateContainer(ctx context.Context, containerID uint, updateFn func(*model.Container) error) (*model.Container, error) {
 	args := m.Called(ctx, containerID, updateFn)
 	if args.Get(0) == nil {

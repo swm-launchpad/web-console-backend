@@ -28,11 +28,11 @@ func TestProjectService_CreateProject(t *testing.T) {
 		service := NewProjectService(mockProjectRepo, mockSlugService)
 
 		name := "테스트 프로젝트"
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		ownerID := uint(1)
 
 		mockProjectRepo.On("ExistsByNameAndUserID", ctx, name, ownerID).Return(false, nil)
-		mockSlugService.On("GenerateSlugFromName", ctx, name).Return(*slug, nil)
+		mockSlugService.On("GenerateSlug", ctx).Return(*slug, nil)
 		mockProjectRepo.On("Create", ctx, mock.MatchedBy(func(project *model.Project) bool {
 			return project.Name() == name && project.Slug().String() == slug.String()
 		})).Return(nil)
@@ -59,7 +59,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 		assert.Nil(t, project)
 
 		mockProjectRepo.AssertNotCalled(t, "ExistsByNameAndUserID")
-		mockSlugService.AssertNotCalled(t, "GenerateSlugFromName")
+		mockSlugService.AssertNotCalled(t, "GenerateSlug")
 		mockProjectRepo.AssertNotCalled(t, "Create")
 	})
 
@@ -76,7 +76,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 		assert.Nil(t, project)
 
 		mockProjectRepo.AssertNotCalled(t, "ExistsByNameAndUserID")
-		mockSlugService.AssertNotCalled(t, "GenerateSlugFromName")
+		mockSlugService.AssertNotCalled(t, "GenerateSlug")
 		mockProjectRepo.AssertNotCalled(t, "Create")
 	})
 
@@ -97,7 +97,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 		assert.Nil(t, project)
 
 		mockProjectRepo.AssertExpectations(t)
-		mockSlugService.AssertNotCalled(t, "GenerateSlugFromName")
+		mockSlugService.AssertNotCalled(t, "GenerateSlug")
 		mockProjectRepo.AssertNotCalled(t, "Create")
 	})
 
@@ -110,7 +110,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 		ownerID := uint(1)
 
 		mockProjectRepo.On("ExistsByNameAndUserID", ctx, name, ownerID).Return(false, nil)
-		mockSlugService.On("GenerateSlugFromName", ctx, name).Return(value.ProjectSlug{}, projecterrors.ErrSlugGenerationFailed)
+		mockSlugService.On("GenerateSlug", ctx).Return(value.ProjectSlug{}, projecterrors.ErrSlugGenerationFailed)
 
 		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil, nil)
 
@@ -129,11 +129,11 @@ func TestProjectService_CreateProject(t *testing.T) {
 		service := NewProjectService(mockProjectRepo, mockSlugService)
 
 		name := "테스트 프로젝트"
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		ownerID := uint(1)
 
 		mockProjectRepo.On("ExistsByNameAndUserID", ctx, name, ownerID).Return(false, nil)
-		mockSlugService.On("GenerateSlugFromName", ctx, name).Return(*slug, nil)
+		mockSlugService.On("GenerateSlug", ctx).Return(*slug, nil)
 		mockProjectRepo.On("Create", ctx, mock.Anything).Return(errors.New("database error"))
 
 		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil, nil)
@@ -156,7 +156,7 @@ func TestProjectService_GetProject(t *testing.T) {
 		service := NewProjectService(mockProjectRepo, mockSlugService)
 
 		projectID := uint(1)
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		expectedProject := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(expectedProject, nil)
@@ -212,7 +212,7 @@ func TestProjectService_UpdateProject(t *testing.T) {
 		service := NewProjectService(mockProjectRepo, mockSlugService)
 
 		projectID := uint(1)
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		project := createTestProject(projectID, "원래 이름", *slug, 1)
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
@@ -254,7 +254,7 @@ func TestProjectService_DeleteProject(t *testing.T) {
 		service := NewProjectService(mockProjectRepo, mockSlugService)
 
 		projectID := uint(1)
-		slug, _ := value.NewProjectSlug("test-project-1234")
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
@@ -290,8 +290,8 @@ func TestProjectService_ListProjects(t *testing.T) {
 		service := NewProjectService(mockProjectRepo, mockSlugService)
 
 		userID := uint(1)
-		slug1, _ := value.NewProjectSlug("project-1")
-		slug2, _ := value.NewProjectSlug("project-2")
+		slug1, _ := value.NewProjectSlug("p2025011812000099999991")
+		slug2, _ := value.NewProjectSlug("p2025011812000099999992")
 		expectedProjects := []*model.Project{
 			createTestProject(1, "프로젝트 1", *slug1, userID),
 			createTestProject(2, "프로젝트 2", *slug2, userID),
@@ -332,9 +332,9 @@ func TestProjectService_CountProjectsByUserID(t *testing.T) {
 		service := NewProjectService(mockProjectRepo, mockSlugService)
 
 		userID := uint(1)
-		slug1, _ := value.NewProjectSlug("project-1")
-		slug2, _ := value.NewProjectSlug("project-2")
-		slug3, _ := value.NewProjectSlug("project-3")
+		slug1, _ := value.NewProjectSlug("p2025011812000099999993")
+		slug2, _ := value.NewProjectSlug("p2025011812000099999994")
+		slug3, _ := value.NewProjectSlug("p2025011812000099999995")
 
 		project1 := createTestProject(1, "프로젝트 1", *slug1, userID)
 		project2 := createTestProject(2, "프로젝트 2", *slug2, userID)
@@ -433,6 +433,111 @@ func TestProjectService_CheckProjectNameExists(t *testing.T) {
 		assert.False(t, exists)
 
 		mockProjectRepo.AssertNotCalled(t, "ExistsByNameAndUserID")
+	})
+}
+
+func TestProjectService_GetProjectBySlug(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("성공: 유효한 Slug로 프로젝트 조회", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		service := NewProjectService(mockProjectRepo, mockSlugService)
+
+		slug, _ := value.NewProjectSlug("p20250118120000abcd1234")
+		expectedProject := createTestProject(1, "테스트 프로젝트", *slug, 1)
+
+		mockProjectRepo.On("FindBySlug", ctx, slug.String()).Return(expectedProject, nil)
+
+		project, err := service.GetProjectBySlug(ctx, slug.String())
+
+		require.NoError(t, err)
+		assert.NotNil(t, project)
+		assert.Equal(t, expectedProject, project)
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("실패: Slug가 너무 짧음 (20자)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		service := NewProjectService(mockProjectRepo, mockSlugService)
+
+		invalidSlug := "p20250118120000abcd" // 20 chars instead of 23
+
+		project, err := service.GetProjectBySlug(ctx, invalidSlug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrSlugInvalidLength, err)
+		assert.Nil(t, project)
+
+		mockProjectRepo.AssertNotCalled(t, "FindBySlug")
+	})
+
+	t.Run("실패: Slug가 너무 긺 (25자)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		service := NewProjectService(mockProjectRepo, mockSlugService)
+
+		invalidSlug := "p20250118120000abcd123456" // 26 chars instead of 23
+
+		project, err := service.GetProjectBySlug(ctx, invalidSlug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrSlugInvalidLength, err)
+		assert.Nil(t, project)
+
+		mockProjectRepo.AssertNotCalled(t, "FindBySlug")
+	})
+
+	t.Run("실패: 잘못된 접두사 (c 대신 p)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		service := NewProjectService(mockProjectRepo, mockSlugService)
+
+		invalidSlug := "c20250118120000abcd1234" // Container prefix instead of Project
+
+		project, err := service.GetProjectBySlug(ctx, invalidSlug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrSlugInvalidFormat, err)
+		assert.Nil(t, project)
+
+		mockProjectRepo.AssertNotCalled(t, "FindBySlug")
+	})
+
+	t.Run("실패: 잘못된 형식 (타임스탬프 부분에 문자)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		service := NewProjectService(mockProjectRepo, mockSlugService)
+
+		invalidSlug := "p2025abc8120000abcd1234" // Letters in timestamp
+
+		project, err := service.GetProjectBySlug(ctx, invalidSlug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrSlugInvalidFormat, err)
+		assert.Nil(t, project)
+
+		mockProjectRepo.AssertNotCalled(t, "FindBySlug")
+	})
+
+	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		service := NewProjectService(mockProjectRepo, mockSlugService)
+
+		slug := "p20250118120000xyz91234"
+
+		mockProjectRepo.On("FindBySlug", ctx, slug).Return((*model.Project)(nil), projecterrors.ErrProjectNotFound)
+
+		project, err := service.GetProjectBySlug(ctx, slug)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrProjectNotFound, err)
+		assert.Nil(t, project)
+
+		mockProjectRepo.AssertExpectations(t)
 	})
 }
 

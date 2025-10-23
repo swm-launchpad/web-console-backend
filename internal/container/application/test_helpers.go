@@ -12,7 +12,7 @@ import (
 
 // createMockContainer creates a basic empty container for testing (no env vars, networks, secrets)
 func createMockContainer(containerID, projectID uint) *model.Container {
-	slug, _ := value.NewContainerSlug("test-container-slug")
+	slug, _ := value.NewContainerSlug("c2025011812000012345678")
 	gitConfig, _ := value.NewGitConfig(
 		"https://github.com/test/repo",
 		"main",
@@ -27,7 +27,7 @@ func createMockContainer(containerID, projectID uint) *model.Container {
 		containerID,
 		projectID,
 		nil,
-		"test-container",
+		"Test Container",
 		slug,
 		nil,
 		nil,
@@ -51,7 +51,7 @@ func createMockContainer(containerID, projectID uint) *model.Container {
 
 // createMockDeletedContainer creates a soft-deleted container for testing
 func createMockDeletedContainer(containerID, projectID uint) *model.Container {
-	slug, _ := value.NewContainerSlug("test-deleted-slug")
+	slug, _ := value.NewContainerSlug("c2025011812000087654321")
 	gitConfig, _ := value.NewGitConfig(
 		"https://github.com/test/repo",
 		"main",
@@ -145,7 +145,7 @@ func createMockContainerWithOptionalFields(
 	stableWindow *uint32,
 	templateConfig map[string]interface{},
 ) *model.Container {
-	slug, _ := value.NewContainerSlug("test-container-slug")
+	slug, _ := value.NewContainerSlug("c2025011812000012345678")
 	gitConfig, _ := value.NewGitConfig(
 		"https://github.com/test/repo",
 		"main",
@@ -160,7 +160,7 @@ func createMockContainerWithOptionalFields(
 		containerID,
 		projectID,
 		nil,
-		"test-container",
+		"Test Container",
 		slug,
 		stableWindow,
 		templateConfig,

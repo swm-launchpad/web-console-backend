@@ -41,8 +41,8 @@ func TestGetContainerUseCase_Execute_Success(t *testing.T) {
 	assert.NotNil(t, output)
 	assert.Equal(t, containerID, output.ContainerID)
 	assert.Equal(t, projectID, output.ProjectID)
-	assert.Equal(t, "test-container", output.Name)
-	assert.Equal(t, "test-container-slug", output.Slug)
+	assert.Equal(t, "Test Container", output.Name)
+	assert.Equal(t, "c2025011812000012345678", output.Slug)
 	assert.Len(t, output.Networks, 2)
 	assert.Len(t, output.EnvVars, 2)
 

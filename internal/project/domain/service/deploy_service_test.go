@@ -21,7 +21,7 @@ import (
 
 // Helper function to create test project for deploy service tests
 func createTestProjectForDeploy(projectID uint, operationStatus value.ProjectOperationStatus) *projectmodel.Project {
-	slug, _ := value.NewProjectSlug("test-project")
+	slug, _ := value.NewProjectSlug("p2025011812000012345678")
 	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
 	now := time.Now()
 
@@ -78,7 +78,7 @@ func TestDeployService_buildTektonRequest(t *testing.T) {
 	assert.NotNil(t, request)
 	assert.Equal(t, "false", request.DryRun)
 	assert.Equal(t, "1", request.DeploymentConfigJSON.ProjectID)
-	assert.Equal(t, "test-project", request.DeploymentConfigJSON.ServiceName) // Should use project slug, not hardcoded service name
+	assert.Equal(t, "p2025011812000012345678", request.DeploymentConfigJSON.ServiceName) // Should use project slug, not hardcoded service name
 	assert.Equal(t, "test-namespace", request.DeploymentConfigJSON.Namespace)
 	assert.Equal(t, 180, request.DeploymentConfigJSON.StableWindow)
 	assert.Len(t, request.DeploymentConfigJSON.Containers, 1)
@@ -469,7 +469,7 @@ func TestDeployService_GetDeploymentStatus_WithActiveDeployment(t *testing.T) {
 	activeDeploymentID := uint(100)
 
 	// Create project with active deployment
-	slug, _ := value.NewProjectSlug("test-project")
+	slug, _ := value.NewProjectSlug("p20250118120000abc12345")
 	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
 	now := time.Now()
 	proj := projectmodel.ReconstructProject(
@@ -522,7 +522,7 @@ func TestDeployService_GetDeploymentStatus_NoActiveDeployment(t *testing.T) {
 	projectID := uint(1)
 
 	// Create project without active deployment
-	slug, _ := value.NewProjectSlug("test-project")
+	slug, _ := value.NewProjectSlug("p20250118120000abc12345")
 	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
 	now := time.Now()
 	proj := projectmodel.ReconstructProject(
@@ -609,7 +609,7 @@ func TestDeployService_RefreshActiveDeployment_Success(t *testing.T) {
 	activeDeploymentID := uint(100)
 
 	// Create project with active deployment
-	slug, _ := value.NewProjectSlug("test-project")
+	slug, _ := value.NewProjectSlug("p20250118120000abc12345")
 	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
 	now := time.Now()
 	proj := projectmodel.ReconstructProject(
@@ -680,7 +680,7 @@ func TestDeployService_RefreshActiveDeployment_NoActiveDeployment(t *testing.T) 
 	projectID := uint(1)
 
 	// Create project without active deployment
-	slug, _ := value.NewProjectSlug("test-project")
+	slug, _ := value.NewProjectSlug("p20250118120000abc12345")
 	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
 	now := time.Now()
 	proj := projectmodel.ReconstructProject(

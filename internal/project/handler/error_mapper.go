@@ -14,7 +14,7 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrProjectAlreadyExists: {StatusCode: http.StatusConflict, Code: "PROJECT_ALREADY_EXISTS", Message: "Project already exists"},
 	projecterrors.ErrProjectNameExists:    {StatusCode: http.StatusConflict, Code: "PROJECT_NAME_EXISTS", Message: "Project name already exists for this user"},
 	projecterrors.ErrProjectUserNotFound:  {StatusCode: http.StatusNotFound, Code: "PROJECT_USER_NOT_FOUND", Message: "Project user not found"},
-	projecterrors.ErrSlugAlreadyExists:    {StatusCode: http.StatusConflict, Code: "SLUG_ALREADY_EXISTS", Message: "Slug already exists"},
+	projecterrors.ErrSlugAlreadyExists:    {StatusCode: http.StatusConflict, Code: "SLUG_ALREADY_EXISTS", Message: "Slug already exists (globally unique)"},
 
 	// Domain errors
 	projecterrors.ErrInvalidProjectData:         {StatusCode: http.StatusBadRequest, Code: "INVALID_PROJECT_DATA", Message: "Invalid project data"},
@@ -30,12 +30,14 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrUserNotInProject:      {StatusCode: http.StatusNotFound, Code: "USER_NOT_IN_PROJECT", Message: "User not in project"},
 
 	// Validation errors
-	projecterrors.ErrMissingField:     {StatusCode: http.StatusBadRequest, Code: "MISSING_FIELD", Message: "Required field is missing"},
-	projecterrors.ErrNameRequired:     {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Project name is required"},
-	projecterrors.ErrSlugRequired:     {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Project slug is required"},
-	projecterrors.ErrInvalidSlug:      {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid project slug"},
-	projecterrors.ErrInvalidProjectID: {StatusCode: http.StatusBadRequest, Code: "INVALID_PROJECT_ID", Message: "Invalid project ID"},
-	projecterrors.ErrValidationFailed: {StatusCode: http.StatusBadRequest, Code: "VALIDATION_FAILED", Message: "Validation failed"},
+	projecterrors.ErrMissingField:      {StatusCode: http.StatusBadRequest, Code: "MISSING_FIELD", Message: "Required field is missing"},
+	projecterrors.ErrNameRequired:      {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Project name is required"},
+	projecterrors.ErrSlugRequired:      {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Project slug is required"},
+	projecterrors.ErrInvalidSlug:       {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid project slug"},
+	projecterrors.ErrSlugInvalidLength: {StatusCode: http.StatusBadRequest, Code: "SLUG_INVALID_LENGTH", Message: "Slug must be exactly 23 characters"},
+	projecterrors.ErrSlugInvalidFormat: {StatusCode: http.StatusBadRequest, Code: "SLUG_INVALID_FORMAT", Message: "Slug has invalid format"},
+	projecterrors.ErrInvalidProjectID:  {StatusCode: http.StatusBadRequest, Code: "INVALID_PROJECT_ID", Message: "Invalid project ID"},
+	projecterrors.ErrValidationFailed:  {StatusCode: http.StatusBadRequest, Code: "VALIDATION_FAILED", Message: "Validation failed"},
 
 	// Resource limit errors
 	projecterrors.ErrResourceLimitExceeded: {StatusCode: http.StatusForbidden, Code: "RESOURCE_LIMIT_EXCEEDED", Message: "Resource limit exceeded"},
@@ -51,7 +53,7 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrVolumeDiskLimitExceeded: {StatusCode: http.StatusBadRequest, Code: "VOLUME_DISK_LIMIT_EXCEEDED", Message: "Volume capacity exceeds project disk limit"},
 	projecterrors.ErrVolumeCapacityTooSmall:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_CAPACITY_TOO_SMALL", Message: "Volume capacity must be at least 128Mi"},
 	projecterrors.ErrVolumeCapacityExceeded:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_CAPACITY_EXCEEDED", Message: "Volume capacity exceeds maximum allowed (2048Mi)"},
-	projecterrors.ErrInvalidVolumeName:       {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_NAME", Message: "Invalid volume name format"},
+	projecterrors.ErrInvalidVolumeName:       {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_NAME", Message: "Volume name must not exceed 255 characters"},
 	projecterrors.ErrMaxVolumesExceeded:      {StatusCode: http.StatusBadRequest, Code: "MAX_VOLUMES_EXCEEDED", Message: "Maximum number of volumes exceeded"},
 
 	// Infrastructure errors
