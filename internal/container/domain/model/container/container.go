@@ -25,11 +25,12 @@ type Container struct {
 	resourceLimits         value.ResourceLimits
 	monthlyBuildTime       *uint32
 	monthlyBuildCount      *uint32
-	monthlyUptime          *string   // Uptime percentage as string (e.g., "99.9%")
-	envVars                []EnvVar  // Aggregate's internal entities
-	networks               []Network // Aggregate's internal entities
-	secrets                []Secret  // Aggregate's internal entities for sensitive environment variables
-	mounts                 []Mount   // Aggregate's internal entities for volume mounts
+	monthlyUptime          *string    // Uptime percentage as string (e.g., "99.9%")
+	envVars                []EnvVar   // Aggregate's internal entities
+	networks               []Network  // Aggregate's internal entities
+	secrets                []Secret   // Aggregate's internal entities for sensitive environment variables
+	buildVars              []BuildVar // Aggregate's internal entities for build-time environment variables
+	mounts                 []Mount    // Aggregate's internal entities for volume mounts
 	isDeleted              bool
 	deletedAt              *time.Time
 	createdAt              time.Time
@@ -38,16 +39,19 @@ type Container struct {
 
 var (
 	// Error variables for aggregate invariants
-	ErrDuplicateEnvVarKey    = containererrors.ErrDuplicateEnvVarKey
-	ErrDuplicateInternalPort = containererrors.ErrDuplicateInternalPort
-	ErrDuplicateSecretKey    = containererrors.ErrDuplicateSecretKey
+	ErrDuplicateEnvVarKey      = containererrors.ErrDuplicateEnvVarKey
+	ErrDuplicateInternalPort   = containererrors.ErrDuplicateInternalPort
+	ErrDuplicateSecretKey      = containererrors.ErrDuplicateSecretKey
+	ErrDuplicateBuildVarKey    = containererrors.ErrDuplicateBuildVarKey
+	ErrDuplicateKeyAcrossTypes = containererrors.ErrDuplicateKeyAcrossTypes
 )
 
 const (
-	MaxEnvVarsPerContainer  = 100
-	MaxNetworksPerContainer = 20
-	MaxSecretsPerContainer  = 100
-	MaxMountsPerContainer   = 10
+	MaxEnvVarsPerContainer   = 100
+	MaxNetworksPerContainer  = 20
+	MaxSecretsPerContainer   = 100
+	MaxBuildVarsPerContainer = 100
+	MaxMountsPerContainer    = 10
 )
 
 // NewContainer creates a new container with initial configuration
@@ -85,6 +89,7 @@ func NewContainer(
 		envVars:              make([]EnvVar, 0),
 		networks:             make([]Network, 0),
 		secrets:              make([]Secret, 0),
+		buildVars:            make([]BuildVar, 0),
 		mounts:               make([]Mount, 0),
 		isDeleted:            false,
 		createdAt:            time.Now(),
@@ -111,6 +116,7 @@ func (c *Container) GitCommitHash() *string                 { return c.gitCommit
 func (c *Container) EnvVars() []EnvVar                      { return c.envVars }
 func (c *Container) Networks() []Network                    { return c.networks }
 func (c *Container) Secrets() []Secret                      { return c.secrets }
+func (c *Container) BuildVars() []BuildVar                  { return c.buildVars }
 func (c *Container) Mounts() []Mount                        { return c.mounts }
 func (c *Container) IsDeleted() bool                        { return c.isDeleted }
 func (c *Container) DeletedAt() *time.Time                  { return c.deletedAt }
@@ -219,10 +225,24 @@ func (c *Container) AddEnvVar(key, value string) (*EnvVar, error) {
 		return nil, containererrors.ErrMaxEnvVarsExceeded
 	}
 
-	// Check for duplicate key
+	// Check for duplicate key in env_vars
 	for _, ev := range c.envVars {
 		if ev.Key() == key {
 			return nil, containererrors.ErrDuplicateEnvVarKey
+		}
+	}
+
+	// Check for duplicate key in secrets (cross-type validation)
+	for _, s := range c.secrets {
+		if s.Key() == key {
+			return nil, containererrors.ErrDuplicateKeyAcrossTypes
+		}
+	}
+
+	// Check for duplicate key in build_vars (cross-type validation)
+	for _, b := range c.buildVars {
+		if b.Key() == key {
+			return nil, containererrors.ErrDuplicateKeyAcrossTypes
 		}
 	}
 
@@ -392,10 +412,24 @@ func (c *Container) AddSecret(key, value string) (*Secret, error) {
 		return nil, containererrors.ErrMaxSecretsExceeded
 	}
 
-	// Check for duplicate key
+	// Check for duplicate key in secrets
 	for _, s := range c.secrets {
 		if s.Key() == key {
 			return nil, containererrors.ErrDuplicateSecretKey
+		}
+	}
+
+	// Check for duplicate key in env_vars (cross-type validation)
+	for _, ev := range c.envVars {
+		if ev.Key() == key {
+			return nil, containererrors.ErrDuplicateKeyAcrossTypes
+		}
+	}
+
+	// Check for duplicate key in build_vars (cross-type validation)
+	for _, b := range c.buildVars {
+		if b.Key() == key {
+			return nil, containererrors.ErrDuplicateKeyAcrossTypes
 		}
 	}
 
@@ -593,6 +627,118 @@ func (c *Container) AddMountDirect(mount *Mount) error {
 	return nil
 }
 
+// AddBuildVar adds a build variable to the container
+func (c *Container) AddBuildVar(key, value string) (*BuildVar, error) {
+	if c.isDeleted {
+		return nil, nil // Already deleted
+	}
+
+	// Check limit
+	if len(c.buildVars) >= MaxBuildVarsPerContainer {
+		return nil, containererrors.ErrMaxBuildVarsExceeded
+	}
+
+	// Check for duplicate key in build_vars
+	for _, b := range c.buildVars {
+		if b.Key() == key {
+			return nil, containererrors.ErrDuplicateBuildVarKey
+		}
+	}
+
+	// Check for duplicate key in env_vars (cross-type validation)
+	for _, ev := range c.envVars {
+		if ev.Key() == key {
+			return nil, containererrors.ErrDuplicateKeyAcrossTypes
+		}
+	}
+
+	// Check for duplicate key in secrets (cross-type validation)
+	for _, s := range c.secrets {
+		if s.Key() == key {
+			return nil, containererrors.ErrDuplicateKeyAcrossTypes
+		}
+	}
+
+	// Create new BuildVar entity
+	buildVar, err := NewBuildVar(c.containerID, key, value)
+	if err != nil {
+		return nil, err
+	}
+
+	c.buildVars = append(c.buildVars, *buildVar)
+	c.updatedAt = time.Now()
+	return buildVar, nil
+}
+
+// UpdateBuildVar updates an existing build variable
+func (c *Container) UpdateBuildVar(key, newValue string) error {
+	if c.isDeleted {
+		return nil // Already deleted
+	}
+
+	for i := range c.buildVars {
+		if c.buildVars[i].Key() == key {
+			if err := c.buildVars[i].UpdateValue(newValue); err != nil {
+				return err
+			}
+			c.updatedAt = time.Now()
+			return nil
+		}
+	}
+
+	return containererrors.ErrBuildVarNotFound
+}
+
+// DeleteBuildVar removes a build variable
+func (c *Container) DeleteBuildVar(key string) error {
+	if c.isDeleted {
+		return nil // Already deleted
+	}
+
+	for i, b := range c.buildVars {
+		if b.Key() == key {
+			c.buildVars = append(c.buildVars[:i], c.buildVars[i+1:]...)
+			c.updatedAt = time.Now()
+			return nil
+		}
+	}
+
+	return containererrors.ErrBuildVarNotFound
+}
+
+// HasBuildVar checks if a build variable with the given key exists
+func (c *Container) HasBuildVar(key string) bool {
+	for _, b := range c.buildVars {
+		if b.Key() == key {
+			return true
+		}
+	}
+	return false
+}
+
+// GetBuildVar retrieves a build variable by key
+func (c *Container) GetBuildVar(key string) (*BuildVar, error) {
+	for i := range c.buildVars {
+		if c.buildVars[i].Key() == key {
+			return &c.buildVars[i], nil
+		}
+	}
+	return nil, containererrors.ErrBuildVarNotFound
+}
+
+// AddBuildVarDirect adds an already-constructed BuildVar entity to the container
+// This is used when loading entities from the database
+func (c *Container) AddBuildVarDirect(buildVar *BuildVar) error {
+	// Check for duplicate key
+	for _, b := range c.buildVars {
+		if b.Key() == buildVar.Key() {
+			return ErrDuplicateBuildVarKey
+		}
+	}
+	c.buildVars = append(c.buildVars, *buildVar)
+	return nil
+}
+
 // ReconstructContainer reconstructs a container from persistence
 // This is used when loading a container from the database
 func ReconstructContainer(
@@ -635,6 +781,7 @@ func ReconstructContainer(
 		envVars:                []EnvVar{},
 		networks:               []Network{},
 		secrets:                []Secret{},
+		buildVars:              []BuildVar{},
 		mounts:                 []Mount{},
 		createdAt:              createdAt,
 		updatedAt:              updatedAt,
