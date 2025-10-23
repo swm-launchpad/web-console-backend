@@ -83,8 +83,17 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 			CreatedAt:   envVar.CreatedAt(),
 			UpdatedAt:   timeToNullTime(envVar.UpdatedAt()),
 		}
-		if _, err := qtx.CreateEnvVar(ctx, envParams); err != nil {
+		result, err := qtx.CreateEnvVar(ctx, envParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if envVar.EnvVarID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			envVar.SetEnvVarID(uint(id))
 		}
 	}
 
@@ -114,8 +123,17 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 			CreatedAt:   secret.CreatedAt(),
 			UpdatedAt:   timeToNullTime(secret.UpdatedAt()),
 		}
-		if _, err := qtx.CreateSecret(ctx, secretParams); err != nil {
+		result, err := qtx.CreateSecret(ctx, secretParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if secret.SecretID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			secret.SetSecretID(uint(id))
 		}
 	}
 
@@ -128,8 +146,17 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 			CreatedAt:   buildVar.CreatedAt(),
 			UpdatedAt:   timeToNullTime(buildVar.UpdatedAt()),
 		}
-		if _, err := qtx.CreateBuildVar(ctx, buildVarParams); err != nil {
+		result, err := qtx.CreateBuildVar(ctx, buildVarParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if buildVar.BuildVarID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			buildVar.SetBuildVarID(uint(id))
 		}
 	}
 
@@ -199,8 +226,17 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 			CreatedAt:   envVar.CreatedAt(),
 			UpdatedAt:   timeToNullTime(envVar.UpdatedAt()),
 		}
-		if _, err := qtx.CreateEnvVar(ctx, envParams); err != nil {
+		result, err := qtx.CreateEnvVar(ctx, envParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if envVar.EnvVarID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			envVar.SetEnvVarID(uint(id))
 		}
 	}
 
@@ -238,8 +274,17 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 			CreatedAt:   secret.CreatedAt(),
 			UpdatedAt:   timeToNullTime(secret.UpdatedAt()),
 		}
-		if _, err := qtx.CreateSecret(ctx, secretParams); err != nil {
+		result, err := qtx.CreateSecret(ctx, secretParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if secret.SecretID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			secret.SetSecretID(uint(id))
 		}
 	}
 
@@ -256,8 +301,17 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 			CreatedAt:   buildVar.CreatedAt(),
 			UpdatedAt:   timeToNullTime(buildVar.UpdatedAt()),
 		}
-		if _, err := qtx.CreateBuildVar(ctx, buildVarParams); err != nil {
+		result, err := qtx.CreateBuildVar(ctx, buildVarParams)
+		if err != nil {
 			return containererrors.ErrDatabaseOperation
+		}
+		// Set the generated ID back to the domain entity
+		if buildVar.BuildVarID() == 0 {
+			id, err := result.LastInsertId()
+			if err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
+			buildVar.SetBuildVarID(uint(id))
 		}
 	}
 
