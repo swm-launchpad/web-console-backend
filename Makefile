@@ -9,7 +9,7 @@ COVERAGE_HTML=coverage.html
 BUILD_FLAGS=-v
 LDFLAGS=-ldflags="-s -w"
 
-.PHONY: setup install-tools fmt fmt-check vet lint tidy tidy-check unit-test integration-test e2e-test test-all check test-coverage build dev clean wire help
+.PHONY: setup install-tools fmt fmt-check vet lint tidy tidy-check unit-test integration-test e2e-test integration-e2e-test test-all check test-coverage build dev clean wire help
 
 setup: install-tools
 install-tools:
@@ -99,7 +99,22 @@ e2e-test:
 	docker-compose --env-file .env.test -f docker-compose.test.yml down; \
 	exit $$EXIT_CODE
 
-test-all: unit-test integration-test e2e-test
+integration-e2e-test:
+	@echo "Starting test database..."
+	@docker-compose --env-file .env.test -f docker-compose.test.yml up -d --wait
+	@echo "Running integration tests..."
+	@go test ./test/integration/... -v -race -timeout 60s; \
+	INTEGRATION_EXIT=$$?; \
+	echo ""; \
+	echo "Running E2E tests..."; \
+	go test ./test/e2e/... -v -race -timeout 120s; \
+	E2E_EXIT=$$?; \
+	echo "Stopping test database..."; \
+	docker-compose --env-file .env.test -f docker-compose.test.yml down; \
+	if [ $$INTEGRATION_EXIT -ne 0 ]; then exit $$INTEGRATION_EXIT; fi; \
+	exit $$E2E_EXIT
+
+test-all: unit-test integration-e2e-test
 
 check:
 	@echo "=========================================="
@@ -115,9 +130,7 @@ check:
 	@echo ""
 	@$(MAKE) unit-test
 	@echo ""
-	@$(MAKE) integration-test
-	@echo ""
-	@$(MAKE) e2e-test
+	@$(MAKE) integration-e2e-test
 	@echo "=========================================="
 	@echo "All checks passed successfully!"
 	@echo "=========================================="
@@ -147,8 +160,9 @@ help:
 	@echo "  unit-test    - Run unit tests"
 	@echo "  integration-test - Run integration tests"
 	@echo "  e2e-test     - Run E2E tests"
+	@echo "  integration-e2e-test - Run integration and E2E tests with single DB instance"
 	@echo "  test-all     - Run all tests"
-	@echo "  check        - Run full CI/CD check pipeline (fmt-check, vet, lint, tidy-check, unit-test, integration-test, e2e-test)"
+	@echo "  check        - Run full CI/CD check pipeline (fmt-check, vet, lint, tidy-check, unit-test, integration-e2e-test)"
 	@echo "  test-coverage - Run tests with coverage report"
 	@echo "  build        - Build the binary"
 	@echo "  dev          - Run the application"
