@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
@@ -18,6 +19,7 @@ import (
 	projectmodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	volumemodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
+	"go.uber.org/zap"
 )
 
 // DeployService defines the interface for deploying projects.
@@ -150,6 +152,7 @@ type deployService struct {
 	kubeClient         infrastructure.KubeClient
 	deployNamespace    string
 	projectServiceName string
+	logger             logger.Logger
 }
 
 // NewDeployService creates a new instance of deployService
@@ -163,6 +166,7 @@ func NewDeployService(
 	kubeClient infrastructure.KubeClient,
 	deployNamespace string,
 	projectServiceName string,
+	log logger.Logger,
 ) DeployService {
 	return &deployService{
 		txManager:          txManager,
@@ -174,11 +178,16 @@ func NewDeployService(
 		kubeClient:         kubeClient,
 		deployNamespace:    deployNamespace,
 		projectServiceName: projectServiceName,
+		logger:             log,
 	}
 }
 
 // DeployProject initiates a deployment for the specified project
 func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+	s.logger.Info(ctx, "deploy project started",
+		zap.Uint("project_id", projectID),
+	)
+
 	// Step 1: Atomically change project status + create deployment in a transaction
 	var d *deployment.Deployment
 	var proj *projectmodel.Project
@@ -187,11 +196,19 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*dep
 		var err error
 		proj, err = s.projectRepo.FindByIDForUpdate(txCtx, projectID)
 		if err != nil {
+			s.logger.Error(ctx, "failed to find project for update",
+				zap.Uint("project_id", projectID),
+				zap.Error(err),
+			)
 			return err
 		}
 
 		// Check if project is already deploying
 		if proj.OperationStatus() != value.ProjectOperationStatusNothing {
+			s.logger.Error(ctx, "project already deploying",
+				zap.Uint("project_id", projectID),
+				zap.String("operation_status", string(proj.OperationStatus())),
+			)
 			return projecterrors.ErrProjectAlreadyDeploying
 		}
 
@@ -216,14 +233,28 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*dep
 	})
 
 	if err != nil {
+		s.logger.Error(ctx, "failed to create deployment in transaction",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		return nil, err
 	}
+
+	s.logger.Info(ctx, "deployment record created",
+		zap.Uint("project_id", projectID),
+		zap.Uint("deployment_id", d.DeploymentID),
+	)
 
 	// From now on, any error should rollback project status and mark deployment as failed
 
 	// Step 2: Gather container configuration
 	containerConfig, err := s.containerClient.GetContainerConfig(ctx, projectID)
 	if err != nil {
+		s.logger.Error(ctx, "failed to get container config",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
 		msg := fmt.Sprintf("Failed to get container config: %v", err)
 		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTriggerFailed, &msg)
 		return nil, projecterrors.ErrContainerConfigNotFound
@@ -232,6 +263,11 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*dep
 	// Step 3: Gather volume information
 	volumes, err := s.volumeRepo.FindByProjectID(ctx, projectID)
 	if err != nil {
+		s.logger.Error(ctx, "failed to get volumes",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
 		msg := fmt.Sprintf("Failed to get volumes: %v", err)
 		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTriggerFailed, &msg)
 		return nil, projecterrors.ErrDatabaseOperation
@@ -240,6 +276,11 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*dep
 	// Step 4: Build Tekton deployment request
 	tektonRequest, err := s.buildTektonRequest(proj, containerConfig, volumes)
 	if err != nil {
+		s.logger.Error(ctx, "failed to build Tekton request",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
 		msg := fmt.Sprintf("Failed to build Tekton request: %v", err)
 		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTriggerFailed, &msg)
 		return nil, err
@@ -248,28 +289,60 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*dep
 	// Step 5: Trigger deployment via Tekton API
 	tektonResponse, err := s.tektonClient.TriggerDeploy(ctx, tektonRequest)
 	if err != nil {
+		s.logger.Error(ctx, "failed to trigger Tekton deployment",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
 		msg := fmt.Sprintf("Failed to trigger Tekton deployment: %v", err)
 		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTriggerFailed, &msg)
 		return nil, projecterrors.ErrTektonDeploymentFailed
 	}
 
+	s.logger.Info(ctx, "Tekton deployment triggered successfully",
+		zap.Uint("project_id", projectID),
+		zap.Uint("deployment_id", d.DeploymentID),
+		zap.String("event_id", tektonResponse.EventID),
+	)
+
 	// Step 6: Update deployment with Tekton event ID
 	eventID := tektonResponse.EventID
 	if err := d.InitTektonInfo(&eventID, nil); err != nil {
+		s.logger.Error(ctx, "failed to init Tekton info",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
 		msg := fmt.Sprintf("Failed to init Tekton info: %v", err)
 		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTrackingFailed, &msg)
 		return nil, err
 	}
 
 	if err := s.deploymentRepo.Save(ctx, d); err != nil {
+		s.logger.Error(ctx, "failed to save deployment",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
 		msg := fmt.Sprintf("Failed to save deployment: %v", err)
 		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTrackingFailed, &msg)
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
 	// Step 7: Start background monitoring in goroutine
-	go s.monitorDeployment(context.Background(), projectID, d.DeploymentID)
+	s.logger.Info(ctx, "starting background deployment monitoring",
+		zap.Uint("project_id", projectID),
+		zap.Uint("deployment_id", d.DeploymentID),
+	)
+	// Create a detached context that preserves request_id and user_id for logging correlation
+	// but doesn't inherit cancellation from the original request
+	monitorCtx := logger.DetachContext(ctx)
+	go s.monitorDeployment(monitorCtx, projectID, d.DeploymentID)
 
+	s.logger.Info(ctx, "deploy project completed",
+		zap.Uint("project_id", projectID),
+		zap.Uint("deployment_id", d.DeploymentID),
+	)
 	// Return the deployment record
 	return d, nil
 }
@@ -298,15 +371,14 @@ func (s *deployService) refreshDeploymentStatus(ctx context.Context, deploymentI
 			// CRITICAL DATA INCONSISTENCY: Same issue as in monitorDeployment
 			// Deployment is not completed but has no EventID - monitoring impossible
 			// Project is stuck in 'deploying' state with no recovery path
-			fmt.Printf("========================================\n")
-			fmt.Printf("CRITICAL DATA INCONSISTENCY DETECTED (RefreshDeploymentStatus)\n")
-			fmt.Printf("========================================\n")
-			fmt.Printf("Deployment ID: %d\n", deploymentID)
-			fmt.Printf("Project ID: %d\n", d.ProjectID())
-			fmt.Printf("Problem: Deployment is not completed (status=%s) but has NO Tekton EventID\n", d.Status())
-			fmt.Printf("Impact: Cannot refresh status - project stuck in 'deploying' state\n")
-			fmt.Printf("Action: Emergency rollback - setting project->nothing, deployment->backend_tracking_failed\n")
-			fmt.Printf("========================================\n")
+			s.logger.Error(ctx, "CRITICAL DATA INCONSISTENCY DETECTED (RefreshDeploymentStatus)",
+				zap.Uint64("deployment_id", deploymentID),
+				zap.Uint("project_id", d.ProjectID()),
+				zap.String("status", string(d.Status())),
+				zap.String("problem", "Deployment is not completed but has NO Tekton EventID"),
+				zap.String("impact", "Cannot refresh status - project stuck in 'deploying' state"),
+				zap.String("action", "Emergency rollback - setting project->nothing, deployment->backend_tracking_failed"),
+			)
 
 			msg := "Deployment refresh impossible: no Tekton EventID found (critical data inconsistency)"
 			s.handleDeployFailure(ctx, uint(d.ProjectID()), uint(deploymentID), deployment.DeploymentStatusBackendTrackingFailed, &msg)
@@ -535,11 +607,17 @@ func (s *deployService) handleDeployFailure(
 				// This is expected in race conditions, so we log and continue
 				if errors.Is(err, projecterrors.ErrInvalidStatusTransition) {
 					activeDeploymentID, hasActive := proj.ActiveDeploymentID()
-					fmt.Printf("INFO: Project %d owned by different deployment (status=%s, active_deployment=%v), skipping cleanup for deployment %d\n",
-						projectID, proj.OperationStatus(), activeDeploymentID, deploymentID)
+					s.logger.Info(ctx, "Project owned by different deployment, skipping cleanup",
+						zap.Uint("project_id", projectID),
+						zap.String("project_status", string(proj.OperationStatus())),
+						zap.Uint("active_deployment_id", activeDeploymentID),
+						zap.Uint("cleanup_deployment_id", deploymentID),
+					)
 					if hasActive && activeDeploymentID != deploymentID {
-						fmt.Printf("WARNING: Race condition detected - deployment %d tried to cleanup but deployment %d owns the project\n",
-							deploymentID, activeDeploymentID)
+						s.logger.Warn(ctx, "Race condition detected - deployment tried to cleanup but different deployment owns the project",
+							zap.Uint("cleanup_deployment_id", deploymentID),
+							zap.Uint("owner_deployment_id", activeDeploymentID),
+						)
 					}
 				} else {
 					return fmt.Errorf("failed to complete operation: %w", err)
@@ -557,7 +635,11 @@ func (s *deployService) handleDeployFailure(
 	if err != nil {
 		// Log the error but don't propagate it since this is a cleanup/recovery operation
 		// and we don't want to fail the caller's flow
-		fmt.Printf("ERROR: handleDeployFailure failed: %v\n", err)
+		s.logger.Error(ctx, "handleDeployFailure failed",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", deploymentID),
+			zap.Error(err),
+		)
 	}
 }
 
@@ -634,11 +716,17 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 					// This is expected in race conditions, so we log and continue
 					if errors.Is(err, projecterrors.ErrInvalidStatusTransition) {
 						activeDeploymentID, hasActive := proj.ActiveDeploymentID()
-						fmt.Printf("INFO: Project %d owned by different deployment (status=%s, active_deployment=%v), skipping reset for deployment %d\n",
-							d.ProjectID(), proj.OperationStatus(), activeDeploymentID, d.DeploymentID)
+						s.logger.Info(ctx, "Project owned by different deployment, skipping reset",
+							zap.Uint("project_id", d.ProjectID()),
+							zap.String("project_status", string(proj.OperationStatus())),
+							zap.Uint("active_deployment_id", activeDeploymentID),
+							zap.Uint("reset_deployment_id", d.DeploymentID),
+						)
 						if hasActive && activeDeploymentID != d.DeploymentID {
-							fmt.Printf("WARNING: Race condition avoided - deployment %d tried to reset but deployment %d owns the project\n",
-								d.DeploymentID, activeDeploymentID)
+							s.logger.Warn(ctx, "Race condition avoided - deployment tried to reset but different deployment owns the project",
+								zap.Uint("reset_deployment_id", d.DeploymentID),
+								zap.Uint("owner_deployment_id", activeDeploymentID),
+							)
 						}
 					} else {
 						return fmt.Errorf("failed to complete operation: %w", err)
@@ -700,11 +788,17 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 					// This is expected in race conditions, so we log and continue
 					if errors.Is(err, projecterrors.ErrInvalidStatusTransition) {
 						activeDeploymentID, hasActive := proj.ActiveDeploymentID()
-						fmt.Printf("INFO: Project %d owned by different deployment (status=%s, active_deployment=%v), skipping reset for deployment %d\n",
-							d.ProjectID(), proj.OperationStatus(), activeDeploymentID, d.DeploymentID)
+						s.logger.Info(ctx, "Project owned by different deployment, skipping reset",
+							zap.Uint("project_id", d.ProjectID()),
+							zap.String("project_status", string(proj.OperationStatus())),
+							zap.Uint("active_deployment_id", activeDeploymentID),
+							zap.Uint("reset_deployment_id", d.DeploymentID),
+						)
 						if hasActive && activeDeploymentID != d.DeploymentID {
-							fmt.Printf("WARNING: Race condition avoided - deployment %d tried to reset but deployment %d owns the project\n",
-								d.DeploymentID, activeDeploymentID)
+							s.logger.Warn(ctx, "Race condition avoided - deployment tried to reset but different deployment owns the project",
+								zap.Uint("reset_deployment_id", d.DeploymentID),
+								zap.Uint("owner_deployment_id", activeDeploymentID),
+							)
 						}
 					} else {
 						return fmt.Errorf("failed to complete operation: %w", err)
@@ -726,47 +820,112 @@ func (s *deployService) updateDeploymentFromKubeStatus(
 
 // GetDeploymentStatus retrieves the latest deployment status from the database
 func (s *deployService) GetDeploymentStatus(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+	s.logger.Info(ctx, "get deployment status started",
+		zap.Uint("project_id", projectID),
+	)
+
 	// Load project to check active_deployment_id
 	proj, err := s.projectRepo.FindByID(ctx, projectID)
 	if err != nil {
+		s.logger.Error(ctx, "failed to find project",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	// If there's an active deployment, return that one
 	if activeDeploymentID, hasActive := proj.ActiveDeploymentID(); hasActive {
-		return s.deploymentRepo.FindByID(ctx, activeDeploymentID)
+		d, err := s.deploymentRepo.FindByID(ctx, activeDeploymentID)
+		if err != nil {
+			s.logger.Error(ctx, "failed to find active deployment",
+				zap.Uint("project_id", projectID),
+				zap.Uint("deployment_id", activeDeploymentID),
+				zap.Error(err),
+			)
+			return nil, err
+		}
+		s.logger.Info(ctx, "get deployment status completed (active)",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.String("status", string(d.Status())),
+		)
+		return d, nil
 	}
 
 	// Otherwise, return the latest deployment (including completed ones)
 	// This allows users to see the last deployment status even after it completes
-	return s.deploymentRepo.FindLatestByProjectID(ctx, projectID)
+	d, err := s.deploymentRepo.FindLatestByProjectID(ctx, projectID)
+	if err != nil {
+		s.logger.Error(ctx, "failed to find latest deployment",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+	s.logger.Info(ctx, "get deployment status completed (latest)",
+		zap.Uint("project_id", projectID),
+		zap.Uint("deployment_id", d.DeploymentID),
+		zap.String("status", string(d.Status())),
+	)
+	return d, nil
 }
 
 // RefreshActiveDeployment queries Kubernetes for the active deployment and updates the database
 func (s *deployService) RefreshActiveDeployment(ctx context.Context, projectID uint) (*deployment.Deployment, error) {
+	s.logger.Info(ctx, "refresh active deployment started",
+		zap.Uint("project_id", projectID),
+	)
+
 	// Load project to check active_deployment_id
 	proj, err := s.projectRepo.FindByID(ctx, projectID)
 	if err != nil {
+		s.logger.Error(ctx, "failed to find project",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	// Check if there's an active deployment
 	activeDeploymentID, hasActive := proj.ActiveDeploymentID()
 	if !hasActive {
+		s.logger.Error(ctx, "no active deployment for project",
+			zap.Uint("project_id", projectID),
+		)
 		// No active deployment - this means project is not being deployed
 		// This is not an error state, just means there's nothing to refresh
 		return nil, projecterrors.ErrDeploymentNotFound
 	}
 
 	// Refresh the active deployment by querying Kubernetes
-	return s.refreshDeploymentStatus(ctx, uint64(activeDeploymentID))
+	d, err := s.refreshDeploymentStatus(ctx, uint64(activeDeploymentID))
+	if err != nil {
+		s.logger.Error(ctx, "failed to refresh deployment status",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", activeDeploymentID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	s.logger.Info(ctx, "refresh active deployment completed",
+		zap.Uint("project_id", projectID),
+		zap.Uint("deployment_id", d.DeploymentID),
+		zap.String("status", string(d.Status())),
+	)
+	return d, nil
 }
 
 // monitorDeployment monitors a deployment in the background
 func (s *deployService) monitorDeployment(ctx context.Context, projectID uint, deploymentID uint) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Printf("PANIC in monitorDeployment: %v\n", r)
+			s.logger.Error(ctx, "PANIC in monitorDeployment",
+				zap.Uint("project_id", projectID),
+				zap.Uint("deployment_id", deploymentID),
+				zap.Any("panic", r),
+			)
 		}
 	}()
 

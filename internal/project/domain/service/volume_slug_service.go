@@ -6,6 +6,9 @@ import (
 	"math/rand"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume/value"
@@ -25,12 +28,14 @@ type VolumeSlugService interface {
 // volumeSlugService is the concrete implementation of VolumeSlugService
 type volumeSlugService struct {
 	volumeRepo repository.VolumeRepository
+	logger     logger.Logger
 }
 
 // NewVolumeSlugService creates a new instance of VolumeSlugService
-func NewVolumeSlugService(volumeRepo repository.VolumeRepository) VolumeSlugService {
+func NewVolumeSlugService(volumeRepo repository.VolumeRepository, log logger.Logger) VolumeSlugService {
 	return &volumeSlugService{
 		volumeRepo: volumeRepo,
+		logger:     log,
 	}
 }
 
@@ -42,6 +47,9 @@ func (s *volumeSlugService) EnsureUniqueSlug(ctx context.Context, slug value.Vol
 	}
 
 	if exists {
+		s.logger.Warn(ctx, "Volume slug collision detected",
+			zap.String("slug", slug.String()),
+		)
 		return projecterrors.ErrSlugAlreadyExists
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
@@ -20,7 +21,8 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 	t.Run("성공: 소유자가 프로젝트 수정", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(1)
 		projectID := uint(1)
@@ -41,7 +43,8 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 	t.Run("실패: UserID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		err := service.CanUserModifyProject(ctx, 0, 1)
 
@@ -54,7 +57,8 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		err := service.CanUserModifyProject(ctx, 1, 0)
 
@@ -67,7 +71,8 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(1)
 		projectID := uint(999)
@@ -85,7 +90,8 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(1)
 		projectID := uint(1)
@@ -103,7 +109,8 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 	t.Run("실패: 사용자가 프로젝트에 속하지 않음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(2) // Different user
 		projectID := uint(1)
@@ -125,7 +132,8 @@ func TestPermissionService_CanUserModifyProject(t *testing.T) {
 	t.Run("실패: 사용자가 소유자가 아님", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		ownerID := uint(1)
 		memberID := uint(2)
@@ -154,7 +162,8 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 	t.Run("성공: 소유자가 프로젝트 접근", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(1)
 		projectID := uint(1)
@@ -175,7 +184,8 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 	t.Run("실패: 비소유자는 프로젝트에 접근할 수 없음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		ownerID := uint(1)
 		nonOwnerID := uint(2)
@@ -199,7 +209,8 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 	t.Run("실패: UserID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		err := service.CanUserAccessProject(ctx, 0, 1)
 
@@ -212,7 +223,8 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		err := service.CanUserAccessProject(ctx, 1, 0)
 
@@ -225,7 +237,8 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(1)
 		projectID := uint(999)
@@ -243,7 +256,8 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(1)
 		projectID := uint(1)
@@ -261,7 +275,8 @@ func TestPermissionService_CanUserAccessProject(t *testing.T) {
 	t.Run("실패: 사용자가 프로젝트에 속하지 않음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(2) // Different user
 		projectID := uint(1)
@@ -287,7 +302,8 @@ func TestPermissionService_CanUserAddVolume(t *testing.T) {
 	t.Run("성공: 소유자가 볼륨 추가", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(1)
 		projectID := uint(1)
@@ -308,7 +324,8 @@ func TestPermissionService_CanUserAddVolume(t *testing.T) {
 	t.Run("실패: 소유자가 아닌 사용자", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		ownerID := uint(1)
 		otherUserID := uint(2)
@@ -334,7 +351,8 @@ func TestPermissionService_CanUserRemoveVolume(t *testing.T) {
 	t.Run("성공: 소유자가 볼륨 제거", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(1)
 		volumeID := uint(1)
@@ -360,7 +378,8 @@ func TestPermissionService_CanUserRemoveVolume(t *testing.T) {
 	t.Run("실패: VolumeID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		err := service.CanUserRemoveVolume(ctx, 1, 0)
 
@@ -373,7 +392,8 @@ func TestPermissionService_CanUserRemoveVolume(t *testing.T) {
 	t.Run("실패: 볼륨을 찾을 수 없음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		volumeID := uint(999)
 
@@ -390,7 +410,8 @@ func TestPermissionService_CanUserRemoveVolume(t *testing.T) {
 	t.Run("실패: 소유자가 아닌 사용자", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		ownerID := uint(1)
 		otherUserID := uint(2)
@@ -422,7 +443,8 @@ func TestPermissionService_CanUserAccessVolume(t *testing.T) {
 	t.Run("성공: 프로젝트 멤버가 볼륨 접근", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		userID := uint(1)
 		volumeID := uint(1)
@@ -448,7 +470,8 @@ func TestPermissionService_CanUserAccessVolume(t *testing.T) {
 	t.Run("실패: VolumeID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		err := service.CanUserAccessVolume(ctx, 1, 0)
 
@@ -461,7 +484,8 @@ func TestPermissionService_CanUserAccessVolume(t *testing.T) {
 	t.Run("실패: 볼륨을 찾을 수 없음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		volumeID := uint(999)
 
@@ -478,7 +502,8 @@ func TestPermissionService_CanUserAccessVolume(t *testing.T) {
 	t.Run("실패: 프로젝트에 속하지 않은 사용자", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockVolumeRepo := new(repository.MockVolumeRepository)
-		service := NewPermissionService(mockProjectRepo, mockVolumeRepo)
+		testLogger := logger.NewForTest()
+		service := NewPermissionService(mockProjectRepo, mockVolumeRepo, testLogger)
 
 		ownerID := uint(1)
 		otherUserID := uint(2)

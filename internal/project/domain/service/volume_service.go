@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 
+	"go.uber.org/zap"
+
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
@@ -35,6 +38,7 @@ type volumeService struct {
 	volumeRepo    repository.VolumeRepository
 	projectRepo   repository.ProjectRepository
 	volumeSlugSvc VolumeSlugService
+	logger        logger.Logger
 }
 
 // NewVolumeService creates a new instance of VolumeService
@@ -42,11 +46,13 @@ func NewVolumeService(
 	volumeRepo repository.VolumeRepository,
 	projectRepo repository.ProjectRepository,
 	volumeSlugSvc VolumeSlugService,
+	log logger.Logger,
 ) VolumeService {
 	return &volumeService{
 		volumeRepo:    volumeRepo,
 		projectRepo:   projectRepo,
 		volumeSlugSvc: volumeSlugSvc,
+		logger:        log,
 	}
 }
 
@@ -87,6 +93,14 @@ func (s *volumeService) CreateVolume(ctx context.Context, projectID uint, name s
 
 	// Check if new volume would exceed project disk limit
 	if totalExistingCapacity+capacity > diskLimit {
+		s.logger.Warn(ctx, "Project disk limit exceeded",
+			zap.Uint("project_id", projectID),
+			zap.String("volume_name", name),
+			zap.Uint32("current_disk_usage", totalExistingCapacity),
+			zap.Uint32("requested_capacity", capacity),
+			zap.Uint32("total_after_creation", totalExistingCapacity+capacity),
+			zap.Uint32("disk_limit", diskLimit),
+		)
 		return nil, projecterrors.ErrVolumeDiskLimitExceeded
 	}
 
@@ -107,6 +121,14 @@ func (s *volumeService) CreateVolume(ctx context.Context, projectID uint, name s
 	if err := s.volumeRepo.Create(ctx, volume); err != nil {
 		return nil, err
 	}
+
+	s.logger.Info(ctx, "Volume created successfully",
+		zap.Uint("project_id", projectID),
+		zap.String("volume_name", name),
+		zap.Uint32("capacity", capacity),
+		zap.String("slug", slug.String()),
+		zap.Uint("volume_id", volume.VolumeID()),
+	)
 
 	return volume, nil
 }
@@ -183,6 +205,10 @@ func (s *volumeService) DeleteVolume(ctx context.Context, volumeID uint) error {
 		return err
 	}
 
+	s.logger.Info(ctx, "Volume deleted successfully",
+		zap.Uint("volume_id", volumeID),
+	)
+
 	return nil
 }
 
@@ -196,6 +222,10 @@ func (s *volumeService) DeleteVolumesByProjectID(ctx context.Context, projectID 
 	if err := s.volumeRepo.DeleteByProjectID(ctx, projectID); err != nil {
 		return err
 	}
+
+	s.logger.Info(ctx, "All volumes deleted for project",
+		zap.Uint("project_id", projectID),
+	)
 
 	return nil
 }
