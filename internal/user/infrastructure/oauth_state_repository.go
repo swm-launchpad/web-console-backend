@@ -29,7 +29,6 @@ func NewOAuthStateRepository(db sqlc.DBTX, log logger.Logger) repository.OAuthSt
 
 func (r *oauthStateRepository) Create(ctx context.Context, state *model.OAuthState) error {
 	r.logger.Info(ctx, "oauth state repository create started",
-		zap.String("state", state.State),
 		zap.Uint("user_id", state.UserID),
 	)
 
@@ -46,20 +45,17 @@ func (r *oauthStateRepository) Create(ctx context.Context, state *model.OAuthSta
 	if err != nil {
 		if isDuplicateError(err) {
 			r.logger.Error(ctx, "oauth state already exists",
-				zap.String("state", state.State),
 				zap.Error(usererrors.ErrValidationFailed),
 			)
 			return usererrors.ErrValidationFailed // State already exists
 		}
 		r.logger.Error(ctx, "oauth state repository create failed",
-			zap.String("state", state.State),
 			zap.Error(err),
 		)
 		return usererrors.ErrDatabaseOperation
 	}
 
 	r.logger.Info(ctx, "oauth state repository create completed",
-		zap.String("state", state.State),
 		zap.Uint("user_id", state.UserID),
 	)
 	return nil

@@ -381,7 +381,6 @@ func (h *GitHubHandler) InstallationCallback(c *gin.Context) {
 		h.logger.Warn(ctx, "missing required parameters",
 			zap.String("handler", "InstallationCallback"),
 			zap.String("installation_id_str", installationIDStr),
-			zap.String("state", state),
 		)
 		c.Redirect(302, h.frontendURL+"/github/callback?error=missing_parameters&popup=true")
 		return
@@ -411,7 +410,6 @@ func (h *GitHubHandler) InstallationCallback(c *gin.Context) {
 			zap.String("handler", "InstallationCallback"),
 			zap.Int64("installation_id", installationID),
 			zap.String("setup_action", setupAction),
-			zap.String("state", state),
 		)
 		_ = c.Error(fmt.Errorf("installation callback failed: %w", err))
 		// Redirect to frontend with error
