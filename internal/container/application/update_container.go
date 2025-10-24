@@ -4,11 +4,13 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"go.uber.org/zap"
 )
 
 type UpdateContainerInput struct {
@@ -41,6 +43,7 @@ type UpdateContainerUseCase struct {
 	buildChangeDetector   service.BuildChangeDetector
 	installationRepo      userrepository.GitHubInstallationRepository
 	txManager             db.TxManager
+	logger                logger.Logger
 }
 
 func NewUpdateContainerUseCase(
@@ -50,6 +53,7 @@ func NewUpdateContainerUseCase(
 	buildChangeDetector service.BuildChangeDetector,
 	installationRepo userrepository.GitHubInstallationRepository,
 	txManager db.TxManager,
+	log logger.Logger,
 ) *UpdateContainerUseCase {
 	return &UpdateContainerUseCase{
 		containerRepo:         containerRepo,
@@ -58,22 +62,37 @@ func NewUpdateContainerUseCase(
 		buildChangeDetector:   buildChangeDetector,
 		installationRepo:      installationRepo,
 		txManager:             txManager,
+		logger:                log,
 	}
 }
 
 func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateContainerInput) (*UpdateContainerOutput, error) {
+	uc.logger.Info(ctx, "update container started",
+		zap.Uint("container_id", input.ContainerID),
+		zap.Uint("user_id", input.UserID),
+	)
+
 	var containerID uint
 	var name, slug, updatedAt string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Check permission
 		if err := uc.permissionSvc.CanUserModifyContainer(txCtx, input.UserID, input.ContainerID); err != nil {
+			uc.logger.Error(ctx, "permission check failed",
+				zap.Error(err),
+				zap.Uint("user_id", input.UserID),
+				zap.Uint("container_id", input.ContainerID),
+			)
 			return err
 		}
 
 		// Get container with lock
 		container, err := uc.containerRepo.FindByIDForUpdate(txCtx, input.ContainerID)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to find container for update",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+			)
 			return err
 		}
 
@@ -105,6 +124,11 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 		// Update name if provided
 		if input.Name != nil {
 			if err := container.ChangeName(*input.Name); err != nil {
+				uc.logger.Error(ctx, "failed to change container name",
+					zap.Error(err),
+					zap.Uint("container_id", input.ContainerID),
+					zap.String("new_name", *input.Name),
+				)
 				return err
 			}
 		}
@@ -120,6 +144,11 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 			// Validate ownership if setting a new installation ID
 			if input.GitHubInstallationID != nil {
 				if err := uc.installationRepo.ValidateUserOwnership(txCtx, *input.GitHubInstallationID, input.UserID); err != nil {
+					uc.logger.Error(ctx, "GitHub installation ownership validation failed",
+						zap.Error(err),
+						zap.Int64("installation_id", *input.GitHubInstallationID),
+						zap.Uint("user_id", input.UserID),
+					)
 					return err
 				}
 			}
@@ -144,10 +173,18 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 
 			gitConfig, err := value.NewGitConfig(gitURL, gitBranch, gitDir)
 			if err != nil {
+				uc.logger.Error(ctx, "failed to create git config",
+					zap.Error(err),
+					zap.Uint("container_id", input.ContainerID),
+				)
 				return err
 			}
 
 			if err := container.UpdateGitConfig(gitConfig); err != nil {
+				uc.logger.Error(ctx, "failed to update git config",
+					zap.Error(err),
+					zap.Uint("container_id", input.ContainerID),
+				)
 				return err
 			}
 		}
@@ -181,15 +218,28 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 				memVal,
 				input.ContainerID, // exclude this container from total calculation
 			); err != nil {
+				uc.logger.Error(ctx, "resource limits validation failed",
+					zap.Error(err),
+					zap.Uint("container_id", input.ContainerID),
+					zap.Uint("project_id", container.ProjectID()),
+				)
 				return err
 			}
 
 			resourceLimits, err := value.NewResourceLimits(cpuLimit, memLimit)
 			if err != nil {
+				uc.logger.Error(ctx, "failed to create resource limits",
+					zap.Error(err),
+					zap.Uint("container_id", input.ContainerID),
+				)
 				return err
 			}
 
 			if err := container.UpdateResourceLimits(resourceLimits); err != nil {
+				uc.logger.Error(ctx, "failed to update resource limits",
+					zap.Error(err),
+					zap.Uint("container_id", input.ContainerID),
+				)
 				return err
 			}
 		}
@@ -197,6 +247,10 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 		// Update template config if provided
 		if input.TemplateConfig != nil {
 			if err := container.UpdateTemplateConfig(input.TemplateID, input.TemplateConfig); err != nil {
+				uc.logger.Error(ctx, "failed to update template config",
+					zap.Error(err),
+					zap.Uint("container_id", input.ContainerID),
+				)
 				return err
 			}
 		}
@@ -208,6 +262,10 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 
 		// Save container
 		if err := uc.containerRepo.Save(txCtx, container); err != nil {
+			uc.logger.Error(ctx, "failed to save container",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+			)
 			return err
 		}
 
@@ -223,6 +281,12 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logger.Info(ctx, "update container completed",
+		zap.Uint("container_id", containerID),
+		zap.String("name", name),
+		zap.String("slug", slug),
+	)
 
 	return &UpdateContainerOutput{
 		ContainerID: containerID,

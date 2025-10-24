@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	projectinfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	userinfra "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
@@ -20,7 +21,8 @@ func TestCreateContainerUseCase_Execute_Success(t *testing.T) {
 	mockVolumeService := new(projectinfra.MockVolumeService)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -67,7 +69,8 @@ func TestCreateContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockVolumeService := new(projectinfra.MockVolumeService)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	projectID := uint(10)

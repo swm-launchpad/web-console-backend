@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 )
@@ -15,7 +16,8 @@ func TestDeleteSecretUseCase_Execute_Success(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteSecretUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteSecretUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -53,7 +55,8 @@ func TestDeleteSecretUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteSecretUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteSecretUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -83,7 +86,8 @@ func TestDeleteSecretUseCase_Execute_SecretNotFound(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteSecretUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteSecretUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -117,7 +121,8 @@ func TestDeleteSecretUseCase_Execute_ContainerNotFound(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteSecretUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteSecretUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)

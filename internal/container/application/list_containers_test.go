@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 )
@@ -12,7 +13,8 @@ import (
 func TestListContainersUseCase_Execute_Success(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
-	useCase := NewListContainersUseCase(mockRepo, mockPermSvc)
+	testLogger := logger.NewForTest()
+	useCase := NewListContainersUseCase(mockRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -47,7 +49,8 @@ func TestListContainersUseCase_Execute_Success(t *testing.T) {
 func TestListContainersUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
-	useCase := NewListContainersUseCase(mockRepo, mockPermSvc)
+	testLogger := logger.NewForTest()
+	useCase := NewListContainersUseCase(mockRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -73,7 +76,8 @@ func TestListContainersUseCase_Execute_PermissionDenied(t *testing.T) {
 func TestListContainersUseCase_Execute_EmptyList(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
-	useCase := NewListContainersUseCase(mockRepo, mockPermSvc)
+	testLogger := logger.NewForTest()
+	useCase := NewListContainersUseCase(mockRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	projectID := uint(10)

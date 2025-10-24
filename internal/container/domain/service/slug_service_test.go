@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
@@ -18,7 +19,8 @@ func TestSlugService_GenerateSlug(t *testing.T) {
 		// Mock that slug does not exist
 		mockRepo.On("ExistsBySlug", mock.Anything, mock.AnythingOfType("string")).Return(false, nil)
 
-		service := NewSlugService(mockRepo)
+		mockLogger := logger.NewForTest()
+		service := NewSlugService(mockRepo, mockLogger)
 		slug, err := service.GenerateSlug(context.Background())
 
 		if err != nil {
@@ -44,7 +46,8 @@ func TestSlugService_GenerateSlug(t *testing.T) {
 		// Mock that slug exists
 		mockRepo.On("ExistsBySlug", mock.Anything, mock.AnythingOfType("string")).Return(true, nil)
 
-		service := NewSlugService(mockRepo)
+		mockLogger := logger.NewForTest()
+		service := NewSlugService(mockRepo, mockLogger)
 		_, err := service.GenerateSlug(context.Background())
 
 		if err != containererrors.ErrSlugAlreadyExists {
@@ -62,7 +65,8 @@ func TestSlugService_EnsureUniqueSlug(t *testing.T) {
 
 		mockRepo.On("ExistsBySlug", mock.Anything, testSlug).Return(false, nil)
 
-		service := NewSlugService(mockRepo)
+		mockLogger := logger.NewForTest()
+		service := NewSlugService(mockRepo, mockLogger)
 		slug, _ := value.NewContainerSlug(testSlug)
 		err := service.EnsureUniqueSlug(context.Background(), slug)
 
@@ -79,7 +83,8 @@ func TestSlugService_EnsureUniqueSlug(t *testing.T) {
 
 		mockRepo.On("ExistsBySlug", mock.Anything, testSlug).Return(true, nil)
 
-		service := NewSlugService(mockRepo)
+		mockLogger := logger.NewForTest()
+		service := NewSlugService(mockRepo, mockLogger)
 		slug, _ := value.NewContainerSlug(testSlug)
 		err := service.EnsureUniqueSlug(context.Background(), slug)
 

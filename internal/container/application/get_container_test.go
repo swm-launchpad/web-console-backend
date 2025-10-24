@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 )
@@ -14,7 +15,8 @@ func TestGetContainerUseCase_Execute_Success(t *testing.T) {
 	// Arrange
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
-	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc)
+	testLogger := logger.NewForTest()
+	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -64,7 +66,8 @@ func TestGetContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	// Arrange
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
-	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc)
+	testLogger := logger.NewForTest()
+	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -97,7 +100,8 @@ func TestGetContainerUseCase_Execute_ContainerNotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
-	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc)
+	testLogger := logger.NewForTest()
+	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(999)
@@ -126,7 +130,8 @@ func TestGetContainerUseCase_Execute_WithOptionalFields(t *testing.T) {
 	// Arrange
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
-	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc)
+	testLogger := logger.NewForTest()
+	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)

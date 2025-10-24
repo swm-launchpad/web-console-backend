@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
@@ -24,7 +25,8 @@ func TestUserRepository_Integration(t *testing.T) {
 	defer testDB.Cleanup()
 
 	// Repository 생성
-	userRepo := infrastructure.NewUserRepository(testDB.DB)
+	testLogger := logger.NewForTest()
+	userRepo := infrastructure.NewUserRepository(testDB.DB, testLogger)
 	ctx := context.Background()
 
 	t.Run("Create and FindByID", func(t *testing.T) {
@@ -260,7 +262,7 @@ func TestUserRepository_Integration(t *testing.T) {
 		defer func() { _ = tx.Rollback() }() // Always rollback at the end
 
 		// Create repository with transaction
-		txRepo := infrastructure.NewUserRepository(tx)
+		txRepo := infrastructure.NewUserRepository(tx, testLogger)
 
 		user := &model.User{
 			Username:     "txuser",

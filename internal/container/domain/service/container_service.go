@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
+	"go.uber.org/zap"
 )
 
 // ContainerService defines the interface for container-related business logic
@@ -42,13 +44,15 @@ type ContainerService interface {
 type containerService struct {
 	containerRepo repository.ContainerRepository
 	slugService   SlugService
+	logger        logger.Logger
 }
 
 // NewContainerService creates a new instance of ContainerService
-func NewContainerService(containerRepo repository.ContainerRepository, slugService SlugService) ContainerService {
+func NewContainerService(containerRepo repository.ContainerRepository, slugService SlugService, log logger.Logger) ContainerService {
 	return &containerService{
 		containerRepo: containerRepo,
 		slugService:   slugService,
+		logger:        log,
 	}
 }
 
@@ -56,35 +60,76 @@ func NewContainerService(containerRepo repository.ContainerRepository, slugServi
 // slug is automatically generated from name
 // gitConfig and resourceLimits are required, templateID, templateConfig, and githubInstallationID are optional
 func (s *containerService) CreateContainer(ctx context.Context, projectID uint, name string, gitConfig value.GitConfig, resourceLimits value.ResourceLimits, templateID *uint, templateConfig map[string]interface{}, githubInstallationID *int64) (*model.Container, error) {
+	s.logger.Info(ctx, "container service create container started",
+		zap.Uint("project_id", projectID),
+		zap.String("name", name),
+	)
+
 	if projectID == 0 {
+		s.logger.Error(ctx, "container service invalid project id",
+			zap.Uint("project_id", projectID),
+		)
 		return nil, containererrors.ErrInvalidProjectID
 	}
 
 	// Check if container name already exists in this project
 	exists, err := s.CheckContainerNameExists(ctx, projectID, name)
 	if err != nil {
+		s.logger.Error(ctx, "container service failed to check container name exists",
+			zap.Uint("project_id", projectID),
+			zap.String("name", name),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 	if exists {
+		s.logger.Error(ctx, "container service container name already exists",
+			zap.Uint("project_id", projectID),
+			zap.String("name", name),
+		)
 		return nil, containererrors.ErrContainerNameExists
 	}
 
 	// Generate slug
 	slug, err := s.slugService.GenerateSlug(ctx)
 	if err != nil {
+		s.logger.Error(ctx, "container service failed to generate slug",
+			zap.Uint("project_id", projectID),
+			zap.String("name", name),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	// Create the container aggregate with all fields
 	container, err := model.NewContainer(projectID, name, slug, gitConfig, resourceLimits, templateID, templateConfig, githubInstallationID)
 	if err != nil {
+		s.logger.Error(ctx, "container service failed to create container model",
+			zap.Uint("project_id", projectID),
+			zap.String("name", name),
+			zap.String("slug", slug.String()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	// Persist the container
 	if err := s.containerRepo.Create(ctx, container); err != nil {
+		s.logger.Error(ctx, "container service failed to persist container",
+			zap.Uint("project_id", projectID),
+			zap.String("name", name),
+			zap.String("slug", slug.String()),
+			zap.Error(err),
+		)
 		return nil, containererrors.ErrContainerCreationFailed
 	}
+
+	s.logger.Info(ctx, "container service create container completed",
+		zap.Uint("container_id", container.ContainerID()),
+		zap.Uint("project_id", projectID),
+		zap.String("name", name),
+		zap.String("slug", slug.String()),
+	)
 
 	return container, nil
 }

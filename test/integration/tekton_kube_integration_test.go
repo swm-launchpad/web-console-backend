@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/test/helper"
@@ -49,7 +50,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 
 	t.Run("TektonClient - Dry run deployment request", func(t *testing.T) {
 		// Given - Create TektonClient
-		tektonClient, err := infrastructure.NewTektonClient()
+		tektonClient, err := infrastructure.NewTektonClient(logger.NewForTest())
 		require.NoError(t, err, "Failed to create TektonClient")
 
 		// Create a minimal deployment request with dry_run=true and project_id=0
@@ -106,7 +107,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient()
+		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Logf("This may be due to network connectivity or certificate issues")
@@ -145,7 +146,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient()
+		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -208,7 +209,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient()
+		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -259,7 +260,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient()
+		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -284,7 +285,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient()
+		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -309,7 +310,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient()
+		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -368,7 +369,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 		}
 
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient()
+		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -401,10 +402,10 @@ func TestTektonClient_FullDeploymentFlow(t *testing.T) {
 	ctx := context.Background()
 
 	// Create clients
-	tektonClient, err := infrastructure.NewTektonClient()
+	tektonClient, err := infrastructure.NewTektonClient(logger.NewForTest())
 	require.NoError(t, err, "Failed to create TektonClient")
 
-	kubeClient, err := infrastructure.NewKubeClient()
+	kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 	require.NoError(t, err, "Failed to create KubeClient")
 
 	// Create a test deployment request with dry_run=false

@@ -3,8 +3,10 @@ package application
 import (
 	"context"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	"go.uber.org/zap"
 )
 
 type GetContainerInput struct {
@@ -75,24 +77,40 @@ type GetContainerOutput struct {
 type GetContainerUseCase struct {
 	containerRepo repository.ContainerRepository
 	permissionSvc service.PermissionService
+	logger        logger.Logger
 }
 
-func NewGetContainerUseCase(containerRepo repository.ContainerRepository, permissionSvc service.PermissionService) *GetContainerUseCase {
+func NewGetContainerUseCase(containerRepo repository.ContainerRepository, permissionSvc service.PermissionService, log logger.Logger) *GetContainerUseCase {
 	return &GetContainerUseCase{
 		containerRepo: containerRepo,
 		permissionSvc: permissionSvc,
+		logger:        log,
 	}
 }
 
 func (uc *GetContainerUseCase) Execute(ctx context.Context, input GetContainerInput) (*GetContainerOutput, error) {
+	uc.logger.Info(ctx, "get container started",
+		zap.Uint("container_id", input.ContainerID),
+		zap.Uint("user_id", input.UserID),
+	)
+
 	// Get container
 	container, err := uc.containerRepo.FindByID(ctx, input.ContainerID)
 	if err != nil {
+		uc.logger.Error(ctx, "failed to find container",
+			zap.Error(err),
+			zap.Uint("container_id", input.ContainerID),
+		)
 		return nil, err
 	}
 
 	// Check permission
 	if err := uc.permissionSvc.CanUserAccessContainer(ctx, input.UserID, input.ContainerID); err != nil {
+		uc.logger.Error(ctx, "permission check failed",
+			zap.Error(err),
+			zap.Uint("user_id", input.UserID),
+			zap.Uint("container_id", input.ContainerID),
+		)
 		return nil, err
 	}
 
@@ -218,6 +236,11 @@ func (uc *GetContainerUseCase) Execute(ctx context.Context, input GetContainerIn
 			MountPath: mount.MountPath(),
 		})
 	}
+
+	uc.logger.Info(ctx, "get container completed",
+		zap.Uint("container_id", container.ContainerID()),
+		zap.String("name", container.Name()),
+	)
 
 	return output, nil
 }

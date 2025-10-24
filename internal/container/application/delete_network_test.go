@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,8 @@ func TestDeleteNetworkUseCase_Execute_Success(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -60,7 +62,8 @@ func TestDeleteNetworkUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -96,7 +99,8 @@ func TestDeleteNetworkUseCase_Execute_NetworkNotFound(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -137,7 +141,8 @@ func TestDeleteNetworkUseCase_Execute_ContainerNotFound(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(999) // Non-existent container
@@ -174,7 +179,8 @@ func TestDeleteNetworkUseCase_Execute_CannotDeleteFromDeleted(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteNetworkUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
