@@ -18,6 +18,16 @@ package dto
 // All string parameters are sent as-is to the Tekton API, with boolean force_build
 // converted to "true" or "false" string.
 type TektonBuildRequest struct {
+	// ProjectID is the ID of the project that owns this container
+	// This is used for tracking and labeling the PipelineRun
+	// Required field
+	ProjectID string `json:"project_id"`
+
+	// ContainerID is the ID of the container being built
+	// This is used for tracking and labeling the PipelineRun
+	// Required field
+	ContainerID string `json:"container_id"`
+
 	// ImageName is the name of the container image to build
 	// This will be used as the image name in the registry (e.g., "my-app")
 	// Required field

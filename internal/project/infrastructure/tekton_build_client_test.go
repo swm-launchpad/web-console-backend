@@ -20,6 +20,7 @@ func TestNewTektonBuildClient(t *testing.T) {
 		name           string
 		buildURL       string
 		authHeader     string
+		registryURL    string
 		expectedError  error
 		shouldSetupEnv bool
 	}{
@@ -27,6 +28,7 @@ func TestNewTektonBuildClient(t *testing.T) {
 			name:           "성공: 유효한 환경변수로 클라이언트 생성",
 			buildURL:       "https://test-tekton-api.example.com/build",
 			authHeader:     "Basic dGVzdDp0ZXN0",
+			registryURL:    "test-registry.example.com",
 			expectedError:  nil,
 			shouldSetupEnv: true,
 		},
@@ -34,6 +36,7 @@ func TestNewTektonBuildClient(t *testing.T) {
 			name:           "실패: TEKTON_BUILD_URL 누락",
 			buildURL:       "",
 			authHeader:     "Basic dGVzdDp0ZXN0",
+			registryURL:    "test-registry.example.com",
 			expectedError:  projecterrors.ErrTektonUnavailable,
 			shouldSetupEnv: true,
 		},
@@ -41,6 +44,15 @@ func TestNewTektonBuildClient(t *testing.T) {
 			name:           "실패: TEKTON_API_AUTH 누락",
 			buildURL:       "https://test-tekton-api.example.com/build",
 			authHeader:     "",
+			registryURL:    "test-registry.example.com",
+			expectedError:  projecterrors.ErrTektonUnavailable,
+			shouldSetupEnv: true,
+		},
+		{
+			name:           "실패: REGISTRY_URL 누락",
+			buildURL:       "https://test-tekton-api.example.com/build",
+			authHeader:     "Basic dGVzdDp0ZXN0",
+			registryURL:    "",
 			expectedError:  projecterrors.ErrTektonUnavailable,
 			shouldSetupEnv: true,
 		},
@@ -48,6 +60,7 @@ func TestNewTektonBuildClient(t *testing.T) {
 			name:           "실패: 모든 환경변수 누락",
 			buildURL:       "",
 			authHeader:     "",
+			registryURL:    "",
 			expectedError:  projecterrors.ErrTektonUnavailable,
 			shouldSetupEnv: true,
 		},
@@ -59,6 +72,7 @@ func TestNewTektonBuildClient(t *testing.T) {
 				// Backup original env vars
 				originalBuildURL := os.Getenv("TEKTON_BUILD_URL")
 				originalAuthHeader := os.Getenv("TEKTON_API_AUTH")
+				originalRegistryURL := os.Getenv("REGISTRY_URL")
 
 				// Set test env vars
 				if tt.buildURL != "" {
@@ -73,6 +87,12 @@ func TestNewTektonBuildClient(t *testing.T) {
 					require.NoError(t, os.Unsetenv("TEKTON_API_AUTH"))
 				}
 
+				if tt.registryURL != "" {
+					require.NoError(t, os.Setenv("REGISTRY_URL", tt.registryURL))
+				} else {
+					require.NoError(t, os.Unsetenv("REGISTRY_URL"))
+				}
+
 				// Restore env vars after test
 				defer func() {
 					if originalBuildURL != "" {
@@ -85,6 +105,12 @@ func TestNewTektonBuildClient(t *testing.T) {
 						_ = os.Setenv("TEKTON_API_AUTH", originalAuthHeader)
 					} else {
 						_ = os.Unsetenv("TEKTON_API_AUTH")
+					}
+
+					if originalRegistryURL != "" {
+						_ = os.Setenv("REGISTRY_URL", originalRegistryURL)
+					} else {
+						_ = os.Unsetenv("REGISTRY_URL")
 					}
 				}()
 			}
@@ -115,6 +141,8 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 		{
 			name: "성공: 정상 빌드 요청 (202 Accepted)",
 			request: &dto.TektonBuildRequest{
+				ProjectID:            "1",
+				ContainerID:          "10",
 				ImageName:            "test-app",
 				GitHubURL:            "https://github.com/test-org/test-repo",
 				GitHubBranch:         "main",
@@ -145,6 +173,8 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 		{
 			name: "성공: 강제 빌드 모드",
 			request: &dto.TektonBuildRequest{
+				ProjectID:    "2",
+				ContainerID:  "20",
 				ImageName:    "test-app",
 				GitHubURL:    "https://github.com/test-org/test-repo",
 				GitHubBranch: "main",
@@ -165,9 +195,11 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 		{
 			name: "성공: GitHub 레포지토리 없이 템플릿만 사용",
 			request: &dto.TektonBuildRequest{
-				ImageName:  "template-only-app",
-				ForceBuild: "true",
-				Template:   "FROM alpine:latest\nRUN echo 'Hello World'",
+				ProjectID:   "3",
+				ContainerID: "30",
+				ImageName:   "template-only-app",
+				ForceBuild:  "true",
+				Template:    "FROM alpine:latest\nRUN echo 'Hello World'",
 			},
 			mockStatusCode: http.StatusAccepted,
 			mockResponse: dto.TektonBuildResponse{
@@ -183,8 +215,10 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 		{
 			name: "실패: 잘못된 요청 (400 Bad Request)",
 			request: &dto.TektonBuildRequest{
-				ImageName:  "",
-				ForceBuild: "true",
+				ProjectID:   "4",
+				ContainerID: "40",
+				ImageName:   "",
+				ForceBuild:  "true",
 			},
 			mockStatusCode: http.StatusBadRequest,
 			mockResponse:   "validation failed: image_name is required",
@@ -194,9 +228,11 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 		{
 			name: "실패: 인증 실패 (401 Unauthorized)",
 			request: &dto.TektonBuildRequest{
-				ImageName:  "test-app",
-				ForceBuild: "true",
-				Template:   "FROM node:18",
+				ProjectID:   "5",
+				ContainerID: "50",
+				ImageName:   "test-app",
+				ForceBuild:  "true",
+				Template:    "FROM node:18",
 			},
 			mockStatusCode: http.StatusUnauthorized,
 			mockResponse:   "unauthorized",
@@ -206,9 +242,11 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 		{
 			name: "실패: 권한 거부 (403 Forbidden)",
 			request: &dto.TektonBuildRequest{
-				ImageName:  "test-app",
-				ForceBuild: "true",
-				Template:   "FROM node:18",
+				ProjectID:   "6",
+				ContainerID: "60",
+				ImageName:   "test-app",
+				ForceBuild:  "true",
+				Template:    "FROM node:18",
 			},
 			mockStatusCode: http.StatusForbidden,
 			mockResponse:   "forbidden",
@@ -218,9 +256,11 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 		{
 			name: "실패: 서버 에러 (500 Internal Server Error)",
 			request: &dto.TektonBuildRequest{
-				ImageName:  "test-app",
-				ForceBuild: "true",
-				Template:   "FROM node:18",
+				ProjectID:   "7",
+				ContainerID: "70",
+				ImageName:   "test-app",
+				ForceBuild:  "true",
+				Template:    "FROM node:18",
 			},
 			mockStatusCode: http.StatusInternalServerError,
 			mockResponse:   "internal server error",
@@ -230,9 +270,11 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 		{
 			name: "실패: 잘못된 응답 형식",
 			request: &dto.TektonBuildRequest{
-				ImageName:  "test-app",
-				ForceBuild: "true",
-				Template:   "FROM node:18",
+				ProjectID:   "8",
+				ContainerID: "80",
+				ImageName:   "test-app",
+				ForceBuild:  "true",
+				Template:    "FROM node:18",
 			},
 			mockStatusCode: http.StatusAccepted,
 			mockResponse:   "not a json response",
@@ -269,9 +311,10 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 
 			// Create client with mock server URL
 			client := &tektonBuildClient{
-				buildURL:   server.URL,
-				authHeader: "Basic test-auth",
-				httpClient: server.Client(),
+				buildURL:    server.URL,
+				authHeader:  "Basic test-auth",
+				registryURL: "test-registry.example.com",
+				httpClient:  server.Client(),
 			}
 
 			// Execute test
@@ -299,15 +342,18 @@ func TestTektonBuildClient_TriggerBuild_NetworkError(t *testing.T) {
 	t.Run("실패: 네트워크 에러 (서버 연결 불가)", func(t *testing.T) {
 		// Create client with invalid URL (no server listening)
 		client := &tektonBuildClient{
-			buildURL:   "http://localhost:9999",
-			authHeader: "Basic test-auth",
-			httpClient: &http.Client{},
+			buildURL:    "http://localhost:9999",
+			authHeader:  "Basic test-auth",
+			registryURL: "test-registry.example.com",
+			httpClient:  &http.Client{},
 		}
 
 		request := &dto.TektonBuildRequest{
-			ImageName:  "test-app",
-			ForceBuild: "true",
-			Template:   "FROM node:18",
+			ProjectID:   "9",
+			ContainerID: "90",
+			ImageName:   "test-app",
+			ForceBuild:  "true",
+			Template:    "FROM node:18",
 		}
 
 		ctx := context.Background()
@@ -329,15 +375,18 @@ func TestTektonBuildClient_TriggerBuild_ContextCancellation(t *testing.T) {
 		defer server.Close()
 
 		client := &tektonBuildClient{
-			buildURL:   server.URL,
-			authHeader: "Basic test-auth",
-			httpClient: server.Client(),
+			buildURL:    server.URL,
+			authHeader:  "Basic test-auth",
+			registryURL: "test-registry.example.com",
+			httpClient:  server.Client(),
 		}
 
 		request := &dto.TektonBuildRequest{
-			ImageName:  "test-app",
-			ForceBuild: "true",
-			Template:   "FROM node:18",
+			ProjectID:   "10",
+			ContainerID: "100",
+			ImageName:   "test-app",
+			ForceBuild:  "true",
+			Template:    "FROM node:18",
 		}
 
 		// Create cancelled context
@@ -372,12 +421,15 @@ func TestTektonBuildClient_TriggerBuild_RequestValidation(t *testing.T) {
 		defer server.Close()
 
 		client := &tektonBuildClient{
-			buildURL:   server.URL,
-			authHeader: "Basic test-auth",
-			httpClient: server.Client(),
+			buildURL:    server.URL,
+			authHeader:  "Basic test-auth",
+			registryURL: "test-registry.example.com",
+			httpClient:  server.Client(),
 		}
 
 		expectedRequest := &dto.TektonBuildRequest{
+			ProjectID:            "11",
+			ContainerID:          "110",
 			ImageName:            "my-awesome-app",
 			GitHubURL:            "https://github.com/myorg/myrepo",
 			GitHubBranch:         "develop",
@@ -397,6 +449,8 @@ func TestTektonBuildClient_TriggerBuild_RequestValidation(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify the request was sent correctly
+		assert.Equal(t, expectedRequest.ProjectID, receivedRequest.ProjectID)
+		assert.Equal(t, expectedRequest.ContainerID, receivedRequest.ContainerID)
 		assert.Equal(t, expectedRequest.ImageName, receivedRequest.ImageName)
 		assert.Equal(t, expectedRequest.GitHubURL, receivedRequest.GitHubURL)
 		assert.Equal(t, expectedRequest.GitHubBranch, receivedRequest.GitHubBranch)

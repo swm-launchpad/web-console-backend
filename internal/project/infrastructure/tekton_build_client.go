@@ -18,9 +18,10 @@ import (
 // tektonBuildClient implements the TektonBuildClient interface using HTTP requests.
 // It communicates with the Tekton EventListener to trigger container image builds.
 type tektonBuildClient struct {
-	buildURL   string
-	authHeader string
-	httpClient *http.Client
+	buildURL    string
+	authHeader  string
+	registryURL string
+	httpClient  *http.Client
 }
 
 // NewTektonBuildClient creates a new Tekton build client using configuration from environment variables.
@@ -28,6 +29,7 @@ type tektonBuildClient struct {
 // Required environment variables:
 //   - TEKTON_BUILD_URL: The Tekton EventListener endpoint URL (e.g., "https://tekton-api.launchpad.kr/build")
 //   - TEKTON_API_AUTH: The Basic authentication header value (e.g., "Basic base64encodedcredentials")
+//   - REGISTRY_URL: The container registry URL (e.g., "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com")
 //
 // Returns an error if any required environment variable is missing.
 func NewTektonBuildClient() (infrastructure.TektonBuildClient, error) {
@@ -41,21 +43,32 @@ func NewTektonBuildClient() (infrastructure.TektonBuildClient, error) {
 		return nil, projecterrors.ErrTektonUnavailable
 	}
 
+	registryURL := os.Getenv("REGISTRY_URL")
+	if registryURL == "" {
+		return nil, projecterrors.ErrTektonUnavailable
+	}
+
 	// Create HTTP client with reasonable timeout
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 
 	return &tektonBuildClient{
-		buildURL:   buildURL,
-		authHeader: authHeader,
-		httpClient: httpClient,
+		buildURL:    buildURL,
+		authHeader:  authHeader,
+		registryURL: registryURL,
+		httpClient:  httpClient,
 	}, nil
 }
 
 // TriggerBuild sends a build request to the Tekton EventListener.
 // It returns the response from Tekton on success (HTTP 202 Accepted).
 func (t *tektonBuildClient) TriggerBuild(ctx context.Context, request *dto.TektonBuildRequest) (*dto.TektonBuildResponse, error) {
+	// Set RegistryURL from environment variable if not provided in request
+	if request.RegistryURL == "" {
+		request.RegistryURL = t.registryURL
+	}
+
 	// Marshal request to JSON
 	requestBody, err := json.Marshal(request)
 	if err != nil {

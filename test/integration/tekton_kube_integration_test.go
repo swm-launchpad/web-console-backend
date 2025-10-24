@@ -546,9 +546,11 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 
 		// Create a minimal build request with template only (no GitHub repo)
 		buildRequest := &dto.TektonBuildRequest{
-			ImageName:  "integration-test-image",
-			ForceBuild: "true",
-			Template:   "FROM alpine:latest\nRUN echo 'Integration test build'",
+			ProjectID:   "0",
+			ContainerID: "0",
+			ImageName:   "integration-test-image",
+			ForceBuild:  "true",
+			Template:    "FROM alpine:latest\nRUN echo 'Integration test build'",
 		}
 
 		// When - Trigger build
@@ -574,6 +576,8 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 		// Create a build request with GitHub repository
 		// This uses the test repository from user-workload-infra/tekton-pipelines/image-build-push/test/
 		buildRequest := &dto.TektonBuildRequest{
+			ProjectID:            "0",
+			ContainerID:          "0",
 			ImageName:            "integration-test-github",
 			GitHubURL:            "https://github.com/hakumizuki/cicd-test",
 			GitHubBranch:         "main",
@@ -583,7 +587,7 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 			Template:             "FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nEXPOSE 3000\nCMD [\"node\", \"index.js\"]",
 			DockerfileConfigJSON: "",
 			BuildEnvJSON:         `{"NODE_ENV":"production"}`,
-			RegistryURL:          "registry.launchpad.kr/",
+			// RegistryURL is not set, will use environment variable
 		}
 
 		// When - Trigger build
@@ -597,7 +601,7 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 			require.NotNil(t, response, "Response should not be nil")
 			assert.NotEmpty(t, response.EventListener, "EventListener should be set")
 			assert.NotEmpty(t, response.EventID, "EventID should be set")
-			assert.Equal(t, "image-build-push", response.EventListener, "EventListener should be image-build-push")
+			assert.Equal(t, "image-build-push-listener", response.EventListener, "EventListener should be image-build-push-listener")
 			assert.Equal(t, "build-pipeline", response.Namespace, "Namespace should be build-pipeline")
 			t.Logf("Build triggered - EventID: %s", response.EventID)
 		}
