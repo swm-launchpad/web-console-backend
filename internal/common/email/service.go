@@ -2,11 +2,14 @@ package email
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"html/template"
 	"os"
 	"path/filepath"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	"go.uber.org/zap"
 	"gopkg.in/gomail.v2"
 )
 
@@ -28,16 +31,20 @@ type service struct {
 	from        string
 	frontendURL string
 	templates   *template.Template
+	logger      logger.Logger
 }
 
 // NewService creates a new email service
-func NewService(host string, port int, username, password, from, frontendURL string) Service {
+func NewService(host string, port int, username, password, from, frontendURL string, log logger.Logger) Service {
 	// Load email templates
 	templatesPath := filepath.Join("templates", "email", "*.html")
 	tmpl, err := template.ParseGlob(templatesPath)
 	if err != nil {
 		// Log error but don't fail - we can fall back to embedded templates
-		fmt.Printf("Warning: Failed to load email templates from %s: %v\n", templatesPath, err)
+		log.Error(context.Background(), "failed to load email templates",
+			zap.String("templates_path", templatesPath),
+			zap.Error(err),
+		)
 	}
 
 	return &service{
@@ -48,11 +55,18 @@ func NewService(host string, port int, username, password, from, frontendURL str
 		from:        from,
 		frontendURL: frontendURL,
 		templates:   tmpl,
+		logger:      log,
 	}
 }
 
 // SendVerificationEmail sends an email verification link
 func (s *service) SendVerificationEmail(email, username, token string) error {
+	ctx := context.Background()
+	s.logger.Info(ctx, "email service send verification email started",
+		zap.String("email", email),
+		zap.String("username", username),
+	)
+
 	subject := "이메일 인증 - Launchpad Web Console"
 
 	// Create email body from template
@@ -62,14 +76,35 @@ func (s *service) SendVerificationEmail(email, username, token string) error {
 		"FrontendURL": s.frontendURL,
 	})
 	if err != nil {
+		s.logger.Error(ctx, "email service failed to render verification template",
+			zap.String("email", email),
+			zap.Error(err),
+		)
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	return s.sendEmail(email, subject, body)
+	if err := s.sendEmail(email, subject, body); err != nil {
+		s.logger.Error(ctx, "email service failed to send verification email",
+			zap.String("email", email),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info(ctx, "email service send verification email completed",
+		zap.String("email", email),
+	)
+	return nil
 }
 
 // SendPasswordResetEmail sends a password reset link
 func (s *service) SendPasswordResetEmail(email, username, token string) error {
+	ctx := context.Background()
+	s.logger.Info(ctx, "email service send password reset email started",
+		zap.String("email", email),
+		zap.String("username", username),
+	)
+
 	subject := "비밀번호 재설정 - Launchpad Web Console"
 
 	// Create email body from template
@@ -79,10 +114,25 @@ func (s *service) SendPasswordResetEmail(email, username, token string) error {
 		"FrontendURL": s.frontendURL,
 	})
 	if err != nil {
+		s.logger.Error(ctx, "email service failed to render password reset template",
+			zap.String("email", email),
+			zap.Error(err),
+		)
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
-	return s.sendEmail(email, subject, body)
+	if err := s.sendEmail(email, subject, body); err != nil {
+		s.logger.Error(ctx, "email service failed to send password reset email",
+			zap.String("email", email),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info(ctx, "email service send password reset email completed",
+		zap.String("email", email),
+	)
+	return nil
 }
 
 // sendEmail sends an email using SMTP
