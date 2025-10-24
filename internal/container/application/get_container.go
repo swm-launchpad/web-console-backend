@@ -106,7 +106,7 @@ func (uc *GetContainerUseCase) Execute(ctx context.Context, input GetContainerIn
 
 	// Check permission
 	if err := uc.permissionSvc.CanUserAccessContainer(ctx, input.UserID, input.ContainerID); err != nil {
-		uc.logger.Error(ctx, "permission check failed",
+		uc.logger.Warn(ctx, "permission check failed",
 			zap.Error(err),
 			zap.Uint("user_id", input.UserID),
 			zap.Uint("container_id", input.ContainerID),

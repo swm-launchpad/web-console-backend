@@ -78,7 +78,7 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Check permission
 		if err := uc.permissionSvc.CanUserModifyContainer(txCtx, input.UserID, input.ContainerID); err != nil {
-			uc.logger.Error(ctx, "permission check failed",
+			uc.logger.Warn(ctx, "permission check failed",
 				zap.Error(err),
 				zap.Uint("user_id", input.UserID),
 				zap.Uint("container_id", input.ContainerID),

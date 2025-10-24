@@ -60,7 +60,7 @@ func (uc *ListContainersUseCase) Execute(ctx context.Context, input ListContaine
 
 	// Check permission to access project (using CreateContainer permission as proxy for project access)
 	if err := uc.permissionSvc.CanUserCreateContainer(ctx, input.UserID, input.ProjectID); err != nil {
-		uc.logger.Error(ctx, "permission check failed",
+		uc.logger.Warn(ctx, "permission check failed",
 			zap.Error(err),
 			zap.Uint("user_id", input.UserID),
 			zap.Uint("project_id", input.ProjectID),
