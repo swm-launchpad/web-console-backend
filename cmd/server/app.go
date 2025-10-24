@@ -138,8 +138,9 @@ func (a *App) waitForShutdown() {
 		a.Logger.Error(ctx, "failed to close database connection", zap.Error(err))
 	}
 
-	// Sync logger before exit
-	_ = a.Logger.Sync() // Ignore sync errors on stdout/stderr
-
+	// Log server exit before final sync
 	a.Logger.Info(ctx, "server exited")
+
+	// Sync logger to ensure all logs are flushed
+	_ = a.Logger.Sync() // Ignore sync errors on stdout/stderr
 }
