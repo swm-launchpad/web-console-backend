@@ -41,4 +41,13 @@ type PipelineRun struct {
 	// CompletionTime is when the PipelineRun completed
 	// Nil if the PipelineRun is still running or hasn't started
 	CompletionTime *time.Time
+
+	// Results contains the task results from the PipelineRun
+	// For build pipelines, this typically includes:
+	//   - latest_commit_hash: The latest Git commit hash
+	//   - image_tag: The image tag used for the build
+	//   - should_build: Whether the build was executed ("true" or "false")
+	// This field is populated only when specifically requested (e.g., for build monitoring)
+	// and will be nil for deploy pipeline queries
+	Results map[string]string
 }

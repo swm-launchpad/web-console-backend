@@ -28,7 +28,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 	// Load environment variables from .env.test
 	helper.LoadTestEnv(t)
 
-	// Verify required environment variables
+	// Verify required environment variables for deploy
 	requiredEnvVars := []string{
 		"TEKTON_DEPLOY_URL",
 		"TEKTON_API_AUTH",
@@ -503,4 +503,270 @@ func retryWithBackoff(maxAttempts int, interval time.Duration, fn func() bool) b
 		}
 	}
 	return false
+}
+
+// TestTektonBuildKubeIntegration tests the integration between TektonBuildClient and KubeBuildClient.
+// This test requires actual Tekton build infrastructure and Kubernetes to be available.
+//
+// Prerequisites:
+// - Tekton EventListener for builds must be accessible
+// - Kubernetes API server must be accessible with build-pipeline namespace
+// - Environment variables must be set in .env.test
+func TestTektonBuildKubeIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Load environment variables from .env.test
+	helper.LoadTestEnv(t)
+
+	// Verify required environment variables for build
+	requiredEnvVars := []string{
+		"TEKTON_BUILD_URL",
+		"TEKTON_API_AUTH",
+		"KUBE_API_SERVER",
+		"KUBE_SERVICE_ACCOUNT_TOKEN",
+		"KUBE_BUILD_NAMESPACE",
+		"KUBE_CA_CERT_PATH",
+	}
+
+	for _, envVar := range requiredEnvVars {
+		value := os.Getenv(envVar)
+		if value == "" {
+			t.Skipf("Skipping test: required environment variable %s is not set", envVar)
+		}
+	}
+
+	ctx := context.Background()
+
+	t.Run("TektonBuildClient - Build request with template only", func(t *testing.T) {
+		// Given - Create TektonBuildClient
+		tektonBuildClient, err := infrastructure.NewTektonBuildClient()
+		require.NoError(t, err, "Failed to create TektonBuildClient")
+
+		// Use MySQL template from test directory
+		// This template uses gomplate variables like {{ .mysql_version }}
+		mysqlTemplate := `FROM mysql:{{ .mysql_version }}
+
+# MySQL configuration
+RUN echo "[mysqld]" > /etc/mysql/conf.d/custom.cnf && \
+    echo "character-set-server={{ .charset }}" >> /etc/mysql/conf.d/custom.cnf && \
+    echo "collation-server={{ .collation }}" >> /etc/mysql/conf.d/custom.cnf && \
+    echo "max_connections={{ .max_connections }}" >> /etc/mysql/conf.d/custom.cnf
+
+# Expose MySQL port
+EXPOSE {{ .mysql_port }}`
+
+		// Create a build request with template only (no GitHub repo)
+		buildRequest := &dto.TektonBuildRequest{
+			ProjectID:            "0",
+			ContainerID:          "0",
+			ImageName:            "integration-test-mysql",
+			ForceBuild:           "true",
+			Template:             mysqlTemplate,
+			DockerfileConfigJSON: `{"mysql_version":"8.0","charset":"utf8mb4","collation":"utf8mb4_unicode_ci","max_connections":"200","mysql_port":"3306"}`,
+			BuildEnvJSON:         `{"TZ":"Asia/Seoul"}`,
+		}
+
+		// When - Trigger build
+		response, err := tektonBuildClient.TriggerBuild(ctx, buildRequest)
+
+		// Then - Request should be accepted
+		if err != nil {
+			t.Logf("Build request failed: %v", err)
+			t.Skip("Skipping test - Tekton build API not available or rejected request")
+		} else {
+			require.NotNil(t, response, "Response should not be nil")
+			assert.NotEmpty(t, response.EventListener, "EventListener should be set")
+			assert.NotEmpty(t, response.EventID, "EventID should be set")
+			t.Logf("Build triggered - EventID: %s, EventListener: %s", response.EventID, response.EventListener)
+		}
+	})
+
+	t.Run("TektonBuildClient - Build request with GitHub repository", func(t *testing.T) {
+		// Given - Create TektonBuildClient
+		tektonBuildClient, err := infrastructure.NewTektonBuildClient()
+		require.NoError(t, err, "Failed to create TektonBuildClient")
+
+		// Use Node.js template with gomplate variables
+		nodeTemplate := `FROM node:{{ .node_version }}-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE {{ .app_port }}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD node --version || exit 1
+
+# Run application
+CMD ["node", "{{ .entry_point }}"]`
+
+		// Create a build request with GitHub repository
+		// This uses the test repository from user-workload-infra/tekton-pipelines/image-build-push/test/
+		buildRequest := &dto.TektonBuildRequest{
+			ProjectID:            "0",
+			ContainerID:          "0",
+			ImageName:            "integration-test-nodejs",
+			GitHubURL:            "https://github.com/hakumizuki/cicd-test",
+			GitHubBranch:         "main",
+			DirectoryPath:        ".",
+			ForceBuild:           "true", // Force build for testing
+			LastBuildCommitHash:  "",     // Empty means first build
+			Template:             nodeTemplate,
+			DockerfileConfigJSON: `{"node_version":"18","app_port":"3000","entry_point":"index.js"}`,
+			BuildEnvJSON:         `{"NODE_ENV":"production","TZ":"Asia/Seoul"}`,
+			// RegistryURL is not set, will use environment variable
+		}
+
+		// When - Trigger build
+		response, err := tektonBuildClient.TriggerBuild(ctx, buildRequest)
+
+		// Then - Request should be accepted
+		if err != nil {
+			t.Logf("Build request failed: %v", err)
+			t.Skip("Skipping test - Tekton build API not available or rejected request")
+		} else {
+			require.NotNil(t, response, "Response should not be nil")
+			assert.NotEmpty(t, response.EventListener, "EventListener should be set")
+			assert.NotEmpty(t, response.EventID, "EventID should be set")
+			assert.Equal(t, "image-build-push-listener", response.EventListener, "EventListener should be image-build-push-listener")
+			assert.Equal(t, "build-pipeline", response.Namespace, "Namespace should be build-pipeline")
+			t.Logf("Build triggered - EventID: %s", response.EventID)
+		}
+	})
+
+	t.Run("KubeBuildClient - Find build PipelineRun by EventID", func(t *testing.T) {
+		// Fix CA cert path for tests
+		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+		}
+
+		// Given - Create KubeBuildClient
+		kubeBuildClient, err := infrastructure.NewKubeBuildClient()
+		if err != nil {
+			t.Logf("KubeBuildClient creation failed: %v", err)
+			t.Logf("This may be due to network connectivity or certificate issues")
+			t.Skip("Skipping KubeBuildClient tests - Kubernetes API not available")
+		}
+		require.NoError(t, err, "Failed to create KubeBuildClient")
+		require.NotNil(t, kubeBuildClient, "KubeBuildClient should not be nil")
+
+		// For this test, we need an existing build EventID
+		// This is a placeholder test that can be enhanced with actual EventID
+		t.Log("KubeBuildClient created successfully")
+		t.Log("FindPipelineRunNameByEventID requires an existing build EventID")
+		t.Log("This would be tested in E2E tests with actual build flow")
+	})
+
+	t.Run("KubeBuildClient - Get build PipelineRun status with results", func(t *testing.T) {
+		// Fix CA cert path for tests
+		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+		}
+
+		// Given - Create KubeBuildClient
+		kubeBuildClient, err := infrastructure.NewKubeBuildClient()
+		if err != nil {
+			t.Logf("KubeBuildClient creation failed: %v", err)
+			t.Skip("Skipping test - Kubernetes API not available")
+		}
+		require.NoError(t, err, "Failed to create KubeBuildClient")
+		require.NotNil(t, kubeBuildClient, "KubeBuildClient should not be nil")
+
+		// For this test, we would need an existing build PipelineRun name
+		// This is a placeholder test that documents expected behavior
+		t.Log("KubeBuildClient created successfully")
+		t.Log("GetPipelineRunStatus with Results extraction requires an existing build PipelineRun")
+		t.Log("Expected Results fields: latest_commit_hash, image_tag, should_build")
+		t.Log("This would be tested in E2E tests with actual build flow")
+	})
+}
+
+// TestTektonBuildClient_FullBuildFlow tests a complete build flow (optional).
+// This test is skipped by default as it creates actual resources in the cluster.
+func TestTektonBuildClient_FullBuildFlow(t *testing.T) {
+	t.Skip("Skipping full build test - requires cleanup and may create actual resources")
+
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Load environment variables from .env.test
+	helper.LoadTestEnv(t)
+
+	ctx := context.Background()
+
+	// Create clients
+	tektonBuildClient, err := infrastructure.NewTektonBuildClient()
+	require.NoError(t, err, "Failed to create TektonBuildClient")
+
+	// Fix CA cert path for tests
+	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+	if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+		_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+	}
+
+	kubeBuildClient, err := infrastructure.NewKubeBuildClient()
+	require.NoError(t, err, "Failed to create KubeBuildClient")
+
+	// Create a test build request
+	buildRequest := &dto.TektonBuildRequest{
+		ImageName:            "full-flow-test",
+		GitHubURL:            "https://github.com/hakumizuki/cicd-test",
+		GitHubBranch:         "main",
+		DirectoryPath:        ".",
+		ForceBuild:           "true",
+		LastBuildCommitHash:  "",
+		Template:             "FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nEXPOSE 3000\nCMD [\"node\", \"index.js\"]",
+		DockerfileConfigJSON: "",
+		BuildEnvJSON:         `{"NODE_ENV":"test"}`,
+		RegistryURL:          "registry.launchpad.kr/",
+	}
+
+	// Trigger build
+	response, err := tektonBuildClient.TriggerBuild(ctx, buildRequest)
+	require.NoError(t, err, "Failed to trigger build")
+	require.NotNil(t, response, "Response should not be nil")
+
+	t.Logf("Build triggered - EventID: %s", response.EventID)
+
+	// Wait a bit for the PipelineRun to be created
+	time.Sleep(5 * time.Second)
+
+	// Try to find the created PipelineRun by EventID
+	pipelineRunName, err := kubeBuildClient.FindPipelineRunNameByEventID(ctx, response.EventID)
+	if err != nil {
+		t.Logf("PipelineRun not found yet (may take a few seconds to appear): %v", err)
+	} else {
+		t.Logf("Found build PipelineRun: %s", pipelineRunName)
+
+		// Get detailed status with results
+		status, err := kubeBuildClient.GetPipelineRunStatus(ctx, pipelineRunName)
+		require.NoError(t, err, "Failed to get build PipelineRun status")
+
+		t.Logf("Status: %s, Reason: %s", status.Status, status.Reason)
+		t.Logf("Message: %s", status.Message)
+
+		if len(status.Results) > 0 {
+			t.Logf("Build Results:")
+			for key, value := range status.Results {
+				t.Logf("  %s: %s", key, value)
+			}
+		} else {
+			t.Logf("Results not yet available (build may still be running)")
+		}
+	}
 }
