@@ -2,7 +2,6 @@ package logger
 
 import (
 	"context"
-	"os"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -49,7 +48,12 @@ func New(cfg Config) (Logger, error) {
 		// Development configuration with console output
 		zapCfg = zap.NewDevelopmentConfig()
 		zapCfg.Level = zap.NewAtomicLevelAt(level)
-		zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		// Disable colors if file output is configured to avoid ANSI codes in log files
+		if cfg.FilePath != "" {
+			zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+		} else {
+			zapCfg.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		}
 		zapCfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	}
 
@@ -192,7 +196,7 @@ func Error(ctx context.Context, msg string, fields ...zap.Field) {
 }
 
 // Fatal logs a fatal message and exits using the global logger
+// Note: zap.Fatal already calls os.Exit(1), so no additional exit is needed
 func Fatal(ctx context.Context, msg string, fields ...zap.Field) {
 	GetGlobal().Fatal(ctx, msg, fields...)
-	os.Exit(1)
 }

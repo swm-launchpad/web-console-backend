@@ -43,7 +43,7 @@ func (m *LoggingMiddleware) Handler() gin.HandlerFunc {
 		// Log request start
 		m.logger.Info(ctx, "request started",
 			zap.String("method", c.Request.Method),
-			zap.String("path", c.Request.URL.Path),
+			zap.String("path", c.FullPath()), // Use route pattern instead of actual URL
 			zap.String("client_ip", c.ClientIP()),
 			zap.String("user_agent", c.Request.UserAgent()),
 		)
@@ -69,7 +69,7 @@ func (m *LoggingMiddleware) Handler() gin.HandlerFunc {
 		// Log request completion
 		fields := []zap.Field{
 			zap.String("method", c.Request.Method),
-			zap.String("path", c.Request.URL.Path),
+			zap.String("path", c.FullPath()), // Use route pattern for better aggregation
 			zap.Int("status", statusCode),
 			zap.Duration("duration", duration),
 			zap.Int("response_size", c.Writer.Size()),
@@ -92,11 +92,11 @@ func (m *LoggingMiddleware) RecoveryHandler() gin.HandlerFunc {
 				ctx := c.Request.Context()
 
 				// Log the panic
+				// Note: stacktrace is automatically added by zap.AddStacktrace(zapcore.ErrorLevel)
 				m.logger.Error(ctx, "panic recovered",
 					zap.Any("error", err),
 					zap.String("method", c.Request.Method),
-					zap.String("path", c.Request.URL.Path),
-					zap.Stack("stacktrace"),
+					zap.String("path", c.FullPath()), // Use route pattern
 				)
 
 				// Abort with 500 status

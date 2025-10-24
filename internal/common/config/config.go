@@ -122,8 +122,8 @@ func Load() (*Config, error) {
 
 	// Determine log defaults based on GIN_MODE
 	ginMode := getEnv("GIN_MODE", "debug")
-	logLevel := getEnv("LOG_LEVEL", "info")
-	logFormat := getEnv("LOG_FORMAT", "console")
+	logLevel := strings.ToLower(getEnv("LOG_LEVEL", "info"))
+	logFormat := strings.ToLower(getEnv("LOG_FORMAT", "console"))
 	if ginMode == "release" {
 		if getEnv("LOG_LEVEL", "") == "" {
 			logLevel = "info"
