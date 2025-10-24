@@ -107,7 +107,7 @@ func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserIn
 
 	// Send verification email (outside transaction to avoid holding DB connection)
 	// If email sending fails, we log it but don't fail the registration
-	if err := uc.emailService.SendVerificationEmail(userEmail, username, verificationTokenStr); err != nil {
+	if err := uc.emailService.SendVerificationEmail(ctx, userEmail, username, verificationTokenStr); err != nil {
 		uc.logger.Error(ctx, "failed to send verification email",
 			zap.Error(err),
 			zap.Uint("user_id", output.UserID),

@@ -67,7 +67,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 			Return(user, "jwt_token", nil)
 		mockTokenService.On("CreateEmailVerificationToken", mock.Anything, uint(1)).
 			Return(verificationToken, nil)
-		mockEmailService.On("SendVerificationEmail", "test@example.com", "testuser", verificationToken.Token).
+		mockEmailService.On("SendVerificationEmail", mock.Anything, "test@example.com", "testuser", verificationToken.Token).
 			Return(nil)
 
 		router := gin.New()
@@ -125,7 +125,7 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 			Return(user, "jwt_token", nil)
 		mockTokenService.On("CreateEmailVerificationToken", mock.Anything, uint(2)).
 			Return(verificationToken, nil)
-		mockEmailService.On("SendVerificationEmail", "test2@example.com", "testuser2", verificationToken.Token).
+		mockEmailService.On("SendVerificationEmail", mock.Anything, "test2@example.com", "testuser2", verificationToken.Token).
 			Return(nil)
 
 		router := gin.New()

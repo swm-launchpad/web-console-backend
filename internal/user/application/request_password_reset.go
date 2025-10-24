@@ -92,7 +92,7 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, input Reques
 	// Send password reset email (outside transaction)
 	// Only send if we have a token (i.e., user was found)
 	if resetTokenStr != "" {
-		if err := uc.emailService.SendPasswordResetEmail(userEmail, username, resetTokenStr); err != nil {
+		if err := uc.emailService.SendPasswordResetEmail(ctx, userEmail, username, resetTokenStr); err != nil {
 			uc.logger.Error(ctx, "failed to send password reset email",
 				zap.Error(err),
 				zap.String("email", userEmail),

@@ -16,10 +16,10 @@ import (
 // Service defines the interface for email operations
 type Service interface {
 	// SendVerificationEmail sends an email verification link to the user
-	SendVerificationEmail(email, username, token string) error
+	SendVerificationEmail(ctx context.Context, email, username, token string) error
 
 	// SendPasswordResetEmail sends a password reset link to the user
-	SendPasswordResetEmail(email, username, token string) error
+	SendPasswordResetEmail(ctx context.Context, email, username, token string) error
 }
 
 // service is the concrete implementation of Service
@@ -60,8 +60,7 @@ func NewService(host string, port int, username, password, from, frontendURL str
 }
 
 // SendVerificationEmail sends an email verification link
-func (s *service) SendVerificationEmail(email, username, token string) error {
-	ctx := context.Background()
+func (s *service) SendVerificationEmail(ctx context.Context, email, username, token string) error {
 	s.logger.Info(ctx, "email service send verification email started",
 		zap.String("email", email),
 		zap.String("username", username),
@@ -98,8 +97,7 @@ func (s *service) SendVerificationEmail(email, username, token string) error {
 }
 
 // SendPasswordResetEmail sends a password reset link
-func (s *service) SendPasswordResetEmail(email, username, token string) error {
-	ctx := context.Background()
+func (s *service) SendPasswordResetEmail(ctx context.Context, email, username, token string) error {
 	s.logger.Info(ctx, "email service send password reset email started",
 		zap.String("email", email),
 		zap.String("username", username),

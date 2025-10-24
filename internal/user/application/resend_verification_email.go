@@ -118,7 +118,7 @@ func (uc *ResendVerificationEmailUseCase) Execute(ctx context.Context, input Res
 	}
 
 	// Send verification email (outside transaction)
-	if err := uc.emailService.SendVerificationEmail(userEmail, username, verificationTokenStr); err != nil {
+	if err := uc.emailService.SendVerificationEmail(ctx, userEmail, username, verificationTokenStr); err != nil {
 		uc.logger.Error(ctx, "failed to resend verification email",
 			zap.Error(err),
 			zap.String("email", userEmail),

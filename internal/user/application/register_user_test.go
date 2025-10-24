@@ -62,7 +62,7 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Return(verificationToken, nil)
 
 		mockEmailService.
-			On("SendVerificationEmail", input.Email, input.Username, verificationToken.Token).
+			On("SendVerificationEmail", mock.Anything, input.Email, input.Username, verificationToken.Token).
 			Return(nil)
 
 		output, err := uc.Execute(ctx, input)
@@ -117,7 +117,7 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Return(verificationToken, nil)
 
 		mockEmailService.
-			On("SendVerificationEmail", input.Email, input.Username, verificationToken.Token).
+			On("SendVerificationEmail", mock.Anything, input.Email, input.Username, verificationToken.Token).
 			Return(nil)
 
 		output, err := uc.Execute(ctx, input)
