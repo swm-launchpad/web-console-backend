@@ -22,6 +22,7 @@ type Container struct {
 	gitConfig              value.GitConfig
 	gitCommitHash          *string // Current/target git commit hash
 	lastBuiltGitCommitHash *string // Last successfully built git commit hash
+	needsBuild             bool    // Indicates whether build is required (set to true when build parameters change)
 	resourceLimits         value.ResourceLimits
 	monthlyBuildTime       *uint32
 	monthlyBuildCount      *uint32
@@ -85,6 +86,7 @@ func NewContainer(
 		templateConfig:       templateConfig,
 		githubInstallationID: githubInstallationID,
 		gitConfig:            gitConfig,
+		needsBuild:           true, // New containers always need to be built
 		resourceLimits:       resourceLimits,
 		envVars:              make([]EnvVar, 0),
 		networks:             make([]Network, 0),
@@ -108,6 +110,7 @@ func (c *Container) TemplateConfig() map[string]interface{} { return c.templateC
 func (c *Container) GitHubInstallationID() *int64           { return c.githubInstallationID }
 func (c *Container) GitConfig() value.GitConfig             { return c.gitConfig }
 func (c *Container) LastBuiltGitCommitHash() *string        { return c.lastBuiltGitCommitHash }
+func (c *Container) NeedsBuild() bool                       { return c.needsBuild }
 func (c *Container) ResourceLimits() value.ResourceLimits   { return c.resourceLimits }
 func (c *Container) MonthlyBuildTime() *uint32              { return c.monthlyBuildTime }
 func (c *Container) MonthlyBuildCount() *uint32             { return c.monthlyBuildCount }
@@ -197,6 +200,20 @@ func (c *Container) UpdateTemplateConfig(templateID *uint, config map[string]int
 // SetLastBuiltCommitHash sets the last successfully built commit hash
 func (c *Container) SetLastBuiltCommitHash(commitHash *string) {
 	c.lastBuiltGitCommitHash = commitHash
+	c.updatedAt = time.Now()
+}
+
+// MarkNeedsBuild marks that a build is required for this container
+// This should be called when build parameters (git config, template, build vars) change
+func (c *Container) MarkNeedsBuild() {
+	c.needsBuild = true
+	c.updatedAt = time.Now()
+}
+
+// ClearNeedsBuild marks that build is not required for this container
+// This should be called after a successful build completes
+func (c *Container) ClearNeedsBuild() {
+	c.needsBuild = false
 	c.updatedAt = time.Now()
 }
 
@@ -753,6 +770,7 @@ func ReconstructContainer(
 	gitConfig value.GitConfig,
 	gitCommitHash *string,
 	lastBuiltGitCommitHash *string,
+	needsBuild bool,
 	resourceLimits value.ResourceLimits,
 	monthlyBuildTime *uint32,
 	monthlyBuildCount *uint32,
@@ -774,6 +792,7 @@ func ReconstructContainer(
 		gitConfig:              gitConfig,
 		gitCommitHash:          gitCommitHash,
 		lastBuiltGitCommitHash: lastBuiltGitCommitHash,
+		needsBuild:             needsBuild,
 		resourceLimits:         resourceLimits,
 		monthlyBuildTime:       monthlyBuildTime,
 		monthlyBuildCount:      monthlyBuildCount,

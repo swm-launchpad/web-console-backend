@@ -321,8 +321,9 @@ func TestReconstructContainer(t *testing.T) {
 		nil, // templateConfig
 		nil, // githubInstallationID
 		gitConfig,
-		nil, // gitCommitHash
-		nil, // lastBuiltGitCommitHash
+		nil,  // gitCommitHash
+		nil,  // lastBuiltGitCommitHash
+		true, // needsBuild
 		resourceLimits,
 		nil, // monthlyBuildTime
 		nil, // monthlyBuildCount
@@ -359,8 +360,9 @@ func TestReconstructContainer_WithGitHubInstallationID(t *testing.T) {
 		nil, // templateConfig
 		&githubInstallationID,
 		gitConfig,
-		nil, // gitCommitHash
-		nil, // lastBuiltGitCommitHash
+		nil,  // gitCommitHash
+		nil,  // lastBuiltGitCommitHash
+		true, // needsBuild
 		resourceLimits,
 		nil, // monthlyBuildTime
 		nil, // monthlyBuildCount

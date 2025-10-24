@@ -5,6 +5,7 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
+	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
@@ -37,6 +38,7 @@ type UpdateContainerUseCase struct {
 	containerRepo         repository.ContainerRepository
 	permissionSvc         service.PermissionService
 	resourceValidationSvc service.ResourceValidationService
+	buildChangeDetector   service.BuildChangeDetector
 	installationRepo      userrepository.GitHubInstallationRepository
 	txManager             db.TxManager
 }
@@ -45,6 +47,7 @@ func NewUpdateContainerUseCase(
 	containerRepo repository.ContainerRepository,
 	permissionSvc service.PermissionService,
 	resourceValidationSvc service.ResourceValidationService,
+	buildChangeDetector service.BuildChangeDetector,
 	installationRepo userrepository.GitHubInstallationRepository,
 	txManager db.TxManager,
 ) *UpdateContainerUseCase {
@@ -52,6 +55,7 @@ func NewUpdateContainerUseCase(
 		containerRepo:         containerRepo,
 		permissionSvc:         permissionSvc,
 		resourceValidationSvc: resourceValidationSvc,
+		buildChangeDetector:   buildChangeDetector,
 		installationRepo:      installationRepo,
 		txManager:             txManager,
 	}
@@ -72,6 +76,31 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 		if err != nil {
 			return err
 		}
+
+		// Create immutable snapshot of old container for build change detection
+		// We must clone the container to avoid comparing the same post-mutation state
+		oldContainer := model.ReconstructContainer(
+			container.ContainerID(),
+			container.ProjectID(),
+			container.TemplateID(),
+			container.Name(),
+			container.Slug(),
+			container.StableWindow(),
+			container.TemplateConfig(),
+			container.GitHubInstallationID(),
+			container.GitConfig(),
+			container.GitCommitHash(),
+			container.LastBuiltGitCommitHash(),
+			container.NeedsBuild(),
+			container.ResourceLimits(),
+			container.MonthlyBuildTime(),
+			container.MonthlyBuildCount(),
+			container.MonthlyUptime(),
+			container.IsDeleted(),
+			container.DeletedAt(),
+			container.CreatedAt(),
+			container.UpdatedAt(),
+		)
 
 		// Update name if provided
 		if input.Name != nil {
@@ -170,6 +199,11 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 			if err := container.UpdateTemplateConfig(input.TemplateID, input.TemplateConfig); err != nil {
 				return err
 			}
+		}
+
+		// Check if build parameters changed and mark needs_build if necessary
+		if uc.buildChangeDetector.ShouldRebuild(oldContainer, container) {
+			container.MarkNeedsBuild()
 		}
 
 		// Save container

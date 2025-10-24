@@ -63,6 +63,9 @@ func (uc *AddBuildVarUseCase) Execute(ctx context.Context, input AddBuildVarInpu
 			return err
 		}
 
+		// Mark container as needing rebuild since build variables changed
+		container.MarkNeedsBuild()
+
 		// Save container
 		if err := uc.containerRepo.Save(txCtx, container); err != nil {
 			return err

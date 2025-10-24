@@ -260,6 +260,7 @@ func InitializeApp() (*App, error) {
 		containerService.NewContainerService,
 		containerService.NewPermissionService,
 		containerService.NewResourceValidationService,
+		containerService.NewBuildChangeDetector,
 
 		// Container use cases
 		containerApp.NewCreateContainerUseCase,
