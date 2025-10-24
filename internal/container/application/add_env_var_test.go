@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 )
@@ -16,7 +17,8 @@ func TestAddEnvVarUseCase_Execute_Success(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -63,7 +65,8 @@ func TestAddEnvVarUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -101,7 +104,8 @@ func TestAddEnvVarUseCase_Execute_DuplicateKey(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -144,7 +148,8 @@ func TestAddEnvVarUseCase_Execute_MaxEnvVarsExceeded(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -188,7 +193,8 @@ func TestAddEnvVarUseCase_Execute_InvalidKeyFormat(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -230,7 +236,8 @@ func TestAddEnvVarUseCase_Execute_KeyTooLong(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -273,7 +280,8 @@ func TestAddEnvVarUseCase_Execute_ValueTooLong(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -319,7 +327,8 @@ func TestAddEnvVarUseCase_Execute_EmptyKey(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -361,7 +370,8 @@ func TestAddEnvVarUseCase_Execute_EmptyValue(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewAddEnvVarUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)

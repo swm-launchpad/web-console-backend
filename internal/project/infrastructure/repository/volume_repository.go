@@ -8,28 +8,37 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
+	"go.uber.org/zap"
 )
 
 type volumeRepository struct {
 	db      sqlc.DBTX
 	queries *sqlc.Queries
+	logger  logger.Logger
 }
 
 // NewVolumeRepository creates a new instance of VolumeRepository
-func NewVolumeRepository(db sqlc.DBTX) repository.VolumeRepository {
+func NewVolumeRepository(db sqlc.DBTX, log logger.Logger) repository.VolumeRepository {
 	return &volumeRepository{
 		db:      db,
 		queries: sqlc.New(db),
+		logger:  log,
 	}
 }
 
 // Create persists a new volume and assigns its ID
 func (r *volumeRepository) Create(ctx context.Context, volume *model.Volume) error {
+	r.logger.Info(ctx, "volume repository create started",
+		zap.Uint("project_id", volume.ProjectID()),
+		zap.String("name", volume.Name()),
+	)
+
 	qtx := r.queriesWithContext(ctx)
 
 	// Create volume
@@ -44,34 +53,68 @@ func (r *volumeRepository) Create(ctx context.Context, volume *model.Volume) err
 	result, err := qtx.CreateVolume(ctx, params)
 	if err != nil {
 		if isDuplicateError(err) {
+			r.logger.Error(ctx, "duplicate volume name",
+				zap.Uint("project_id", volume.ProjectID()),
+				zap.String("name", volume.Name()),
+				zap.Error(projecterrors.ErrDuplicateVolumeName),
+			)
 			return projecterrors.ErrDuplicateVolumeName
 		}
+		r.logger.Error(ctx, "volume repository create failed",
+			zap.Uint("project_id", volume.ProjectID()),
+			zap.Error(err),
+		)
 		return projecterrors.ErrDatabaseOperation
 	}
 
 	// Get the auto-generated ID
 	volumeID, err := result.LastInsertId()
 	if err != nil {
+		r.logger.Error(ctx, "volume repository create last insert id failed",
+			zap.String("name", volume.Name()),
+			zap.Error(err),
+		)
 		return err
 	}
 	volume.SetVolumeID(uint(volumeID))
 
+	r.logger.Info(ctx, "volume repository create completed",
+		zap.Uint("volume_id", volume.VolumeID()),
+		zap.String("name", volume.Name()),
+	)
 	return nil
 }
 
 // FindByID retrieves a volume by its ID
 func (r *volumeRepository) FindByID(ctx context.Context, volumeID uint) (*model.Volume, error) {
+	r.logger.Info(ctx, "volume repository find by id started",
+		zap.Uint("volume_id", volumeID),
+	)
+
 	qtx := r.queriesWithContext(ctx)
 
 	row, err := qtx.GetVolumeByID(ctx, uint32(volumeID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "volume not found",
+				zap.Uint("volume_id", volumeID),
+				zap.Error(projecterrors.ErrVolumeNotFound),
+			)
 			return nil, projecterrors.ErrVolumeNotFound
 		}
+		r.logger.Error(ctx, "volume repository find by id failed",
+			zap.Uint("volume_id", volumeID),
+			zap.Error(err),
+		)
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	return r.toDomainVolumeFromGetRow(row), nil
+	volume := r.toDomainVolumeFromGetRow(row)
+	r.logger.Info(ctx, "volume repository find by id completed",
+		zap.Uint("volume_id", volume.VolumeID()),
+		zap.String("name", volume.Name()),
+	)
+	return volume, nil
 }
 
 // FindByProjectID retrieves all volumes for a specific project

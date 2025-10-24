@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"go.uber.org/zap"
 )
 
 type CreateProjectInput struct {
@@ -37,16 +39,25 @@ type CreateProjectOutput struct {
 type CreateProjectUseCase struct {
 	projectService service.ProjectService
 	txManager      db.TxManager
+	logger         logger.Logger
 }
 
-func NewCreateProjectUseCase(projectService service.ProjectService, txManager db.TxManager) *CreateProjectUseCase {
+func NewCreateProjectUseCase(projectService service.ProjectService, txManager db.TxManager, log logger.Logger) *CreateProjectUseCase {
 	return &CreateProjectUseCase{
 		projectService: projectService,
 		txManager:      txManager,
+		logger:         log,
 	}
 }
 
 func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProjectInput) (*CreateProjectOutput, error) {
+	uc.logger.Info(ctx, "create project started",
+		zap.String("name", input.Name),
+		zap.Uint("owner_id", input.OwnerID),
+		zap.Uint32("cpu_limit", input.CPULimit),
+		zap.Uint32("memory_limit", input.MemoryLimit),
+	)
+
 	var projectID uint
 	var name string
 	var slug string
@@ -65,6 +76,10 @@ func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProject
 			input.TrafficLimit,
 		)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to create resource limits",
+				zap.Error(err),
+				zap.Uint("owner_id", input.OwnerID),
+			)
 			return err
 		}
 
@@ -79,6 +94,11 @@ func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProject
 			input.Plan,
 		)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to create project",
+				zap.Error(err),
+				zap.String("name", input.Name),
+				zap.Uint("owner_id", input.OwnerID),
+			)
 			return err
 		}
 
@@ -110,6 +130,12 @@ func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProject
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logger.Info(ctx, "create project completed",
+		zap.Uint("project_id", projectID),
+		zap.String("name", name),
+		zap.String("slug", slug),
+	)
 
 	// Build output after successful transaction
 	output := &CreateProjectOutput{

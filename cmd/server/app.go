@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,7 +11,9 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"go.uber.org/zap"
 )
 
 type App struct {
@@ -20,20 +21,24 @@ type App struct {
 	Database       *sql.DB
 	Router         *Router
 	OAuthStateRepo repository.OAuthStateRepository
+	Logger         logger.Logger
 	server         *http.Server
 	stopCleanup    chan struct{}
 }
 
-func NewApp(cfg *config.Config, database *sql.DB, r *Router, oauthStateRepo repository.OAuthStateRepository) *App {
+func NewApp(cfg *config.Config, database *sql.DB, r *Router, oauthStateRepo repository.OAuthStateRepository, log logger.Logger) *App {
 	return &App{
 		Config:         cfg,
 		Database:       database,
 		Router:         r,
 		OAuthStateRepo: oauthStateRepo,
+		Logger:         log,
 	}
 }
 
 func (a *App) Start() error {
+	ctx := context.Background()
+
 	// Setup routes
 	a.Router.Setup()
 
@@ -51,9 +56,12 @@ func (a *App) Start() error {
 
 	// Start server in a goroutine
 	go func() {
-		log.Printf("Starting server on port %s", a.Config.Server.Port)
+		a.Logger.Info(ctx, "starting server",
+			zap.String("port", a.Config.Server.Port),
+			zap.String("gin_mode", a.Config.Server.GinMode),
+		)
 		if err := a.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			a.Logger.Fatal(ctx, "failed to start server", zap.Error(err))
 		}
 	}()
 
@@ -64,6 +72,7 @@ func (a *App) Start() error {
 }
 
 func (a *App) startStateCleanup() {
+	ctx := context.Background()
 	a.stopCleanup = make(chan struct{})
 	ticker := time.NewTicker(1 * time.Hour)
 
@@ -79,13 +88,13 @@ func (a *App) startStateCleanup() {
 			case <-ticker.C:
 				a.cleanupExpiredStates()
 			case <-a.stopCleanup:
-				log.Println("OAuth state cleanup goroutine stopped")
+				a.Logger.Info(ctx, "oauth state cleanup goroutine stopped")
 				return
 			}
 		}
 	}()
 
-	log.Println("OAuth state cleanup goroutine started (runs every 1 hour)")
+	a.Logger.Info(ctx, "oauth state cleanup goroutine started", zap.Duration("interval", 1*time.Hour))
 }
 
 func (a *App) cleanupExpiredStates() {
@@ -94,21 +103,22 @@ func (a *App) cleanupExpiredStates() {
 
 	count, err := a.OAuthStateRepo.DeleteExpired(ctx)
 	if err != nil {
-		log.Printf("Failed to cleanup expired OAuth states: %v", err)
+		a.Logger.Error(ctx, "failed to cleanup expired oauth states", zap.Error(err))
 		return
 	}
 
 	if count > 0 {
-		log.Printf("Cleaned up %d expired OAuth states", count)
+		a.Logger.Info(ctx, "cleaned up expired oauth states", zap.Int64("count", count))
 	}
 }
 
 func (a *App) waitForShutdown() {
+	ctx := context.Background()
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down server...")
+	a.Logger.Info(ctx, "shutting down server")
 
 	// Stop cleanup goroutine
 	if a.stopCleanup != nil {
@@ -116,17 +126,21 @@ func (a *App) waitForShutdown() {
 	}
 
 	// Graceful shutdown with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	if err := a.server.Shutdown(ctx); err != nil {
-		log.Printf("Server forced to shutdown: %v", err)
+	if err := a.server.Shutdown(shutdownCtx); err != nil {
+		a.Logger.Error(ctx, "server forced to shutdown", zap.Error(err))
 	}
 
 	// Close database connection
 	if err := a.Database.Close(); err != nil {
-		log.Printf("Failed to close database connection: %v", err)
+		a.Logger.Error(ctx, "failed to close database connection", zap.Error(err))
 	}
 
-	log.Println("Server exited")
+	// Log server exit before final sync
+	a.Logger.Info(ctx, "server exited")
+
+	// Sync logger to ensure all logs are flushed
+	_ = a.Logger.Sync() // Ignore sync errors on stdout/stderr
 }

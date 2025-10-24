@@ -6,33 +6,43 @@ import (
 	"errors"
 	"time"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/template"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/template/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure/sqlc"
+	"go.uber.org/zap"
 )
 
 type templateRepository struct {
 	db      sqlc.DBTX
 	queries *sqlc.Queries
+	logger  logger.Logger
 }
 
 // NewTemplateRepository creates a new TemplateRepository instance
-func NewTemplateRepository(db sqlc.DBTX) repository.TemplateRepository {
+func NewTemplateRepository(db sqlc.DBTX, log logger.Logger) repository.TemplateRepository {
 	return &templateRepository{
 		db:      db,
 		queries: sqlc.New(db),
+		logger:  log,
 	}
 }
 
 // FindAll retrieves all templates (including inactive ones)
 func (r *templateRepository) FindAll(ctx context.Context) ([]*model.Template, error) {
+	r.logger.Info(ctx, "template repository find all started")
+
 	rows, err := r.queries.FindAllTemplates(ctx)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Info(ctx, "template repository find all completed (no templates found)")
 			return []*model.Template{}, nil
 		}
+		r.logger.Error(ctx, "template repository find all failed",
+			zap.Error(err),
+		)
 		return nil, containererrors.ErrDatabaseOperation
 	}
 
@@ -45,20 +55,44 @@ func (r *templateRepository) FindAll(ctx context.Context) ([]*model.Template, er
 		templates = append(templates, template)
 	}
 
+	r.logger.Info(ctx, "template repository find all completed",
+		zap.Int("count", len(templates)),
+	)
 	return templates, nil
 }
 
 // FindByID retrieves a template by its ID
 func (r *templateRepository) FindByID(ctx context.Context, templateID uint) (*model.Template, error) {
+	r.logger.Info(ctx, "template repository find by id started",
+		zap.Uint("template_id", templateID),
+	)
+
 	row, err := r.queries.FindTemplateByID(ctx, uint32(templateID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "template not found",
+				zap.Uint("template_id", templateID),
+				zap.Error(containererrors.ErrTemplateNotFound),
+			)
 			return nil, containererrors.ErrTemplateNotFound
 		}
+		r.logger.Error(ctx, "template repository find by id failed",
+			zap.Uint("template_id", templateID),
+			zap.Error(err),
+		)
 		return nil, containererrors.ErrDatabaseOperation
 	}
 
-	return r.rowToTemplate(row)
+	template, err := r.rowToTemplate(row)
+	if err != nil {
+		return nil, err
+	}
+
+	r.logger.Info(ctx, "template repository find by id completed",
+		zap.Uint("template_id", template.TemplateID()),
+		zap.String("name", template.Name()),
+	)
+	return template, nil
 }
 
 // FindActiveTemplates retrieves only active templates

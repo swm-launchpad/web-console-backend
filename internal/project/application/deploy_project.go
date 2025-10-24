@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"go.uber.org/zap"
 )
 
 type DeployProjectInput struct {
@@ -24,23 +26,34 @@ type DeployProjectOutput struct {
 
 type DeployProjectUseCase struct {
 	deployService service.DeployService
+	logger        logger.Logger
 }
 
 func NewDeployProjectUseCase(
 	deployService service.DeployService,
+	log logger.Logger,
 ) *DeployProjectUseCase {
 	return &DeployProjectUseCase{
 		deployService: deployService,
+		logger:        log,
 	}
 }
 
 func (uc *DeployProjectUseCase) Execute(ctx context.Context, input DeployProjectInput) (*DeployProjectOutput, error) {
+	uc.logger.Info(ctx, "deploy project started",
+		zap.Uint("project_id", input.ProjectID),
+	)
+
 	// Note: Permission check is performed in the handler to prevent information disclosure
 	// The handler converts permission errors to "not found" errors
 
 	// Deploy project
 	deployment, err := uc.deployService.DeployProject(ctx, input.ProjectID)
 	if err != nil {
+		uc.logger.Error(ctx, "failed to deploy project",
+			zap.Error(err),
+			zap.Uint("project_id", input.ProjectID),
+		)
 		return nil, err
 	}
 
@@ -68,6 +81,12 @@ func (uc *DeployProjectUseCase) Execute(ctx context.Context, input DeployProject
 	if startedAt, ok := deployment.StartedAt(); ok {
 		output.StartedAt = startedAt.UTC().Format(time.RFC3339)
 	}
+
+	uc.logger.Info(ctx, "deploy project completed",
+		zap.Uint("project_id", input.ProjectID),
+		zap.Uint64("deployment_id", uint64(deployment.DeploymentID)),
+		zap.String("status", string(deployment.Status())),
+	)
 
 	return output, nil
 }

@@ -7,9 +7,11 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/github"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"go.uber.org/zap"
 )
 
 type ConnectGitHubInput struct {
@@ -28,31 +30,48 @@ type ConnectGitHubUseCase struct {
 	installationRepo repository.GitHubInstallationRepository
 	githubClient     *github.Client
 	txManager        db.TxManager
+	logger           logger.Logger
 }
 
 func NewConnectGitHubUseCase(
 	installationRepo repository.GitHubInstallationRepository,
 	githubClient *github.Client,
 	txManager db.TxManager,
+	log logger.Logger,
 ) *ConnectGitHubUseCase {
 	return &ConnectGitHubUseCase{
 		installationRepo: installationRepo,
 		githubClient:     githubClient,
 		txManager:        txManager,
+		logger:           log,
 	}
 }
 
 func (uc *ConnectGitHubUseCase) Execute(ctx context.Context, input ConnectGitHubInput) (*ConnectGitHubOutput, error) {
+	uc.logger.Info(ctx, "connect github started",
+		zap.Uint("user_id", input.UserID),
+		zap.Int64("installation_id", input.InstallationID),
+	)
+
 	// Validate input
 	if input.UserID == 0 {
+		uc.logger.Error(ctx, "user ID is required",
+			zap.Uint("user_id", input.UserID),
+		)
 		return nil, usererrors.ErrUserIDRequired
 	}
 	if input.InstallationID <= 0 {
+		uc.logger.Error(ctx, "invalid installation ID",
+			zap.Int64("installation_id", input.InstallationID),
+		)
 		return nil, usererrors.ErrInvalidInstallationID
 	}
 
 	// Check if GitHub client is configured
 	if uc.githubClient == nil {
+		uc.logger.Error(ctx, "github client not configured",
+			zap.Uint("user_id", input.UserID),
+		)
 		return nil, usererrors.ErrGitHubNotConfigured
 	}
 
@@ -62,15 +81,26 @@ func (uc *ConnectGitHubUseCase) Execute(ctx context.Context, input ConnectGitHub
 		// Check if installation already exists
 		exists, err := uc.installationRepo.ExistsByInstallationID(txCtx, input.InstallationID)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to check installation existence",
+				zap.Error(err),
+				zap.Int64("installation_id", input.InstallationID),
+			)
 			return fmt.Errorf("failed to check installation existence: %w", err)
 		}
 		if exists {
+			uc.logger.Warn(ctx, "installation already exists",
+				zap.Int64("installation_id", input.InstallationID),
+			)
 			return usererrors.ErrInstallationExists
 		}
 
 		// Get installation info from GitHub API
 		installationInfo, err := uc.githubClient.GetInstallationInfo(input.InstallationID)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to get installation info from GitHub API",
+				zap.Error(err),
+				zap.Int64("installation_id", input.InstallationID),
+			)
 			return fmt.Errorf("%w: %v", usererrors.ErrGitHubAPIFailed, err)
 		}
 
@@ -87,11 +117,21 @@ func (uc *ConnectGitHubUseCase) Execute(ctx context.Context, input ConnectGitHub
 			accountType,
 		)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to create github installation entity",
+				zap.Error(err),
+				zap.Uint("user_id", input.UserID),
+				zap.Int64("installation_id", input.InstallationID),
+			)
 			return err
 		}
 
 		// Save to database
 		if err := uc.installationRepo.Create(txCtx, installation); err != nil {
+			uc.logger.Error(ctx, "failed to create installation in database",
+				zap.Error(err),
+				zap.Uint("user_id", input.UserID),
+				zap.Int64("installation_id", input.InstallationID),
+			)
 			return fmt.Errorf("failed to create installation: %w", err)
 		}
 
@@ -103,12 +143,23 @@ func (uc *ConnectGitHubUseCase) Execute(ctx context.Context, input ConnectGitHub
 			CreatedAt:      installation.CreatedAt,
 		}
 
+		uc.logger.Info(ctx, "github installation connected successfully",
+			zap.Uint("user_id", input.UserID),
+			zap.Int64("installation_id", installation.InstallationID),
+			zap.String("account_login", installation.AccountLogin),
+		)
+
 		return nil
 	})
 
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logger.Info(ctx, "connect github completed",
+		zap.Uint("user_id", input.UserID),
+		zap.Int64("installation_id", output.InstallationID),
+	)
 
 	return output, nil
 }

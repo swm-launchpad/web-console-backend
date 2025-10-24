@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
@@ -19,7 +20,8 @@ func TestRemoveVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 볼륨 삭제", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := RemoveVolumeInput{
 			VolumeID: 1,
@@ -38,7 +40,8 @@ func TestRemoveVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 여러 볼륨 중 하나 삭제", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := RemoveVolumeInput{
 			VolumeID: 2,
@@ -56,7 +59,8 @@ func TestRemoveVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: VolumeID가 0", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := RemoveVolumeInput{
 			VolumeID: 0,
@@ -75,7 +79,8 @@ func TestRemoveVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 볼륨을 찾을 수 없음", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := RemoveVolumeInput{
 			VolumeID: 999,
@@ -94,7 +99,8 @@ func TestRemoveVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := RemoveVolumeInput{
 			VolumeID: 1,
@@ -113,7 +119,8 @@ func TestRemoveVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 동시성 충돌", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := RemoveVolumeInput{
 			VolumeID: 1,

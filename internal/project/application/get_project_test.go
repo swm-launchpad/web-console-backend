@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	projectmodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
@@ -25,7 +26,8 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 	t.Run("성공: ID로 프로젝트 조회", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
 
 		projectID := uint(1)
 		input := GetProjectInput{
@@ -64,7 +66,8 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 	t.Run("성공: 볼륨이 없는 프로젝트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
 
 		projectID := uint(1)
 		input := GetProjectInput{
@@ -90,7 +93,8 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 	t.Run("실패: 볼륨 조회 실패", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
 
 		projectID := uint(1)
 		input := GetProjectInput{
@@ -116,7 +120,8 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 	t.Run("실패: ID로 프로젝트 조회 실패", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
 
 		projectID := uint(999)
 		input := GetProjectInput{
@@ -138,7 +143,8 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
 
 		projectID := uint(1)
 		input := GetProjectInput{

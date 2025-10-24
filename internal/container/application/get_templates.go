@@ -3,7 +3,9 @@ package application
 import (
 	"context"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
+	"go.uber.org/zap"
 )
 
 type GetTemplatesOutput struct {
@@ -24,18 +26,25 @@ type TemplateListItem struct {
 
 type GetTemplatesUseCase struct {
 	templateRepo repository.TemplateRepository
+	logger       logger.Logger
 }
 
-func NewGetTemplatesUseCase(templateRepo repository.TemplateRepository) *GetTemplatesUseCase {
+func NewGetTemplatesUseCase(templateRepo repository.TemplateRepository, log logger.Logger) *GetTemplatesUseCase {
 	return &GetTemplatesUseCase{
 		templateRepo: templateRepo,
+		logger:       log,
 	}
 }
 
 func (uc *GetTemplatesUseCase) Execute(ctx context.Context) (*GetTemplatesOutput, error) {
+	uc.logger.Info(ctx, "get templates started")
+
 	// Get only active templates
 	templates, err := uc.templateRepo.FindActiveTemplates(ctx)
 	if err != nil {
+		uc.logger.Error(ctx, "failed to find active templates",
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -60,6 +69,10 @@ func (uc *GetTemplatesUseCase) Execute(ctx context.Context) (*GetTemplatesOutput
 
 		items = append(items, item)
 	}
+
+	uc.logger.Info(ctx, "get templates completed",
+		zap.Int("count", len(items)),
+	)
 
 	return &GetTemplatesOutput{
 		Templates: items,

@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"go.uber.org/zap"
 )
 
 type AddVolumeInput struct {
@@ -25,16 +27,24 @@ type AddVolumeOutput struct {
 type AddVolumeUseCase struct {
 	volumeService service.VolumeService
 	txManager     db.TxManager
+	logger        logger.Logger
 }
 
-func NewAddVolumeUseCase(volumeService service.VolumeService, txManager db.TxManager) *AddVolumeUseCase {
+func NewAddVolumeUseCase(volumeService service.VolumeService, txManager db.TxManager, log logger.Logger) *AddVolumeUseCase {
 	return &AddVolumeUseCase{
 		volumeService: volumeService,
 		txManager:     txManager,
+		logger:        log,
 	}
 }
 
 func (uc *AddVolumeUseCase) Execute(ctx context.Context, input AddVolumeInput) (*AddVolumeOutput, error) {
+	uc.logger.Info(ctx, "add volume started",
+		zap.Uint("project_id", input.ProjectID),
+		zap.String("name", input.Name),
+		zap.Uint32("capacity", input.Capacity),
+	)
+
 	var volumeID uint
 	var projectID uint
 	var name string
@@ -46,6 +56,11 @@ func (uc *AddVolumeUseCase) Execute(ctx context.Context, input AddVolumeInput) (
 		// Create volume through VolumeService
 		volume, err := uc.volumeService.CreateVolume(txCtx, input.ProjectID, input.Name, input.Capacity)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to create volume",
+				zap.Error(err),
+				zap.Uint("project_id", input.ProjectID),
+				zap.String("name", input.Name),
+			)
 			return err
 		}
 
@@ -63,6 +78,12 @@ func (uc *AddVolumeUseCase) Execute(ctx context.Context, input AddVolumeInput) (
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logger.Info(ctx, "add volume completed",
+		zap.Uint("volume_id", volumeID),
+		zap.Uint("project_id", projectID),
+		zap.String("slug", slug),
+	)
 
 	// Build output after successful transaction
 	return &AddVolumeOutput{

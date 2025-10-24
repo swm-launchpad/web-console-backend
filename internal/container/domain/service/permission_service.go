@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 
+	"go.uber.org/zap"
+
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
@@ -34,13 +37,19 @@ type PermissionService interface {
 type permissionService struct {
 	containerRepo repository.ContainerRepository
 	projectRepo   projectrepo.ProjectRepository
+	logger        logger.Logger
 }
 
 // NewPermissionService creates a new instance of PermissionService
-func NewPermissionService(containerRepo repository.ContainerRepository, projectRepo projectrepo.ProjectRepository) PermissionService {
+func NewPermissionService(
+	containerRepo repository.ContainerRepository,
+	projectRepo projectrepo.ProjectRepository,
+	log logger.Logger,
+) PermissionService {
 	return &permissionService{
 		containerRepo: containerRepo,
 		projectRepo:   projectRepo,
+		logger:        log,
 	}
 }
 
@@ -56,6 +65,11 @@ func (s *permissionService) CanUserModifyContainer(ctx context.Context, userID u
 		if err == containererrors.ErrContainerNotFound {
 			return err
 		}
+		s.logger.Error(ctx, "Failed to find container for modify permission check",
+			zap.Uint("user_id", userID),
+			zap.Uint("container_id", containerID),
+			zap.Error(err),
+		)
 		return containererrors.ErrDatabaseOperation
 	}
 
@@ -65,21 +79,43 @@ func (s *permissionService) CanUserModifyContainer(ctx context.Context, userID u
 		if err == projecterrors.ErrProjectNotFound {
 			return containererrors.ErrInvalidProjectID
 		}
+		s.logger.Error(ctx, "Failed to find project for modify permission check",
+			zap.Uint("user_id", userID),
+			zap.Uint("container_id", containerID),
+			zap.Uint("project_id", container.ProjectID()),
+			zap.Error(err),
+		)
 		return containererrors.ErrDatabaseOperation
 	}
 
 	// Check if user is in the project
 	if !project.HasUser(userID) {
+		s.logger.Warn(ctx, "User not in project - modify permission denied",
+			zap.Uint("user_id", userID),
+			zap.Uint("container_id", containerID),
+			zap.Uint("project_id", container.ProjectID()),
+		)
 		return containererrors.ErrPermissionDenied
 	}
 
 	// Check if user is an owner
 	projectUser, err := project.GetUserByID(userID)
 	if err != nil {
+		s.logger.Warn(ctx, "User not found in project - modify permission denied",
+			zap.Uint("user_id", userID),
+			zap.Uint("container_id", containerID),
+			zap.Uint("project_id", container.ProjectID()),
+		)
 		return containererrors.ErrPermissionDenied
 	}
 
 	if !projectUser.IsOwner() {
+		s.logger.Warn(ctx, "User is not project owner - owner required for modification",
+			zap.Uint("user_id", userID),
+			zap.Uint("container_id", containerID),
+			zap.Uint("project_id", container.ProjectID()),
+			zap.String("user_role", string(projectUser.Role())),
+		)
 		return containererrors.ErrOwnerRequired
 	}
 
@@ -98,6 +134,11 @@ func (s *permissionService) CanUserAccessContainer(ctx context.Context, userID u
 		if err == containererrors.ErrContainerNotFound {
 			return err
 		}
+		s.logger.Error(ctx, "Failed to find container for access permission check",
+			zap.Uint("user_id", userID),
+			zap.Uint("container_id", containerID),
+			zap.Error(err),
+		)
 		return containererrors.ErrDatabaseOperation
 	}
 
@@ -107,11 +148,22 @@ func (s *permissionService) CanUserAccessContainer(ctx context.Context, userID u
 		if err == projecterrors.ErrProjectNotFound {
 			return containererrors.ErrInvalidProjectID
 		}
+		s.logger.Error(ctx, "Failed to find project for access permission check",
+			zap.Uint("user_id", userID),
+			zap.Uint("container_id", containerID),
+			zap.Uint("project_id", container.ProjectID()),
+			zap.Error(err),
+		)
 		return containererrors.ErrDatabaseOperation
 	}
 
 	// Check if user is in the project
 	if !project.HasUser(userID) {
+		s.logger.Warn(ctx, "User not in project - access permission denied",
+			zap.Uint("user_id", userID),
+			zap.Uint("container_id", containerID),
+			zap.Uint("project_id", container.ProjectID()),
+		)
 		return containererrors.ErrPermissionDenied
 	}
 
@@ -130,21 +182,39 @@ func (s *permissionService) CanUserCreateContainer(ctx context.Context, userID u
 		if err == projecterrors.ErrProjectNotFound {
 			return containererrors.ErrInvalidProjectID
 		}
+		s.logger.Error(ctx, "Failed to find project for create permission check",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		return containererrors.ErrDatabaseOperation
 	}
 
 	// Check if user is in the project
 	if !project.HasUser(userID) {
+		s.logger.Warn(ctx, "User not in project - create permission denied",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+		)
 		return containererrors.ErrPermissionDenied
 	}
 
 	// Check if user is an owner
 	projectUser, err := project.GetUserByID(userID)
 	if err != nil {
+		s.logger.Warn(ctx, "User not found in project - create permission denied",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+		)
 		return containererrors.ErrPermissionDenied
 	}
 
 	if !projectUser.IsOwner() {
+		s.logger.Warn(ctx, "User is not project owner - owner required for creation",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+			zap.String("user_role", string(projectUser.Role())),
+		)
 		return containererrors.ErrOwnerRequired
 	}
 

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 )
 
@@ -14,7 +15,8 @@ func TestDeleteContainerUseCase_Execute_Success(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteContainerUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteContainerUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -49,7 +51,8 @@ func TestDeleteContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteContainerUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteContainerUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -78,7 +81,8 @@ func TestDeleteContainerUseCase_Execute_ContainerNotFound(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewDeleteContainerUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewDeleteContainerUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)

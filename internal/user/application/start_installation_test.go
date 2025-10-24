@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
@@ -37,7 +38,8 @@ func TestStartInstallationUseCase_Success(t *testing.T) {
 			state.ConsumedAt == nil
 	})).Return(nil)
 
-	useCase := NewStartInstallationUseCase(cfg, mockStateRepo)
+	testLogger := logger.NewForTest()
+	useCase := NewStartInstallationUseCase(cfg, mockStateRepo, testLogger)
 
 	// Execute
 	input := StartInstallationInput{UserID: userID}
@@ -72,7 +74,8 @@ func TestStartInstallationUseCase_GitHubNotConfigured(t *testing.T) {
 
 	mockStateRepo := new(infrastructure.MockOAuthStateRepository)
 
-	useCase := NewStartInstallationUseCase(cfg, mockStateRepo)
+	testLogger := logger.NewForTest()
+	useCase := NewStartInstallationUseCase(cfg, mockStateRepo, testLogger)
 
 	// Execute
 	input := StartInstallationInput{UserID: userID}
@@ -104,7 +107,8 @@ func TestStartInstallationUseCase_InvalidUserID(t *testing.T) {
 
 	mockStateRepo := new(infrastructure.MockOAuthStateRepository)
 
-	useCase := NewStartInstallationUseCase(cfg, mockStateRepo)
+	testLogger := logger.NewForTest()
+	useCase := NewStartInstallationUseCase(cfg, mockStateRepo, testLogger)
 
 	// Execute with invalid user ID (0)
 	input := StartInstallationInput{UserID: 0}

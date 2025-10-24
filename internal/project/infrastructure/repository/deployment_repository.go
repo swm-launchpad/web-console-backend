@@ -7,22 +7,26 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
+	"go.uber.org/zap"
 )
 
 type deploymentRepository struct {
 	db      sqlc.DBTX
 	queries *sqlc.Queries
+	logger  logger.Logger
 }
 
 // NewDeploymentRepository creates a new deployment repository instance
-func NewDeploymentRepository(db sqlc.DBTX) repository.DeploymentRepository {
+func NewDeploymentRepository(db sqlc.DBTX, log logger.Logger) repository.DeploymentRepository {
 	return &deploymentRepository{
 		db:      db,
 		queries: sqlc.New(db),
+		logger:  log,
 	}
 }
 
@@ -32,6 +36,10 @@ func (r *deploymentRepository) Create(ctx context.Context, d *deployment.Deploym
 	if d == nil {
 		return projecterrors.ErrInvalidProjectData
 	}
+
+	r.logger.Info(ctx, "deployment repository create started",
+		zap.Uint("project_id", d.ProjectID()),
+	)
 
 	qtx := r.queriesWithContext(ctx)
 
@@ -77,15 +85,27 @@ func (r *deploymentRepository) Create(ctx context.Context, d *deployment.Deploym
 		FinishedAt:            timePtrToNullTime(finishedAtPtr),
 	})
 	if err != nil {
+		r.logger.Error(ctx, "deployment repository create failed",
+			zap.Uint("project_id", d.ProjectID()),
+			zap.Error(err),
+		)
 		return projecterrors.ErrDatabaseOperation
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
+		r.logger.Error(ctx, "deployment repository create last insert id failed",
+			zap.Uint("project_id", d.ProjectID()),
+			zap.Error(err),
+		)
 		return projecterrors.ErrDatabaseOperation
 	}
 
 	d.SetDeploymentID(uint(id))
+	r.logger.Info(ctx, "deployment repository create completed",
+		zap.Uint("deployment_id", d.DeploymentID),
+		zap.Uint("project_id", d.ProjectID()),
+	)
 	return nil
 }
 

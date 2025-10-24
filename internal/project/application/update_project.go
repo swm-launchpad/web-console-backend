@@ -4,9 +4,11 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"go.uber.org/zap"
 )
 
 type UpdateProjectInput struct {
@@ -38,16 +40,22 @@ type UpdateProjectOutput struct {
 type UpdateProjectUseCase struct {
 	projectService service.ProjectService
 	txManager      db.TxManager
+	logger         logger.Logger
 }
 
-func NewUpdateProjectUseCase(projectService service.ProjectService, txManager db.TxManager) *UpdateProjectUseCase {
+func NewUpdateProjectUseCase(projectService service.ProjectService, txManager db.TxManager, log logger.Logger) *UpdateProjectUseCase {
 	return &UpdateProjectUseCase{
 		projectService: projectService,
 		txManager:      txManager,
+		logger:         log,
 	}
 }
 
 func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProjectInput) (*UpdateProjectOutput, error) {
+	uc.logger.Info(ctx, "update project started",
+		zap.Uint("project_id", input.ProjectID),
+	)
+
 	var projectID uint
 	var name string
 	var slug string
@@ -126,6 +134,10 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 		})
 
 		if err != nil {
+			uc.logger.Error(ctx, "failed to update project",
+				zap.Error(err),
+				zap.Uint("project_id", input.ProjectID),
+			)
 			return err
 		}
 
@@ -159,6 +171,11 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logger.Info(ctx, "update project completed",
+		zap.Uint("project_id", projectID),
+		zap.String("name", name),
+	)
 
 	// Build output after successful transaction
 	output := &UpdateProjectOutput{

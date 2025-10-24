@@ -3,8 +3,10 @@ package application
 import (
 	"context"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"go.uber.org/zap"
 )
 
 type GetProjectInput struct {
@@ -45,23 +47,47 @@ type GetProjectOutput struct {
 type GetProjectUseCase struct {
 	projectService service.ProjectService
 	volumeService  service.VolumeService
+	logger         logger.Logger
 }
 
-func NewGetProjectUseCase(projectService service.ProjectService, volumeService service.VolumeService) *GetProjectUseCase {
+func NewGetProjectUseCase(projectService service.ProjectService, volumeService service.VolumeService, log logger.Logger) *GetProjectUseCase {
 	return &GetProjectUseCase{
 		projectService: projectService,
 		volumeService:  volumeService,
+		logger:         log,
 	}
 }
 
 func (uc *GetProjectUseCase) Execute(ctx context.Context, input GetProjectInput) (*GetProjectOutput, error) {
+	uc.logger.Info(ctx, "get project started",
+		zap.Uint("project_id", input.ProjectID),
+	)
+
 	// Get project by ID
 	project, err := uc.projectService.GetProject(ctx, input.ProjectID)
 	if err != nil {
+		uc.logger.Error(ctx, "failed to get project",
+			zap.Error(err),
+			zap.Uint("project_id", input.ProjectID),
+		)
 		return nil, err
 	}
 
-	return buildProjectOutput(ctx, project, uc.volumeService)
+	output, err := buildProjectOutput(ctx, project, uc.volumeService)
+	if err != nil {
+		uc.logger.Error(ctx, "failed to build project output",
+			zap.Error(err),
+			zap.Uint("project_id", input.ProjectID),
+		)
+		return nil, err
+	}
+
+	uc.logger.Info(ctx, "get project completed",
+		zap.Uint("project_id", project.ProjectID()),
+		zap.String("name", project.Name()),
+	)
+
+	return output, nil
 }
 
 // buildProjectOutput is a shared helper function to build GetProjectOutput from a project domain model

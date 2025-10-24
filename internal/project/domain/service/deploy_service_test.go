@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
@@ -460,9 +461,11 @@ func TestDeployService_GetDeploymentStatus_WithActiveDeployment(t *testing.T) {
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockDeploymentRepo := new(repository.MockDeploymentRepository)
 
+	testLogger := logger.NewForTest()
 	service := &deployService{
 		projectRepo:    mockProjectRepo,
 		deploymentRepo: mockDeploymentRepo,
+		logger:         testLogger,
 	}
 
 	projectID := uint(1)
@@ -514,9 +517,11 @@ func TestDeployService_GetDeploymentStatus_NoActiveDeployment(t *testing.T) {
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockDeploymentRepo := new(repository.MockDeploymentRepository)
 
+	testLogger := logger.NewForTest()
 	service := &deployService{
 		projectRepo:    mockProjectRepo,
 		deploymentRepo: mockDeploymentRepo,
+		logger:         testLogger,
 	}
 
 	projectID := uint(1)
@@ -570,9 +575,11 @@ func TestDeployService_GetDeploymentStatus_ProjectNotFound(t *testing.T) {
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockDeploymentRepo := new(repository.MockDeploymentRepository)
 
+	testLogger := logger.NewForTest()
 	service := &deployService{
 		projectRepo:    mockProjectRepo,
 		deploymentRepo: mockDeploymentRepo,
+		logger:         testLogger,
 	}
 
 	projectID := uint(1)
@@ -597,12 +604,14 @@ func TestDeployService_RefreshActiveDeployment_Success(t *testing.T) {
 	mockDeploymentRepo := new(repository.MockDeploymentRepository)
 	mockKubeClient := new(infrastructure.MockKubeClient)
 	txManager := db.NewStubTxManager()
+	testLogger := logger.NewForTest()
 
 	service := &deployService{
 		txManager:      txManager,
 		projectRepo:    mockProjectRepo,
 		deploymentRepo: mockDeploymentRepo,
 		kubeClient:     mockKubeClient,
+		logger:         testLogger,
 	}
 
 	projectID := uint(1)
@@ -672,9 +681,11 @@ func TestDeployService_RefreshActiveDeployment_NoActiveDeployment(t *testing.T) 
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockDeploymentRepo := new(repository.MockDeploymentRepository)
 
+	testLogger := logger.NewForTest()
 	service := &deployService{
 		projectRepo:    mockProjectRepo,
 		deploymentRepo: mockDeploymentRepo,
+		logger:         testLogger,
 	}
 
 	projectID := uint(1)
@@ -716,9 +727,11 @@ func TestDeployService_RefreshActiveDeployment_ProjectNotFound(t *testing.T) {
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockDeploymentRepo := new(repository.MockDeploymentRepository)
 
+	testLogger := logger.NewForTest()
 	service := &deployService{
 		projectRepo:    mockProjectRepo,
 		deploymentRepo: mockDeploymentRepo,
+		logger:         testLogger,
 	}
 
 	projectID := uint(1)

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
@@ -100,7 +101,7 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 			}
 
 			// Create client
-			client, err := NewKubeClient()
+			client, err := NewKubeClient(logger.NewForTest())
 
 			if tt.shouldSucceed {
 				assert.NoError(t, err)

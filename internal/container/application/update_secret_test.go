@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 )
@@ -15,7 +16,8 @@ func TestUpdateSecretUseCase_Execute_Success(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -56,7 +58,8 @@ func TestUpdateSecretUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -87,7 +90,8 @@ func TestUpdateSecretUseCase_Execute_SecretNotFound(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -122,7 +126,8 @@ func TestUpdateSecretUseCase_Execute_ValueTooLong(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -162,7 +167,8 @@ func TestUpdateSecretUseCase_Execute_EmptyValue(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockTxMgr := new(db.MockTxManager)
-	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr)
+	testLogger := logger.NewForTest()
+	useCase := NewUpdateSecretUseCase(mockRepo, mockPermSvc, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)

@@ -14,6 +14,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/github"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	containerApp "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	containerDeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
@@ -51,8 +52,23 @@ func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
 	return jwt.NewJWTUtil(cfg.JWT.Secret)
 }
 
+// provideLogger creates a logger from config
+func provideLogger(cfg *config.Config) (logger.Logger, error) {
+	loggerCfg := logger.Config{
+		Level:    cfg.Log.Level,
+		Format:   cfg.Log.Format,
+		FilePath: cfg.Log.FilePath,
+	}
+	return logger.New(loggerCfg)
+}
+
+// provideLoggingMiddleware creates a logging middleware
+func provideLoggingMiddleware(log logger.Logger) *logger.LoggingMiddleware {
+	return logger.NewLoggingMiddleware(log)
+}
+
 // provideEmailService creates an email service from config
-func provideEmailService(cfg *config.Config) email.Service {
+func provideEmailService(cfg *config.Config, log logger.Logger) email.Service {
 	// For development, use default values if not configured
 	host := cfg.Email.Host
 	if host == "" {
@@ -78,24 +94,36 @@ func provideEmailService(cfg *config.Config) email.Service {
 		cfg.Email.Password,
 		from,
 		frontendURL,
+		log,
 	)
 }
 
 // provideTektonClient creates a Tekton client from environment variables
-func provideTektonClient() (projectDomainInfra.TektonClient, error) {
-	return projectInfra.NewTektonClient()
+func provideTektonClient(log logger.Logger) (projectDomainInfra.TektonClient, error) {
+	return projectInfra.NewTektonClient(log)
 }
 
 // provideKubeClient creates a Kubernetes client from environment variables
-func provideKubeClient() (projectDomainInfra.KubeClient, error) {
-	return projectInfra.NewKubeClient()
+func provideKubeClient(log logger.Logger) (projectDomainInfra.KubeClient, error) {
+	return projectInfra.NewKubeClient(log)
 }
 
 // provideContainerClient creates a container client
 func provideContainerClient(
 	getContainersUseCase *containerDeployment.GetContainersForDeploymentUseCase,
+	log logger.Logger,
 ) projectDomainInfra.ContainerClient {
-	return projectInfra.NewContainerClient(getContainersUseCase)
+	return projectInfra.NewContainerClient(getContainersUseCase, log)
+}
+
+// provideKubeBuildClient creates a Kubernetes build client from environment variables
+func provideKubeBuildClient(log logger.Logger) (projectDomainInfra.KubeBuildClient, error) {
+	return projectInfra.NewKubeBuildClient(log)
+}
+
+// provideTektonBuildClient creates a Tekton build client from environment variables
+func provideTektonBuildClient(log logger.Logger) (projectDomainInfra.TektonBuildClient, error) {
+	return projectInfra.NewTektonBuildClient(log)
 }
 
 // provideDeployNamespace provides the deployment namespace from environment
@@ -118,6 +146,7 @@ func provideDeployService(
 	containerClient projectDomainInfra.ContainerClient,
 	tektonClient projectDomainInfra.TektonClient,
 	kubeClient projectDomainInfra.KubeClient,
+	log logger.Logger,
 ) projectService.DeployService {
 	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
 	if deployNamespace == "" {
@@ -136,6 +165,7 @@ func provideDeployService(
 		kubeClient,
 		deployNamespace,
 		projectServiceName,
+		log,
 	)
 }
 
@@ -159,6 +189,7 @@ func provideGitHubHandler(
 	startInstallationUseCase *application.StartInstallationUseCase,
 	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	cfg *config.Config,
+	log logger.Logger,
 ) *userHTTP.GitHubHandler {
 	return userHTTP.NewGitHubHandler(
 		connectUseCase,
@@ -169,6 +200,7 @@ func provideGitHubHandler(
 		startInstallationUseCase,
 		installationCallbackUseCase,
 		cfg.Frontend.URL,
+		log,
 	)
 }
 
@@ -181,6 +213,10 @@ func InitializeApp() (*App, error) {
 		wire.Bind(new(userssqlc.DBTX), new(*sql.DB)),
 		wire.Bind(new(projectSqlc.DBTX), new(*sql.DB)),
 		wire.Bind(new(containerSqlc.DBTX), new(*sql.DB)),
+
+		// Logger
+		provideLogger,
+		provideLoggingMiddleware,
 
 		// Auth infrastructure
 		provideJWTUtil,

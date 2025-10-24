@@ -3,7 +3,9 @@ package application
 import (
 	"context"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"go.uber.org/zap"
 )
 
 type ListProjectsInput struct {
@@ -32,18 +34,28 @@ type ListProjectsOutput struct {
 
 type ListProjectsUseCase struct {
 	projectService service.ProjectService
+	logger         logger.Logger
 }
 
-func NewListProjectsUseCase(projectService service.ProjectService) *ListProjectsUseCase {
+func NewListProjectsUseCase(projectService service.ProjectService, log logger.Logger) *ListProjectsUseCase {
 	return &ListProjectsUseCase{
 		projectService: projectService,
+		logger:         log,
 	}
 }
 
 func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsInput) (*ListProjectsOutput, error) {
+	uc.logger.Info(ctx, "list projects started",
+		zap.Uint("user_id", input.UserID),
+	)
+
 	// Get projects for the user
 	projects, err := uc.projectService.ListProjects(ctx, input.UserID)
 	if err != nil {
+		uc.logger.Error(ctx, "failed to list projects",
+			zap.Error(err),
+			zap.Uint("user_id", input.UserID),
+		)
 		return nil, err
 	}
 
@@ -77,6 +89,11 @@ func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsIn
 
 		output.Projects = append(output.Projects, item)
 	}
+
+	uc.logger.Info(ctx, "list projects completed",
+		zap.Uint("user_id", input.UserID),
+		zap.Int("total_projects", len(projects)),
+	)
 
 	return output, nil
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
@@ -25,7 +26,8 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("성공: 유효한 프로젝트 생성", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		name := "테스트 프로젝트"
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -51,7 +53,8 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: 빈 프로젝트 이름", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		project, err := service.CreateProject(ctx, "", 1, defaultLimits(), nil, nil)
 
@@ -66,7 +69,8 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: OwnerID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		name := "테스트 프로젝트"
 
@@ -83,7 +87,8 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: 프로젝트 이름이 이미 존재", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		name := "기존 프로젝트"
 		ownerID := uint(1)
@@ -104,7 +109,8 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: Slug 생성 실패", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		name := "테스트 프로젝트"
 		ownerID := uint(1)
@@ -126,7 +132,8 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: 저장소 생성 에러", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		name := "테스트 프로젝트"
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -153,7 +160,8 @@ func TestProjectService_GetProject(t *testing.T) {
 	t.Run("성공: 유효한 ID로 프로젝트 조회", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		projectID := uint(1)
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -173,7 +181,8 @@ func TestProjectService_GetProject(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		project, err := service.GetProject(ctx, 0)
 
@@ -187,7 +196,8 @@ func TestProjectService_GetProject(t *testing.T) {
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		projectID := uint(999)
 
@@ -209,7 +219,8 @@ func TestProjectService_UpdateProject(t *testing.T) {
 	t.Run("성공: 프로젝트 업데이트", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		projectID := uint(1)
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -231,7 +242,8 @@ func TestProjectService_UpdateProject(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		updatedProject, err := service.UpdateProject(ctx, 0, func(p *model.Project) error {
 			return nil
@@ -251,7 +263,8 @@ func TestProjectService_DeleteProject(t *testing.T) {
 	t.Run("성공: 프로젝트 삭제", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		projectID := uint(1)
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -270,7 +283,8 @@ func TestProjectService_DeleteProject(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		err := service.DeleteProject(ctx, 0)
 
@@ -287,7 +301,8 @@ func TestProjectService_ListProjects(t *testing.T) {
 	t.Run("성공: 사용자 프로젝트 목록 조회", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		userID := uint(1)
 		slug1, _ := value.NewProjectSlug("p2025011812000099999991")
@@ -311,7 +326,8 @@ func TestProjectService_ListProjects(t *testing.T) {
 	t.Run("실패: UserID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		projects, err := service.ListProjects(ctx, 0)
 
@@ -329,7 +345,8 @@ func TestProjectService_CountProjectsByUserID(t *testing.T) {
 	t.Run("성공: 활성 프로젝트 개수 조회", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		userID := uint(1)
 		slug1, _ := value.NewProjectSlug("p2025011812000099999993")
@@ -356,7 +373,8 @@ func TestProjectService_CountProjectsByUserID(t *testing.T) {
 	t.Run("실패: UserID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		count, err := service.CountProjectsByUserID(ctx, 0)
 
@@ -374,7 +392,8 @@ func TestProjectService_CheckProjectNameExists(t *testing.T) {
 	t.Run("성공: 프로젝트 이름 존재하지 않음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		name := "새로운 프로젝트"
 		userID := uint(1)
@@ -392,7 +411,8 @@ func TestProjectService_CheckProjectNameExists(t *testing.T) {
 	t.Run("성공: 프로젝트 이름 존재함", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		name := "기존 프로젝트"
 		userID := uint(1)
@@ -410,7 +430,8 @@ func TestProjectService_CheckProjectNameExists(t *testing.T) {
 	t.Run("실패: 빈 프로젝트 이름", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		exists, err := service.CheckProjectNameExists(ctx, "", 1)
 
@@ -424,7 +445,8 @@ func TestProjectService_CheckProjectNameExists(t *testing.T) {
 	t.Run("실패: UserID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		exists, err := service.CheckProjectNameExists(ctx, "테스트", 0)
 
@@ -442,7 +464,8 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("성공: 유효한 Slug로 프로젝트 조회", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		slug, _ := value.NewProjectSlug("p20250118120000abcd1234")
 		expectedProject := createTestProject(1, "테스트 프로젝트", *slug, 1)
@@ -461,7 +484,8 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: Slug가 너무 짧음 (20자)", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		invalidSlug := "p20250118120000abcd" // 20 chars instead of 23
 
@@ -477,7 +501,8 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: Slug가 너무 긺 (25자)", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		invalidSlug := "p20250118120000abcd123456" // 26 chars instead of 23
 
@@ -493,7 +518,8 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: 잘못된 접두사 (c 대신 p)", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		invalidSlug := "c20250118120000abcd1234" // Container prefix instead of Project
 
@@ -509,7 +535,8 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: 잘못된 형식 (타임스탬프 부분에 문자)", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		invalidSlug := "p2025abc8120000abcd1234" // Letters in timestamp
 
@@ -525,7 +552,8 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
-		service := NewProjectService(mockProjectRepo, mockSlugService)
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
 
 		slug := "p20250118120000xyz91234"
 

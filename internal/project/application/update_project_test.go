@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
@@ -29,7 +30,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 프로젝트 이름 업데이트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID: 1,
@@ -56,7 +58,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: FQDN과 Plan 업데이트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID: 1,
@@ -84,7 +87,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 상태 업데이트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID: 1,
@@ -109,7 +113,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 리소스 제한 업데이트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID:    1,
@@ -144,7 +149,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 모든 필드 업데이트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID:    1,
@@ -189,7 +195,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID: 0,
@@ -209,7 +216,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID: 999,
@@ -229,7 +237,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 삭제된 프로젝트 수정 불가", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID: 1,
@@ -249,7 +258,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 잘못된 상태 전환", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID: 1,
@@ -269,7 +279,8 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewUpdateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
 			ProjectID: 1,

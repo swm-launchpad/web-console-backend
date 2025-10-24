@@ -8,31 +8,45 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure/sqlc"
+	"go.uber.org/zap"
 )
 
 type containerRepository struct {
 	db      sqlc.DBTX
 	queries *sqlc.Queries
+	logger  logger.Logger
 }
 
-func NewContainerRepository(db sqlc.DBTX) repository.ContainerRepository {
+func NewContainerRepository(db sqlc.DBTX, log logger.Logger) repository.ContainerRepository {
 	return &containerRepository{
 		db:      db,
 		queries: sqlc.New(db),
+		logger:  log,
 	}
 }
 
 func (r *containerRepository) Create(ctx context.Context, container *model.Container) error {
+	r.logger.Info(ctx, "container repository create started",
+		zap.Uint("project_id", container.ProjectID()),
+		zap.String("name", container.Name()),
+		zap.String("slug", container.Slug().String()),
+	)
+
 	qtx := r.queriesWithContext(ctx)
 
 	// Marshal template config to JSON
 	templateConfigJSON, err := json.Marshal(container.TemplateConfig())
 	if err != nil {
+		r.logger.Error(ctx, "container repository create invalid template config",
+			zap.String("name", container.Name()),
+			zap.Error(err),
+		)
 		return containererrors.ErrInvalidTemplateConfig
 	}
 
@@ -171,10 +185,18 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 			UpdatedAt:   timeToNullTime(mount.UpdatedAt()),
 		}
 		if _, err := qtx.CreateMount(ctx, mountParams); err != nil {
+			r.logger.Error(ctx, "container repository create mount failed",
+				zap.Uint("container_id", container.ContainerID()),
+				zap.Error(err),
+			)
 			return containererrors.ErrDatabaseOperation
 		}
 	}
 
+	r.logger.Info(ctx, "container repository create completed",
+		zap.Uint("container_id", container.ContainerID()),
+		zap.String("name", container.Name()),
+	)
 	return nil
 }
 
@@ -351,14 +373,26 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 }
 
 func (r *containerRepository) FindByID(ctx context.Context, containerID uint) (*model.Container, error) {
+	r.logger.Info(ctx, "container repository find by id started",
+		zap.Uint("container_id", containerID),
+	)
+
 	qtx := r.queriesWithContext(ctx)
 
 	// Get container
 	sqlcContainer, err := qtx.GetContainerByID(ctx, uint32(containerID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "container not found",
+				zap.Uint("container_id", containerID),
+				zap.Error(containererrors.ErrContainerNotFound),
+			)
 			return nil, containererrors.ErrContainerNotFound
 		}
+		r.logger.Error(ctx, "container repository find by id failed",
+			zap.Uint("container_id", containerID),
+			zap.Error(err),
+		)
 		return nil, containererrors.ErrDatabaseOperation
 	}
 
@@ -418,6 +452,10 @@ func (r *containerRepository) FindByID(ctx context.Context, containerID uint) (*
 		return nil, err
 	}
 
+	r.logger.Info(ctx, "container repository find by id completed",
+		zap.Uint("container_id", container.ContainerID()),
+		zap.String("name", container.Name()),
+	)
 	return container, nil
 }
 
@@ -572,13 +610,25 @@ func (r *containerRepository) FindByProjectID(ctx context.Context, projectID uin
 }
 
 func (r *containerRepository) FindBySlug(ctx context.Context, slug string) (*model.Container, error) {
+	r.logger.Info(ctx, "container repository find by slug started",
+		zap.String("slug", slug),
+	)
+
 	qtx := r.queriesWithContext(ctx)
 
 	sqlcContainer, err := qtx.GetContainerBySlug(ctx, slug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "container not found by slug",
+				zap.String("slug", slug),
+				zap.Error(containererrors.ErrContainerNotFound),
+			)
 			return nil, containererrors.ErrContainerNotFound
 		}
+		r.logger.Error(ctx, "container repository find by slug failed",
+			zap.String("slug", slug),
+			zap.Error(err),
+		)
 		return nil, containererrors.ErrDatabaseOperation
 	}
 
@@ -607,6 +657,10 @@ func (r *containerRepository) FindBySlug(ctx context.Context, slug string) (*mod
 		return nil, err
 	}
 
+	r.logger.Info(ctx, "container repository find by slug completed",
+		zap.Uint("container_id", container.ContainerID()),
+		zap.String("slug", slug),
+	)
 	return container, nil
 }
 

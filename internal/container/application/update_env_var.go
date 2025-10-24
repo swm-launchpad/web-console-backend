@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	"go.uber.org/zap"
 )
 
 type UpdateEnvVarInput struct {
@@ -26,48 +28,80 @@ type UpdateEnvVarUseCase struct {
 	containerRepo repository.ContainerRepository
 	permissionSvc service.PermissionService
 	txManager     db.TxManager
+	logger        logger.Logger
 }
 
 func NewUpdateEnvVarUseCase(
 	containerRepo repository.ContainerRepository,
 	permissionSvc service.PermissionService,
 	txManager db.TxManager,
+	log logger.Logger,
 ) *UpdateEnvVarUseCase {
 	return &UpdateEnvVarUseCase{
 		containerRepo: containerRepo,
 		permissionSvc: permissionSvc,
 		txManager:     txManager,
+		logger:        log,
 	}
 }
 
 func (uc *UpdateEnvVarUseCase) Execute(ctx context.Context, input UpdateEnvVarInput) (*UpdateEnvVarOutput, error) {
+	uc.logger.Info(ctx, "update env var started",
+		zap.Uint("container_id", input.ContainerID),
+		zap.Uint("user_id", input.UserID),
+		zap.String("key", input.EnvVarKey),
+	)
+
 	var key, value, updatedAt string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Check permission
 		if err := uc.permissionSvc.CanUserModifyContainer(txCtx, input.UserID, input.ContainerID); err != nil {
+			uc.logger.Warn(ctx, "permission check failed",
+				zap.Error(err),
+				zap.Uint("user_id", input.UserID),
+				zap.Uint("container_id", input.ContainerID),
+			)
 			return err
 		}
 
 		// Get container with lock
 		container, err := uc.containerRepo.FindByIDForUpdate(txCtx, input.ContainerID)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to find container for update",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+			)
 			return err
 		}
 
 		// Update environment variable
 		if err := container.UpdateEnvVar(input.EnvVarKey, input.Value); err != nil {
+			uc.logger.Error(ctx, "failed to update env var",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+				zap.String("key", input.EnvVarKey),
+			)
 			return err
 		}
 
 		// Save container
 		if err := uc.containerRepo.Save(txCtx, container); err != nil {
+			uc.logger.Error(ctx, "failed to save container",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+			)
 			return err
 		}
 
 		// Get updated env var
 		envVar, err := container.GetEnvVar(input.EnvVarKey)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to get updated env var",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+				zap.String("key", input.EnvVarKey),
+			)
 			return err
 		}
 
@@ -82,6 +116,11 @@ func (uc *UpdateEnvVarUseCase) Execute(ctx context.Context, input UpdateEnvVarIn
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logger.Info(ctx, "update env var completed",
+		zap.Uint("container_id", input.ContainerID),
+		zap.String("key", key),
+	)
 
 	return &UpdateEnvVarOutput{
 		ContainerID: input.ContainerID,

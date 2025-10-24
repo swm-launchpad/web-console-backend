@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 )
 
@@ -22,7 +23,8 @@ func TestAuthService_RegisterUser(t *testing.T) {
 		jwtUtil := jwt.NewJWTUtil("test-secret")
 		passwordUtil := password.NewPasswordUtil()
 
-		service := NewAuthService(mockUserService, jwtUtil, passwordUtil)
+		testLogger := logger.NewForTest()
+		service := NewAuthService(mockUserService, jwtUtil, passwordUtil, testLogger)
 
 		username := "testuser"
 		plainPassword := "password123"
@@ -58,10 +60,12 @@ func TestAuthService_RegisterUser(t *testing.T) {
 
 	t.Run("실패: username 유효성 검증 실패", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		// Act
@@ -76,10 +80,12 @@ func TestAuthService_RegisterUser(t *testing.T) {
 
 	t.Run("실패: 짧은 username", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		// Act
@@ -94,10 +100,12 @@ func TestAuthService_RegisterUser(t *testing.T) {
 
 	t.Run("실패: 약한 비밀번호", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		// Act
@@ -112,10 +120,12 @@ func TestAuthService_RegisterUser(t *testing.T) {
 
 	t.Run("실패: 잘못된 이메일 형식", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		// Act
@@ -131,10 +141,12 @@ func TestAuthService_RegisterUser(t *testing.T) {
 	t.Run("실패: username 이미 존재", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(MockUserService)
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			mockUserService,
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		username := "existinguser"
@@ -155,10 +167,12 @@ func TestAuthService_RegisterUser(t *testing.T) {
 	t.Run("실패: email 이미 존재", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(MockUserService)
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			mockUserService,
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		username := "testuser"
@@ -189,7 +203,8 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 		jwtUtil := jwt.NewJWTUtil("test-secret")
 		passwordUtil := password.NewPasswordUtil()
 
-		service := NewAuthService(mockUserService, jwtUtil, passwordUtil)
+		testLogger := logger.NewForTest()
+		service := NewAuthService(mockUserService, jwtUtil, passwordUtil, testLogger)
 
 		username := "testuser"
 		plainPassword := "password123"
@@ -222,10 +237,12 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 
 	t.Run("실패: 빈 username", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		// Act
@@ -240,10 +257,12 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 
 	t.Run("실패: 빈 password", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			new(MockUserService),
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		// Act
@@ -259,10 +278,12 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(MockUserService)
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			mockUserService,
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		username := "nonexistent"
@@ -283,10 +304,12 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 	t.Run("실패: 비활성 사용자", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(MockUserService)
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			mockUserService,
 			jwt.NewJWTUtil("test-secret"),
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		username := "inactiveuser"
@@ -315,10 +338,12 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 		// Arrange
 		mockUserService := new(MockUserService)
 		passwordUtil := password.NewPasswordUtil()
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			mockUserService,
 			jwt.NewJWTUtil("test-secret"),
 			passwordUtil,
+			testLogger,
 		)
 
 		username := "testuser"
@@ -350,7 +375,8 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 }
 
 func TestAuthService_ValidateRegistrationInput(t *testing.T) {
-	service := NewAuthService(nil, nil, nil)
+	testLogger := logger.NewForTest()
+	service := NewAuthService(nil, nil, nil, testLogger)
 
 	t.Run("성공: 유효한 입력", func(t *testing.T) {
 		err := service.ValidateRegistrationInput("testuser", "password123", "test@example.com")
@@ -401,7 +427,8 @@ func TestAuthService_ValidateRegistrationInput(t *testing.T) {
 }
 
 func TestAuthService_ValidateLoginInput(t *testing.T) {
-	service := NewAuthService(nil, nil, nil)
+	testLogger := logger.NewForTest()
+	service := NewAuthService(nil, nil, nil, testLogger)
 
 	t.Run("성공: 유효한 입력", func(t *testing.T) {
 		err := service.ValidateLoginInput("testuser", "password123")
@@ -426,10 +453,12 @@ func TestAuthService_GenerateToken(t *testing.T) {
 
 	t.Run("성공: 유효한 userID로 토큰 생성", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			nil,
 			jwt.NewJWTUtil("test-secret"),
 			nil,
+			testLogger,
 		)
 
 		userID := uint(1)
@@ -444,10 +473,12 @@ func TestAuthService_GenerateToken(t *testing.T) {
 
 	t.Run("실패: userID가 0", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			nil,
 			jwt.NewJWTUtil("test-secret"),
 			nil,
+			testLogger,
 		)
 
 		// Act
@@ -463,10 +494,12 @@ func TestAuthService_GenerateToken(t *testing.T) {
 func TestAuthService_HashPassword(t *testing.T) {
 	t.Run("성공: 비밀번호 해싱", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			nil,
 			nil,
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		plainPassword := "password123"
@@ -482,10 +515,12 @@ func TestAuthService_HashPassword(t *testing.T) {
 
 	t.Run("실패: 빈 비밀번호", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			nil,
 			nil,
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		// Act
@@ -502,10 +537,12 @@ func TestAuthService_VerifyPassword(t *testing.T) {
 	t.Run("성공: 비밀번호 검증", func(t *testing.T) {
 		// Arrange
 		passwordUtil := password.NewPasswordUtil()
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			nil,
 			nil,
 			passwordUtil,
+			testLogger,
 		)
 
 		plainPassword := "password123"
@@ -520,10 +557,12 @@ func TestAuthService_VerifyPassword(t *testing.T) {
 
 	t.Run("실패: 빈 passwordHash", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			nil,
 			nil,
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		// Act
@@ -536,10 +575,12 @@ func TestAuthService_VerifyPassword(t *testing.T) {
 
 	t.Run("실패: 빈 plainPassword", func(t *testing.T) {
 		// Arrange
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			nil,
 			nil,
 			password.NewPasswordUtil(),
+			testLogger,
 		)
 
 		// Act
@@ -553,10 +594,12 @@ func TestAuthService_VerifyPassword(t *testing.T) {
 	t.Run("실패: 잘못된 비밀번호", func(t *testing.T) {
 		// Arrange
 		passwordUtil := password.NewPasswordUtil()
+		testLogger := logger.NewForTest()
 		service := NewAuthService(
 			nil,
 			nil,
 			passwordUtil,
+			testLogger,
 		)
 
 		correctPassword := "correct_password"

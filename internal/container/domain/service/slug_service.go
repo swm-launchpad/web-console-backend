@@ -6,6 +6,9 @@ import (
 	"math/rand"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
@@ -25,12 +28,14 @@ type SlugService interface {
 // slugService is the concrete implementation of SlugService
 type slugService struct {
 	containerRepo repository.ContainerRepository
+	logger        logger.Logger
 }
 
 // NewSlugService creates a new instance of SlugService
-func NewSlugService(containerRepo repository.ContainerRepository) SlugService {
+func NewSlugService(containerRepo repository.ContainerRepository, log logger.Logger) SlugService {
 	return &slugService{
 		containerRepo: containerRepo,
+		logger:        log,
 	}
 }
 
@@ -42,6 +47,9 @@ func (s *slugService) EnsureUniqueSlug(ctx context.Context, slug value.Container
 	}
 
 	if exists {
+		s.logger.Warn(ctx, "Container slug collision detected",
+			zap.String("slug", slug.String()),
+		)
 		return containererrors.ErrSlugAlreadyExists
 	}
 

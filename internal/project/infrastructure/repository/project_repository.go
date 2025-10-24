@@ -7,26 +7,35 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
+	"go.uber.org/zap"
 )
 
 type projectRepository struct {
 	db      sqlc.DBTX
 	queries *sqlc.Queries
+	logger  logger.Logger
 }
 
-func NewProjectRepository(db sqlc.DBTX) repository.ProjectRepository {
+func NewProjectRepository(db sqlc.DBTX, log logger.Logger) repository.ProjectRepository {
 	return &projectRepository{
 		db:      db,
 		queries: sqlc.New(db),
+		logger:  log,
 	}
 }
 
 func (r *projectRepository) Create(ctx context.Context, project *model.Project) error {
+	r.logger.Info(ctx, "project repository create started",
+		zap.String("name", project.Name()),
+		zap.String("slug", project.Slug().String()),
+	)
+
 	qtx := r.queriesWithContext(ctx)
 
 	// Create project
@@ -49,14 +58,26 @@ func (r *projectRepository) Create(ctx context.Context, project *model.Project) 
 	result, err := qtx.CreateProject(ctx, params)
 	if err != nil {
 		if isDuplicateError(err) {
+			r.logger.Error(ctx, "project slug already exists",
+				zap.String("slug", project.Slug().String()),
+				zap.Error(projecterrors.ErrSlugAlreadyExists),
+			)
 			return projecterrors.ErrSlugAlreadyExists
 		}
+		r.logger.Error(ctx, "project repository create failed",
+			zap.String("name", project.Name()),
+			zap.Error(err),
+		)
 		return projecterrors.ErrDatabaseOperation
 	}
 
 	// Get the auto-generated ID
 	projectID, err := result.LastInsertId()
 	if err != nil {
+		r.logger.Error(ctx, "project repository create last insert id failed",
+			zap.String("name", project.Name()),
+			zap.Error(err),
+		)
 		return err
 	}
 	project.SetProjectID(uint(projectID))
@@ -72,11 +93,20 @@ func (r *projectRepository) Create(ctx context.Context, project *model.Project) 
 				UpdatedAt: sql.NullTime{Time: user.UpdatedAt(), Valid: !user.UpdatedAt().IsZero()},
 			}
 			if _, err := qtx.CreateProjectUser(ctx, userParams); err != nil {
+				r.logger.Error(ctx, "project repository create project user failed",
+					zap.Uint("project_id", project.ProjectID()),
+					zap.Uint("user_id", user.UserID()),
+					zap.Error(err),
+				)
 				return projecterrors.ErrDatabaseOperation
 			}
 		}
 	}
 
+	r.logger.Info(ctx, "project repository create completed",
+		zap.Uint("project_id", project.ProjectID()),
+		zap.String("name", project.Name()),
+	)
 	return nil
 }
 
@@ -199,12 +229,24 @@ func (r *projectRepository) Save(ctx context.Context, project *model.Project) er
 }
 
 func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*model.Project, error) {
+	r.logger.Info(ctx, "project repository find by id started",
+		zap.Uint("project_id", projectID),
+	)
+
 	// Get project
 	row, err := r.queriesWithContext(ctx).GetProjectByID(ctx, uint32(projectID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "project not found",
+				zap.Uint("project_id", projectID),
+				zap.Error(projecterrors.ErrProjectNotFound),
+			)
 			return nil, projecterrors.ErrProjectNotFound
 		}
+		r.logger.Error(ctx, "project repository find by id failed",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
@@ -229,6 +271,10 @@ func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*mode
 		return nil, err
 	}
 
+	r.logger.Info(ctx, "project repository find by id completed",
+		zap.Uint("project_id", project.ProjectID()),
+		zap.String("name", project.Name()),
+	)
 	return project, nil
 }
 
@@ -267,12 +313,24 @@ func (r *projectRepository) FindByIDForUpdate(ctx context.Context, projectID uin
 }
 
 func (r *projectRepository) FindBySlug(ctx context.Context, slug string) (*model.Project, error) {
+	r.logger.Info(ctx, "project repository find by slug started",
+		zap.String("slug", slug),
+	)
+
 	// Get project by slug
 	row, err := r.queriesWithContext(ctx).GetProjectBySlug(ctx, slug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "project not found by slug",
+				zap.String("slug", slug),
+				zap.Error(projecterrors.ErrProjectNotFound),
+			)
 			return nil, projecterrors.ErrProjectNotFound
 		}
+		r.logger.Error(ctx, "project repository find by slug failed",
+			zap.String("slug", slug),
+			zap.Error(err),
+		)
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
@@ -297,6 +355,10 @@ func (r *projectRepository) FindBySlug(ctx context.Context, slug string) (*model
 		return nil, err
 	}
 
+	r.logger.Info(ctx, "project repository find by slug completed",
+		zap.Uint("project_id", project.ProjectID()),
+		zap.String("slug", slug),
+	)
 	return project, nil
 }
 

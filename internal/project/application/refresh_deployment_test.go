@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
@@ -17,7 +18,8 @@ import (
 func TestRefreshDeploymentUseCase_Execute_Success(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewRefreshDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewRefreshDeploymentUseCase(mockDeployService, testLogger)
 
 	input := RefreshDeploymentInput{
 		ProjectID: 1,
@@ -56,7 +58,8 @@ func TestRefreshDeploymentUseCase_Execute_Success(t *testing.T) {
 func TestRefreshDeploymentUseCase_Execute_NoActiveDeployment(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewRefreshDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewRefreshDeploymentUseCase(mockDeployService, testLogger)
 
 	input := RefreshDeploymentInput{
 		ProjectID: 1,
@@ -80,7 +83,8 @@ func TestRefreshDeploymentUseCase_Execute_NoActiveDeployment(t *testing.T) {
 func TestRefreshDeploymentUseCase_Execute_ProjectNotFound(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewRefreshDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewRefreshDeploymentUseCase(mockDeployService, testLogger)
 
 	input := RefreshDeploymentInput{
 		ProjectID: 1,
@@ -104,7 +108,8 @@ func TestRefreshDeploymentUseCase_Execute_ProjectNotFound(t *testing.T) {
 func TestRefreshDeploymentUseCase_Execute_RefreshError(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewRefreshDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewRefreshDeploymentUseCase(mockDeployService, testLogger)
 
 	input := RefreshDeploymentInput{
 		ProjectID: 1,
@@ -127,7 +132,8 @@ func TestRefreshDeploymentUseCase_Execute_RefreshError(t *testing.T) {
 func TestRefreshDeploymentUseCase_Execute_WithAllOptionalFields(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewRefreshDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewRefreshDeploymentUseCase(mockDeployService, testLogger)
 
 	input := RefreshDeploymentInput{
 		ProjectID: 1,

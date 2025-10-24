@@ -14,6 +14,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/password"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	containerApp "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	containerService "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
@@ -47,87 +48,90 @@ func SetupTestServer(t *testing.T) *TestServer {
 	testDB := SetupTestDB(t)
 
 	// 의존성 초기화
-	userRepo := infrastructure.NewUserRepository(testDB.DB)
-	tokenRepo := infrastructure.NewTokenRepository(testDB.DB)
-	installationRepo := infrastructure.NewGitHubInstallationRepository(testDB.DB)
+	userRepo := infrastructure.NewUserRepository(testDB.DB, logger.NewForTest())
+	tokenRepo := infrastructure.NewTokenRepository(testDB.DB, logger.NewForTest())
+	installationRepo := infrastructure.NewGitHubInstallationRepository(testDB.DB, logger.NewForTest())
 	jwtUtil := jwt.NewJWTUtil("test-secret")
 	passwordUtil := password.NewPasswordUtil()
 	txManager := db.NewTxManager(testDB.DB)
 
 	// Email Service 초기화 (테스트용 Mock 사용)
 	mockEmailService := new(email.MockService)
-	// Mock email service to always succeed
-	mockEmailService.On("SendVerificationEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockEmailService.On("SendPasswordResetEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	// Mock email service to always succeed (ctx, email, username, token)
+	mockEmailService.On("SendVerificationEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockEmailService.On("SendPasswordResetEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	// Logger 초기화 (테스트용)
+	testLogger := logger.NewForTest()
 
 	// User Service 초기화
-	userService := service.NewUserService(userRepo)
-	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
-	tokenService := service.NewTokenService(tokenRepo)
+	userService := service.NewUserService(userRepo, testLogger)
+	authService := service.NewAuthService(userService, jwtUtil, passwordUtil, testLogger)
+	tokenService := service.NewTokenService(tokenRepo, testLogger)
 
 	// User UseCase 초기화
-	registerUseCase := application.NewRegisterUserUseCase(authService, tokenService, mockEmailService, txManager)
-	loginUseCase := application.NewLoginUserUseCase(authService)
-	getUserUseCase := application.NewGetUserUseCase(userService)
-	updateUserUseCase := application.NewUpdateUserUseCase(userService)
-	changePasswordUseCase := application.NewChangePasswordUseCase(userService, authService)
+	registerUseCase := application.NewRegisterUserUseCase(authService, tokenService, mockEmailService, txManager, testLogger)
+	loginUseCase := application.NewLoginUserUseCase(authService, testLogger)
+	getUserUseCase := application.NewGetUserUseCase(userService, testLogger)
+	updateUserUseCase := application.NewUpdateUserUseCase(userService, testLogger)
+	changePasswordUseCase := application.NewChangePasswordUseCase(userService, authService, testLogger)
 
 	// Project dependencies
-	projectRepository := projectRepo.NewProjectRepository(testDB.DB)
-	volumeRepo := projectRepo.NewVolumeRepository(testDB.DB)
-	slugService := projectService.NewSlugService(projectRepository)
-	volumeSlugService := projectService.NewVolumeSlugService(volumeRepo)
-	projectSvc := projectService.NewProjectService(projectRepository, slugService)
-	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepository, volumeSlugService)
-	permissionSvc := projectService.NewPermissionService(projectRepository, volumeRepo)
+	projectRepository := projectRepo.NewProjectRepository(testDB.DB, testLogger)
+	volumeRepo := projectRepo.NewVolumeRepository(testDB.DB, testLogger)
+	slugService := projectService.NewSlugService(projectRepository, testLogger)
+	volumeSlugService := projectService.NewVolumeSlugService(volumeRepo, testLogger)
+	projectSvc := projectService.NewProjectService(projectRepository, slugService, testLogger)
+	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepository, volumeSlugService, testLogger)
+	permissionSvc := projectService.NewPermissionService(projectRepository, volumeRepo, testLogger)
 
 	// Project UseCases
-	createProjectUseCase := projectApp.NewCreateProjectUseCase(projectSvc, txManager)
-	getProjectUseCase := projectApp.NewGetProjectUseCase(projectSvc, volumeSvc)
-	getProjectBySlugUseCase := projectApp.NewGetProjectBySlugUseCase(projectSvc, volumeSvc)
-	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, txManager)
-	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, txManager)
-	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc)
-	addVolumeUseCase := projectApp.NewAddVolumeUseCase(volumeSvc, txManager)
-	getVolumesUseCase := projectApp.NewGetVolumesUseCase(volumeSvc)
-	removeVolumeUseCase := projectApp.NewRemoveVolumeUseCase(volumeSvc, txManager)
+	createProjectUseCase := projectApp.NewCreateProjectUseCase(projectSvc, txManager, testLogger)
+	getProjectUseCase := projectApp.NewGetProjectUseCase(projectSvc, volumeSvc, testLogger)
+	getProjectBySlugUseCase := projectApp.NewGetProjectBySlugUseCase(projectSvc, volumeSvc, testLogger)
+	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, txManager, testLogger)
+	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, txManager, testLogger)
+	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc, testLogger)
+	addVolumeUseCase := projectApp.NewAddVolumeUseCase(volumeSvc, txManager, testLogger)
+	getVolumesUseCase := projectApp.NewGetVolumesUseCase(volumeSvc, testLogger)
+	removeVolumeUseCase := projectApp.NewRemoveVolumeUseCase(volumeSvc, txManager, testLogger)
 
 	// Container dependencies
-	containerRepo := containerInfra.NewContainerRepository(testDB.DB)
-	templateRepo := containerInfra.NewTemplateRepository(testDB.DB)
-	containerSlugService := containerService.NewSlugService(containerRepo)
-	containerSvc := containerService.NewContainerService(containerRepo, containerSlugService)
-	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository)
-	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository)
+	containerRepo := containerInfra.NewContainerRepository(testDB.DB, testLogger)
+	templateRepo := containerInfra.NewTemplateRepository(testDB.DB, testLogger)
+	containerSlugService := containerService.NewSlugService(containerRepo, testLogger)
+	containerSvc := containerService.NewContainerService(containerRepo, containerSlugService, testLogger)
+	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository, testLogger)
+	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository, testLogger)
 	buildChangeDetector := containerService.NewBuildChangeDetector()
 
 	// Container UseCases
-	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, installationRepo, txManager)
-	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, containerPermissionSvc)
-	listContainersUseCase := containerApp.NewListContainersUseCase(containerRepo, containerPermissionSvc)
-	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, buildChangeDetector, installationRepo, txManager)
-	deleteContainerUseCase := containerApp.NewDeleteContainerUseCase(containerRepo, containerPermissionSvc, txManager)
-	addEnvVarUseCase := containerApp.NewAddEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
-	updateEnvVarUseCase := containerApp.NewUpdateEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
-	deleteEnvVarUseCase := containerApp.NewDeleteEnvVarUseCase(containerRepo, containerPermissionSvc, txManager)
-	addNetworkUseCase := containerApp.NewAddNetworkUseCase(containerRepo, containerPermissionSvc, txManager)
-	deleteNetworkUseCase := containerApp.NewDeleteNetworkUseCase(containerRepo, containerPermissionSvc, txManager)
-	addSecretUseCase := containerApp.NewAddSecretUseCase(containerRepo, containerPermissionSvc, txManager)
-	updateSecretUseCase := containerApp.NewUpdateSecretUseCase(containerRepo, containerPermissionSvc, txManager)
-	deleteSecretUseCase := containerApp.NewDeleteSecretUseCase(containerRepo, containerPermissionSvc, txManager)
-	addBuildVarUseCase := containerApp.NewAddBuildVarUseCase(containerRepo, containerPermissionSvc, txManager)
-	updateBuildVarUseCase := containerApp.NewUpdateBuildVarUseCase(containerRepo, containerPermissionSvc, txManager)
-	deleteBuildVarUseCase := containerApp.NewDeleteBuildVarUseCase(containerRepo, containerPermissionSvc, txManager)
-	addMountUseCase := containerApp.NewAddMountUseCase(containerRepo, containerPermissionSvc, volumeSvc, txManager)
-	deleteMountUseCase := containerApp.NewDeleteMountUseCase(containerRepo, containerPermissionSvc, txManager)
+	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, installationRepo, txManager, testLogger)
+	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, containerPermissionSvc, testLogger)
+	listContainersUseCase := containerApp.NewListContainersUseCase(containerRepo, containerPermissionSvc, testLogger)
+	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, buildChangeDetector, installationRepo, txManager, testLogger)
+	deleteContainerUseCase := containerApp.NewDeleteContainerUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	addEnvVarUseCase := containerApp.NewAddEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	updateEnvVarUseCase := containerApp.NewUpdateEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	deleteEnvVarUseCase := containerApp.NewDeleteEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	addNetworkUseCase := containerApp.NewAddNetworkUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	deleteNetworkUseCase := containerApp.NewDeleteNetworkUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	addSecretUseCase := containerApp.NewAddSecretUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	updateSecretUseCase := containerApp.NewUpdateSecretUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	deleteSecretUseCase := containerApp.NewDeleteSecretUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	addBuildVarUseCase := containerApp.NewAddBuildVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	updateBuildVarUseCase := containerApp.NewUpdateBuildVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	deleteBuildVarUseCase := containerApp.NewDeleteBuildVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	addMountUseCase := containerApp.NewAddMountUseCase(containerRepo, containerPermissionSvc, volumeSvc, txManager, testLogger)
+	deleteMountUseCase := containerApp.NewDeleteMountUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 
 	// Template UseCases
-	getTemplatesUseCase := containerApp.NewGetTemplatesUseCase(templateRepo)
-	getTemplateUseCase := containerApp.NewGetTemplateUseCase(templateRepo)
+	getTemplatesUseCase := containerApp.NewGetTemplatesUseCase(templateRepo, testLogger)
+	getTemplateUseCase := containerApp.NewGetTemplateUseCase(templateRepo, testLogger)
 
 	// Handler 초기화
-	authHandler := userhttp.NewAuthHandler(registerUseCase, loginUseCase)
-	userHandler := userhttp.NewUserHandler(getUserUseCase, updateUserUseCase, changePasswordUseCase)
+	authHandler := userhttp.NewAuthHandler(registerUseCase, loginUseCase, testLogger)
+	userHandler := userhttp.NewUserHandler(getUserUseCase, updateUserUseCase, changePasswordUseCase, testLogger)
 	projectHandler := projectHTTP.NewProjectHandler(
 		createProjectUseCase,
 		getProjectUseCase,
@@ -137,6 +141,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 		listProjectsUseCase,
 		permissionSvc,
 		projectSvc,
+		testLogger,
 	)
 	volumeHandler := projectHTTP.NewVolumeHandler(
 		addVolumeUseCase,
@@ -144,6 +149,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 		removeVolumeUseCase,
 		permissionSvc,
 		volumeSvc,
+		testLogger,
 	)
 	containerHandler := containerHTTP.NewContainerHandler(
 		createContainerUseCase,
@@ -166,10 +172,12 @@ func SetupTestServer(t *testing.T) *TestServer {
 		deleteMountUseCase,
 		projectSvc,
 		containerSvc,
+		testLogger,
 	)
 	templateHandler := containerHTTP.NewTemplateHandler(
 		getTemplatesUseCase,
 		getTemplateUseCase,
+		testLogger,
 	)
 
 	// Middleware
@@ -397,23 +405,23 @@ func (ts *TestServer) LoginUser(t *testing.T, username, password string) (uint, 
 
 // GetGitHubInstallationRepository returns the GitHub installation repository for testing
 func GetGitHubInstallationRepository(testDB *TestDB) userrepository.GitHubInstallationRepository {
-	return infrastructure.NewGitHubInstallationRepository(testDB.DB)
+	return infrastructure.NewGitHubInstallationRepository(testDB.DB, logger.NewForTest())
 }
 
 // GetCreateContainerUseCase returns the create container use case for testing
 func GetCreateContainerUseCase(ts *TestServer) *containerApp.CreateContainerUseCase {
-	containerRepo := containerInfra.NewContainerRepository(ts.DB.DB)
-	containerSlugService := containerService.NewSlugService(containerRepo)
-	containerSvc := containerService.NewContainerService(containerRepo, containerSlugService)
-	projectRepository := projectRepo.NewProjectRepository(ts.DB.DB)
-	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository)
-	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository)
-	volumeRepo := projectRepo.NewVolumeRepository(ts.DB.DB)
-	volumeSlugService := projectService.NewVolumeSlugService(volumeRepo)
-	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepository, volumeSlugService)
-	installationRepo := infrastructure.NewGitHubInstallationRepository(ts.DB.DB)
+	testLogger := logger.NewForTest()
+	containerRepo := containerInfra.NewContainerRepository(ts.DB.DB, testLogger)
+	containerSlugService := containerService.NewSlugService(containerRepo, testLogger)
+	containerSvc := containerService.NewContainerService(containerRepo, containerSlugService, testLogger)
+	projectRepository := projectRepo.NewProjectRepository(ts.DB.DB, testLogger)
+	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository, testLogger)
+	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository, testLogger)
+	volumeRepo := projectRepo.NewVolumeRepository(ts.DB.DB, testLogger)
+	volumeSlugService := projectService.NewVolumeSlugService(volumeRepo, testLogger)
+	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepository, volumeSlugService, testLogger)
+	installationRepo := infrastructure.NewGitHubInstallationRepository(ts.DB.DB, testLogger)
 	txManager := db.NewTxManager(ts.DB.DB)
-
 	return containerApp.NewCreateContainerUseCase(
 		containerSvc,
 		containerRepo,
@@ -422,17 +430,19 @@ func GetCreateContainerUseCase(ts *TestServer) *containerApp.CreateContainerUseC
 		volumeSvc,
 		installationRepo,
 		txManager,
+		testLogger,
 	)
 }
 
 // GetUpdateContainerUseCase returns the update container use case for testing
 func GetUpdateContainerUseCase(ts *TestServer) *containerApp.UpdateContainerUseCase {
-	containerRepo := containerInfra.NewContainerRepository(ts.DB.DB)
-	projectRepository := projectRepo.NewProjectRepository(ts.DB.DB)
-	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository)
-	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository)
+	testLogger := logger.NewForTest()
+	containerRepo := containerInfra.NewContainerRepository(ts.DB.DB, testLogger)
+	projectRepository := projectRepo.NewProjectRepository(ts.DB.DB, testLogger)
+	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository, testLogger)
+	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository, testLogger)
 	buildChangeDetector := containerService.NewBuildChangeDetector()
-	installationRepo := infrastructure.NewGitHubInstallationRepository(ts.DB.DB)
+	installationRepo := infrastructure.NewGitHubInstallationRepository(ts.DB.DB, testLogger)
 	txManager := db.NewTxManager(ts.DB.DB)
 
 	return containerApp.NewUpdateContainerUseCase(
@@ -442,5 +452,6 @@ func GetUpdateContainerUseCase(ts *TestServer) *containerApp.UpdateContainerUseC
 		buildChangeDetector,
 		installationRepo,
 		txManager,
+		testLogger,
 	)
 }

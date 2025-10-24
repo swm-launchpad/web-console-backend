@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 )
@@ -12,39 +13,41 @@ import (
 // TestDeploymentRepository_ErrorHandling tests error handling with invalid inputs
 // Note: All functional tests are in integration tests with real database
 func TestDeploymentRepository_ErrorHandling(t *testing.T) {
+	testLogger := logger.NewForTest()
+
 	t.Run("Create with nil deployment", func(t *testing.T) {
-		repo := NewDeploymentRepository(nil)
+		repo := NewDeploymentRepository(nil, testLogger)
 		err := repo.Create(context.Background(), nil)
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
 	})
 
 	t.Run("Save with nil deployment", func(t *testing.T) {
-		repo := NewDeploymentRepository(nil)
+		repo := NewDeploymentRepository(nil, testLogger)
 		err := repo.Save(context.Background(), nil)
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
 	})
 
 	t.Run("Save with zero deployment ID", func(t *testing.T) {
-		repo := NewDeploymentRepository(nil)
+		repo := NewDeploymentRepository(nil, testLogger)
 		d := deployment.NewDeployment(123)
 		err := repo.Save(context.Background(), d)
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
 	})
 
 	t.Run("FindByID with zero ID", func(t *testing.T) {
-		repo := NewDeploymentRepository(nil)
+		repo := NewDeploymentRepository(nil, testLogger)
 		_, err := repo.FindByID(context.Background(), 0)
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
 	})
 
 	t.Run("FindLatestByProjectID with zero ID", func(t *testing.T) {
-		repo := NewDeploymentRepository(nil)
+		repo := NewDeploymentRepository(nil, testLogger)
 		_, err := repo.FindLatestByProjectID(context.Background(), 0)
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
 	})
 
 	t.Run("FindByProjectID with zero ID", func(t *testing.T) {
-		repo := NewDeploymentRepository(nil)
+		repo := NewDeploymentRepository(nil, testLogger)
 		_, err := repo.FindByProjectID(context.Background(), 0, 10, 0)
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
 	})

@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	"go.uber.org/zap"
 )
 
 type DeleteMountInput struct {
@@ -24,42 +26,69 @@ type DeleteMountUseCase struct {
 	containerRepo repository.ContainerRepository
 	permissionSvc service.PermissionService
 	txManager     db.TxManager
+	logger        logger.Logger
 }
 
 func NewDeleteMountUseCase(
 	containerRepo repository.ContainerRepository,
 	permissionSvc service.PermissionService,
 	txManager db.TxManager,
+	log logger.Logger,
 ) *DeleteMountUseCase {
 	return &DeleteMountUseCase{
 		containerRepo: containerRepo,
 		permissionSvc: permissionSvc,
 		txManager:     txManager,
+		logger:        log,
 	}
 }
 
 func (uc *DeleteMountUseCase) Execute(ctx context.Context, input DeleteMountInput) (*DeleteMountOutput, error) {
+	uc.logger.Info(ctx, "delete mount started",
+		zap.Uint("container_id", input.ContainerID),
+		zap.Uint("user_id", input.UserID),
+		zap.Uint("volume_id", input.VolumeID),
+	)
+
 	var deletedAt string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Check permission
 		if err := uc.permissionSvc.CanUserModifyContainer(txCtx, input.UserID, input.ContainerID); err != nil {
+			uc.logger.Warn(ctx, "permission check failed",
+				zap.Error(err),
+				zap.Uint("user_id", input.UserID),
+				zap.Uint("container_id", input.ContainerID),
+			)
 			return err
 		}
 
 		// Get container with lock
 		container, err := uc.containerRepo.FindByIDForUpdate(txCtx, input.ContainerID)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to find container for update",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+			)
 			return err
 		}
 
 		// Delete volume mount
 		if err := container.DeleteMount(input.VolumeID); err != nil {
+			uc.logger.Error(ctx, "failed to delete mount",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+				zap.Uint("volume_id", input.VolumeID),
+			)
 			return err
 		}
 
 		// Save container
 		if err := uc.containerRepo.Save(txCtx, container); err != nil {
+			uc.logger.Error(ctx, "failed to save container",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+			)
 			return err
 		}
 
@@ -72,6 +101,11 @@ func (uc *DeleteMountUseCase) Execute(ctx context.Context, input DeleteMountInpu
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logger.Info(ctx, "delete mount completed",
+		zap.Uint("container_id", input.ContainerID),
+		zap.Uint("volume_id", input.VolumeID),
+	)
 
 	return &DeleteMountOutput{
 		ContainerID: input.ContainerID,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 	projectinfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
@@ -57,7 +58,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 	defer testDB.Cleanup()
 
 	// Create repository
-	repo := projectinfra.NewDeploymentRepository(testDB.DB)
+	repo := projectinfra.NewDeploymentRepository(testDB.DB, logger.NewForTest())
 	ctx := context.Background()
 
 	t.Run("Create - New deployment", func(t *testing.T) {

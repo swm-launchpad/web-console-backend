@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
+	"go.uber.org/zap"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,6 +33,7 @@ type kubeClient struct {
 	namespace      string
 	pipelineRunGVR schema.GroupVersionResource
 	taskRunGVR     schema.GroupVersionResource
+	logger         logger.Logger
 }
 
 // NewKubeClient creates a new Kubernetes client using configuration from environment variables.
@@ -43,7 +46,7 @@ type kubeClient struct {
 //
 // Returns an error if any required environment variable is missing or if the client
 // cannot be initialized.
-func NewKubeClient() (infrastructure.KubeClient, error) {
+func NewKubeClient(log logger.Logger) (infrastructure.KubeClient, error) {
 	// Read configuration from environment variables
 	apiServer := os.Getenv("KUBE_API_SERVER")
 	if apiServer == "" {
@@ -113,12 +116,18 @@ func NewKubeClient() (infrastructure.KubeClient, error) {
 		namespace:      namespace,
 		pipelineRunGVR: pipelineRunGVR,
 		taskRunGVR:     taskRunGVR,
+		logger:         log,
 	}, nil
 }
 
 // GetPipelineRunStatus retrieves the current status of a PipelineRun.
 // It examines the PipelineRun's status.conditions to extract raw condition values.
 func (k *kubeClient) GetPipelineRunStatus(ctx context.Context, pipelineRunName string) (*dto.PipelineRun, error) {
+	k.logger.Info(ctx, "kube client get pipeline run status started",
+		zap.String("pipeline_run_name", pipelineRunName),
+		zap.String("namespace", k.namespace),
+	)
+
 	// Get the PipelineRun resource
 	pipelineRun, err := k.dynamicClient.
 		Resource(k.pipelineRunGVR).
@@ -128,19 +137,39 @@ func (k *kubeClient) GetPipelineRunStatus(ctx context.Context, pipelineRunName s
 	if err != nil {
 		// Map Kubernetes NotFound error to domain error
 		if apierrors.IsNotFound(err) {
+			k.logger.Error(ctx, "kube client pipeline run not found",
+				zap.String("pipeline_run_name", pipelineRunName),
+				zap.Error(projecterrors.ErrKubePipelineRunNotFound),
+			)
 			return nil, projecterrors.ErrKubePipelineRunNotFound
 		}
+		k.logger.Error(ctx, "kube client get pipeline run failed",
+			zap.String("pipeline_run_name", pipelineRunName),
+			zap.Error(err),
+		)
 		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
 	// Extract status information
 	status := extractPipelineRunStatus(pipelineRun)
+
+	k.logger.Info(ctx, "kube client get pipeline run status completed",
+		zap.String("pipeline_run_name", pipelineRunName),
+		zap.String("status", status.Status),
+		zap.String("reason", status.Reason),
+	)
+
 	return status, nil
 }
 
 // GetPipelineRunLogs retrieves aggregated logs from all tasks in a PipelineRun.
 // It traverses TaskRuns associated with the PipelineRun and collects logs from their Pods.
 func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName string) (string, error) {
+	k.logger.Info(ctx, "kube client get pipeline run logs started",
+		zap.String("pipeline_run_name", pipelineRunName),
+		zap.String("namespace", k.namespace),
+	)
+
 	// First, verify that the PipelineRun exists
 	// This ensures we return ErrKubePipelineRunNotFound for nonexistent PipelineRuns,
 	// distinguishing "not found" from "no logs available yet"
@@ -152,8 +181,16 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 	if err != nil {
 		// Map Kubernetes NotFound error to domain error
 		if apierrors.IsNotFound(err) {
+			k.logger.Error(ctx, "kube client pipeline run not found for logs",
+				zap.String("pipeline_run_name", pipelineRunName),
+				zap.Error(projecterrors.ErrKubePipelineRunNotFound),
+			)
 			return "", projecterrors.ErrKubePipelineRunNotFound
 		}
+		k.logger.Error(ctx, "kube client verify pipeline run failed",
+			zap.String("pipeline_run_name", pipelineRunName),
+			zap.Error(err),
+		)
 		return "", projecterrors.ErrKubernetesUnavailable
 	}
 
@@ -166,8 +203,17 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 		})
 
 	if err != nil {
+		k.logger.Error(ctx, "kube client list task runs failed",
+			zap.String("pipeline_run_name", pipelineRunName),
+			zap.Error(err),
+		)
 		return "", projecterrors.ErrKubernetesUnavailable
 	}
+
+	k.logger.Info(ctx, "kube client found task runs",
+		zap.String("pipeline_run_name", pipelineRunName),
+		zap.Int("task_run_count", len(taskRuns.Items)),
+	)
 
 	// Collect logs from all TaskRuns
 	var logs strings.Builder
@@ -179,6 +225,10 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 		// Tekton stores the actual Pod name in .status.podName
 		podName, err := getPodNameFromTaskRun(&taskRun)
 		if err != nil {
+			k.logger.Error(ctx, "kube client failed to get pod name from task run",
+				zap.String("task_run_name", taskRunName),
+				zap.Error(err),
+			)
 			logs.WriteString(fmt.Sprintf("\n=== Task: %s (TaskRun: %s) ===\n", taskName, taskRunName))
 			logs.WriteString(fmt.Sprintf("Error getting pod name: %v\n", err))
 			continue
@@ -187,6 +237,11 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 		taskLogs, err := k.getPodLogs(ctx, podName)
 		if err != nil {
 			// Log the error but continue with other tasks
+			k.logger.Error(ctx, "kube client failed to get pod logs",
+				zap.String("pod_name", podName),
+				zap.String("task_run_name", taskRunName),
+				zap.Error(err),
+			)
 			logs.WriteString(fmt.Sprintf("\n=== Task: %s (TaskRun: %s) ===\n", taskName, taskRunName))
 			logs.WriteString(fmt.Sprintf("Error retrieving logs: %v\n", err))
 			continue
@@ -197,8 +252,16 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 	}
 
 	if logs.Len() == 0 {
+		k.logger.Info(ctx, "kube client get pipeline run logs completed (no logs)",
+			zap.String("pipeline_run_name", pipelineRunName),
+		)
 		return "No logs available", nil
 	}
+
+	k.logger.Info(ctx, "kube client get pipeline run logs completed",
+		zap.String("pipeline_run_name", pipelineRunName),
+		zap.Int("log_size", logs.Len()),
+	)
 
 	return logs.String(), nil
 }
@@ -207,6 +270,11 @@ func (k *kubeClient) GetPipelineRunLogs(ctx context.Context, pipelineRunName str
 // It filters PipelineRuns by the "project-id" label and sorts them by creation time
 // in descending order (newest first).
 func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*dto.PipelineRun, error) {
+	k.logger.Info(ctx, "kube client list pipeline runs started",
+		zap.Uint("project_id", projectID),
+		zap.String("namespace", k.namespace),
+	)
+
 	// List PipelineRuns with project-id label
 	pipelineRuns, err := k.dynamicClient.
 		Resource(k.pipelineRunGVR).
@@ -216,6 +284,10 @@ func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*d
 		})
 
 	if err != nil {
+		k.logger.Error(ctx, "kube client list pipeline runs failed",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		return nil, projecterrors.ErrKubernetesUnavailable
 	}
 
@@ -255,12 +327,22 @@ func (k *kubeClient) ListPipelineRuns(ctx context.Context, projectID uint) ([]*d
 		return result[i].StartTime.After(*result[j].StartTime)
 	})
 
+	k.logger.Info(ctx, "kube client list pipeline runs completed",
+		zap.Uint("project_id", projectID),
+		zap.Int("count", len(result)),
+	)
+
 	return result, nil
 }
 
 // FindPipelineRunNameByEventID retrieves the PipelineRun name associated with a Tekton event ID.
 // It searches for PipelineRuns with the "triggers.tekton.dev/triggers-eventid" label matching the given EventID.
 func (k *kubeClient) FindPipelineRunNameByEventID(ctx context.Context, eventID string) (string, error) {
+	k.logger.Info(ctx, "kube client find pipeline run by event id started",
+		zap.String("event_id", eventID),
+		zap.String("namespace", k.namespace),
+	)
+
 	// List PipelineRuns with triggers.tekton.dev/triggers-eventid label
 	pipelineRuns, err := k.dynamicClient.
 		Resource(k.pipelineRunGVR).
@@ -270,16 +352,34 @@ func (k *kubeClient) FindPipelineRunNameByEventID(ctx context.Context, eventID s
 		})
 
 	if err != nil {
+		k.logger.Error(ctx, "kube client find pipeline run by event id failed",
+			zap.String("event_id", eventID),
+			zap.Error(err),
+		)
 		return "", projecterrors.ErrKubernetesUnavailable
 	}
 
 	// Check if any PipelineRuns were found
 	if len(pipelineRuns.Items) == 0 {
+		k.logger.Error(ctx, "kube client no pipeline run found for event id",
+			zap.String("event_id", eventID),
+			zap.Error(projecterrors.ErrKubePipelineRunNotFound),
+		)
 		return "", projecterrors.ErrKubePipelineRunNotFound
 	}
 
+	k.logger.Info(ctx, "kube client found pipeline runs for event id",
+		zap.String("event_id", eventID),
+		zap.Int("count", len(pipelineRuns.Items)),
+	)
+
 	// If multiple PipelineRuns found, return the most recent one
 	if len(pipelineRuns.Items) > 1 {
+		k.logger.Info(ctx, "kube client multiple pipeline runs found, selecting most recent",
+			zap.String("event_id", eventID),
+			zap.Int("count", len(pipelineRuns.Items)),
+		)
+
 		// Extract status information to get startTime
 		runs := make([]*dto.PipelineRun, 0, len(pipelineRuns.Items))
 		for _, pr := range pipelineRuns.Items {
@@ -306,11 +406,20 @@ func (k *kubeClient) FindPipelineRunNameByEventID(ctx context.Context, eventID s
 		})
 
 		// Return the name of the most recent PipelineRun
+		k.logger.Info(ctx, "kube client find pipeline run by event id completed",
+			zap.String("event_id", eventID),
+			zap.String("pipeline_run_name", runs[0].Name),
+		)
 		return runs[0].Name, nil
 	}
 
 	// Single PipelineRun found
-	return pipelineRuns.Items[0].GetName(), nil
+	pipelineRunName := pipelineRuns.Items[0].GetName()
+	k.logger.Info(ctx, "kube client find pipeline run by event id completed",
+		zap.String("event_id", eventID),
+		zap.String("pipeline_run_name", pipelineRunName),
+	)
+	return pipelineRunName, nil
 }
 
 // extractPipelineRunStatus extracts status information from a PipelineRun unstructured object.

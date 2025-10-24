@@ -18,6 +18,7 @@ type Config struct {
 	Email     EmailConfig
 	Frontend  FrontendConfig
 	GitHubApp GitHubAppConfig
+	Log       LogConfig
 }
 
 type DatabaseConfig struct {
@@ -64,6 +65,12 @@ type GitHubAppConfig struct {
 	ClientSecret    string // GitHub App Client Secret (may be used for future OAuth flows)
 	PrivateKeyPath  string // Path to GitHub App private key for JWT authentication
 	InstallationURL string // Base URL for GitHub App installation
+}
+
+type LogConfig struct {
+	Level    string // Log level (debug, info, warn, error, fatal)
+	Format   string // Log format (console, json)
+	FilePath string // Optional log file path
 }
 
 func Load() (*Config, error) {
@@ -113,6 +120,23 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid EMAIL_PORT: %w", err)
 	}
 
+	// Determine log defaults based on GIN_MODE
+	ginMode := getEnv("GIN_MODE", "debug")
+	logLevel := strings.ToLower(getEnv("LOG_LEVEL", "info"))
+	logFormat := strings.ToLower(getEnv("LOG_FORMAT", "console"))
+	if ginMode == "release" {
+		if getEnv("LOG_LEVEL", "") == "" {
+			logLevel = "info"
+		}
+		if getEnv("LOG_FORMAT", "") == "" {
+			logFormat = "json"
+		}
+	} else {
+		if getEnv("LOG_LEVEL", "") == "" {
+			logLevel = "debug"
+		}
+	}
+
 	config := &Config{
 		Database: DatabaseConfig{
 			Host:            getEnv("DB_HOST", "localhost"),
@@ -127,7 +151,7 @@ func Load() (*Config, error) {
 		},
 		Server: ServerConfig{
 			Port:    getEnv("PORT", "8080"),
-			GinMode: getEnv("GIN_MODE", "debug"),
+			GinMode: ginMode,
 			BaseURL: getEnv("BACKEND_URL", "http://localhost:8080"),
 		},
 		JWT: JWTConfig{
@@ -152,6 +176,11 @@ func Load() (*Config, error) {
 			ClientSecret:    getEnv("GITHUB_APP_CLIENT_SECRET", ""),
 			PrivateKeyPath:  getEnv("GITHUB_APP_PRIVATE_KEY_PATH", ""),
 			InstallationURL: getEnv("GITHUB_APP_INSTALLATION_URL", ""),
+		},
+		Log: LogConfig{
+			Level:    logLevel,
+			Format:   logFormat,
+			FilePath: getEnv("LOG_FILE_PATH", ""),
 		},
 	}
 

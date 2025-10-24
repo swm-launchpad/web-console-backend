@@ -4,11 +4,13 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	projectservice "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"go.uber.org/zap"
 )
 
 type VolumeToCreate struct {
@@ -55,6 +57,7 @@ type CreateContainerUseCase struct {
 	volumeService         projectservice.VolumeService
 	installationRepo      userrepository.GitHubInstallationRepository
 	txManager             db.TxManager
+	logger                logger.Logger
 }
 
 func NewCreateContainerUseCase(
@@ -65,6 +68,7 @@ func NewCreateContainerUseCase(
 	volumeService projectservice.VolumeService,
 	installationRepo userrepository.GitHubInstallationRepository,
 	txManager db.TxManager,
+	log logger.Logger,
 ) *CreateContainerUseCase {
 	return &CreateContainerUseCase{
 		containerService:      containerService,
@@ -74,10 +78,19 @@ func NewCreateContainerUseCase(
 		volumeService:         volumeService,
 		installationRepo:      installationRepo,
 		txManager:             txManager,
+		logger:                log,
 	}
 }
 
 func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateContainerInput) (*CreateContainerOutput, error) {
+	uc.logger.Info(ctx, "create container started",
+		zap.Uint("project_id", input.ProjectID),
+		zap.Uint("user_id", input.UserID),
+		zap.String("name", input.Name),
+		zap.Uint32("cpu_limit", input.CPULimit),
+		zap.Uint32("memory_limit", input.MemoryLimit),
+	)
+
 	var containerID, projectID uint
 	var templateID *uint
 	var name, slug, gitURL, gitBranch string
@@ -88,12 +101,21 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Check permission
 		if err := uc.permissionSvc.CanUserCreateContainer(txCtx, input.UserID, input.ProjectID); err != nil {
+			uc.logger.Warn(ctx, "permission check failed",
+				zap.Error(err),
+				zap.Uint("user_id", input.UserID),
+				zap.Uint("project_id", input.ProjectID),
+			)
 			return err
 		}
 
 		// Validate GitHub installation ownership if provided
 		if input.GitHubInstallationID != nil {
 			if err := uc.installationRepo.ValidateUserOwnership(txCtx, *input.GitHubInstallationID, input.UserID); err != nil {
+				uc.logger.Error(ctx, "GitHub installation ownership validation failed",
+					zap.Error(err),
+					zap.Int64("installation_id", *input.GitHubInstallationID),
+				)
 				return err
 			}
 		}
@@ -106,12 +128,19 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 			input.MemoryLimit,
 			0, // excludeContainerID = 0 for new containers
 		); err != nil {
+			uc.logger.Error(ctx, "resource limits validation failed",
+				zap.Error(err),
+				zap.Uint("project_id", input.ProjectID),
+			)
 			return err
 		}
 
 		// Create Git configuration
 		gitConfig, err := value.NewGitConfig(input.GitURL, input.GitBranch, input.GitDirectory)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to create git config",
+				zap.Error(err),
+			)
 			return err
 		}
 
@@ -120,6 +149,9 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 		memLimitPtr := &input.MemoryLimit
 		resourceLimits, err := value.NewResourceLimits(cpuLimitPtr, memLimitPtr)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to create resource limits",
+				zap.Error(err),
+			)
 			return err
 		}
 
@@ -136,6 +168,10 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 			input.GitHubInstallationID,
 		)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to create container",
+				zap.Error(err),
+				zap.String("name", input.Name),
+			)
 			return err
 		}
 
@@ -188,6 +224,12 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logger.Info(ctx, "create container completed",
+		zap.Uint("container_id", containerID),
+		zap.Uint("project_id", projectID),
+		zap.String("slug", slug),
+	)
 
 	// Build output after successful transaction
 	output := &CreateContainerOutput{

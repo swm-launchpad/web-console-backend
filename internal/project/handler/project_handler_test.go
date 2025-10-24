@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
@@ -33,13 +34,15 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 
 		// Create real use cases with mocked dependencies
 		mockVolumeService := new(service.MockVolumeService)
-		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
-		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
-		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
-		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService)
+		testLogger := logger.NewForTest()
+		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
+		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
+		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -49,6 +52,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -129,13 +133,15 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 
 		// Create real use cases with mocked dependencies
 		mockVolumeService := new(service.MockVolumeService)
-		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
-		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
-		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
-		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService)
+		testLogger := logger.NewForTest()
+		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
+		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
+		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -145,6 +151,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		router := gin.New()
@@ -173,13 +180,15 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 
 		// Create real use cases with mocked dependencies
 		mockVolumeService := new(service.MockVolumeService)
-		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
-		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
-		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
-		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService)
+		testLogger := logger.NewForTest()
+		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
+		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
+		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -189,6 +198,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -243,13 +253,15 @@ func TestProjectHandler_GetProject(t *testing.T) {
 
 		// Create real use cases with mocked dependencies
 		mockVolumeService := new(service.MockVolumeService)
-		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
-		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
-		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
-		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService)
+		testLogger := logger.NewForTest()
+		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
+		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
+		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -259,6 +271,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -304,13 +317,15 @@ func TestProjectHandler_GetProject(t *testing.T) {
 
 		// Create real use cases with mocked dependencies
 		mockVolumeService := new(service.MockVolumeService)
-		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager)
-		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService)
-		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService)
-		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService)
+		testLogger := logger.NewForTest()
+		createUseCase := application.NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
+		getUseCase := application.NewGetProjectUseCase(mockProjectService, mockVolumeService, testLogger)
+		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
+		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -320,6 +335,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)

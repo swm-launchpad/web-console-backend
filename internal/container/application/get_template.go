@@ -3,8 +3,10 @@ package application
 import (
 	"context"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/template/value"
+	"go.uber.org/zap"
 )
 
 type GetTemplateInput struct {
@@ -34,18 +36,28 @@ type GetTemplateOutput struct {
 
 type GetTemplateUseCase struct {
 	templateRepo repository.TemplateRepository
+	logger       logger.Logger
 }
 
-func NewGetTemplateUseCase(templateRepo repository.TemplateRepository) *GetTemplateUseCase {
+func NewGetTemplateUseCase(templateRepo repository.TemplateRepository, log logger.Logger) *GetTemplateUseCase {
 	return &GetTemplateUseCase{
 		templateRepo: templateRepo,
+		logger:       log,
 	}
 }
 
 func (uc *GetTemplateUseCase) Execute(ctx context.Context, input GetTemplateInput) (*GetTemplateOutput, error) {
+	uc.logger.Info(ctx, "get template started",
+		zap.Uint("template_id", input.TemplateID),
+	)
+
 	// Get template by ID
 	template, err := uc.templateRepo.FindByID(ctx, input.TemplateID)
 	if err != nil {
+		uc.logger.Error(ctx, "failed to find template",
+			zap.Error(err),
+			zap.Uint("template_id", input.TemplateID),
+		)
 		return nil, err
 	}
 
@@ -78,6 +90,11 @@ func (uc *GetTemplateUseCase) Execute(ctx context.Context, input GetTemplateInpu
 		output.DefaultVolumes = config.DefaultVolumes
 		output.DefaultResources = config.DefaultResources
 	}
+
+	uc.logger.Info(ctx, "get template completed",
+		zap.Uint("template_id", template.TemplateID()),
+		zap.String("name", template.Name()),
+	)
 
 	return output, nil
 }

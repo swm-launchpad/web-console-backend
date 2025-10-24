@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
@@ -20,7 +21,8 @@ func TestUserService_CreateUser(t *testing.T) {
 	t.Run("성공: 유효한 사용자 생성", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		username := "testuser"
 		email := "test@example.com"
@@ -54,7 +56,8 @@ func TestUserService_CreateUser(t *testing.T) {
 	t.Run("성공: name 없이 사용자 생성", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		username := "testuser2"
 		email := "test2@example.com"
@@ -80,7 +83,8 @@ func TestUserService_CreateUser(t *testing.T) {
 	t.Run("실패: 빈 username", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		// Act
 		user, err := service.CreateUser(ctx, "", "test@example.com", "password", nil)
@@ -96,7 +100,8 @@ func TestUserService_CreateUser(t *testing.T) {
 	t.Run("실패: 빈 email", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		// Act
 		user, err := service.CreateUser(ctx, "testuser", "", "password", nil)
@@ -112,7 +117,8 @@ func TestUserService_CreateUser(t *testing.T) {
 	t.Run("실패: repository 에러", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		username := "testuser"
 		email := "test@example.com"
@@ -134,7 +140,8 @@ func TestUserService_CreateUser(t *testing.T) {
 	t.Run("실패: 이미 존재하는 사용자", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		username := "existing"
 		email := "existing@example.com"
@@ -160,7 +167,8 @@ func TestUserService_GetUserByID(t *testing.T) {
 	t.Run("성공: 유효한 ID로 사용자 조회", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		userID := uint(1)
 		expectedUser := &model.User{
@@ -185,7 +193,8 @@ func TestUserService_GetUserByID(t *testing.T) {
 	t.Run("실패: userID가 0", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		// Act
 		user, err := service.GetUserByID(ctx, 0)
@@ -201,7 +210,8 @@ func TestUserService_GetUserByID(t *testing.T) {
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		userID := uint(999)
 
@@ -225,7 +235,8 @@ func TestUserService_GetUserByUsername(t *testing.T) {
 	t.Run("성공: 유효한 username으로 사용자 조회", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		username := "testuser"
 		expectedUser := &model.User{
@@ -250,7 +261,8 @@ func TestUserService_GetUserByUsername(t *testing.T) {
 	t.Run("실패: 빈 username", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		// Act
 		user, err := service.GetUserByUsername(ctx, "")
@@ -270,7 +282,8 @@ func TestUserService_GetUserByEmail(t *testing.T) {
 	t.Run("성공: 유효한 email로 사용자 조회", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		email := "test@example.com"
 		expectedUser := &model.User{
@@ -295,7 +308,8 @@ func TestUserService_GetUserByEmail(t *testing.T) {
 	t.Run("실패: 빈 email", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		// Act
 		user, err := service.GetUserByEmail(ctx, "")
@@ -315,7 +329,8 @@ func TestUserService_UpdateUser(t *testing.T) {
 	t.Run("성공: 유효한 사용자 업데이트", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		user := &model.User{
 			UserID:   1,
@@ -340,7 +355,8 @@ func TestUserService_UpdateUser(t *testing.T) {
 	t.Run("실패: nil user", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		// Act
 		err := service.UpdateUser(ctx, nil)
@@ -355,7 +371,8 @@ func TestUserService_UpdateUser(t *testing.T) {
 	t.Run("실패: userID가 0", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		user := &model.User{
 			UserID:   0,
@@ -380,7 +397,8 @@ func TestUserService_ActivateUser(t *testing.T) {
 	t.Run("성공: 사용자 활성화", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		userID := uint(1)
 		now := time.Now()
@@ -410,7 +428,8 @@ func TestUserService_ActivateUser(t *testing.T) {
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		userID := uint(999)
 
@@ -429,7 +448,8 @@ func TestUserService_ActivateUser(t *testing.T) {
 	t.Run("실패: 삭제된 사용자", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		userID := uint(1)
 		user := &model.User{
@@ -457,7 +477,8 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 	t.Run("성공: 활성 사용자", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		user := &model.User{
 			UserID:    1,
@@ -476,7 +497,8 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 	t.Run("실패: nil user", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		// Act
 		err := service.ValidateUserCredentials(ctx, nil)
@@ -489,7 +511,8 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 	t.Run("실패: 비활성 사용자", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		user := &model.User{
 			UserID:    1,
@@ -509,7 +532,8 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 	t.Run("실패: 삭제된 사용자", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		user := &model.User{
 			UserID:    1,
@@ -533,7 +557,8 @@ func TestUserService_UpdatePassword(t *testing.T) {
 	t.Run("성공: 비밀번호 업데이트", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		userID := uint(1)
 		newPasswordHash := "new_hashed_password"
@@ -560,7 +585,8 @@ func TestUserService_UpdatePassword(t *testing.T) {
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		userID := uint(999)
 
@@ -583,7 +609,8 @@ func TestUserService_CheckUsernameAvailability(t *testing.T) {
 	t.Run("성공: username 사용 가능", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		username := "newuser"
 
@@ -601,7 +628,8 @@ func TestUserService_CheckUsernameAvailability(t *testing.T) {
 	t.Run("실패: 빈 username", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		// Act
 		err := service.CheckUsernameAvailability(ctx, "")
@@ -616,7 +644,8 @@ func TestUserService_CheckUsernameAvailability(t *testing.T) {
 	t.Run("실패: username 이미 존재", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		username := "existinguser"
 
@@ -635,7 +664,8 @@ func TestUserService_CheckUsernameAvailability(t *testing.T) {
 	t.Run("실패: repository 에러", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		username := "testuser"
 
@@ -658,7 +688,8 @@ func TestUserService_CheckEmailAvailability(t *testing.T) {
 	t.Run("성공: email 사용 가능", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		email := "new@example.com"
 
@@ -676,7 +707,8 @@ func TestUserService_CheckEmailAvailability(t *testing.T) {
 	t.Run("실패: 빈 email", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		// Act
 		err := service.CheckEmailAvailability(ctx, "")
@@ -691,7 +723,8 @@ func TestUserService_CheckEmailAvailability(t *testing.T) {
 	t.Run("실패: email 이미 존재", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
-		service := NewUserService(mockRepo)
+		testLogger := logger.NewForTest()
+		service := NewUserService(mockRepo, testLogger)
 
 		email := "existing@example.com"
 

@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
+	"go.uber.org/zap"
 )
 
 // PermissionService defines the interface for project permission checks
@@ -29,25 +31,41 @@ type PermissionService interface {
 type permissionService struct {
 	projectRepo repository.ProjectRepository
 	volumeRepo  repository.VolumeRepository
+	logger      logger.Logger
 }
 
 // NewPermissionService creates a new instance of PermissionService
-func NewPermissionService(projectRepo repository.ProjectRepository, volumeRepo repository.VolumeRepository) PermissionService {
+func NewPermissionService(projectRepo repository.ProjectRepository, volumeRepo repository.VolumeRepository, log logger.Logger) PermissionService {
 	return &permissionService{
 		projectRepo: projectRepo,
 		volumeRepo:  volumeRepo,
+		logger:      log,
 	}
 }
 
 // CanUserModifyProject checks if a user can modify a project
 func (s *permissionService) CanUserModifyProject(ctx context.Context, userID uint, projectID uint) error {
+	s.logger.Info(ctx, "can user modify project started",
+		zap.Uint("user_id", userID),
+		zap.Uint("project_id", projectID),
+	)
+
 	if userID == 0 || projectID == 0 {
+		s.logger.Error(ctx, "permission denied (invalid IDs)",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+		)
 		return projecterrors.ErrPermissionDenied
 	}
 
 	// Get the project
 	project, err := s.projectRepo.FindByID(ctx, projectID)
 	if err != nil {
+		s.logger.Error(ctx, "failed to find project",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		if err == projecterrors.ErrProjectNotFound {
 			return err
 		}
@@ -56,31 +74,62 @@ func (s *permissionService) CanUserModifyProject(ctx context.Context, userID uin
 
 	// Check if user is in the project
 	if !project.HasUser(userID) {
+		s.logger.Error(ctx, "permission denied (user not in project)",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+		)
 		return projecterrors.ErrPermissionDenied
 	}
 
 	// Check if user is an owner
 	projectUser, err := project.GetUserByID(userID)
 	if err != nil {
+		s.logger.Error(ctx, "permission denied (failed to get project user)",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		return projecterrors.ErrPermissionDenied
 	}
 
 	if !projectUser.IsOwner() {
+		s.logger.Error(ctx, "permission denied (owner required)",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+		)
 		return projecterrors.ErrOwnerRequired
 	}
 
+	s.logger.Info(ctx, "can user modify project completed (allowed)",
+		zap.Uint("user_id", userID),
+		zap.Uint("project_id", projectID),
+	)
 	return nil
 }
 
 // CanUserAccessProject checks if a user can access a project
 func (s *permissionService) CanUserAccessProject(ctx context.Context, userID uint, projectID uint) error {
+	s.logger.Info(ctx, "can user access project started",
+		zap.Uint("user_id", userID),
+		zap.Uint("project_id", projectID),
+	)
+
 	if userID == 0 || projectID == 0 {
+		s.logger.Error(ctx, "permission denied (invalid IDs)",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+		)
 		return projecterrors.ErrPermissionDenied
 	}
 
 	// Get the project
 	project, err := s.projectRepo.FindByID(ctx, projectID)
 	if err != nil {
+		s.logger.Error(ctx, "failed to find project",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		if err == projecterrors.ErrProjectNotFound {
 			return err
 		}
@@ -89,9 +138,17 @@ func (s *permissionService) CanUserAccessProject(ctx context.Context, userID uin
 
 	// Check if user is in the project
 	if !project.HasUser(userID) {
+		s.logger.Error(ctx, "permission denied (user not in project)",
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", projectID),
+		)
 		return projecterrors.ErrPermissionDenied
 	}
 
+	s.logger.Info(ctx, "can user access project completed (allowed)",
+		zap.Uint("user_id", userID),
+		zap.Uint("project_id", projectID),
+	)
 	return nil
 }
 
@@ -103,13 +160,26 @@ func (s *permissionService) CanUserAddVolume(ctx context.Context, userID uint, p
 
 // CanUserRemoveVolume checks if a user can remove a volume
 func (s *permissionService) CanUserRemoveVolume(ctx context.Context, userID uint, volumeID uint) error {
+	s.logger.Info(ctx, "can user remove volume started",
+		zap.Uint("user_id", userID),
+		zap.Uint("volume_id", volumeID),
+	)
+
 	if volumeID == 0 {
+		s.logger.Error(ctx, "volume not found (invalid ID)",
+			zap.Uint("volume_id", volumeID),
+		)
 		return projecterrors.ErrVolumeNotFound
 	}
 
 	// Get the volume from repository
 	volume, err := s.volumeRepo.FindByID(ctx, volumeID)
 	if err != nil {
+		s.logger.Error(ctx, "failed to find volume",
+			zap.Uint("user_id", userID),
+			zap.Uint("volume_id", volumeID),
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -119,13 +189,26 @@ func (s *permissionService) CanUserRemoveVolume(ctx context.Context, userID uint
 
 // CanUserAccessVolume checks if a user can access a volume
 func (s *permissionService) CanUserAccessVolume(ctx context.Context, userID uint, volumeID uint) error {
+	s.logger.Info(ctx, "can user access volume started",
+		zap.Uint("user_id", userID),
+		zap.Uint("volume_id", volumeID),
+	)
+
 	if volumeID == 0 {
+		s.logger.Error(ctx, "volume not found (invalid ID)",
+			zap.Uint("volume_id", volumeID),
+		)
 		return projecterrors.ErrVolumeNotFound
 	}
 
 	// Get the volume from repository
 	volume, err := s.volumeRepo.FindByID(ctx, volumeID)
 	if err != nil {
+		s.logger.Error(ctx, "failed to find volume",
+			zap.Uint("user_id", userID),
+			zap.Uint("volume_id", volumeID),
+			zap.Error(err),
+		)
 		return err
 	}
 
