@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
@@ -29,16 +30,19 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
+		testLogger := logger.NewForTest()
+		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService, testLogger)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		refreshDeploymentUseCase := &application.RefreshDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -88,16 +92,19 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
+		testLogger := logger.NewForTest()
+		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService, testLogger)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		refreshDeploymentUseCase := &application.RefreshDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -135,16 +142,19 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
+		testLogger := logger.NewForTest()
+		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService, testLogger)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		refreshDeploymentUseCase := &application.RefreshDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -184,16 +194,19 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
+		testLogger := logger.NewForTest()
+		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService, testLogger)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		refreshDeploymentUseCase := &application.RefreshDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		// Setup router - no user in context
@@ -219,16 +232,19 @@ func TestDeploymentHandler_GetDeployment(t *testing.T) {
 		mockProjectService.On("GetProjectBySlug", mock.Anything, "invalid").Return(nil, projecterrors.ErrSlugInvalidFormat)
 
 		// Create use cases
-		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
+		testLogger := logger.NewForTest()
+		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService, testLogger)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		refreshDeploymentUseCase := &application.RefreshDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -262,16 +278,19 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
+		testLogger2 := logger.NewForTest()
+		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService, testLogger2)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		getDeploymentUseCase := &application.GetDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -321,16 +340,19 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
+		testLogger2 := logger.NewForTest()
+		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService, testLogger2)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		getDeploymentUseCase := &application.GetDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -368,16 +390,19 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
+		testLogger2 := logger.NewForTest()
+		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService, testLogger2)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		getDeploymentUseCase := &application.GetDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -417,16 +442,19 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
+		testLogger2 := logger.NewForTest()
+		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService, testLogger2)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		getDeploymentUseCase := &application.GetDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		// Setup router - no user in context
@@ -452,16 +480,19 @@ func TestDeploymentHandler_RefreshDeployment(t *testing.T) {
 		mockProjectService.On("GetProjectBySlug", mock.Anything, "invalid").Return(nil, projecterrors.ErrSlugInvalidFormat)
 
 		// Create use cases
-		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
+		testLogger2 := logger.NewForTest()
+		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService, testLogger2)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		getDeploymentUseCase := &application.GetDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -495,16 +526,19 @@ func TestDeploymentHandler_PermissionDifference(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService)
+		testLogger := logger.NewForTest()
+		getDeploymentUseCase := application.NewGetDeploymentUseCase(mockDeployService, testLogger)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		refreshDeploymentUseCase := &application.RefreshDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)
@@ -546,16 +580,19 @@ func TestDeploymentHandler_PermissionDifference(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 
 		// Create use cases
-		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService)
+		testLogger2 := logger.NewForTest()
+		refreshDeploymentUseCase := application.NewRefreshDeploymentUseCase(mockDeployService, testLogger2)
 		deployProjectUseCase := &application.DeployProjectUseCase{}
 		getDeploymentUseCase := &application.GetDeploymentUseCase{}
 
+		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewDeploymentHandler(
 			deployProjectUseCase,
 			getDeploymentUseCase,
 			refreshDeploymentUseCase,
 			mockPermissionService,
 			mockProjectService,
+			mockLogger,
 		)
 
 		userID := uint(1)

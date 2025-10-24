@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
@@ -20,7 +21,8 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 유효한 입력으로 프로젝트 생성", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewCreateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		cpuLimit := uint32(1000)
 		memoryLimit := uint32(2048)
@@ -62,7 +64,8 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 최소 리소스 제한으로 프로젝트 생성", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewCreateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		cpuLimit := uint32(100)
 		memoryLimit := uint32(128)
@@ -101,7 +104,8 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: FQDN과 Plan이 있는 프로젝트 생성", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewCreateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		fqdn := "example.com"
 		plan := "premium"
@@ -145,7 +149,8 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 빈 프로젝트 이름", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewCreateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := CreateProjectInput{
 			Name:    "",
@@ -163,7 +168,8 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: OwnerID가 0", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewCreateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := CreateProjectInput{
 			Name:         "테스트 프로젝트",
@@ -187,7 +193,8 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 프로젝트 생성 서비스 에러", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewCreateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := CreateProjectInput{
 			Name:         "테스트 프로젝트",
@@ -212,7 +219,8 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 프로젝트 이름 이미 존재", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
-		uc := NewCreateProjectUseCase(mockProjectService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := CreateProjectInput{
 			Name:         "중복 프로젝트",

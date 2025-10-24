@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
@@ -19,7 +20,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 볼륨 추가", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 1,
@@ -46,7 +48,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 큰 용량의 볼륨 추가", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 1,
@@ -69,7 +72,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 최소 용량의 볼륨 추가", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 1,
@@ -92,7 +96,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 0,
@@ -113,7 +118,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 빈 볼륨 이름", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 1,
@@ -134,7 +140,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 용량이 너무 작음", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 1,
@@ -155,7 +162,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 용량이 너무 큼", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 1,
@@ -176,7 +184,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 999,
@@ -197,7 +206,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 중복된 볼륨 이름", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 1,
@@ -218,7 +228,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 프로젝트 디스크 제한 초과", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 1,
@@ -239,7 +250,8 @@ func TestAddVolumeUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewAddVolumeUseCase(mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 
 		input := AddVolumeInput{
 			ProjectID: 1,

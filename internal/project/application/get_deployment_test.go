@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
@@ -16,7 +17,8 @@ import (
 func TestGetDeploymentUseCase_Execute_Success(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewGetDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewGetDeploymentUseCase(mockDeployService, testLogger)
 
 	input := GetDeploymentInput{
 		ProjectID: 1,
@@ -47,7 +49,8 @@ func TestGetDeploymentUseCase_Execute_Success(t *testing.T) {
 func TestGetDeploymentUseCase_Execute_DeploymentNotFound(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewGetDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewGetDeploymentUseCase(mockDeployService, testLogger)
 
 	input := GetDeploymentInput{
 		ProjectID: 1,
@@ -70,7 +73,8 @@ func TestGetDeploymentUseCase_Execute_DeploymentNotFound(t *testing.T) {
 func TestGetDeploymentUseCase_Execute_WithAllOptionalFields(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewGetDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewGetDeploymentUseCase(mockDeployService, testLogger)
 
 	input := GetDeploymentInput{
 		ProjectID: 1,
@@ -112,7 +116,8 @@ func TestGetDeploymentUseCase_Execute_WithAllOptionalFields(t *testing.T) {
 func TestGetDeploymentUseCase_Execute_RunningDeployment(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewGetDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewGetDeploymentUseCase(mockDeployService, testLogger)
 
 	input := GetDeploymentInput{
 		ProjectID: 1,
@@ -149,7 +154,8 @@ func TestGetDeploymentUseCase_Execute_RunningDeployment(t *testing.T) {
 func TestGetDeploymentUseCase_Execute_DatabaseError(t *testing.T) {
 	// Arrange
 	mockDeployService := new(service.MockDeployService)
-	useCase := NewGetDeploymentUseCase(mockDeployService)
+	testLogger := logger.NewForTest()
+	useCase := NewGetDeploymentUseCase(mockDeployService, testLogger)
 
 	input := GetDeploymentInput{
 		ProjectID: 1,

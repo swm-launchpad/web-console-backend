@@ -3,7 +3,9 @@ package application
 import (
 	"context"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"go.uber.org/zap"
 )
 
 type GetVolumesInput struct {
@@ -25,18 +27,28 @@ type GetVolumesOutput struct {
 
 type GetVolumesUseCase struct {
 	volumeService service.VolumeService
+	logger        logger.Logger
 }
 
-func NewGetVolumesUseCase(volumeService service.VolumeService) *GetVolumesUseCase {
+func NewGetVolumesUseCase(volumeService service.VolumeService, log logger.Logger) *GetVolumesUseCase {
 	return &GetVolumesUseCase{
 		volumeService: volumeService,
+		logger:        log,
 	}
 }
 
 func (uc *GetVolumesUseCase) Execute(ctx context.Context, input GetVolumesInput) (*GetVolumesOutput, error) {
+	uc.logger.Info(ctx, "get volumes started",
+		zap.Uint("project_id", input.ProjectID),
+	)
+
 	// Get volumes for specific project
 	volumes, err := uc.volumeService.ListVolumesByProjectID(ctx, input.ProjectID)
 	if err != nil {
+		uc.logger.Error(ctx, "failed to get volumes",
+			zap.Error(err),
+			zap.Uint("project_id", input.ProjectID),
+		)
 		return nil, err
 	}
 
@@ -55,6 +67,11 @@ func (uc *GetVolumesUseCase) Execute(ctx context.Context, input GetVolumesInput)
 			CreatedAt: volume.CreatedAt().Format("2006-01-02T15:04:05Z"),
 		})
 	}
+
+	uc.logger.Info(ctx, "get volumes completed",
+		zap.Uint("project_id", input.ProjectID),
+		zap.Int("count", len(volumes)),
+	)
 
 	return output, nil
 }

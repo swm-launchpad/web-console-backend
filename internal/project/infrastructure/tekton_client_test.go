@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 )
@@ -89,7 +90,7 @@ func TestNewTektonClient(t *testing.T) {
 				}()
 			}
 
-			client, err := NewTektonClient()
+			client, err := NewTektonClient(logger.NewForTest())
 
 			if tt.expectedError != nil {
 				assert.Error(t, err)
@@ -255,6 +256,7 @@ func TestTektonClient_TriggerDeploy(t *testing.T) {
 				deployURL:  server.URL,
 				authHeader: "Basic test-auth",
 				httpClient: server.Client(),
+				logger:     logger.NewForTest(),
 			}
 
 			// Execute test
@@ -285,6 +287,7 @@ func TestTektonClient_TriggerDeploy_NetworkError(t *testing.T) {
 			deployURL:  "http://localhost:9999",
 			authHeader: "Basic test-auth",
 			httpClient: &http.Client{},
+			logger:     logger.NewForTest(),
 		}
 
 		request := &dto.TektonDeployRequest{
@@ -318,6 +321,7 @@ func TestTektonClient_TriggerDeploy_ContextCancellation(t *testing.T) {
 			deployURL:  server.URL,
 			authHeader: "Basic test-auth",
 			httpClient: server.Client(),
+			logger:     logger.NewForTest(),
 		}
 
 		request := &dto.TektonDeployRequest{
@@ -364,6 +368,7 @@ func TestTektonClient_TriggerDeploy_RequestValidation(t *testing.T) {
 			deployURL:  server.URL,
 			authHeader: "Basic test-auth",
 			httpClient: server.Client(),
+			logger:     logger.NewForTest(),
 		}
 
 		expectedRequest := &dto.TektonDeployRequest{

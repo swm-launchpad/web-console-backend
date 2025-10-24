@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
@@ -16,7 +17,8 @@ func TestGetVolumesUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 특정 프로젝트의 볼륨 목록 조회", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetVolumesUseCase(mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetVolumesUseCase(mockVolumeService, testLogger)
 
 		projectID := uint(1)
 		input := GetVolumesInput{
@@ -51,7 +53,8 @@ func TestGetVolumesUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 빈 볼륨 목록", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetVolumesUseCase(mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetVolumesUseCase(mockVolumeService, testLogger)
 
 		projectID := uint(1)
 		input := GetVolumesInput{
@@ -71,7 +74,8 @@ func TestGetVolumesUseCase_Execute(t *testing.T) {
 
 	t.Run("성공: 단일 볼륨", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetVolumesUseCase(mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetVolumesUseCase(mockVolumeService, testLogger)
 
 		projectID := uint(1)
 		input := GetVolumesInput{
@@ -96,7 +100,8 @@ func TestGetVolumesUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 특정 프로젝트 볼륨 조회 에러", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetVolumesUseCase(mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetVolumesUseCase(mockVolumeService, testLogger)
 
 		projectID := uint(999)
 		input := GetVolumesInput{
@@ -116,7 +121,8 @@ func TestGetVolumesUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 프로젝트 ID가 0", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetVolumesUseCase(mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetVolumesUseCase(mockVolumeService, testLogger)
 
 		projectID := uint(0)
 		input := GetVolumesInput{
@@ -136,7 +142,8 @@ func TestGetVolumesUseCase_Execute(t *testing.T) {
 
 	t.Run("실패: 데이터베이스 연결 오류", func(t *testing.T) {
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewGetVolumesUseCase(mockVolumeService)
+		testLogger := logger.NewForTest()
+		uc := NewGetVolumesUseCase(mockVolumeService, testLogger)
 
 		projectID := uint(1)
 		input := GetVolumesInput{

@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"go.uber.org/zap"
 )
 
 type GetDeploymentInput struct {
@@ -25,23 +27,34 @@ type GetDeploymentOutput struct {
 
 type GetDeploymentUseCase struct {
 	deployService service.DeployService
+	logger        logger.Logger
 }
 
 func NewGetDeploymentUseCase(
 	deployService service.DeployService,
+	log logger.Logger,
 ) *GetDeploymentUseCase {
 	return &GetDeploymentUseCase{
 		deployService: deployService,
+		logger:        log,
 	}
 }
 
 func (uc *GetDeploymentUseCase) Execute(ctx context.Context, input GetDeploymentInput) (*GetDeploymentOutput, error) {
+	uc.logger.Info(ctx, "get deployment started",
+		zap.Uint("project_id", input.ProjectID),
+	)
+
 	// Note: Permission check is performed in the handler to prevent information disclosure
 	// The handler converts permission errors to "not found" errors
 
 	// Get latest deployment status from database (lightweight operation)
 	deployment, err := uc.deployService.GetDeploymentStatus(ctx, input.ProjectID)
 	if err != nil {
+		uc.logger.Error(ctx, "failed to get deployment status",
+			zap.Error(err),
+			zap.Uint("project_id", input.ProjectID),
+		)
 		return nil, err
 	}
 
@@ -73,6 +86,12 @@ func (uc *GetDeploymentUseCase) Execute(ctx context.Context, input GetDeployment
 	if finishedAt, ok := deployment.FinishedAt(); ok {
 		output.FinishedAt = finishedAt.UTC().Format(time.RFC3339)
 	}
+
+	uc.logger.Info(ctx, "get deployment completed",
+		zap.Uint("project_id", input.ProjectID),
+		zap.Uint64("deployment_id", uint64(deployment.DeploymentID)),
+		zap.String("status", string(deployment.Status())),
+	)
 
 	return output, nil
 }

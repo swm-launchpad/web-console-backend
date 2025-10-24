@@ -5,10 +5,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"go.uber.org/zap"
 )
 
 // MVP 강제 정책 상수 - Handler 계층에서 정책 적용
@@ -29,6 +31,7 @@ type ProjectHandler struct {
 	listProjectsUseCase     *application.ListProjectsUseCase
 	permissionService       service.PermissionService
 	projectService          service.ProjectService
+	logger                  logger.Logger
 }
 
 func NewProjectHandler(
@@ -40,6 +43,7 @@ func NewProjectHandler(
 	listProjectsUseCase *application.ListProjectsUseCase,
 	permissionService service.PermissionService,
 	projectService service.ProjectService,
+	log logger.Logger,
 ) *ProjectHandler {
 	return &ProjectHandler{
 		createProjectUseCase:    createProjectUseCase,
@@ -50,6 +54,7 @@ func NewProjectHandler(
 		listProjectsUseCase:     listProjectsUseCase,
 		permissionService:       permissionService,
 		projectService:          projectService,
+		logger:                  log,
 	}
 }
 
@@ -68,15 +73,27 @@ type CreateProjectRequest struct {
 
 // CreateProject handles POST /api/v1/projects
 func (h *ProjectHandler) CreateProject(c *gin.Context) {
+	ctx := c.Request.Context()
+	h.logger.Info(ctx, "create project handler started",
+		zap.String("handler", "CreateProject"),
+	)
+
 	// Get user ID from context (set by auth middleware)
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "CreateProject"),
+		)
 		response.Error(c, auth.ErrUnauthorized, mapProjectError)
 		return
 	}
 
 	var req CreateProjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Warn(ctx, "request validation failed",
+			zap.Error(err),
+			zap.String("handler", "CreateProject"),
+		)
 		response.Error(c, projecterrors.ErrValidationFailed, mapProjectError, response.WithDetails(map[string]any{
 			"message": "Invalid request format: " + err.Error(),
 		}))
@@ -86,10 +103,21 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 	// MVP 정책 1: 사용자당 프로젝트 개수 제한 확인
 	projectCount, err := h.projectService.CountProjectsByUserID(c.Request.Context(), userID.(uint))
 	if err != nil {
+		h.logger.Error(ctx, "failed to count user projects",
+			zap.Error(err),
+			zap.String("handler", "CreateProject"),
+			zap.Uint("user_id", userID.(uint)),
+		)
 		response.Error(c, err, mapProjectError)
 		return
 	}
 	if projectCount >= MVPMaxProjectsPerUser {
+		h.logger.Warn(ctx, "project limit exceeded",
+			zap.String("handler", "CreateProject"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Int("current_count", projectCount),
+			zap.Int("max_allowed", MVPMaxProjectsPerUser),
+		)
 		response.Error(c, projecterrors.ErrProjectLimitExceeded, mapProjectError)
 		return
 	}
@@ -109,20 +137,43 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 
 	output, err := h.createProjectUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
+		h.logger.Error(ctx, "create project use case failed",
+			zap.Error(err),
+			zap.String("handler", "CreateProject"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.String("project_name", req.Name),
+		)
 		response.Error(c, err, mapProjectError)
 		return
 	}
+
+	h.logger.Info(ctx, "create project handler completed",
+		zap.String("handler", "CreateProject"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("project_id", output.ProjectID),
+		zap.String("project_slug", output.Slug),
+	)
 
 	response.Created(c, output)
 }
 
 // GetProject handles GET /api/v1/projects/:slug
 func (h *ProjectHandler) GetProject(c *gin.Context) {
+	ctx := c.Request.Context()
 	slug := c.Param("slug")
+
+	h.logger.Info(ctx, "get project handler started",
+		zap.String("handler", "GetProject"),
+		zap.String("slug", slug),
+	)
 
 	// Check user permission for project access
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "GetProject"),
+			zap.String("slug", slug),
+		)
 		response.Error(c, auth.ErrUnauthorized, mapProjectError)
 		return
 	}
@@ -133,6 +184,11 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 	}
 	output, err := h.getProjectBySlugUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
+		h.logger.Error(ctx, "get project by slug use case failed",
+			zap.Error(err),
+			zap.String("handler", "GetProject"),
+			zap.String("slug", slug),
+		)
 		response.Error(c, err, mapProjectError)
 		return
 	}
@@ -140,10 +196,24 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 	// Check user permission for project access
 	// If user doesn't have permission, return the same error as "not found" to prevent information disclosure
 	if err := h.permissionService.CanUserAccessProject(c.Request.Context(), userID.(uint), output.ProjectID); err != nil {
+		h.logger.Warn(ctx, "user permission check failed",
+			zap.Error(err),
+			zap.String("handler", "GetProject"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("project_id", output.ProjectID),
+			zap.String("slug", slug),
+		)
 		// Return project not found instead of permission denied to prevent information disclosure
 		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
 		return
 	}
+
+	h.logger.Info(ctx, "get project handler completed",
+		zap.String("handler", "GetProject"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("project_id", output.ProjectID),
+		zap.String("slug", slug),
+	)
 
 	response.OK(c, output)
 }
@@ -163,10 +233,21 @@ type UpdateProjectRequest struct {
 
 // UpdateProject handles PUT /api/v1/projects/:id
 func (h *ProjectHandler) UpdateProject(c *gin.Context) {
+	ctx := c.Request.Context()
 	slug := c.Param("slug")
+
+	h.logger.Info(ctx, "update project handler started",
+		zap.String("handler", "UpdateProject"),
+		zap.String("slug", slug),
+	)
 
 	var req UpdateProjectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Warn(ctx, "request validation failed",
+			zap.Error(err),
+			zap.String("handler", "UpdateProject"),
+			zap.String("slug", slug),
+		)
 		response.Error(c, projecterrors.ErrValidationFailed, mapProjectError, response.WithDetails(map[string]any{
 			"message": "Invalid request format: " + err.Error(),
 		}))
@@ -176,6 +257,10 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	// Check user permission for project update
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "UpdateProject"),
+			zap.String("slug", slug),
+		)
 		response.Error(c, auth.ErrUnauthorized, mapProjectError)
 		return
 	}
@@ -183,11 +268,23 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	// Get project by slug first to check permission
 	project, err := h.projectService.GetProjectBySlug(c.Request.Context(), slug)
 	if err != nil {
+		h.logger.Error(ctx, "failed to get project by slug",
+			zap.Error(err),
+			zap.String("handler", "UpdateProject"),
+			zap.String("slug", slug),
+		)
 		response.Error(c, err, mapProjectError)
 		return
 	}
 
 	if err := h.permissionService.CanUserModifyProject(c.Request.Context(), userID.(uint), project.ProjectID()); err != nil {
+		h.logger.Warn(ctx, "user permission check failed",
+			zap.Error(err),
+			zap.String("handler", "UpdateProject"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.String("slug", slug),
+		)
 		// Return project not found instead of permission denied to prevent information disclosure
 		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
 		return
@@ -214,20 +311,44 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 
 	output, err := h.updateProjectUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
+		h.logger.Error(ctx, "update project use case failed",
+			zap.Error(err),
+			zap.String("handler", "UpdateProject"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.String("slug", slug),
+		)
 		response.Error(c, err, mapProjectError)
 		return
 	}
+
+	h.logger.Info(ctx, "update project handler completed",
+		zap.String("handler", "UpdateProject"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("project_id", output.ProjectID),
+		zap.String("slug", slug),
+	)
 
 	response.OK(c, output)
 }
 
 // DeleteProject handles DELETE /api/v1/projects/:slug
 func (h *ProjectHandler) DeleteProject(c *gin.Context) {
+	ctx := c.Request.Context()
 	slug := c.Param("slug")
+
+	h.logger.Info(ctx, "delete project handler started",
+		zap.String("handler", "DeleteProject"),
+		zap.String("slug", slug),
+	)
 
 	// Check user permission for project deletion
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "DeleteProject"),
+			zap.String("slug", slug),
+		)
 		response.Error(c, auth.ErrUnauthorized, mapProjectError)
 		return
 	}
@@ -235,11 +356,23 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 	// Get project by slug first to check permission
 	project, err := h.projectService.GetProjectBySlug(c.Request.Context(), slug)
 	if err != nil {
+		h.logger.Error(ctx, "failed to get project by slug",
+			zap.Error(err),
+			zap.String("handler", "DeleteProject"),
+			zap.String("slug", slug),
+		)
 		response.Error(c, err, mapProjectError)
 		return
 	}
 
 	if err := h.permissionService.CanUserModifyProject(c.Request.Context(), userID.(uint), project.ProjectID()); err != nil {
+		h.logger.Warn(ctx, "user permission check failed",
+			zap.Error(err),
+			zap.String("handler", "DeleteProject"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.String("slug", slug),
+		)
 		// Return project not found instead of permission denied to prevent information disclosure
 		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
 		return
@@ -252,18 +385,40 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 
 	output, err := h.deleteProjectUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
+		h.logger.Error(ctx, "delete project use case failed",
+			zap.Error(err),
+			zap.String("handler", "DeleteProject"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.String("slug", slug),
+		)
 		response.Error(c, err, mapProjectError)
 		return
 	}
+
+	h.logger.Info(ctx, "delete project handler completed",
+		zap.String("handler", "DeleteProject"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("project_id", project.ProjectID()),
+		zap.String("slug", slug),
+	)
 
 	response.OK(c, output)
 }
 
 // ListProjects handles GET /api/v1/projects
 func (h *ProjectHandler) ListProjects(c *gin.Context) {
+	ctx := c.Request.Context()
+	h.logger.Info(ctx, "list projects handler started",
+		zap.String("handler", "ListProjects"),
+	)
+
 	// Get current user ID for security check
 	currentUserID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "ListProjects"),
+		)
 		response.Error(c, auth.ErrUnauthorized, mapProjectError)
 		return
 	}
@@ -275,6 +430,11 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 			id := uint(parsedUserID)
 			// Security check: users can only list their own projects
 			if id != currentUserID.(uint) {
+				h.logger.Warn(ctx, "user trying to list other user's projects",
+					zap.String("handler", "ListProjects"),
+					zap.Uint("current_user_id", currentUserID.(uint)),
+					zap.Uint("requested_user_id", id),
+				)
 				response.Error(c, projecterrors.ErrPermissionDenied, mapProjectError)
 				return
 			}
@@ -288,9 +448,20 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 
 	output, err := h.listProjectsUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
+		h.logger.Error(ctx, "list projects use case failed",
+			zap.Error(err),
+			zap.String("handler", "ListProjects"),
+			zap.Uint("user_id", userID),
+		)
 		response.Error(c, err, mapProjectError)
 		return
 	}
+
+	h.logger.Info(ctx, "list projects handler completed",
+		zap.String("handler", "ListProjects"),
+		zap.Uint("user_id", userID),
+		zap.Int("project_count", len(output.Projects)),
+	)
 
 	response.OK(c, output)
 }

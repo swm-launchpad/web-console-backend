@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
@@ -20,7 +21,8 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 	t.Run("성공: 프로젝트 삭제", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
@@ -42,7 +44,8 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 	t.Run("실패: 볼륨 삭제 실패 시 프로젝트도 삭제되지 않음", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
@@ -63,7 +66,8 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 	t.Run("성공: 볼륨이 없는 프로젝트 삭제", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
@@ -84,7 +88,8 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 0,
@@ -106,7 +111,8 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 999,
@@ -128,7 +134,8 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 	t.Run("실패: 프로젝트 삭제 불가", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
@@ -150,7 +157,8 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
@@ -172,7 +180,8 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 	t.Run("실패: 이미 삭제된 프로젝트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
