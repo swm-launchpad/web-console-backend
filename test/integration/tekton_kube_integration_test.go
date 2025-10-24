@@ -544,13 +544,28 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 		tektonBuildClient, err := infrastructure.NewTektonBuildClient()
 		require.NoError(t, err, "Failed to create TektonBuildClient")
 
-		// Create a minimal build request with template only (no GitHub repo)
+		// Use MySQL template from test directory
+		// This template uses gomplate variables like {{ .mysql_version }}
+		mysqlTemplate := `FROM mysql:{{ .mysql_version }}
+
+# MySQL configuration
+RUN echo "[mysqld]" > /etc/mysql/conf.d/custom.cnf && \
+    echo "character-set-server={{ .charset }}" >> /etc/mysql/conf.d/custom.cnf && \
+    echo "collation-server={{ .collation }}" >> /etc/mysql/conf.d/custom.cnf && \
+    echo "max_connections={{ .max_connections }}" >> /etc/mysql/conf.d/custom.cnf
+
+# Expose MySQL port
+EXPOSE {{ .mysql_port }}`
+
+		// Create a build request with template only (no GitHub repo)
 		buildRequest := &dto.TektonBuildRequest{
-			ProjectID:   "0",
-			ContainerID: "0",
-			ImageName:   "integration-test-image",
-			ForceBuild:  "true",
-			Template:    "FROM alpine:latest\nRUN echo 'Integration test build'",
+			ProjectID:            "0",
+			ContainerID:          "0",
+			ImageName:            "integration-test-mysql",
+			ForceBuild:           "true",
+			Template:             mysqlTemplate,
+			DockerfileConfigJSON: `{"mysql_version":"8.0","charset":"utf8mb4","collation":"utf8mb4_unicode_ci","max_connections":"200","mysql_port":"3306"}`,
+			BuildEnvJSON:         `{"TZ":"Asia/Seoul"}`,
 		}
 
 		// When - Trigger build
@@ -573,20 +588,44 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 		tektonBuildClient, err := infrastructure.NewTektonBuildClient()
 		require.NoError(t, err, "Failed to create TektonBuildClient")
 
+		// Use Node.js template with gomplate variables
+		nodeTemplate := `FROM node:{{ .node_version }}-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE {{ .app_port }}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD node --version || exit 1
+
+# Run application
+CMD ["node", "{{ .entry_point }}"]`
+
 		// Create a build request with GitHub repository
 		// This uses the test repository from user-workload-infra/tekton-pipelines/image-build-push/test/
 		buildRequest := &dto.TektonBuildRequest{
 			ProjectID:            "0",
 			ContainerID:          "0",
-			ImageName:            "integration-test-github",
+			ImageName:            "integration-test-nodejs",
 			GitHubURL:            "https://github.com/hakumizuki/cicd-test",
 			GitHubBranch:         "main",
 			DirectoryPath:        ".",
-			ForceBuild:           "false", // Let Tekton decide based on commit hash
-			LastBuildCommitHash:  "",      // Empty means first build
-			Template:             "FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nEXPOSE 3000\nCMD [\"node\", \"index.js\"]",
-			DockerfileConfigJSON: "",
-			BuildEnvJSON:         `{"NODE_ENV":"production"}`,
+			ForceBuild:           "true", // Force build for testing
+			LastBuildCommitHash:  "",     // Empty means first build
+			Template:             nodeTemplate,
+			DockerfileConfigJSON: `{"node_version":"18","app_port":"3000","entry_point":"index.js"}`,
+			BuildEnvJSON:         `{"NODE_ENV":"production","TZ":"Asia/Seoul"}`,
 			// RegistryURL is not set, will use environment variable
 		}
 
