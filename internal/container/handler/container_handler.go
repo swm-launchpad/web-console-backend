@@ -807,7 +807,7 @@ type AddNetworkRequest struct {
 // AddNetwork handles adding a network port mapping to a container
 func (h *ContainerHandler) AddNetwork(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 
 	h.logger.Info(ctx, "add network handler started",
 		zap.String("handler", "AddNetwork"),
@@ -889,7 +889,7 @@ func (h *ContainerHandler) AddNetwork(c *gin.Context) {
 // DeleteNetwork handles deleting a network port mapping from a container
 func (h *ContainerHandler) DeleteNetwork(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 	portStr := c.Param("port")
 
 	h.logger.Info(ctx, "delete network handler started",
@@ -972,15 +972,28 @@ func (h *ContainerHandler) DeleteNetwork(c *gin.Context) {
 
 // ListNetworks handles fetching all network port mappings for a container
 func (h *ContainerHandler) ListNetworks(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	h.logger.Info(ctx, "list networks handler started",
+		zap.String("handler", "ListNetworks"),
+	)
+
 	// Get user ID from context
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "ListNetworks"),
+		)
 		response.Error(c, auth.ErrUnauthorized, mapContainerError)
 		return
 	}
 
 	container, err := h.getContainerBySlug(c)
 	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "ListNetworks"),
+		)
 		response.Error(c, err, mapContainerError)
 		return
 	}
@@ -993,9 +1006,22 @@ func (h *ContainerHandler) ListNetworks(c *gin.Context) {
 
 	output, err := h.getContainerUC.Execute(c.Request.Context(), input)
 	if err != nil {
+		h.logger.Error(ctx, "get container use case failed",
+			zap.Error(err),
+			zap.String("handler", "ListNetworks"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("container_id", container.ContainerID()),
+		)
 		response.Error(c, err, mapContainerError)
 		return
 	}
+
+	h.logger.Info(ctx, "list networks handler completed",
+		zap.String("handler", "ListNetworks"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.Int("count", len(output.Networks)),
+	)
 
 	// Return just the networks
 	response.OK(c, gin.H{"networks": output.Networks})
@@ -1003,15 +1029,28 @@ func (h *ContainerHandler) ListNetworks(c *gin.Context) {
 
 // ListEnvVars handles fetching all environment variables for a container
 func (h *ContainerHandler) ListEnvVars(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	h.logger.Info(ctx, "list env vars handler started",
+		zap.String("handler", "ListEnvVars"),
+	)
+
 	// Get user ID from context
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "ListEnvVars"),
+		)
 		response.Error(c, auth.ErrUnauthorized, mapContainerError)
 		return
 	}
 
 	container, err := h.getContainerBySlug(c)
 	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "ListEnvVars"),
+		)
 		response.Error(c, err, mapContainerError)
 		return
 	}
@@ -1024,9 +1063,22 @@ func (h *ContainerHandler) ListEnvVars(c *gin.Context) {
 
 	output, err := h.getContainerUC.Execute(c.Request.Context(), input)
 	if err != nil {
+		h.logger.Error(ctx, "get container use case failed",
+			zap.Error(err),
+			zap.String("handler", "ListEnvVars"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("container_id", container.ContainerID()),
+		)
 		response.Error(c, err, mapContainerError)
 		return
 	}
+
+	h.logger.Info(ctx, "list env vars handler completed",
+		zap.String("handler", "ListEnvVars"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.Int("count", len(output.EnvVars)),
+	)
 
 	// Return just the environment variables
 	response.OK(c, gin.H{"env_vars": output.EnvVars})
@@ -1041,7 +1093,7 @@ type AddSecretRequest struct {
 // AddSecret handles adding a secret to a container
 func (h *ContainerHandler) AddSecret(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 
 	h.logger.Info(ctx, "add secret handler started",
 		zap.String("handler", "AddSecret"),
@@ -1119,7 +1171,7 @@ type UpdateSecretRequest struct {
 // UpdateSecret handles updating an existing secret
 func (h *ContainerHandler) UpdateSecret(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 	key := c.Param("key")
 
 	h.logger.Info(ctx, "update secret handler started",
@@ -1204,7 +1256,7 @@ func (h *ContainerHandler) UpdateSecret(c *gin.Context) {
 // DeleteSecret handles deleting a secret from a container
 func (h *ContainerHandler) DeleteSecret(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 	key := c.Param("key")
 
 	h.logger.Info(ctx, "delete secret handler started",
@@ -1275,15 +1327,28 @@ func (h *ContainerHandler) DeleteSecret(c *gin.Context) {
 
 // ListSecrets handles fetching all secrets for a container
 func (h *ContainerHandler) ListSecrets(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	h.logger.Info(ctx, "list secrets handler started",
+		zap.String("handler", "ListSecrets"),
+	)
+
 	// Get user ID from context
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "ListSecrets"),
+		)
 		response.Error(c, auth.ErrUnauthorized, mapContainerError)
 		return
 	}
 
 	container, err := h.getContainerBySlug(c)
 	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "ListSecrets"),
+		)
 		response.Error(c, err, mapContainerError)
 		return
 	}
@@ -1296,9 +1361,22 @@ func (h *ContainerHandler) ListSecrets(c *gin.Context) {
 
 	output, err := h.getContainerUC.Execute(c.Request.Context(), input)
 	if err != nil {
+		h.logger.Error(ctx, "get container use case failed",
+			zap.Error(err),
+			zap.String("handler", "ListSecrets"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("container_id", container.ContainerID()),
+		)
 		response.Error(c, err, mapContainerError)
 		return
 	}
+
+	h.logger.Info(ctx, "list secrets handler completed",
+		zap.String("handler", "ListSecrets"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.Int("count", len(output.Secrets)),
+	)
 
 	// Return just the secrets
 	response.OK(c, gin.H{"secrets": output.Secrets})
@@ -1313,7 +1391,7 @@ type AddMountRequest struct {
 // AddMount handles adding a volume mount to a container
 func (h *ContainerHandler) AddMount(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 
 	h.logger.Info(ctx, "add mount handler started",
 		zap.String("handler", "AddMount"),
@@ -1389,7 +1467,7 @@ func (h *ContainerHandler) AddMount(c *gin.Context) {
 // DeleteMount handles deleting a volume mount from a container
 func (h *ContainerHandler) DeleteMount(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 	volumeIDStr := c.Param("volume_id")
 
 	h.logger.Info(ctx, "delete mount handler started",
@@ -1477,15 +1555,28 @@ func (h *ContainerHandler) DeleteMount(c *gin.Context) {
 
 // ListBuildVars handles fetching all build variables for a container
 func (h *ContainerHandler) ListBuildVars(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	h.logger.Info(ctx, "list build vars handler started",
+		zap.String("handler", "ListBuildVars"),
+	)
+
 	// Get user ID from context
 	userID, exists := c.Get(auth.ContextKeyUserID)
 	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "ListBuildVars"),
+		)
 		response.Error(c, auth.ErrUnauthorized, mapContainerError)
 		return
 	}
 
 	container, err := h.getContainerBySlug(c)
 	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "ListBuildVars"),
+		)
 		response.Error(c, err, mapContainerError)
 		return
 	}
@@ -1498,9 +1589,22 @@ func (h *ContainerHandler) ListBuildVars(c *gin.Context) {
 
 	output, err := h.getContainerUC.Execute(c.Request.Context(), input)
 	if err != nil {
+		h.logger.Error(ctx, "get container use case failed",
+			zap.Error(err),
+			zap.String("handler", "ListBuildVars"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("container_id", container.ContainerID()),
+		)
 		response.Error(c, err, mapContainerError)
 		return
 	}
+
+	h.logger.Info(ctx, "list build vars handler completed",
+		zap.String("handler", "ListBuildVars"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.Int("count", len(output.BuildVars)),
+	)
 
 	// Return just the build variables
 	response.OK(c, gin.H{"build_vars": output.BuildVars})
@@ -1515,7 +1619,7 @@ type AddBuildVarRequest struct {
 // AddBuildVar handles adding a build variable to a container
 func (h *ContainerHandler) AddBuildVar(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 
 	h.logger.Info(ctx, "add build var handler started",
 		zap.String("handler", "AddBuildVar"),
@@ -1593,7 +1697,7 @@ type UpdateBuildVarRequest struct {
 // UpdateBuildVar handles updating a build variable in a container
 func (h *ContainerHandler) UpdateBuildVar(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 	buildVarKey := c.Param("key")
 
 	h.logger.Info(ctx, "update build var handler started",
@@ -1678,7 +1782,7 @@ func (h *ContainerHandler) UpdateBuildVar(c *gin.Context) {
 // DeleteBuildVar handles deleting a build variable from a container
 func (h *ContainerHandler) DeleteBuildVar(c *gin.Context) {
 	ctx := c.Request.Context()
-	containerSlug := c.Param("container_slug")
+	containerSlug := c.Param("slug")
 	key := c.Param("key")
 
 	h.logger.Info(ctx, "delete build var handler started",
