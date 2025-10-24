@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
@@ -39,8 +40,9 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
-		handler := NewAuthHandler(registerUseCase, nil)
+		testLogger := logger.NewForTest()
+		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
+		handler := NewAuthHandler(registerUseCase, nil, testLogger)
 
 		createdAt := time.Now()
 		name := "Test User"
@@ -97,8 +99,9 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
-		handler := NewAuthHandler(registerUseCase, nil)
+		testLogger := logger.NewForTest()
+		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
+		handler := NewAuthHandler(registerUseCase, nil, testLogger)
 
 		createdAt := time.Now()
 		user := &model.User{
@@ -153,8 +156,9 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
-		handler := NewAuthHandler(registerUseCase, nil)
+		testLogger := logger.NewForTest()
+		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
+		handler := NewAuthHandler(registerUseCase, nil, testLogger)
 
 		name := "Test User"
 		mockAuthService.On("RegisterUser", mock.Anything, "existinguser", "password123", "test@example.com", &name).
@@ -186,8 +190,9 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
-		handler := NewAuthHandler(registerUseCase, nil)
+		testLogger := logger.NewForTest()
+		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
+		handler := NewAuthHandler(registerUseCase, nil, testLogger)
 
 		name := "Test User"
 		mockAuthService.On("RegisterUser", mock.Anything, "testuser", "password123", "existing@example.com", &name).
@@ -219,8 +224,9 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
-		handler := NewAuthHandler(registerUseCase, nil)
+		testLogger := logger.NewForTest()
+		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
+		handler := NewAuthHandler(registerUseCase, nil, testLogger)
 
 		router := gin.New()
 		router.POST("/auth/register", handler.Register)
@@ -250,8 +256,9 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 
 	t.Run("성공: 유효한 입력으로 로그인", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		loginUseCase := application.NewLoginUserUseCase(mockAuthService)
-		handler := NewAuthHandler(nil, loginUseCase)
+		testLogger := logger.NewForTest()
+		loginUseCase := application.NewLoginUserUseCase(mockAuthService, testLogger)
+		handler := NewAuthHandler(nil, loginUseCase, testLogger)
 
 		name := "Test User"
 		user := &model.User{
@@ -293,8 +300,9 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 잘못된 자격증명", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		loginUseCase := application.NewLoginUserUseCase(mockAuthService)
-		handler := NewAuthHandler(nil, loginUseCase)
+		testLogger := logger.NewForTest()
+		loginUseCase := application.NewLoginUserUseCase(mockAuthService, testLogger)
+		handler := NewAuthHandler(nil, loginUseCase, testLogger)
 
 		mockAuthService.On("AuthenticateUser", context.Background(), "testuser", "wrongpassword").
 			Return((*model.User)(nil), "", service.ErrInvalidCredentials)
@@ -323,8 +331,9 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 
 	t.Run("실패: 요청 형식 오류", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
-		loginUseCase := application.NewLoginUserUseCase(mockAuthService)
-		handler := NewAuthHandler(nil, loginUseCase)
+		testLogger := logger.NewForTest()
+		loginUseCase := application.NewLoginUserUseCase(mockAuthService, testLogger)
+		handler := NewAuthHandler(nil, loginUseCase, testLogger)
 
 		router := gin.New()
 		router.POST("/auth/login", handler.Login)

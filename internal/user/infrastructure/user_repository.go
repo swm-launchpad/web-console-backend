@@ -8,23 +8,32 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
+	"go.uber.org/zap"
 )
 
 type userRepository struct {
 	queries *sqlc.Queries
+	logger  logger.Logger
 }
 
-func NewUserRepository(db sqlc.DBTX) repository.UserRepository {
+func NewUserRepository(db sqlc.DBTX, log logger.Logger) repository.UserRepository {
 	return &userRepository{
 		queries: sqlc.New(db),
+		logger:  log,
 	}
 }
 
 func (r *userRepository) Create(ctx context.Context, user *model.User) error {
+	r.logger.Info(ctx, "user repository create started",
+		zap.String("username", user.Username),
+		zap.String("email", user.Email),
+	)
+
 	params := sqlc.CreateUserParams{
 		Username:          user.Username,
 		PasswordHash:      user.PasswordHash,
@@ -44,22 +53,44 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 	if err != nil {
 		// Check for duplicate username or email
 		if isDuplicateError(err) {
+			r.logger.Error(ctx, "duplicate user",
+				zap.String("username", user.Username),
+				zap.String("email", user.Email),
+				zap.Error(err),
+			)
 			return usererrors.ErrUserAlreadyExists
 		}
+		r.logger.Error(ctx, "failed to create user",
+			zap.String("username", user.Username),
+			zap.Error(err),
+		)
 		return usererrors.ErrDatabaseUnavailable
 	}
 
 	// Get the auto-generated ID
 	lastID, err := result.LastInsertId()
 	if err != nil {
+		r.logger.Error(ctx, "failed to get last insert ID",
+			zap.String("username", user.Username),
+			zap.Error(err),
+		)
 		return err
 	}
 	user.UserID = uint(lastID)
 
+	r.logger.Info(ctx, "user repository create completed",
+		zap.Uint("user_id", user.UserID),
+		zap.String("username", user.Username),
+	)
 	return nil
 }
 
 func (r *userRepository) Update(ctx context.Context, user *model.User) error {
+	r.logger.Info(ctx, "user repository update started",
+		zap.Uint("user_id", user.UserID),
+		zap.String("username", user.Username),
+	)
+
 	params := sqlc.UpdateUserParams{
 		PasswordHash:      user.PasswordHash,
 		PasswordUpdatedAt: toNullTime(user.PasswordUpdatedAt),
@@ -76,18 +107,32 @@ func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 
 	result, err := r.queriesWithContext(ctx).UpdateUser(ctx, params)
 	if err != nil {
+		r.logger.Error(ctx, "failed to update user",
+			zap.Uint("user_id", user.UserID),
+			zap.Error(err),
+		)
 		return usererrors.ErrDatabaseUnavailable
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
+		r.logger.Error(ctx, "failed to get rows affected",
+			zap.Uint("user_id", user.UserID),
+			zap.Error(err),
+		)
 		return usererrors.ErrDatabaseOperation
 	}
 
 	if rowsAffected == 0 {
+		r.logger.Error(ctx, "user not found for update",
+			zap.Uint("user_id", user.UserID),
+		)
 		return usererrors.ErrUserNotFound
 	}
 
+	r.logger.Info(ctx, "user repository update completed",
+		zap.Uint("user_id", user.UserID),
+	)
 	return nil
 }
 
@@ -95,8 +140,15 @@ func (r *userRepository) FindByID(ctx context.Context, userID uint) (*model.User
 	sqlcUser, err := r.queriesWithContext(ctx).GetUserByID(ctx, uint32(userID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "user not found",
+				zap.Uint("user_id", userID),
+			)
 			return nil, usererrors.ErrUserNotFound
 		}
+		r.logger.Error(ctx, "failed to find user by ID",
+			zap.Uint("user_id", userID),
+			zap.Error(err),
+		)
 		return nil, usererrors.ErrDatabaseUnavailable
 	}
 

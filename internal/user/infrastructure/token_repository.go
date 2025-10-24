@@ -7,20 +7,24 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model/token"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
+	"go.uber.org/zap"
 )
 
 type tokenRepository struct {
 	queries *sqlc.Queries
+	logger  logger.Logger
 }
 
 // NewTokenRepository creates a new token repository instance
-func NewTokenRepository(db sqlc.DBTX) repository.TokenRepository {
+func NewTokenRepository(db sqlc.DBTX, log logger.Logger) repository.TokenRepository {
 	return &tokenRepository{
 		queries: sqlc.New(db),
+		logger:  log,
 	}
 }
 
@@ -35,6 +39,11 @@ func (r *tokenRepository) getQueries(ctx context.Context) *sqlc.Queries {
 
 // Create saves a new verification token
 func (r *tokenRepository) Create(ctx context.Context, t *token.VerificationToken) error {
+	r.logger.Info(ctx, "token repository create started",
+		zap.Uint("user_id", t.UserID),
+		zap.String("token_type", string(t.TokenType)),
+	)
+
 	params := sqlc.CreateVerificationTokenParams{
 		UserID:    uint32(t.UserID),
 		Token:     t.Token,
@@ -46,28 +55,49 @@ func (r *tokenRepository) Create(ctx context.Context, t *token.VerificationToken
 	queries := r.getQueries(ctx)
 	err := queries.CreateVerificationToken(ctx, params)
 	if err != nil {
+		r.logger.Error(ctx, "token repository create failed",
+			zap.Uint("user_id", t.UserID),
+			zap.Error(err),
+		)
 		return usererrors.ErrDatabaseOperation
 	}
 
+	r.logger.Info(ctx, "token repository create completed",
+		zap.Uint("user_id", t.UserID),
+		zap.String("token_type", string(t.TokenType)),
+	)
 	return nil
 }
 
 // FindByToken retrieves a token by its token string
 func (r *tokenRepository) FindByToken(ctx context.Context, tokenStr string) (*token.VerificationToken, error) {
+	r.logger.Info(ctx, "token repository find by token started")
+
 	queries := r.getQueries(ctx)
 	sqlcToken, err := queries.FindTokenByToken(ctx, tokenStr)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "token not found", zap.Error(usererrors.ErrTokenNotFound))
 			return nil, usererrors.ErrTokenNotFound
 		}
+		r.logger.Error(ctx, "token repository find by token failed", zap.Error(err))
 		return nil, usererrors.ErrDatabaseOperation
 	}
 
-	return mapSQLCTokenToDomainToken(sqlcToken), nil
+	domainToken := mapSQLCTokenToDomainToken(sqlcToken)
+	r.logger.Info(ctx, "token repository find by token completed",
+		zap.Uint("token_id", domainToken.TokenID),
+		zap.Uint("user_id", domainToken.UserID),
+	)
+	return domainToken, nil
 }
 
 // MarkAsUsed marks a token as used
 func (r *tokenRepository) MarkAsUsed(ctx context.Context, tokenID uint) error {
+	r.logger.Info(ctx, "token repository mark as used started",
+		zap.Uint("token_id", tokenID),
+	)
+
 	// Set current time
 	now := sql.NullTime{
 		Time:  time.Now(),
@@ -82,9 +112,16 @@ func (r *tokenRepository) MarkAsUsed(ctx context.Context, tokenID uint) error {
 	queries := r.getQueries(ctx)
 	err := queries.MarkTokenAsUsed(ctx, params)
 	if err != nil {
+		r.logger.Error(ctx, "token repository mark as used failed",
+			zap.Uint("token_id", tokenID),
+			zap.Error(err),
+		)
 		return usererrors.ErrDatabaseOperation
 	}
 
+	r.logger.Info(ctx, "token repository mark as used completed",
+		zap.Uint("token_id", tokenID),
+	)
 	return nil
 }
 

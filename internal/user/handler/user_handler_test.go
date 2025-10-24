@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
@@ -55,8 +56,9 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 	t.Run("성공: 인증된 사용자 프로필 조회", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		userID := uint(123)
 		createdAt := time.Date(2024, 1, 15, 10, 30, 45, 0, time.UTC)
@@ -112,8 +114,9 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		userID := uint(456)
 
@@ -150,8 +153,9 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 	t.Run("실패: 데이터베이스 오류", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		userID := uint(789)
 
@@ -188,8 +192,9 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 	t.Run("성공: 선택적 필드가 nil인 경우", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		userID := uint(321)
 		createdAt := time.Date(2024, 1, 15, 10, 30, 45, 0, time.UTC)
@@ -246,8 +251,9 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 	t.Run("실패: userID가 0인 경우", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		userID := uint(0)
 
@@ -284,8 +290,9 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 	t.Run("실패: userID가 context에 없는 경우", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		// Act
 		router := gin.New()
@@ -320,8 +327,9 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 	t.Run("성공: ID로 사용자 조회", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		userID := uint(100)
 		createdAt := time.Date(2024, 2, 20, 14, 25, 30, 0, time.UTC)
@@ -374,8 +382,9 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 	t.Run("실패: 잘못된 ID 형식", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		// Act
 		router := gin.New()
@@ -405,8 +414,9 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		userID := uint(999)
 
@@ -440,8 +450,9 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 	t.Run("실패: 데이터베이스 오류", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
-		getUserUseCase := application.NewGetUserUseCase(mockService)
-		handler := NewUserHandler(getUserUseCase, nil, nil)
+		testLogger := logger.NewForTest()
+		getUserUseCase := application.NewGetUserUseCase(mockService, testLogger)
+		handler := NewUserHandler(getUserUseCase, nil, nil, testLogger)
 
 		userID := uint(200)
 

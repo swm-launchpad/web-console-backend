@@ -7,23 +7,33 @@ import (
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
+	"go.uber.org/zap"
 )
 
 type githubInstallationRepository struct {
 	queries *sqlc.Queries
+	logger  logger.Logger
 }
 
-func NewGitHubInstallationRepository(db sqlc.DBTX) repository.GitHubInstallationRepository {
+func NewGitHubInstallationRepository(db sqlc.DBTX, log logger.Logger) repository.GitHubInstallationRepository {
 	return &githubInstallationRepository{
 		queries: sqlc.New(db),
+		logger:  log,
 	}
 }
 
 func (r *githubInstallationRepository) Create(ctx context.Context, installation *model.GitHubInstallation) error {
+	r.logger.Info(ctx, "github installation repository create started",
+		zap.Int64("installation_id", installation.InstallationID),
+		zap.Uint("user_id", installation.UserID),
+		zap.String("account_login", installation.AccountLogin),
+	)
+
 	params := sqlc.CreateGitHubInstallationParams{
 		InstallationID: uint64(installation.InstallationID),
 		UserID:         uint32(installation.UserID),
@@ -41,24 +51,53 @@ func (r *githubInstallationRepository) Create(ctx context.Context, installation 
 	_, err := r.queriesWithContext(ctx).CreateGitHubInstallation(ctx, params)
 	if err != nil {
 		if isDuplicateError(err) {
+			r.logger.Error(ctx, "github installation already exists",
+				zap.Int64("installation_id", installation.InstallationID),
+				zap.Error(usererrors.ErrInstallationExists),
+			)
 			return usererrors.ErrInstallationExists
 		}
+		r.logger.Error(ctx, "github installation repository create failed",
+			zap.Int64("installation_id", installation.InstallationID),
+			zap.Error(err),
+		)
 		return usererrors.ErrDatabaseOperation
 	}
 
+	r.logger.Info(ctx, "github installation repository create completed",
+		zap.Int64("installation_id", installation.InstallationID),
+		zap.Uint("user_id", installation.UserID),
+	)
 	return nil
 }
 
 func (r *githubInstallationRepository) FindByInstallationID(ctx context.Context, installationID int64) (*model.GitHubInstallation, error) {
+	r.logger.Info(ctx, "github installation repository find by installation id started",
+		zap.Int64("installation_id", installationID),
+	)
+
 	row, err := r.queriesWithContext(ctx).GetGitHubInstallationByID(ctx, uint64(installationID))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "github installation not found",
+				zap.Int64("installation_id", installationID),
+				zap.Error(usererrors.ErrInstallationNotFound),
+			)
 			return nil, usererrors.ErrInstallationNotFound
 		}
+		r.logger.Error(ctx, "github installation repository find failed",
+			zap.Int64("installation_id", installationID),
+			zap.Error(err),
+		)
 		return nil, usererrors.ErrDatabaseUnavailable
 	}
 
-	return toGitHubInstallationModel(row), nil
+	installation := toGitHubInstallationModel(row)
+	r.logger.Info(ctx, "github installation repository find by installation id completed",
+		zap.Int64("installation_id", installationID),
+		zap.Uint("user_id", installation.UserID),
+	)
+	return installation, nil
 }
 
 func (r *githubInstallationRepository) FindByUserID(ctx context.Context, userID uint) ([]*model.GitHubInstallation, error) {
@@ -76,6 +115,10 @@ func (r *githubInstallationRepository) FindByUserID(ctx context.Context, userID 
 }
 
 func (r *githubInstallationRepository) Update(ctx context.Context, installation *model.GitHubInstallation) error {
+	r.logger.Info(ctx, "github installation repository update started",
+		zap.Int64("installation_id", installation.InstallationID),
+	)
+
 	params := sqlc.UpdateGitHubInstallationParams{
 		CachedToken:    toNullString(installation.CachedToken),
 		TokenExpiresAt: toNullTime(installation.TokenExpiresAt),
@@ -85,18 +128,33 @@ func (r *githubInstallationRepository) Update(ctx context.Context, installation 
 
 	result, err := r.queriesWithContext(ctx).UpdateGitHubInstallation(ctx, params)
 	if err != nil {
+		r.logger.Error(ctx, "github installation repository update failed",
+			zap.Int64("installation_id", installation.InstallationID),
+			zap.Error(err),
+		)
 		return usererrors.ErrDatabaseOperation
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
+		r.logger.Error(ctx, "github installation repository update rows affected check failed",
+			zap.Int64("installation_id", installation.InstallationID),
+			zap.Error(err),
+		)
 		return usererrors.ErrDatabaseOperation
 	}
 
 	if rowsAffected == 0 {
+		r.logger.Error(ctx, "github installation not found for update",
+			zap.Int64("installation_id", installation.InstallationID),
+			zap.Error(usererrors.ErrInstallationNotFound),
+		)
 		return usererrors.ErrInstallationNotFound
 	}
 
+	r.logger.Info(ctx, "github installation repository update completed",
+		zap.Int64("installation_id", installation.InstallationID),
+	)
 	return nil
 }
 
