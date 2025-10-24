@@ -311,11 +311,13 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 			defer server.Close()
 
 			// Create client with mock server URL
+			log := logger.NewForTest()
 			client := &tektonBuildClient{
 				buildURL:    server.URL,
 				authHeader:  "Basic test-auth",
 				registryURL: "test-registry.example.com",
 				httpClient:  server.Client(),
+				logger:      log,
 			}
 
 			// Execute test
@@ -342,11 +344,13 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 func TestTektonBuildClient_TriggerBuild_NetworkError(t *testing.T) {
 	t.Run("실패: 네트워크 에러 (서버 연결 불가)", func(t *testing.T) {
 		// Create client with invalid URL (no server listening)
+		log := logger.NewForTest()
 		client := &tektonBuildClient{
 			buildURL:    "http://localhost:9999",
 			authHeader:  "Basic test-auth",
 			registryURL: "test-registry.example.com",
 			httpClient:  &http.Client{},
+			logger:      log,
 		}
 
 		request := &dto.TektonBuildRequest{
@@ -375,11 +379,13 @@ func TestTektonBuildClient_TriggerBuild_ContextCancellation(t *testing.T) {
 		}))
 		defer server.Close()
 
+		log := logger.NewForTest()
 		client := &tektonBuildClient{
 			buildURL:    server.URL,
 			authHeader:  "Basic test-auth",
 			registryURL: "test-registry.example.com",
 			httpClient:  server.Client(),
+			logger:      log,
 		}
 
 		request := &dto.TektonBuildRequest{
@@ -421,11 +427,13 @@ func TestTektonBuildClient_TriggerBuild_RequestValidation(t *testing.T) {
 		}))
 		defer server.Close()
 
+		log := logger.NewForTest()
 		client := &tektonBuildClient{
 			buildURL:    server.URL,
 			authHeader:  "Basic test-auth",
 			registryURL: "test-registry.example.com",
 			httpClient:  server.Client(),
+			logger:      log,
 		}
 
 		expectedRequest := &dto.TektonBuildRequest{
