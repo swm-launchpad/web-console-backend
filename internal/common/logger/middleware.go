@@ -23,8 +23,12 @@ func NewLoggingMiddleware(logger Logger) *LoggingMiddleware {
 // Handler returns the Gin middleware handler
 func (m *LoggingMiddleware) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Generate request ID
-		requestID := uuid.New().String()
+		// Check for existing request ID from upstream (e.g., load balancer, API gateway)
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			// Generate new request ID only if not provided
+			requestID = uuid.New().String()
+		}
 
 		// Add request ID to context
 		ctx := WithRequestID(c.Request.Context(), requestID)
@@ -46,6 +50,9 @@ func (m *LoggingMiddleware) Handler() gin.HandlerFunc {
 
 		// Process request
 		c.Next()
+
+		// Get updated context after middleware chain (includes auth metadata)
+		ctx = c.Request.Context()
 
 		// Calculate duration
 		duration := time.Since(start)
