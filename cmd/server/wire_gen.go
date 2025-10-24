@@ -14,6 +14,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/github"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	application3 "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
@@ -45,108 +46,112 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	userRepository := infrastructure.NewUserRepository(db)
-	userService := service.NewUserService(userRepository)
+	logger, err := provideLogger(configConfig)
+	if err != nil {
+		return nil, err
+	}
+	userRepository := infrastructure.NewUserRepository(db, logger)
+	userService := service.NewUserService(userRepository, logger)
 	jwtUtil := provideJWTUtil(configConfig)
 	passwordUtil := password.NewPasswordUtil()
-	authService := service.NewAuthService(userService, jwtUtil, passwordUtil)
-	tokenRepository := infrastructure.NewTokenRepository(db)
-	tokenService := service.NewTokenService(tokenRepository)
-	emailService := provideEmailService(configConfig)
+	authService := service.NewAuthService(userService, jwtUtil, passwordUtil, logger)
+	tokenRepository := infrastructure.NewTokenRepository(db, logger)
+	tokenService := service.NewTokenService(tokenRepository, logger)
+	emailService := provideEmailService(configConfig, logger)
 	txManager := provideTxManager(db)
-	registerUserUseCase := application.NewRegisterUserUseCase(authService, tokenService, emailService, txManager)
-	loginUserUseCase := application.NewLoginUserUseCase(authService)
-	authHandler := handler.NewAuthHandler(registerUserUseCase, loginUserUseCase)
-	getUserUseCase := application.NewGetUserUseCase(userService)
-	updateUserUseCase := application.NewUpdateUserUseCase(userService)
-	changePasswordUseCase := application.NewChangePasswordUseCase(userService, authService)
-	userHandler := handler.NewUserHandler(getUserUseCase, updateUserUseCase, changePasswordUseCase)
-	verifyEmailUseCase := application.NewVerifyEmailUseCase(tokenService, userService, txManager)
-	resendVerificationEmailUseCase := application.NewResendVerificationEmailUseCase(userService, tokenService, emailService, txManager)
-	verificationHandler := handler.NewVerificationHandler(verifyEmailUseCase, resendVerificationEmailUseCase)
-	requestPasswordResetUseCase := application.NewRequestPasswordResetUseCase(userService, tokenService, emailService, txManager)
-	resetPasswordUseCase := application.NewResetPasswordUseCase(tokenService, authService, userService, txManager)
-	passwordResetHandler := handler.NewPasswordResetHandler(requestPasswordResetUseCase, resetPasswordUseCase)
-	gitHubInstallationRepository := infrastructure.NewGitHubInstallationRepository(db)
+	registerUserUseCase := application.NewRegisterUserUseCase(authService, tokenService, emailService, txManager, logger)
+	loginUserUseCase := application.NewLoginUserUseCase(authService, logger)
+	authHandler := handler.NewAuthHandler(registerUserUseCase, loginUserUseCase, logger)
+	getUserUseCase := application.NewGetUserUseCase(userService, logger)
+	updateUserUseCase := application.NewUpdateUserUseCase(userService, logger)
+	changePasswordUseCase := application.NewChangePasswordUseCase(userService, authService, logger)
+	userHandler := handler.NewUserHandler(getUserUseCase, updateUserUseCase, changePasswordUseCase, logger)
+	verifyEmailUseCase := application.NewVerifyEmailUseCase(tokenService, userService, txManager, logger)
+	resendVerificationEmailUseCase := application.NewResendVerificationEmailUseCase(userService, tokenService, emailService, txManager, logger)
+	verificationHandler := handler.NewVerificationHandler(verifyEmailUseCase, resendVerificationEmailUseCase, logger)
+	requestPasswordResetUseCase := application.NewRequestPasswordResetUseCase(userService, tokenService, emailService, txManager, logger)
+	resetPasswordUseCase := application.NewResetPasswordUseCase(tokenService, authService, userService, txManager, logger)
+	passwordResetHandler := handler.NewPasswordResetHandler(requestPasswordResetUseCase, resetPasswordUseCase, logger)
+	gitHubInstallationRepository := infrastructure.NewGitHubInstallationRepository(db, logger)
 	client, err := provideGitHubClient(configConfig)
 	if err != nil {
 		return nil, err
 	}
-	connectGitHubUseCase := application.NewConnectGitHubUseCase(gitHubInstallationRepository, client, txManager)
-	disconnectGitHubUseCase := application.NewDisconnectGitHubUseCase(gitHubInstallationRepository, txManager)
-	getGitHubInstallationUseCase := application.NewGetGitHubInstallationUseCase(gitHubInstallationRepository)
-	generateInstallationTokenUseCase := application.NewGenerateInstallationTokenUseCase(gitHubInstallationRepository, client, txManager)
-	listRepositoriesUseCase := application.NewListRepositoriesUseCase(gitHubInstallationRepository, client)
-	oAuthStateRepository := infrastructure.NewOAuthStateRepository(db)
-	startInstallationUseCase := application.NewStartInstallationUseCase(configConfig, oAuthStateRepository)
-	installationCallbackUseCase := application.NewInstallationCallbackUseCase(configConfig, client, gitHubInstallationRepository, oAuthStateRepository, txManager)
-	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, startInstallationUseCase, installationCallbackUseCase, configConfig)
-	projectRepository := repository.NewProjectRepository(db)
-	slugService := service2.NewSlugService(projectRepository)
-	projectService := service2.NewProjectService(projectRepository, slugService)
-	createProjectUseCase := application2.NewCreateProjectUseCase(projectService, txManager)
-	volumeRepository := repository.NewVolumeRepository(db)
-	volumeSlugService := service2.NewVolumeSlugService(volumeRepository)
-	volumeService := service2.NewVolumeService(volumeRepository, projectRepository, volumeSlugService)
-	getProjectUseCase := application2.NewGetProjectUseCase(projectService, volumeService)
-	getProjectBySlugUseCase := application2.NewGetProjectBySlugUseCase(projectService, volumeService)
-	updateProjectUseCase := application2.NewUpdateProjectUseCase(projectService, txManager)
-	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, txManager)
-	listProjectsUseCase := application2.NewListProjectsUseCase(projectService)
-	permissionService := service2.NewPermissionService(projectRepository, volumeRepository)
-	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService)
-	addVolumeUseCase := application2.NewAddVolumeUseCase(volumeService, txManager)
-	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService)
-	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager)
-	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService, volumeService)
-	deploymentRepository := repository.NewDeploymentRepository(db)
-	containerRepository := infrastructure2.NewContainerRepository(db)
-	serviceSlugService := service3.NewSlugService(containerRepository)
-	containerService := service3.NewContainerService(containerRepository, serviceSlugService)
+	connectGitHubUseCase := application.NewConnectGitHubUseCase(gitHubInstallationRepository, client, txManager, logger)
+	disconnectGitHubUseCase := application.NewDisconnectGitHubUseCase(gitHubInstallationRepository, txManager, logger)
+	getGitHubInstallationUseCase := application.NewGetGitHubInstallationUseCase(gitHubInstallationRepository, logger)
+	generateInstallationTokenUseCase := application.NewGenerateInstallationTokenUseCase(gitHubInstallationRepository, client, txManager, logger)
+	listRepositoriesUseCase := application.NewListRepositoriesUseCase(gitHubInstallationRepository, client, logger)
+	oAuthStateRepository := infrastructure.NewOAuthStateRepository(db, logger)
+	startInstallationUseCase := application.NewStartInstallationUseCase(configConfig, oAuthStateRepository, logger)
+	installationCallbackUseCase := application.NewInstallationCallbackUseCase(configConfig, client, gitHubInstallationRepository, oAuthStateRepository, txManager, logger)
+	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, startInstallationUseCase, installationCallbackUseCase, configConfig, logger)
+	projectRepository := repository.NewProjectRepository(db, logger)
+	slugService := service2.NewSlugService(projectRepository, logger)
+	projectService := service2.NewProjectService(projectRepository, slugService, logger)
+	createProjectUseCase := application2.NewCreateProjectUseCase(projectService, txManager, logger)
+	volumeRepository := repository.NewVolumeRepository(db, logger)
+	volumeSlugService := service2.NewVolumeSlugService(volumeRepository, logger)
+	volumeService := service2.NewVolumeService(volumeRepository, projectRepository, volumeSlugService, logger)
+	getProjectUseCase := application2.NewGetProjectUseCase(projectService, volumeService, logger)
+	getProjectBySlugUseCase := application2.NewGetProjectBySlugUseCase(projectService, volumeService, logger)
+	updateProjectUseCase := application2.NewUpdateProjectUseCase(projectService, txManager, logger)
+	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, txManager, logger)
+	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, logger)
+	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
+	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService, logger)
+	addVolumeUseCase := application2.NewAddVolumeUseCase(volumeService, txManager, logger)
+	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService, logger)
+	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager, logger)
+	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService, volumeService, logger)
+	deploymentRepository := repository.NewDeploymentRepository(db, logger)
+	containerRepository := infrastructure2.NewContainerRepository(db, logger)
+	serviceSlugService := service3.NewSlugService(containerRepository, logger)
+	containerService := service3.NewContainerService(containerRepository, serviceSlugService, logger)
 	getContainersForDeploymentUseCase := deployment.NewGetContainersForDeploymentUseCase(containerService)
 	containerClient := provideContainerClient(getContainersForDeploymentUseCase)
-	tektonClient, err := provideTektonClient()
+	tektonClient, err := provideTektonClient(logger)
 	if err != nil {
 		return nil, err
 	}
-	kubeClient, err := provideKubeClient()
+	kubeClient, err := provideKubeClient(logger)
 	if err != nil {
 		return nil, err
 	}
-	deployService := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient)
-	deployProjectUseCase := application2.NewDeployProjectUseCase(deployService)
-	getDeploymentUseCase := application2.NewGetDeploymentUseCase(deployService)
-	refreshDeploymentUseCase := application2.NewRefreshDeploymentUseCase(deployService)
-	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, getDeploymentUseCase, refreshDeploymentUseCase, permissionService, projectService)
-	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository)
-	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository)
-	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, servicePermissionService, resourceValidationService, volumeService, gitHubInstallationRepository, txManager)
-	getContainerUseCase := application3.NewGetContainerUseCase(containerRepository, servicePermissionService)
-	buildChangeDetector := service3.NewBuildChangeDetector()
-	updateContainerUseCase := application3.NewUpdateContainerUseCase(containerRepository, servicePermissionService, resourceValidationService, buildChangeDetector, gitHubInstallationRepository, txManager)
-	deleteContainerUseCase := application3.NewDeleteContainerUseCase(containerRepository, servicePermissionService, txManager)
-	listContainersUseCase := application3.NewListContainersUseCase(containerRepository, servicePermissionService)
-	addEnvVarUseCase := application3.NewAddEnvVarUseCase(containerRepository, servicePermissionService, txManager)
-	updateEnvVarUseCase := application3.NewUpdateEnvVarUseCase(containerRepository, servicePermissionService, txManager)
-	deleteEnvVarUseCase := application3.NewDeleteEnvVarUseCase(containerRepository, servicePermissionService, txManager)
-	addNetworkUseCase := application3.NewAddNetworkUseCase(containerRepository, servicePermissionService, txManager)
-	deleteNetworkUseCase := application3.NewDeleteNetworkUseCase(containerRepository, servicePermissionService, txManager)
-	addSecretUseCase := application3.NewAddSecretUseCase(containerRepository, servicePermissionService, txManager)
-	updateSecretUseCase := application3.NewUpdateSecretUseCase(containerRepository, servicePermissionService, txManager)
-	deleteSecretUseCase := application3.NewDeleteSecretUseCase(containerRepository, servicePermissionService, txManager)
-	addBuildVarUseCase := application3.NewAddBuildVarUseCase(containerRepository, servicePermissionService, txManager)
-	updateBuildVarUseCase := application3.NewUpdateBuildVarUseCase(containerRepository, servicePermissionService, txManager)
-	deleteBuildVarUseCase := application3.NewDeleteBuildVarUseCase(containerRepository, servicePermissionService, txManager)
-	addMountUseCase := application3.NewAddMountUseCase(containerRepository, servicePermissionService, volumeService, txManager)
-	deleteMountUseCase := application3.NewDeleteMountUseCase(containerRepository, servicePermissionService, txManager)
-	containerHandler := handler3.NewContainerHandler(createContainerUseCase, getContainerUseCase, updateContainerUseCase, deleteContainerUseCase, listContainersUseCase, addEnvVarUseCase, updateEnvVarUseCase, deleteEnvVarUseCase, addNetworkUseCase, deleteNetworkUseCase, addSecretUseCase, updateSecretUseCase, deleteSecretUseCase, addBuildVarUseCase, updateBuildVarUseCase, deleteBuildVarUseCase, addMountUseCase, deleteMountUseCase, projectService, containerService)
-	templateRepository := infrastructure2.NewTemplateRepository(db)
-	getTemplatesUseCase := application3.NewGetTemplatesUseCase(templateRepository)
-	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository)
-	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase)
+	deployService := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient, logger)
+	deployProjectUseCase := application2.NewDeployProjectUseCase(deployService, logger)
+	getDeploymentUseCase := application2.NewGetDeploymentUseCase(deployService, logger)
+	refreshDeploymentUseCase := application2.NewRefreshDeploymentUseCase(deployService, logger)
+	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, getDeploymentUseCase, refreshDeploymentUseCase, permissionService, projectService, logger)
+	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository, logger)
+	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository, logger)
+	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, servicePermissionService, resourceValidationService, volumeService, gitHubInstallationRepository, txManager, logger)
+	getContainerUseCase := application3.NewGetContainerUseCase(containerRepository, servicePermissionService, logger)
+	updateContainerUseCase := application3.NewUpdateContainerUseCase(containerRepository, servicePermissionService, resourceValidationService, gitHubInstallationRepository, txManager, logger)
+	deleteContainerUseCase := application3.NewDeleteContainerUseCase(containerRepository, servicePermissionService, txManager, logger)
+	listContainersUseCase := application3.NewListContainersUseCase(containerRepository, servicePermissionService, logger)
+	addEnvVarUseCase := application3.NewAddEnvVarUseCase(containerRepository, servicePermissionService, txManager, logger)
+	updateEnvVarUseCase := application3.NewUpdateEnvVarUseCase(containerRepository, servicePermissionService, txManager, logger)
+	deleteEnvVarUseCase := application3.NewDeleteEnvVarUseCase(containerRepository, servicePermissionService, txManager, logger)
+	addNetworkUseCase := application3.NewAddNetworkUseCase(containerRepository, servicePermissionService, txManager, logger)
+	deleteNetworkUseCase := application3.NewDeleteNetworkUseCase(containerRepository, servicePermissionService, txManager, logger)
+	addSecretUseCase := application3.NewAddSecretUseCase(containerRepository, servicePermissionService, txManager, logger)
+	updateSecretUseCase := application3.NewUpdateSecretUseCase(containerRepository, servicePermissionService, txManager, logger)
+	deleteSecretUseCase := application3.NewDeleteSecretUseCase(containerRepository, servicePermissionService, txManager, logger)
+	addBuildVarUseCase := application3.NewAddBuildVarUseCase(containerRepository, servicePermissionService, txManager, logger)
+	updateBuildVarUseCase := application3.NewUpdateBuildVarUseCase(containerRepository, servicePermissionService, txManager, logger)
+	deleteBuildVarUseCase := application3.NewDeleteBuildVarUseCase(containerRepository, servicePermissionService, txManager, logger)
+	addMountUseCase := application3.NewAddMountUseCase(containerRepository, servicePermissionService, volumeService, txManager, logger)
+	deleteMountUseCase := application3.NewDeleteMountUseCase(containerRepository, servicePermissionService, txManager, logger)
+	containerHandler := handler3.NewContainerHandler(createContainerUseCase, getContainerUseCase, updateContainerUseCase, deleteContainerUseCase, listContainersUseCase, addEnvVarUseCase, updateEnvVarUseCase, deleteEnvVarUseCase, addNetworkUseCase, deleteNetworkUseCase, addSecretUseCase, updateSecretUseCase, deleteSecretUseCase, addBuildVarUseCase, updateBuildVarUseCase, deleteBuildVarUseCase, addMountUseCase, deleteMountUseCase, projectService, containerService, logger)
+	templateRepository := infrastructure2.NewTemplateRepository(db, logger)
+	getTemplatesUseCase := application3.NewGetTemplatesUseCase(templateRepository, logger)
+	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository, logger)
+	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase, logger)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, containerHandler, templateHandler, authMiddleware)
-	app := NewApp(configConfig, db, router, oAuthStateRepository)
+	loggingMiddleware := provideLoggingMiddleware(logger)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, containerHandler, templateHandler, authMiddleware, loggingMiddleware)
+	app := NewApp(configConfig, db, router, oAuthStateRepository, logger)
 	return app, nil
 }
 
@@ -167,8 +172,23 @@ func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
 	return jwt.NewJWTUtil(cfg.JWT.Secret)
 }
 
+// provideLogger creates a logger from config
+func provideLogger(cfg *config.Config) (logger.Logger, error) {
+	loggerCfg := logger.Config{
+		Level:    cfg.Log.Level,
+		Format:   cfg.Log.Format,
+		FilePath: cfg.Log.FilePath,
+	}
+	return logger.New(loggerCfg)
+}
+
+// provideLoggingMiddleware creates a logging middleware
+func provideLoggingMiddleware(log logger.Logger) *logger.LoggingMiddleware {
+	return logger.NewLoggingMiddleware(log)
+}
+
 // provideEmailService creates an email service from config
-func provideEmailService(cfg *config.Config) email.Service {
+func provideEmailService(cfg *config.Config, log logger.Logger) email.Service {
 
 	host := cfg.Email.Host
 	if host == "" {
@@ -194,17 +214,18 @@ func provideEmailService(cfg *config.Config) email.Service {
 		cfg.Email.Password,
 		from,
 		frontendURL,
+		log,
 	)
 }
 
 // provideTektonClient creates a Tekton client from environment variables
-func provideTektonClient() (infrastructure3.TektonClient, error) {
-	return infrastructure4.NewTektonClient()
+func provideTektonClient(log logger.Logger) (infrastructure3.TektonClient, error) {
+	return infrastructure4.NewTektonClient(log)
 }
 
 // provideKubeClient creates a Kubernetes client from environment variables
-func provideKubeClient() (infrastructure3.KubeClient, error) {
-	return infrastructure4.NewKubeClient()
+func provideKubeClient(log logger.Logger) (infrastructure3.KubeClient, error) {
+	return infrastructure4.NewKubeClient(log)
 }
 
 // provideContainerClient creates a container client
@@ -233,6 +254,7 @@ func provideDeployService(
 	containerClient infrastructure3.ContainerClient,
 	tektonClient infrastructure3.TektonClient,
 	kubeClient infrastructure3.KubeClient,
+	log logger.Logger,
 ) service2.DeployService {
 	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
 	if deployNamespace == "" {
@@ -251,6 +273,7 @@ func provideDeployService(
 		kubeClient,
 		deployNamespace,
 		projectServiceName,
+		log,
 	)
 }
 
@@ -274,6 +297,7 @@ func provideGitHubHandler(
 	startInstallationUseCase *application.StartInstallationUseCase,
 	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	cfg *config.Config,
+	log logger.Logger,
 ) *handler.GitHubHandler {
 	return handler.NewGitHubHandler(
 		connectUseCase,
@@ -284,5 +308,6 @@ func provideGitHubHandler(
 		startInstallationUseCase,
 		installationCallbackUseCase,
 		cfg.Frontend.URL,
+		log,
 	)
 }
