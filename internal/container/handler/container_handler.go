@@ -973,9 +973,11 @@ func (h *ContainerHandler) DeleteNetwork(c *gin.Context) {
 // ListNetworks handles fetching all network port mappings for a container
 func (h *ContainerHandler) ListNetworks(c *gin.Context) {
 	ctx := c.Request.Context()
+	containerSlug := c.Param("slug")
 
 	h.logger.Info(ctx, "list networks handler started",
 		zap.String("handler", "ListNetworks"),
+		zap.String("container_slug", containerSlug),
 	)
 
 	// Get user ID from context
@@ -1030,9 +1032,11 @@ func (h *ContainerHandler) ListNetworks(c *gin.Context) {
 // ListEnvVars handles fetching all environment variables for a container
 func (h *ContainerHandler) ListEnvVars(c *gin.Context) {
 	ctx := c.Request.Context()
+	containerSlug := c.Param("slug")
 
 	h.logger.Info(ctx, "list env vars handler started",
 		zap.String("handler", "ListEnvVars"),
+		zap.String("container_slug", containerSlug),
 	)
 
 	// Get user ID from context
@@ -1328,9 +1332,11 @@ func (h *ContainerHandler) DeleteSecret(c *gin.Context) {
 // ListSecrets handles fetching all secrets for a container
 func (h *ContainerHandler) ListSecrets(c *gin.Context) {
 	ctx := c.Request.Context()
+	containerSlug := c.Param("slug")
 
 	h.logger.Info(ctx, "list secrets handler started",
 		zap.String("handler", "ListSecrets"),
+		zap.String("container_slug", containerSlug),
 	)
 
 	// Get user ID from context
@@ -1556,9 +1562,11 @@ func (h *ContainerHandler) DeleteMount(c *gin.Context) {
 // ListBuildVars handles fetching all build variables for a container
 func (h *ContainerHandler) ListBuildVars(c *gin.Context) {
 	ctx := c.Request.Context()
+	containerSlug := c.Param("slug")
 
 	h.logger.Info(ctx, "list build vars handler started",
 		zap.String("handler", "ListBuildVars"),
+		zap.String("container_slug", containerSlug),
 	)
 
 	// Get user ID from context

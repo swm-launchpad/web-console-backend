@@ -357,7 +357,6 @@ func (h *GitHubHandler) StartInstallation(c *gin.Context) {
 	h.logger.Info(ctx, "start installation handler completed",
 		zap.String("handler", "StartInstallation"),
 		zap.Uint("user_id", userID),
-		zap.String("installation_url", output.InstallationURL),
 	)
 
 	response.OK(c, output)
