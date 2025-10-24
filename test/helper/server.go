@@ -57,9 +57,9 @@ func SetupTestServer(t *testing.T) *TestServer {
 
 	// Email Service 초기화 (테스트용 Mock 사용)
 	mockEmailService := new(email.MockService)
-	// Mock email service to always succeed
-	mockEmailService.On("SendVerificationEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	mockEmailService.On("SendPasswordResetEmail", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	// Mock email service to always succeed (ctx, email, username, token)
+	mockEmailService.On("SendVerificationEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockEmailService.On("SendPasswordResetEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// Logger 초기화 (테스트용)
 	testLogger := logger.NewForTest()
