@@ -4,9 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
+	"go.uber.org/zap"
 )
 
 var (
@@ -50,20 +52,31 @@ type UserService interface {
 // userService is the concrete implementation of UserService
 type userService struct {
 	userRepo repository.UserRepository
+	logger   logger.Logger
 }
 
 // NewUserService creates a new instance of UserService
-func NewUserService(userRepo repository.UserRepository) UserService {
+func NewUserService(userRepo repository.UserRepository, log logger.Logger) UserService {
 	return &userService{
 		userRepo: userRepo,
+		logger:   log,
 	}
 }
 
 // CreateUser creates a new user with validation
 func (s *userService) CreateUser(ctx context.Context, username, email string, passwordHash string, name *string) (*model.User, error) {
+	s.logger.Info(ctx, "create user started",
+		zap.String("username", username),
+		zap.String("email", email),
+	)
+
 	// Create user model
 	user, err := model.NewUser(username, email)
 	if err != nil {
+		s.logger.Error(ctx, "failed to create user model",
+			zap.Error(err),
+			zap.String("username", username),
+		)
 		return nil, err
 	}
 
@@ -80,8 +93,17 @@ func (s *userService) CreateUser(ctx context.Context, username, email string, pa
 
 	// Save to repository
 	if err := s.userRepo.Create(ctx, user); err != nil {
+		s.logger.Error(ctx, "failed to save user",
+			zap.Error(err),
+			zap.String("username", username),
+		)
 		return nil, err
 	}
+
+	s.logger.Info(ctx, "create user completed",
+		zap.Uint("user_id", user.UserID),
+		zap.String("username", username),
+	)
 
 	return user, nil
 }
@@ -173,10 +195,17 @@ func (s *userService) CheckUsernameAvailability(ctx context.Context, username st
 
 	exists, err := s.userRepo.ExistsByUsername(ctx, username)
 	if err != nil {
+		s.logger.Error(ctx, "failed to check username existence",
+			zap.Error(err),
+			zap.String("username", username),
+		)
 		return err
 	}
 
 	if exists {
+		s.logger.Info(ctx, "username already exists",
+			zap.String("username", username),
+		)
 		return usererrors.ErrUsernameExists
 	}
 
@@ -191,10 +220,17 @@ func (s *userService) CheckEmailAvailability(ctx context.Context, email string) 
 
 	exists, err := s.userRepo.ExistsByEmail(ctx, email)
 	if err != nil {
+		s.logger.Error(ctx, "failed to check email existence",
+			zap.Error(err),
+			zap.String("email", email),
+		)
 		return err
 	}
 
 	if exists {
+		s.logger.Info(ctx, "email already exists",
+			zap.String("email", email),
+		)
 		return usererrors.ErrEmailExists
 	}
 
