@@ -112,6 +112,8 @@ var (
 	ErrTektonAuthenticationFailed   = errors.New("tekton API authentication failed")
 	ErrInvalidDeploymentRequest     = errors.New("invalid deployment request")
 	ErrTektonDeploymentFailed       = errors.New("tekton deployment request failed")
+	ErrInvalidBuildRequest          = errors.New("invalid build request")
+	ErrTektonBuildFailed            = errors.New("tekton build request failed")
 	ErrInvalidTektonResponse        = errors.New("invalid response from tekton API")
 )
 
