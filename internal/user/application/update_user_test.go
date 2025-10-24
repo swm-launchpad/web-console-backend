@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
@@ -19,7 +20,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 	t.Run("성공: 모든 필드 업데이트", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
-		useCase := NewUpdateUserUseCase(mockUserService)
+		testLogger := logger.NewForTest()
+		useCase := NewUpdateUserUseCase(mockUserService, testLogger)
 
 		userID := uint(1)
 		name := "Updated Name"
@@ -68,7 +70,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 	t.Run("성공: 일부 필드만 업데이트", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
-		useCase := NewUpdateUserUseCase(mockUserService)
+		testLogger := logger.NewForTest()
+		useCase := NewUpdateUserUseCase(mockUserService, testLogger)
 
 		userID := uint(2)
 		name := "Only Name Updated"
@@ -107,7 +110,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 	t.Run("실패: 사용자를 찾을 수 없음", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
-		useCase := NewUpdateUserUseCase(mockUserService)
+		testLogger := logger.NewForTest()
+		useCase := NewUpdateUserUseCase(mockUserService, testLogger)
 
 		userID := uint(999)
 		name := "Test Name"
@@ -133,7 +137,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 	t.Run("실패: 비활성 사용자", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
-		useCase := NewUpdateUserUseCase(mockUserService)
+		testLogger := logger.NewForTest()
+		useCase := NewUpdateUserUseCase(mockUserService, testLogger)
 
 		userID := uint(3)
 		name := "Test Name"
@@ -167,7 +172,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 	t.Run("실패: 업데이트할 필드가 없음", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
-		useCase := NewUpdateUserUseCase(mockUserService)
+		testLogger := logger.NewForTest()
+		useCase := NewUpdateUserUseCase(mockUserService, testLogger)
 
 		userID := uint(4)
 
@@ -199,7 +205,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 	t.Run("실패: 데이터베이스 업데이트 오류", func(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
-		useCase := NewUpdateUserUseCase(mockUserService)
+		testLogger := logger.NewForTest()
+		useCase := NewUpdateUserUseCase(mockUserService, testLogger)
 
 		userID := uint(5)
 		name := "Test Name"

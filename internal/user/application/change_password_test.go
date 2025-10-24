@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	usererrors "github.com/swm-launchpad/web-console-backend/internal/user/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
@@ -18,7 +19,8 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
 		mockAuthService := new(service.MockAuthService)
-		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService)
+		testLogger := logger.NewForTest()
+		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService, testLogger)
 
 		userID := uint(1)
 		currentPassword := "oldpass123"
@@ -62,7 +64,8 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
 		mockAuthService := new(service.MockAuthService)
-		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService)
+		testLogger := logger.NewForTest()
+		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService, testLogger)
 
 		userID := uint(999)
 
@@ -89,7 +92,8 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
 		mockAuthService := new(service.MockAuthService)
-		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService)
+		testLogger := logger.NewForTest()
+		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService, testLogger)
 
 		userID := uint(2)
 
@@ -124,7 +128,8 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
 		mockAuthService := new(service.MockAuthService)
-		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService)
+		testLogger := logger.NewForTest()
+		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService, testLogger)
 
 		userID := uint(3)
 		currentPassword := "wrongpassword"
@@ -165,7 +170,8 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
 		mockAuthService := new(service.MockAuthService)
-		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService)
+		testLogger := logger.NewForTest()
+		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService, testLogger)
 
 		userID := uint(4)
 		currentPassword := "oldpass123"
@@ -206,7 +212,8 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
 		mockAuthService := new(service.MockAuthService)
-		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService)
+		testLogger := logger.NewForTest()
+		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService, testLogger)
 
 		userID := uint(5)
 		currentPassword := "oldpass123"
@@ -247,7 +254,8 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 		// Arrange
 		mockUserService := new(service.MockUserService)
 		mockAuthService := new(service.MockAuthService)
-		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService)
+		testLogger := logger.NewForTest()
+		useCase := NewChangePasswordUseCase(mockUserService, mockAuthService, testLogger)
 
 		userID := uint(6)
 		currentPassword := "oldpass123"

@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model/token"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
+	"go.uber.org/zap"
 )
 
 type VerifyEmailInput struct {
@@ -21,21 +23,28 @@ type VerifyEmailUseCase struct {
 	tokenService service.TokenService
 	userService  service.UserService
 	txManager    db.TxManager
+	logger       logger.Logger
 }
 
 func NewVerifyEmailUseCase(
 	tokenService service.TokenService,
 	userService service.UserService,
 	txManager db.TxManager,
+	log logger.Logger,
 ) *VerifyEmailUseCase {
 	return &VerifyEmailUseCase{
 		tokenService: tokenService,
 		userService:  userService,
 		txManager:    txManager,
+		logger:       log,
 	}
 }
 
 func (uc *VerifyEmailUseCase) Execute(ctx context.Context, input VerifyEmailInput) (*VerifyEmailOutput, error) {
+	uc.logger.Info(ctx, "verify email started",
+		zap.String("token_prefix", input.Token[:min(10, len(input.Token))]),
+	)
+
 	var output *VerifyEmailOutput
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
@@ -46,17 +55,29 @@ func (uc *VerifyEmailUseCase) Execute(ctx context.Context, input VerifyEmailInpu
 			token.TokenTypeEmailVerification,
 		)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to validate verification token",
+				zap.Error(err),
+				zap.String("token_prefix", input.Token[:min(10, len(input.Token))]),
+			)
 			return err
 		}
 
 		// Activate user
 		if err := uc.userService.ActivateUser(txCtx, verificationToken.UserID); err != nil {
+			uc.logger.Error(ctx, "failed to activate user",
+				zap.Error(err),
+				zap.Uint("user_id", verificationToken.UserID),
+			)
 			return err
 		}
 
 		// Get user details for response
 		user, err := uc.userService.GetUserByID(txCtx, verificationToken.UserID)
 		if err != nil {
+			uc.logger.Error(ctx, "failed to get user details",
+				zap.Error(err),
+				zap.Uint("user_id", verificationToken.UserID),
+			)
 			return err
 		}
 
@@ -65,11 +86,20 @@ func (uc *VerifyEmailUseCase) Execute(ctx context.Context, input VerifyEmailInpu
 			Email:  user.Email,
 		}
 
+		uc.logger.Info(ctx, "user activated successfully",
+			zap.Uint("user_id", user.UserID),
+			zap.String("email", user.Email),
+		)
+
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
+
+	uc.logger.Info(ctx, "verify email completed",
+		zap.Uint("user_id", output.UserID),
+	)
 
 	return output, nil
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/model/token"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
@@ -24,7 +25,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -79,7 +81,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -133,7 +136,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
 			Username: "",
@@ -159,7 +163,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
 			Username: "existinguser",
@@ -185,7 +190,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -211,7 +217,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -237,7 +244,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
 			Username: "testuser",
@@ -263,7 +271,8 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
 		mockEmailService := new(email.MockService)
-		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager)
+		testLogger := logger.NewForTest()
+		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
 			Username: "testuser",
