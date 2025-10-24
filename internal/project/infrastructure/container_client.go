@@ -4,38 +4,54 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containerdeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	projectinfra "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
+	"go.uber.org/zap"
 )
 
 // containerClient is the implementation of ContainerClient interface.
 // It fetches actual container configuration from the container bounded context.
 type containerClient struct {
 	getContainersUseCase *containerdeployment.GetContainersForDeploymentUseCase
+	logger               logger.Logger
 }
 
 // NewContainerClient creates a new containerClient instance.
 func NewContainerClient(
 	getContainersUseCase *containerdeployment.GetContainersForDeploymentUseCase,
+	log logger.Logger,
 ) projectinfra.ContainerClient {
 	return &containerClient{
 		getContainersUseCase: getContainersUseCase,
+		logger:               log,
 	}
 }
 
 // GetContainerConfig returns container configuration from the container bounded context.
 func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint) (*dto.ContainerDeploymentConfig, error) {
+	c.logger.Info(ctx, "container client get container config started",
+		zap.Uint("project_id", projectID),
+	)
+
 	// Step 1: Get containers from container bounded context
 	containersOutput, err := c.getContainersUseCase.Execute(ctx, containerdeployment.GetContainersForDeploymentInput{
 		ProjectID: projectID,
 	})
 	if err != nil {
+		c.logger.Error(ctx, "container client failed to get containers",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to get containers: %w", err)
 	}
 
 	if len(containersOutput.Containers) == 0 {
+		c.logger.Warn(ctx, "container client no containers found",
+			zap.Uint("project_id", projectID),
+		)
 		return nil, projecterrors.ErrContainerConfigNotFound
 	}
 
@@ -57,6 +73,10 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 			}
 		} else {
 			// No last built commit hash - cannot deploy
+			c.logger.Error(ctx, "container client container missing last built commit hash",
+				zap.Uint("project_id", projectID),
+				zap.String("container_name", container.Name),
+			)
 			return nil, fmt.Errorf("container %s has no last_built_git_commit_hash", container.Name)
 		}
 
@@ -75,6 +95,10 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 			}
 		} else {
 			// No network defined - cannot deploy
+			c.logger.Error(ctx, "container client container missing network configuration",
+				zap.Uint("project_id", projectID),
+				zap.String("container_name", container.Name),
+			)
 			return nil, fmt.Errorf("container %s has no network configuration", container.Name)
 		}
 
@@ -121,6 +145,11 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 
 		containerInfos = append(containerInfos, containerInfo)
 	}
+
+	c.logger.Info(ctx, "container client get container config completed",
+		zap.Uint("project_id", projectID),
+		zap.Int("container_count", len(containerInfos)),
+	)
 
 	return &dto.ContainerDeploymentConfig{
 		Containers: containerInfos,

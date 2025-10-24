@@ -111,8 +111,19 @@ func provideKubeClient(log logger.Logger) (projectDomainInfra.KubeClient, error)
 // provideContainerClient creates a container client
 func provideContainerClient(
 	getContainersUseCase *containerDeployment.GetContainersForDeploymentUseCase,
+	log logger.Logger,
 ) projectDomainInfra.ContainerClient {
-	return projectInfra.NewContainerClient(getContainersUseCase)
+	return projectInfra.NewContainerClient(getContainersUseCase, log)
+}
+
+// provideKubeBuildClient creates a Kubernetes build client from environment variables
+func provideKubeBuildClient(log logger.Logger) (projectDomainInfra.KubeBuildClient, error) {
+	return projectInfra.NewKubeBuildClient(log)
+}
+
+// provideTektonBuildClient creates a Tekton build client from environment variables
+func provideTektonBuildClient(log logger.Logger) (projectDomainInfra.TektonBuildClient, error) {
+	return projectInfra.NewTektonBuildClient(log)
 }
 
 // provideDeployNamespace provides the deployment namespace from environment

@@ -109,7 +109,7 @@ func InitializeApp() (*App, error) {
 	serviceSlugService := service3.NewSlugService(containerRepository, logger)
 	containerService := service3.NewContainerService(containerRepository, serviceSlugService, logger)
 	getContainersForDeploymentUseCase := deployment.NewGetContainersForDeploymentUseCase(containerService)
-	containerClient := provideContainerClient(getContainersForDeploymentUseCase)
+	containerClient := provideContainerClient(getContainersForDeploymentUseCase, logger)
 	tektonClient, err := provideTektonClient(logger)
 	if err != nil {
 		return nil, err
@@ -232,8 +232,19 @@ func provideKubeClient(log logger.Logger) (infrastructure3.KubeClient, error) {
 // provideContainerClient creates a container client
 func provideContainerClient(
 	getContainersUseCase *deployment.GetContainersForDeploymentUseCase,
+	log logger.Logger,
 ) infrastructure3.ContainerClient {
-	return infrastructure4.NewContainerClient(getContainersUseCase)
+	return infrastructure4.NewContainerClient(getContainersUseCase, log)
+}
+
+// provideKubeBuildClient creates a Kubernetes build client from environment variables
+func provideKubeBuildClient(log logger.Logger) (infrastructure3.KubeBuildClient, error) {
+	return infrastructure4.NewKubeBuildClient(log)
+}
+
+// provideTektonBuildClient creates a Tekton build client from environment variables
+func provideTektonBuildClient(log logger.Logger) (infrastructure3.TektonBuildClient, error) {
+	return infrastructure4.NewTektonBuildClient(log)
 }
 
 // provideDeployNamespace provides the deployment namespace from environment

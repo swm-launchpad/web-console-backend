@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 )
@@ -115,7 +116,7 @@ func TestNewTektonBuildClient(t *testing.T) {
 				}()
 			}
 
-			client, err := NewTektonBuildClient()
+			client, err := NewTektonBuildClient(logger.NewForTest())
 
 			if tt.expectedError != nil {
 				assert.Error(t, err)

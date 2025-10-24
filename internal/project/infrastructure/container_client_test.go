@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containerDeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 )
 
@@ -11,9 +12,10 @@ func TestNewContainerClient(t *testing.T) {
 	t.Run("Create new container client with valid dependencies", func(t *testing.T) {
 		// Arrange
 		mockGetContainersUseCase := &containerDeployment.GetContainersForDeploymentUseCase{}
+		testLogger := logger.NewForTest()
 
 		// Act
-		client := NewContainerClient(mockGetContainersUseCase)
+		client := NewContainerClient(mockGetContainersUseCase, testLogger)
 
 		// Assert
 		assert.NotNil(t, client)
@@ -22,14 +24,16 @@ func TestNewContainerClient(t *testing.T) {
 	t.Run("Container client structure validation", func(t *testing.T) {
 		// Arrange
 		mockGetContainersUseCase := &containerDeployment.GetContainersForDeploymentUseCase{}
+		testLogger := logger.NewForTest()
 
 		// Act
-		client := NewContainerClient(mockGetContainersUseCase)
+		client := NewContainerClient(mockGetContainersUseCase, testLogger)
 		concreteClient, ok := client.(*containerClient)
 
 		// Assert
 		assert.True(t, ok, "Client should be of type *containerClient")
 		assert.NotNil(t, concreteClient.getContainersUseCase)
+		assert.NotNil(t, concreteClient.logger)
 	})
 }
 
@@ -40,15 +44,17 @@ func TestContainerClient_NoDependencyOnVolumeRepo(t *testing.T) {
 
 		// Arrange
 		mockGetContainersUseCase := &containerDeployment.GetContainersForDeploymentUseCase{}
+		testLogger := logger.NewForTest()
 
 		// Act
-		client := NewContainerClient(mockGetContainersUseCase)
+		client := NewContainerClient(mockGetContainersUseCase, testLogger)
 		concreteClient, ok := client.(*containerClient)
 
 		// Assert
 		assert.True(t, ok)
-		// The containerClient struct should only have getContainersUseCase field
+		// The containerClient struct should have getContainersUseCase and logger fields
 		// No volumeRepo field should exist
 		assert.NotNil(t, concreteClient.getContainersUseCase)
+		assert.NotNil(t, concreteClient.logger)
 	})
 }

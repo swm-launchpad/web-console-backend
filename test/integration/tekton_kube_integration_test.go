@@ -542,7 +542,7 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 
 	t.Run("TektonBuildClient - Build request with template only", func(t *testing.T) {
 		// Given - Create TektonBuildClient
-		tektonBuildClient, err := infrastructure.NewTektonBuildClient()
+		tektonBuildClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
 		require.NoError(t, err, "Failed to create TektonBuildClient")
 
 		// Use MySQL template from test directory
@@ -586,7 +586,7 @@ EXPOSE {{ .mysql_port }}`
 
 	t.Run("TektonBuildClient - Build request with GitHub repository", func(t *testing.T) {
 		// Given - Create TektonBuildClient
-		tektonBuildClient, err := infrastructure.NewTektonBuildClient()
+		tektonBuildClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
 		require.NoError(t, err, "Failed to create TektonBuildClient")
 
 		// Use Node.js template with gomplate variables
@@ -655,7 +655,7 @@ CMD ["node", "{{ .entry_point }}"]`
 		}
 
 		// Given - Create KubeBuildClient
-		kubeBuildClient, err := infrastructure.NewKubeBuildClient()
+		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeBuildClient creation failed: %v", err)
 			t.Logf("This may be due to network connectivity or certificate issues")
@@ -679,7 +679,7 @@ CMD ["node", "{{ .entry_point }}"]`
 		}
 
 		// Given - Create KubeBuildClient
-		kubeBuildClient, err := infrastructure.NewKubeBuildClient()
+		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeBuildClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -711,7 +711,7 @@ func TestTektonBuildClient_FullBuildFlow(t *testing.T) {
 	ctx := context.Background()
 
 	// Create clients
-	tektonBuildClient, err := infrastructure.NewTektonBuildClient()
+	tektonBuildClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
 	require.NoError(t, err, "Failed to create TektonBuildClient")
 
 	// Fix CA cert path for tests
@@ -720,7 +720,7 @@ func TestTektonBuildClient_FullBuildFlow(t *testing.T) {
 		_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
 	}
 
-	kubeBuildClient, err := infrastructure.NewKubeBuildClient()
+	kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
 	require.NoError(t, err, "Failed to create KubeBuildClient")
 
 	// Create a test build request
