@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	userinfra "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
@@ -16,10 +17,11 @@ func TestUpdateContainerUseCase_Execute_Success(t *testing.T) {
 	mockRepo := new(infrastructure.MockContainerRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
+	buildChangeDetector := service.NewBuildChangeDetector()
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	testLogger := logger.NewForTest()
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr, testLogger)
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -59,7 +61,8 @@ func TestUpdateContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	testLogger := logger.NewForTest()
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr, testLogger)
+	buildChangeDetector := service.NewBuildChangeDetector()
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -93,7 +96,8 @@ func TestUpdateContainerUseCase_Execute_UnsetGitHubInstallationID(t *testing.T) 
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	testLogger := logger.NewForTest()
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr, testLogger)
+	buildChangeDetector := service.NewBuildChangeDetector()
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -138,7 +142,8 @@ func TestUpdateContainerUseCase_Execute_SetGitHubInstallationID(t *testing.T) {
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	testLogger := logger.NewForTest()
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr, testLogger)
+	buildChangeDetector := service.NewBuildChangeDetector()
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -184,7 +189,8 @@ func TestUpdateContainerUseCase_Execute_NoUpdateGitHubInstallationID(t *testing.
 	mockTxMgr := new(db.MockTxManager)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	testLogger := logger.NewForTest()
-	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, mockInstallationRepo, mockTxMgr, testLogger)
+	buildChangeDetector := service.NewBuildChangeDetector()
+	useCase := NewUpdateContainerUseCase(mockRepo, mockPermSvc, mockResourceValidationSvc, buildChangeDetector, mockInstallationRepo, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)

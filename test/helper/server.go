@@ -103,12 +103,13 @@ func SetupTestServer(t *testing.T) *TestServer {
 	containerSvc := containerService.NewContainerService(containerRepo, containerSlugService, testLogger)
 	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository, testLogger)
 	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository, testLogger)
+	buildChangeDetector := containerService.NewBuildChangeDetector()
 
 	// Container UseCases
 	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, installationRepo, txManager, testLogger)
 	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, containerPermissionSvc, testLogger)
 	listContainersUseCase := containerApp.NewListContainersUseCase(containerRepo, containerPermissionSvc, testLogger)
-	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, installationRepo, txManager, testLogger)
+	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, buildChangeDetector, installationRepo, txManager, testLogger)
 	deleteContainerUseCase := containerApp.NewDeleteContainerUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	addEnvVarUseCase := containerApp.NewAddEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	updateEnvVarUseCase := containerApp.NewUpdateEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
@@ -440,6 +441,7 @@ func GetUpdateContainerUseCase(ts *TestServer) *containerApp.UpdateContainerUseC
 	projectRepository := projectRepo.NewProjectRepository(ts.DB.DB, testLogger)
 	containerPermissionSvc := containerService.NewPermissionService(containerRepo, projectRepository, testLogger)
 	resourceValidationSvc := containerService.NewResourceValidationService(containerRepo, projectRepository, testLogger)
+	buildChangeDetector := containerService.NewBuildChangeDetector()
 	installationRepo := infrastructure.NewGitHubInstallationRepository(ts.DB.DB, testLogger)
 	txManager := db.NewTxManager(ts.DB.DB)
 
@@ -447,6 +449,7 @@ func GetUpdateContainerUseCase(ts *TestServer) *containerApp.UpdateContainerUseC
 		containerRepo,
 		containerPermissionSvc,
 		resourceValidationSvc,
+		buildChangeDetector,
 		installationRepo,
 		txManager,
 		testLogger,
