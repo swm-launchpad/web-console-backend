@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
@@ -26,6 +27,7 @@ type Router struct {
 	containerHandler     *containerHTTP.ContainerHandler
 	templateHandler      *containerHTTP.TemplateHandler
 	authMiddleware       *middleware.AuthMiddleware
+	loggingMiddleware    *logger.LoggingMiddleware
 }
 
 func NewRouter(
@@ -42,13 +44,18 @@ func NewRouter(
 	containerHandler *containerHTTP.ContainerHandler,
 	templateHandler *containerHTTP.TemplateHandler,
 	authMiddleware *middleware.AuthMiddleware,
+	loggingMiddleware *logger.LoggingMiddleware,
 ) *Router {
 	// Set Gin mode
 	gin.SetMode(cfg.Server.GinMode)
 
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(gin.Logger())
+
+	// Use custom recovery middleware with logging
+	r.Use(loggingMiddleware.RecoveryHandler())
+
+	// Use custom logging middleware (replaces gin.Logger())
+	r.Use(loggingMiddleware.Handler())
 
 	// Apply CORS middleware
 	r.Use(middleware.CORS(&cfg.CORS))
@@ -68,6 +75,7 @@ func NewRouter(
 		containerHandler:     containerHandler,
 		templateHandler:      templateHandler,
 		authMiddleware:       authMiddleware,
+		loggingMiddleware:    loggingMiddleware,
 	}
 }
 
@@ -81,6 +89,7 @@ func (r *Router) Setup() {
 	// Setup routes
 	r.engine.GET("/", healthHandler.Root)
 	r.engine.GET("/health", healthHandler.Health)
+	r.engine.HEAD("/health", healthHandler.Health)
 
 	// API v1 routes
 	v1 := r.engine.Group("/api/v1")

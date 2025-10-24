@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth/jwt"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 )
 
@@ -54,6 +55,10 @@ func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		c.Set(auth.ContextKeyUserID, userID)
 		c.Set(auth.ContextKeyAuth, true)
 
+		// Add user_id to request context for logger
+		ctx := logger.WithUserID(c.Request.Context(), userID)
+		c.Request = c.Request.WithContext(ctx)
+
 		// Continue to the next handler
 		c.Next()
 	}
@@ -101,6 +106,10 @@ func (m *AuthMiddleware) OptionalAuth() gin.HandlerFunc {
 		// Set user ID in context for use in handlers
 		c.Set(auth.ContextKeyUserID, userID)
 		c.Set(auth.ContextKeyAuth, true)
+
+		// Add user_id to request context for logger
+		ctx := logger.WithUserID(c.Request.Context(), userID)
+		c.Request = c.Request.WithContext(ctx)
 
 		// Continue to the next handler
 		c.Next()
