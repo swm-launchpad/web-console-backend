@@ -100,13 +100,13 @@ func NewKubeClient(log logger.Logger) (infrastructure.KubeClient, error) {
 	// Define Group-Version-Resource for Tekton PipelineRuns and TaskRuns
 	pipelineRunGVR := schema.GroupVersionResource{
 		Group:    "tekton.dev",
-		Version:  "v1beta1",
+		Version:  "v1",
 		Resource: "pipelineruns",
 	}
 
 	taskRunGVR := schema.GroupVersionResource{
 		Group:    "tekton.dev",
-		Version:  "v1beta1",
+		Version:  "v1",
 		Resource: "taskruns",
 	}
 
