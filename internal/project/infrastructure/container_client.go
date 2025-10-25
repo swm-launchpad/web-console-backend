@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	containerbuild "github.com/swm-launchpad/web-console-backend/internal/container/application/build"
 	containerdeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	projectinfra "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
@@ -15,18 +16,21 @@ import (
 // containerClient is the implementation of ContainerClient interface.
 // It fetches actual container configuration from the container bounded context.
 type containerClient struct {
-	getContainersUseCase *containerdeployment.GetContainersForDeploymentUseCase
-	logger               logger.Logger
+	getContainersForDeploymentUseCase *containerdeployment.GetContainersForDeploymentUseCase
+	getContainersForBuildUseCase      *containerbuild.GetContainersForBuildUseCase
+	logger                            logger.Logger
 }
 
 // NewContainerClient creates a new containerClient instance.
 func NewContainerClient(
-	getContainersUseCase *containerdeployment.GetContainersForDeploymentUseCase,
+	getContainersForDeploymentUseCase *containerdeployment.GetContainersForDeploymentUseCase,
+	getContainersForBuildUseCase *containerbuild.GetContainersForBuildUseCase,
 	log logger.Logger,
 ) projectinfra.ContainerClient {
 	return &containerClient{
-		getContainersUseCase: getContainersUseCase,
-		logger:               log,
+		getContainersForDeploymentUseCase: getContainersForDeploymentUseCase,
+		getContainersForBuildUseCase:      getContainersForBuildUseCase,
+		logger:                            log,
 	}
 }
 
@@ -37,7 +41,7 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 	)
 
 	// Step 1: Get containers from container bounded context
-	containersOutput, err := c.getContainersUseCase.Execute(ctx, containerdeployment.GetContainersForDeploymentInput{
+	containersOutput, err := c.getContainersForDeploymentUseCase.Execute(ctx, containerdeployment.GetContainersForDeploymentInput{
 		ProjectID: projectID,
 	})
 	if err != nil {
@@ -152,6 +156,63 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 	)
 
 	return &dto.ContainerDeploymentConfig{
+		Containers: containerInfos,
+	}, nil
+}
+
+// GetContainerBuildConfig returns container build configuration from the container bounded context.
+func (c *containerClient) GetContainerBuildConfig(ctx context.Context, projectID uint) (*dto.ContainerBuildConfig, error) {
+	c.logger.Info(ctx, "container client get container build config started",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Step 1: Get containers from container bounded context
+	containersOutput, err := c.getContainersForBuildUseCase.Execute(ctx, containerbuild.GetContainersForBuildInput{
+		ProjectID: projectID,
+	})
+	if err != nil {
+		c.logger.Error(ctx, "container client failed to get containers for build",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("failed to get containers for build: %w", err)
+	}
+
+	if len(containersOutput.Containers) == 0 {
+		c.logger.Warn(ctx, "container client no containers found for build",
+			zap.Uint("project_id", projectID),
+		)
+		return nil, projecterrors.ErrContainerConfigNotFound
+	}
+
+	// Step 2: Convert to DTO format
+	containerInfos := make([]dto.BuildContainerInfo, 0, len(containersOutput.Containers))
+
+	for _, container := range containersOutput.Containers {
+		containerInfo := dto.BuildContainerInfo{
+			ContainerID:         container.ContainerID,
+			Name:                container.Name,
+			Slug:                container.Slug,
+			TemplateBody:        container.TemplateBody,
+			TemplateConfig:      container.TemplateConfig,
+			GitRepositoryURL:    container.GitRepositoryURL,
+			GitBranch:           container.GitBranch,
+			GitDirectoryPath:    container.GitDirectoryPath,
+			LastBuiltCommitHash: container.LastBuiltCommitHash,
+			NeedsBuild:          container.NeedsBuild,
+			BuildVars:           container.BuildVars,
+			InstallationID:      container.InstallationID,
+		}
+
+		containerInfos = append(containerInfos, containerInfo)
+	}
+
+	c.logger.Info(ctx, "container client get container build config completed",
+		zap.Uint("project_id", projectID),
+		zap.Int("container_count", len(containerInfos)),
+	)
+
+	return &dto.ContainerBuildConfig{
 		Containers: containerInfos,
 	}, nil
 }

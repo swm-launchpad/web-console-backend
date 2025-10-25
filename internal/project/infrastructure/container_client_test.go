@@ -5,17 +5,19 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	containerBuild "github.com/swm-launchpad/web-console-backend/internal/container/application/build"
 	containerDeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 )
 
 func TestNewContainerClient(t *testing.T) {
 	t.Run("Create new container client with valid dependencies", func(t *testing.T) {
 		// Arrange
-		mockGetContainersUseCase := &containerDeployment.GetContainersForDeploymentUseCase{}
+		mockGetContainersForDeploymentUseCase := &containerDeployment.GetContainersForDeploymentUseCase{}
+		mockGetContainersForBuildUseCase := &containerBuild.GetContainersForBuildUseCase{}
 		testLogger := logger.NewForTest()
 
 		// Act
-		client := NewContainerClient(mockGetContainersUseCase, testLogger)
+		client := NewContainerClient(mockGetContainersForDeploymentUseCase, mockGetContainersForBuildUseCase, testLogger)
 
 		// Assert
 		assert.NotNil(t, client)
@@ -23,16 +25,18 @@ func TestNewContainerClient(t *testing.T) {
 
 	t.Run("Container client structure validation", func(t *testing.T) {
 		// Arrange
-		mockGetContainersUseCase := &containerDeployment.GetContainersForDeploymentUseCase{}
+		mockGetContainersForDeploymentUseCase := &containerDeployment.GetContainersForDeploymentUseCase{}
+		mockGetContainersForBuildUseCase := &containerBuild.GetContainersForBuildUseCase{}
 		testLogger := logger.NewForTest()
 
 		// Act
-		client := NewContainerClient(mockGetContainersUseCase, testLogger)
+		client := NewContainerClient(mockGetContainersForDeploymentUseCase, mockGetContainersForBuildUseCase, testLogger)
 		concreteClient, ok := client.(*containerClient)
 
 		// Assert
 		assert.True(t, ok, "Client should be of type *containerClient")
-		assert.NotNil(t, concreteClient.getContainersUseCase)
+		assert.NotNil(t, concreteClient.getContainersForDeploymentUseCase)
+		assert.NotNil(t, concreteClient.getContainersForBuildUseCase)
 		assert.NotNil(t, concreteClient.logger)
 	})
 }
@@ -43,18 +47,20 @@ func TestContainerClient_NoDependencyOnVolumeRepo(t *testing.T) {
 		// from ContainerClient to follow separation of concerns
 
 		// Arrange
-		mockGetContainersUseCase := &containerDeployment.GetContainersForDeploymentUseCase{}
+		mockGetContainersForDeploymentUseCase := &containerDeployment.GetContainersForDeploymentUseCase{}
+		mockGetContainersForBuildUseCase := &containerBuild.GetContainersForBuildUseCase{}
 		testLogger := logger.NewForTest()
 
 		// Act
-		client := NewContainerClient(mockGetContainersUseCase, testLogger)
+		client := NewContainerClient(mockGetContainersForDeploymentUseCase, mockGetContainersForBuildUseCase, testLogger)
 		concreteClient, ok := client.(*containerClient)
 
 		// Assert
 		assert.True(t, ok)
-		// The containerClient struct should have getContainersUseCase and logger fields
+		// The containerClient struct should have use cases and logger fields
 		// No volumeRepo field should exist
-		assert.NotNil(t, concreteClient.getContainersUseCase)
+		assert.NotNil(t, concreteClient.getContainersForDeploymentUseCase)
+		assert.NotNil(t, concreteClient.getContainersForBuildUseCase)
 		assert.NotNil(t, concreteClient.logger)
 	})
 }

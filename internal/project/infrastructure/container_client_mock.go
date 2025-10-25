@@ -122,5 +122,91 @@ func (m *MockContainerClient) getMultiContainerConfig() *dto.ContainerDeployment
 	}
 }
 
+// GetContainerBuildConfig returns mock container build configuration based on project ID.
+// Different project IDs return different scenarios:
+//   - projectID 1: Single container for build
+//   - projectID 2: Multi-container for build
+//   - Other IDs: Returns projecterrors.ErrProjectNotFound
+func (m *MockContainerClient) GetContainerBuildConfig(ctx context.Context, projectID uint) (*dto.ContainerBuildConfig, error) {
+	switch projectID {
+	case 1:
+		return m.getSingleContainerBuildConfig(), nil
+	case 2:
+		return m.getMultiContainerBuildConfig(), nil
+	default:
+		return nil, projecterrors.ErrProjectNotFound
+	}
+}
+
+// getSingleContainerBuildConfig returns a single container build configuration scenario.
+func (m *MockContainerClient) getSingleContainerBuildConfig() *dto.ContainerBuildConfig {
+	templateBody := "FROM golang:1.21\nCOPY . /app"
+	dirPath := "/backend"
+	commitHash := "abc1234567890"
+	installationID := int64(12345678)
+
+	return &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{
+				ContainerID:         1,
+				Name:                "backend",
+				Slug:                "c2025011812000011111111",
+				TemplateBody:        &templateBody,
+				TemplateConfig:      map[string]interface{}{"go_version": "1.21"},
+				GitRepositoryURL:    "https://github.com/test/repo",
+				GitBranch:           "main",
+				GitDirectoryPath:    &dirPath,
+				LastBuiltCommitHash: &commitHash,
+				NeedsBuild:          true,
+				BuildVars: map[string]string{
+					"BUILD_ENV":  "production",
+					"GO_VERSION": "1.21",
+				},
+				InstallationID: &installationID,
+			},
+		},
+	}
+}
+
+// getMultiContainerBuildConfig returns a multi-container build configuration scenario.
+func (m *MockContainerClient) getMultiContainerBuildConfig() *dto.ContainerBuildConfig {
+	templateBody := "FROM golang:1.21\nCOPY . /app"
+	mysqlTemplateBody := "FROM mysql:8.0"
+	commitHash := "abc1234567890"
+
+	return &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{
+				ContainerID:         1,
+				Name:                "backend",
+				Slug:                "c2025011812000011111111",
+				TemplateBody:        &templateBody,
+				TemplateConfig:      map[string]interface{}{"go_version": "1.21"},
+				GitRepositoryURL:    "https://github.com/test/repo",
+				GitBranch:           "main",
+				GitDirectoryPath:    nil,
+				LastBuiltCommitHash: &commitHash,
+				NeedsBuild:          true,
+				BuildVars:           map[string]string{},
+				InstallationID:      nil,
+			},
+			{
+				ContainerID:         2,
+				Name:                "mysql",
+				Slug:                "c2025011812000022222222",
+				TemplateBody:        &mysqlTemplateBody,
+				TemplateConfig:      map[string]interface{}{},
+				GitRepositoryURL:    "https://github.com/test/repo",
+				GitBranch:           "main",
+				GitDirectoryPath:    nil,
+				LastBuiltCommitHash: nil,
+				NeedsBuild:          false,
+				BuildVars:           map[string]string{},
+				InstallationID:      nil,
+			},
+		},
+	}
+}
+
 // Compile-time assertion that MockContainerClient implements ContainerClient interface
 var _ infrastructure.ContainerClient = (*MockContainerClient)(nil)
