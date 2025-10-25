@@ -6,6 +6,10 @@ package dto
 // It contains all necessary information to build a container image including
 // template, git configuration, and build-time environment variables.
 type BuildContainerInfo struct {
+	// ProjectID is the unique identifier of the project (required)
+	// This is used to label PipelineRuns in Tekton for proper tracking
+	ProjectID uint `json:"project_id"`
+
 	// ContainerID is the unique identifier of the container (required)
 	ContainerID uint `json:"container_id"`
 

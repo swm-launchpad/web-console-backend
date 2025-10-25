@@ -130,6 +130,7 @@ func TestBuildServiceIntegration(t *testing.T) {
 
 		// Create BuildContainerInfo
 		container := &dto.BuildContainerInfo{
+			ProjectID:        0,
 			ContainerID:      1,
 			Name:             "spring-hello-world",
 			Slug:             imageName,
@@ -241,6 +242,7 @@ func TestBuildServiceIntegration(t *testing.T) {
 
 		// Create BuildContainerInfo without GitHub URL
 		container := &dto.BuildContainerInfo{
+			ProjectID:      0,
 			ContainerID:    2,
 			Name:           "mysql-custom",
 			Slug:           imageName,
@@ -359,6 +361,7 @@ func TestBuildServiceIntegration(t *testing.T) {
 
 		// Create BuildContainerInfo for private repository
 		container := &dto.BuildContainerInfo{
+			ProjectID:        0,
 			ContainerID:      3,
 			Name:             "spring-mysql-demo",
 			Slug:             imageName,

@@ -106,6 +106,7 @@ func TestBuildService_PrepareBuildRequest(t *testing.T) {
 		installationID := int64(12345)
 
 		container := &dto.BuildContainerInfo{
+			ProjectID:           10,
 			ContainerID:         1,
 			Name:                "test-container",
 			Slug:                "test-slug",
@@ -146,6 +147,7 @@ func TestBuildService_PrepareBuildRequest(t *testing.T) {
 
 	t.Run("success with minimal fields", func(t *testing.T) {
 		container := &dto.BuildContainerInfo{
+			ProjectID:        10,
 			ContainerID:      1,
 			Name:             "test-container",
 			Slug:             "test-slug",
@@ -192,6 +194,7 @@ func TestBuildService_BuildContainer_TriggerFailure(t *testing.T) {
 	service := NewBuildService(buildHistoryRepo, tektonBuildClient, kubeBuildClient, testLogger)
 
 	container := &dto.BuildContainerInfo{
+		ProjectID:        10,
 		ContainerID:      1,
 		Name:             "test-container",
 		Slug:             "test-slug",
@@ -238,6 +241,7 @@ func TestBuildService_BuildContainer_FindPipelineRunFailure(t *testing.T) {
 	service := NewBuildService(buildHistoryRepo, tektonBuildClient, kubeBuildClient, testLogger)
 
 	container := &dto.BuildContainerInfo{
+		ProjectID:        10,
 		ContainerID:      1,
 		Name:             "test-container",
 		Slug:             "test-slug",

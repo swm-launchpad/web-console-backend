@@ -194,7 +194,7 @@ func (s *buildServiceImpl) prepareBuildRequest(container *dto.BuildContainerInfo
 	}
 
 	request := &dto.TektonBuildRequest{
-		ProjectID:            fmt.Sprintf("%d", container.ContainerID), // Note: Using ContainerID as ProjectID for now
+		ProjectID:            fmt.Sprintf("%d", container.ProjectID),
 		ContainerID:          fmt.Sprintf("%d", container.ContainerID),
 		ImageName:            container.Slug,
 		GitHubURL:            container.GitRepositoryURL,
@@ -288,11 +288,14 @@ func (s *buildServiceImpl) monitorBuildStatus(
 	for {
 		select {
 		case <-ctx.Done():
-			return &BuildResult{
-				BuildHistoryID: buildHistory.BuildHistoryID,
-				Status:         "cancelled",
-				ErrorMessage:   "context cancelled",
-			}, ctx.Err()
+			// Context cancelled - monitoring goroutine exits but PipelineRun continues
+			// The actual PipelineRun status will be reflected in next polling cycle or force refresh
+			// This matches the DeploymentService pattern
+			s.logger.Info(ctx, "build monitoring context cancelled",
+				zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+				zap.String("pipeline_run_name", pipelineRunName),
+			)
+			return nil, ctx.Err()
 
 		case <-timeout:
 			s.logger.Error(ctx, "build monitoring timeout",
@@ -302,8 +305,21 @@ func (s *buildServiceImpl) monitorBuildStatus(
 
 			// Update build history to backend_tracking_failed
 			summary := "Build monitoring timeout (30 minutes)"
-			_ = buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary)
-			_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+			if err := buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary); err != nil {
+				s.logger.Error(ctx, "failed to update build history status",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.Error(err),
+				)
+				return nil, fmt.Errorf("failed to update build history status: %w", err)
+			}
+
+			if err := s.buildHistoryRepo.Save(ctx, buildHistory); err != nil {
+				s.logger.Error(ctx, "failed to save build history",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.Error(err),
+				)
+				return nil, fmt.Errorf("failed to persist timeout state: %w", err)
+			}
 
 			return &BuildResult{
 				BuildHistoryID: buildHistory.BuildHistoryID,
@@ -353,8 +369,22 @@ func (s *buildServiceImpl) checkBuildStatus(
 		if buildHistory.Status() != build_history.BuildHistoryStatusRunning {
 			summary := "Build is running"
 			startedAt := time.Now()
-			_ = buildHistory.UpdateRunningStatus(&summary, &startedAt)
-			_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+			if err := buildHistory.UpdateRunningStatus(&summary, &startedAt); err != nil {
+				// Log error but continue monitoring - non-terminal state update failure is not critical
+				s.logger.Warn(ctx, "failed to update build history to running status",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.Error(err),
+				)
+				return nil, nil
+			}
+
+			if err := s.buildHistoryRepo.Save(ctx, buildHistory); err != nil {
+				// Log error but continue monitoring - non-terminal state persistence failure is not critical
+				s.logger.Warn(ctx, "failed to save build history running status",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.Error(err),
+				)
+			}
 		}
 		return nil, nil // Continue monitoring
 
@@ -409,10 +439,20 @@ func (s *buildServiceImpl) handleBuildSuccess(
 		commitHashPtr = &commitHash
 	}
 
+	var updateErr error
 	if status == "skipped" {
-		_ = buildHistory.UpdateCompleteStatus(build_history.BuildHistoryStatusSkipped, &summary, commitHashPtr, finishedAt)
+		updateErr = buildHistory.UpdateCompleteStatus(build_history.BuildHistoryStatusSkipped, &summary, commitHashPtr, finishedAt)
 	} else {
-		_ = buildHistory.UpdateCompleteStatus(build_history.BuildHistoryStatusSuccess, &summary, commitHashPtr, finishedAt)
+		updateErr = buildHistory.UpdateCompleteStatus(build_history.BuildHistoryStatusSuccess, &summary, commitHashPtr, finishedAt)
+	}
+
+	if updateErr != nil {
+		s.logger.Error(ctx, "failed to update build history to complete status",
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+			zap.String("status", status),
+			zap.Error(updateErr),
+		)
+		return nil, fmt.Errorf("failed to update build history to %s: %w", status, updateErr)
 	}
 
 	err := s.buildHistoryRepo.Save(ctx, buildHistory)
@@ -421,6 +461,7 @@ func (s *buildServiceImpl) handleBuildSuccess(
 			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
 			zap.Error(err),
 		)
+		return nil, fmt.Errorf("failed to persist build success: %w", err)
 	}
 
 	return &BuildResult{
@@ -467,7 +508,14 @@ func (s *buildServiceImpl) handleBuildFailure(
 		commitHashPtr = &commitHash
 	}
 
-	_ = buildHistory.UpdateCompleteStatus(status, &summary, commitHashPtr, finishedAt)
+	if err := buildHistory.UpdateCompleteStatus(status, &summary, commitHashPtr, finishedAt); err != nil {
+		s.logger.Error(ctx, "failed to update build history to complete status",
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+			zap.String("status", resultStatus),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("failed to update build history to %s: %w", resultStatus, err)
+	}
 
 	err := s.buildHistoryRepo.Save(ctx, buildHistory)
 	if err != nil {
@@ -475,6 +523,7 @@ func (s *buildServiceImpl) handleBuildFailure(
 			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
 			zap.Error(err),
 		)
+		return nil, fmt.Errorf("failed to persist build failure: %w", err)
 	}
 
 	return &BuildResult{
