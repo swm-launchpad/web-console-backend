@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
@@ -492,6 +493,15 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen]
 }
 
+func mustRawMessage(t *testing.T, value string) json.RawMessage {
+	t.Helper()
+	if value == "" {
+		return nil
+	}
+	require.True(t, json.Valid([]byte(value)), "invalid JSON provided to mustRawMessage: %s", value)
+	return json.RawMessage([]byte(value))
+}
+
 // retryWithBackoff retries a function up to maxAttempts times with a 1-second interval.
 // It returns true if the condition is met, false if all attempts fail.
 func retryWithBackoff(maxAttempts int, interval time.Duration, fn func() bool) bool {
@@ -565,8 +575,8 @@ EXPOSE {{ .mysql_port }}`
 			ImageName:            "integration-test-mysql",
 			ForceBuild:           "true",
 			Template:             mysqlTemplate,
-			DockerfileConfigJSON: `{"mysql_version":"8.0","charset":"utf8mb4","collation":"utf8mb4_unicode_ci","max_connections":"200","mysql_port":"3306"}`,
-			BuildEnvJSON:         `{"TZ":"Asia/Seoul"}`,
+			DockerfileConfigJSON: mustRawMessage(t, `{"mysql_version":"8.0","charset":"utf8mb4","collation":"utf8mb4_unicode_ci","max_connections":"200","mysql_port":"3306"}`),
+			BuildEnvJSON:         mustRawMessage(t, `{"TZ":"Asia/Seoul"}`),
 		}
 
 		// When - Trigger build
@@ -625,8 +635,8 @@ CMD ["node", "{{ .entry_point }}"]`
 			ForceBuild:           "true", // Force build for testing
 			LastBuildCommitHash:  "",     // Empty means first build
 			Template:             nodeTemplate,
-			DockerfileConfigJSON: `{"node_version":"18","app_port":"3000","entry_point":"index.js"}`,
-			BuildEnvJSON:         `{"NODE_ENV":"production","TZ":"Asia/Seoul"}`,
+			DockerfileConfigJSON: mustRawMessage(t, `{"node_version":"18","app_port":"3000","entry_point":"index.js"}`),
+			BuildEnvJSON:         mustRawMessage(t, `{"NODE_ENV":"production","TZ":"Asia/Seoul"}`),
 			// RegistryURL is not set, will use environment variable
 		}
 
@@ -732,8 +742,8 @@ func TestTektonBuildClient_FullBuildFlow(t *testing.T) {
 		ForceBuild:           "true",
 		LastBuildCommitHash:  "",
 		Template:             "FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nEXPOSE 3000\nCMD [\"node\", \"index.js\"]",
-		DockerfileConfigJSON: "",
-		BuildEnvJSON:         `{"NODE_ENV":"test"}`,
+		DockerfileConfigJSON: nil,
+		BuildEnvJSON:         mustRawMessage(t, `{"NODE_ENV":"test"}`),
 		RegistryURL:          "registry.launchpad.kr/",
 	}
 

@@ -1,6 +1,8 @@
 // Package dto defines Data Transfer Objects for infrastructure layer communications.
 package dto
 
+import "encoding/json"
+
 // TektonBuildRequest represents the request payload for triggering a Tekton build pipeline.
 // This request is sent to the Tekton EventListener endpoint to initiate an image build process.
 //
@@ -70,17 +72,17 @@ type TektonBuildRequest struct {
 	// Required field
 	Template string `json:"template"`
 
-	// DockerfileConfigJSON is a JSON string containing template variable values
-	// Used by gomplate to substitute variables in the Template
-	// Example: `{"base_image":"node:18","port":"3000"}`
+	// DockerfileConfigJSON contains template variable values in JSON format.
+	// When provided, it should be valid JSON that gomplate can consume.
+	// Example: {"base_image":"node:18","port":"3000"}
 	// Optional field
-	DockerfileConfigJSON string `json:"dockerfile_config_json,omitempty"`
+	DockerfileConfigJSON json.RawMessage `json:"dockerfile_config_json,omitempty"`
 
-	// BuildEnvJSON is a JSON string containing build-time environment variables
-	// These are converted to ARG statements and available during the build process
-	// Example: `{"NODE_ENV":"production","API_URL":"https://api.example.com"}`
+	// BuildEnvJSON contains build-time environment variables in JSON format.
+	// These values are converted to ARG statements and made available during the build process.
+	// Example: {"NODE_ENV":"production","API_URL":"https://api.example.com"}
 	// Optional field
-	BuildEnvJSON string `json:"build_env_json,omitempty"`
+	BuildEnvJSON json.RawMessage `json:"build_env_json,omitempty"`
 
 	// RegistryURL is the container registry URL where the built image will be pushed
 	// Defaults to "registry.launchpad.kr/" if not specified
