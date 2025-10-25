@@ -69,12 +69,11 @@ func (uc *GetContainersForBuildUseCase) Execute(ctx context.Context, input GetCo
 		if container.TemplateID() != nil {
 			template, err := uc.templateRepository.FindByID(ctx, *container.TemplateID())
 			if err != nil {
-				// If template not found, continue without template body
-				// This allows containers without templates to still be built
-				templateBody = nil
-			} else {
-				templateBody = template.TemplateBody()
+				// Template ID is set but template not found - this indicates data inconsistency
+				// or infrastructure failure. Return error instead of silently continuing.
+				return nil, err
 			}
+			templateBody = template.TemplateBody()
 		}
 
 		containerOutput := BuildContainerOutput{

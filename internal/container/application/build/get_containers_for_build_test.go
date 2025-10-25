@@ -143,13 +143,46 @@ func TestGetContainersForBuildUseCase_Execute_TemplateNotFound(t *testing.T) {
 	mockService.On("ListContainersByProjectID", ctx, projectID).Return(mockContainers, nil)
 	mockTemplateRepo.On("FindByID", ctx, templateID).Return(nil, containererrors.ErrTemplateNotFound)
 
-	// Should still succeed but without template body
+	// Should return error when template is not found (strict error handling)
 	output, err := useCase.Execute(ctx, input)
 
-	assert.NoError(t, err)
-	assert.NotNil(t, output)
-	assert.Len(t, output.Containers, 1)
-	assert.Nil(t, output.Containers[0].TemplateBody)
+	assert.Error(t, err)
+	assert.Nil(t, output)
+	assert.ErrorIs(t, err, containererrors.ErrTemplateNotFound)
+
+	mockService.AssertExpectations(t)
+	mockTemplateRepo.AssertExpectations(t)
+}
+
+func TestGetContainersForBuildUseCase_Execute_TemplateRepositoryError(t *testing.T) {
+	mockService := new(infrastructure.MockContainerService)
+	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
+	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo)
+
+	ctx := context.Background()
+	projectID := uint(10)
+
+	input := GetContainersForBuildInput{
+		ProjectID: projectID,
+	}
+
+	templateID := uint(1)
+	mockContainers := []*containermodel.Container{
+		createBuildContainerWithTemplate(1, projectID, &templateID),
+	}
+
+	// Simulate infrastructure error (DB connection failure, etc.)
+	infraError := assert.AnError
+
+	mockService.On("ListContainersByProjectID", ctx, projectID).Return(mockContainers, nil)
+	mockTemplateRepo.On("FindByID", ctx, templateID).Return(nil, infraError)
+
+	// Should return error when infrastructure fails (not silently ignore)
+	output, err := useCase.Execute(ctx, input)
+
+	assert.Error(t, err)
+	assert.Nil(t, output)
+	assert.ErrorIs(t, err, infraError)
 
 	mockService.AssertExpectations(t)
 	mockTemplateRepo.AssertExpectations(t)
