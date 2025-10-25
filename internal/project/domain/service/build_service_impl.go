@@ -1,0 +1,502 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/build_history"
+	"go.uber.org/zap"
+)
+
+// buildServiceImpl implements the BuildService interface
+type buildServiceImpl struct {
+	buildHistoryRepo  repository.BuildHistoryRepository
+	tektonBuildClient infrastructure.TektonBuildClient
+	kubeBuildClient   infrastructure.KubeBuildClient
+	logger            logger.Logger
+}
+
+// NewBuildService creates a new BuildService instance
+func NewBuildService(
+	buildHistoryRepo repository.BuildHistoryRepository,
+	tektonBuildClient infrastructure.TektonBuildClient,
+	kubeBuildClient infrastructure.KubeBuildClient,
+	logger logger.Logger,
+) BuildService {
+	return &buildServiceImpl{
+		buildHistoryRepo:  buildHistoryRepo,
+		tektonBuildClient: tektonBuildClient,
+		kubeBuildClient:   kubeBuildClient,
+		logger:            logger,
+	}
+}
+
+// BuildContainer executes a build for a single container
+// This method is designed to be called in a goroutine and will block until the build completes or times out
+func (s *buildServiceImpl) BuildContainer(
+	ctx context.Context,
+	buildHistoryID uint,
+	container *dto.BuildContainerInfo,
+) (*BuildResult, error) {
+	s.logger.Info(ctx, "build service started",
+		zap.Uint("build_history_id", buildHistoryID),
+		zap.Uint("container_id", container.ContainerID),
+		zap.String("container_name", container.Name),
+	)
+
+	// Load the build history record
+	buildHistory, err := s.buildHistoryRepo.FindByID(ctx, buildHistoryID)
+	if err != nil {
+		s.logger.Error(ctx, "failed to load build history",
+			zap.Uint("build_history_id", buildHistoryID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// Step 1: Trigger Tekton build pipeline
+	buildRequest, err := s.prepareBuildRequest(container)
+	if err != nil {
+		s.logger.Error(ctx, "failed to prepare build request",
+			zap.Uint("build_history_id", buildHistoryID),
+			zap.Error(err),
+		)
+
+		// Update build history to backend_trigger_failed
+		summary := fmt.Sprintf("Failed to prepare build request: %v", err)
+		_ = buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTriggerFailed, &summary)
+		_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+
+		return &BuildResult{
+			BuildHistoryID: buildHistoryID,
+			Status:         "failed",
+			ErrorMessage:   summary,
+		}, err
+	}
+
+	s.logger.Info(ctx, "triggering tekton build",
+		zap.Uint("build_history_id", buildHistoryID),
+		zap.String("image_name", buildRequest.ImageName),
+		zap.String("git_branch", buildRequest.GitHubBranch),
+	)
+
+	buildResponse, err := s.tektonBuildClient.TriggerBuild(ctx, buildRequest)
+	if err != nil {
+		s.logger.Error(ctx, "failed to trigger tekton build",
+			zap.Uint("build_history_id", buildHistoryID),
+			zap.Error(err),
+		)
+
+		// Update build history to backend_trigger_failed
+		summary := fmt.Sprintf("Failed to trigger Tekton build: %v", err)
+		_ = buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTriggerFailed, &summary)
+		_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+
+		return &BuildResult{
+			BuildHistoryID: buildHistoryID,
+			Status:         "failed",
+			ErrorMessage:   summary,
+		}, err
+	}
+
+	s.logger.Info(ctx, "tekton build triggered successfully",
+		zap.Uint("build_history_id", buildHistoryID),
+		zap.String("event_id", buildResponse.EventID),
+	)
+
+	// Update build history with Tekton event ID
+	_ = buildHistory.InitTektonInfo(&buildResponse.EventID, nil)
+	_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+
+	// Step 2: Find PipelineRun name by EventID (with timeout and retries)
+	pipelineRunName, err := s.findPipelineRunWithRetry(ctx, buildHistory, buildResponse.EventID)
+	if err != nil {
+		s.logger.Error(ctx, "failed to find PipelineRun",
+			zap.Uint("build_history_id", buildHistoryID),
+			zap.String("event_id", buildResponse.EventID),
+			zap.Error(err),
+		)
+
+		// Update build history to backend_tracking_failed
+		summary := fmt.Sprintf("Failed to find PipelineRun within 5 minutes: %v", err)
+		_ = buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary)
+		_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+
+		return &BuildResult{
+			BuildHistoryID: buildHistoryID,
+			Status:         "failed",
+			ErrorMessage:   summary,
+		}, err
+	}
+
+	s.logger.Info(ctx, "found PipelineRun",
+		zap.Uint("build_history_id", buildHistoryID),
+		zap.String("pipeline_run_name", pipelineRunName),
+	)
+
+	// Update build history with PipelineRun name
+	_ = buildHistory.InitTektonInfo(nil, &pipelineRunName)
+	_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+
+	// Step 3: Monitor PipelineRun status every 30 seconds
+	result, err := s.monitorBuildStatus(ctx, buildHistory, pipelineRunName)
+	if err != nil {
+		s.logger.Error(ctx, "build monitoring failed",
+			zap.Uint("build_history_id", buildHistoryID),
+			zap.String("pipeline_run_name", pipelineRunName),
+			zap.Error(err),
+		)
+		return result, err
+	}
+
+	s.logger.Info(ctx, "build completed",
+		zap.Uint("build_history_id", buildHistoryID),
+		zap.String("status", result.Status),
+		zap.String("commit_hash", result.LatestCommitHash),
+	)
+
+	return result, nil
+}
+
+// prepareBuildRequest converts BuildContainerInfo to TektonBuildRequest
+func (s *buildServiceImpl) prepareBuildRequest(container *dto.BuildContainerInfo) (*dto.TektonBuildRequest, error) {
+	// Convert template_config map to JSON
+	var templateConfigJSON json.RawMessage
+	if container.TemplateConfig != nil {
+		configBytes, err := json.Marshal(container.TemplateConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal template_config: %w", err)
+		}
+		templateConfigJSON = configBytes
+	}
+
+	// Convert build_vars map to JSON
+	var buildEnvJSON json.RawMessage
+	if container.BuildVars != nil {
+		buildVarsBytes, err := json.Marshal(container.BuildVars)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal build_vars: %w", err)
+		}
+		buildEnvJSON = buildVarsBytes
+	}
+
+	// Determine force_build flag
+	// Backend always sends needs_build status to Tekton, and Tekton makes the final decision
+	forceBuild := "false"
+	if container.NeedsBuild {
+		forceBuild = "true"
+	}
+
+	request := &dto.TektonBuildRequest{
+		ProjectID:            fmt.Sprintf("%d", container.ContainerID), // Note: Using ContainerID as ProjectID for now
+		ContainerID:          fmt.Sprintf("%d", container.ContainerID),
+		ImageName:            container.Slug,
+		GitHubURL:            container.GitRepositoryURL,
+		GitHubBranch:         container.GitBranch,
+		DirectoryPath:        stringPtrToString(container.GitDirectoryPath),
+		ForceBuild:           forceBuild,
+		LastBuildCommitHash:  stringPtrToString(container.LastBuiltCommitHash),
+		Template:             stringPtrToString(container.TemplateBody),
+		DockerfileConfigJSON: templateConfigJSON,
+		BuildEnvJSON:         buildEnvJSON,
+		RegistryURL:          "", // Will be set by TektonBuildClient from env var
+		InstallationID:       int64PtrToString(container.InstallationID),
+	}
+
+	return request, nil
+}
+
+// findPipelineRunWithRetry attempts to find PipelineRun by EventID with retries
+// Retries every 10 seconds for up to 5 minutes
+func (s *buildServiceImpl) findPipelineRunWithRetry(
+	ctx context.Context,
+	buildHistory *build_history.BuildHistory,
+	eventID string,
+) (string, error) {
+	const (
+		maxRetries    = 30               // 30 retries
+		retryInterval = 10 * time.Second // Every 10 seconds
+		totalTimeout  = 5 * time.Minute  // 5 minutes total
+	)
+
+	ticker := time.NewTicker(retryInterval)
+	defer ticker.Stop()
+
+	timeout := time.After(totalTimeout)
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-timeout:
+			return "", fmt.Errorf("timeout waiting for PipelineRun (5 minutes)")
+		case <-ticker.C:
+			pipelineRunName, err := s.kubeBuildClient.FindPipelineRunNameByEventID(ctx, eventID)
+			if err == nil {
+				return pipelineRunName, nil
+			}
+
+			// Log retry attempt
+			if attempt%3 == 0 { // Log every 30 seconds
+				s.logger.Info(ctx, "waiting for PipelineRun to be created",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.String("event_id", eventID),
+					zap.Int("attempt", attempt+1),
+					zap.Int("max_attempts", maxRetries),
+				)
+			}
+		}
+	}
+
+	return "", fmt.Errorf("PipelineRun not found after %d attempts", maxRetries)
+}
+
+// monitorBuildStatus monitors the PipelineRun status every 30 seconds
+// Returns when the build reaches a terminal state or times out
+func (s *buildServiceImpl) monitorBuildStatus(
+	ctx context.Context,
+	buildHistory *build_history.BuildHistory,
+	pipelineRunName string,
+) (*BuildResult, error) {
+	const (
+		pollingInterval = 30 * time.Second // Poll every 30 seconds
+		totalTimeout    = 30 * time.Minute // 30 minutes total
+	)
+
+	ticker := time.NewTicker(pollingInterval)
+	defer ticker.Stop()
+
+	timeout := time.After(totalTimeout)
+
+	// Initial status check (don't wait for first tick)
+	result, err := s.checkBuildStatus(ctx, buildHistory, pipelineRunName)
+	if err != nil {
+		s.logger.Warn(ctx, "initial status check failed, will retry",
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+			zap.Error(err),
+		)
+	} else if result != nil {
+		return result, nil // Already in terminal state
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return &BuildResult{
+				BuildHistoryID: buildHistory.BuildHistoryID,
+				Status:         "cancelled",
+				ErrorMessage:   "context cancelled",
+			}, ctx.Err()
+
+		case <-timeout:
+			s.logger.Error(ctx, "build monitoring timeout",
+				zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+				zap.String("pipeline_run_name", pipelineRunName),
+			)
+
+			// Update build history to backend_tracking_failed
+			summary := "Build monitoring timeout (30 minutes)"
+			_ = buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary)
+			_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+
+			return &BuildResult{
+				BuildHistoryID: buildHistory.BuildHistoryID,
+				Status:         "failed",
+				ErrorMessage:   summary,
+			}, fmt.Errorf("build monitoring timeout")
+
+		case <-ticker.C:
+			result, err := s.checkBuildStatus(ctx, buildHistory, pipelineRunName)
+			if err != nil {
+				s.logger.Warn(ctx, "status check failed, will retry",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.Error(err),
+				)
+				continue // Continue monitoring
+			}
+
+			if result != nil {
+				return result, nil // Terminal state reached
+			}
+		}
+	}
+}
+
+// checkBuildStatus checks the current status of the PipelineRun and updates BUILD_HISTORY
+// Returns BuildResult if terminal state is reached, nil if still running
+func (s *buildServiceImpl) checkBuildStatus(
+	ctx context.Context,
+	buildHistory *build_history.BuildHistory,
+	pipelineRunName string,
+) (*BuildResult, error) {
+	pipelineRun, err := s.kubeBuildClient.GetPipelineRunStatus(ctx, pipelineRunName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PipelineRun status: %w", err)
+	}
+
+	s.logger.Debug(ctx, "PipelineRun status checked",
+		zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+		zap.String("status", pipelineRun.Status),
+		zap.String("reason", pipelineRun.Reason),
+	)
+
+	// Handle different statuses
+	switch pipelineRun.Status {
+	case "Unknown":
+		// Build is still running
+		if buildHistory.Status() != build_history.BuildHistoryStatusRunning {
+			summary := "Build is running"
+			startedAt := time.Now()
+			_ = buildHistory.UpdateRunningStatus(&summary, &startedAt)
+			_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+		}
+		return nil, nil // Continue monitoring
+
+	case "True":
+		// Build succeeded
+		return s.handleBuildSuccess(ctx, buildHistory, pipelineRun)
+
+	case "False":
+		// Build failed
+		return s.handleBuildFailure(ctx, buildHistory, pipelineRun)
+
+	default:
+		// Unknown status
+		s.logger.Warn(ctx, "unknown PipelineRun status",
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+			zap.String("status", pipelineRun.Status),
+		)
+		return nil, nil // Continue monitoring
+	}
+}
+
+// handleBuildSuccess handles successful build completion
+func (s *buildServiceImpl) handleBuildSuccess(
+	ctx context.Context,
+	buildHistory *build_history.BuildHistory,
+	pipelineRun *dto.PipelineRun,
+) (*BuildResult, error) {
+	// Extract results
+	commitHash := pipelineRun.Results["latest_commit_hash"]
+	imageTag := pipelineRun.Results["image_tag"]
+	shouldBuild := pipelineRun.Results["should_build"]
+
+	s.logger.Info(ctx, "build succeeded",
+		zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+		zap.String("commit_hash", commitHash),
+		zap.String("image_tag", imageTag),
+		zap.String("should_build", shouldBuild),
+	)
+
+	// Determine if build was actually executed or skipped
+	status := "success"
+	if shouldBuild == "false" {
+		status = "skipped"
+	}
+
+	// Update build history
+	finishedAt := time.Now()
+	summary := fmt.Sprintf("Build %s", status)
+
+	var commitHashPtr *string
+	if commitHash != "" {
+		commitHashPtr = &commitHash
+	}
+
+	if status == "skipped" {
+		_ = buildHistory.UpdateCompleteStatus(build_history.BuildHistoryStatusSkipped, &summary, commitHashPtr, finishedAt)
+	} else {
+		_ = buildHistory.UpdateCompleteStatus(build_history.BuildHistoryStatusSuccess, &summary, commitHashPtr, finishedAt)
+	}
+
+	err := s.buildHistoryRepo.Save(ctx, buildHistory)
+	if err != nil {
+		s.logger.Error(ctx, "failed to save build history",
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+			zap.Error(err),
+		)
+	}
+
+	return &BuildResult{
+		BuildHistoryID:   buildHistory.BuildHistoryID,
+		Status:           status,
+		LatestCommitHash: commitHash,
+		ImageTag:         imageTag,
+		ShouldBuild:      shouldBuild == "true",
+	}, nil
+}
+
+// handleBuildFailure handles build failure or cancellation
+func (s *buildServiceImpl) handleBuildFailure(
+	ctx context.Context,
+	buildHistory *build_history.BuildHistory,
+	pipelineRun *dto.PipelineRun,
+) (*BuildResult, error) {
+	s.logger.Error(ctx, "build failed",
+		zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+		zap.String("reason", pipelineRun.Reason),
+		zap.String("message", pipelineRun.Message),
+	)
+
+	// Determine status based on reason
+	var status build_history.BuildHistoryStatus
+	var resultStatus string
+
+	if pipelineRun.Reason == "Cancelled" || pipelineRun.Reason == "PipelineRunCancelled" {
+		status = build_history.BuildHistoryStatusCancelled
+		resultStatus = "cancelled"
+	} else {
+		status = build_history.BuildHistoryStatusFailed
+		resultStatus = "failed"
+	}
+
+	// Update build history
+	finishedAt := time.Now()
+	summary := fmt.Sprintf("Build %s: %s", resultStatus, pipelineRun.Message)
+
+	// Try to extract commit hash if available
+	commitHash := pipelineRun.Results["latest_commit_hash"]
+	var commitHashPtr *string
+	if commitHash != "" {
+		commitHashPtr = &commitHash
+	}
+
+	_ = buildHistory.UpdateCompleteStatus(status, &summary, commitHashPtr, finishedAt)
+
+	err := s.buildHistoryRepo.Save(ctx, buildHistory)
+	if err != nil {
+		s.logger.Error(ctx, "failed to save build history",
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+			zap.Error(err),
+		)
+	}
+
+	return &BuildResult{
+		BuildHistoryID:   buildHistory.BuildHistoryID,
+		Status:           resultStatus,
+		LatestCommitHash: commitHash,
+		ErrorMessage:     pipelineRun.Message,
+	}, nil
+}
+
+// Helper functions
+
+func stringPtrToString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func int64PtrToString(i *int64) string {
+	if i == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", *i)
+}
