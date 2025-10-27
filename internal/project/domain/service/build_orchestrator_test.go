@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -442,4 +443,155 @@ func TestBuildOrchestrator_BuildAndWait_OrderPreserved(t *testing.T) {
 	assert.Equal(t, "commit-first", results[0].LatestCommitHash)
 	assert.Equal(t, "commit-second", results[1].LatestCommitHash)
 	assert.Equal(t, "commit-third", results[2].LatestCommitHash)
+}
+
+func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
+	// Test that BuildOrchestrator preserves BuildResult even when error is present
+	// and distinguishes context cancellation from real failures
+	testLogger := logger.NewForTest()
+
+	t.Run("Preserve BuildResult when returned with error", func(t *testing.T) {
+		// BuildService often returns both BuildResult and error for terminal states
+		// (e.g., monitoring timeout, terminal failure with metadata)
+		// Orchestrator must preserve the BuildResult, not throw it away
+
+		mockRepo := &mockOrchestratorBuildHistoryRepo{
+			createFunc: func(ctx context.Context, buildHistory *build_history.BuildHistory) error {
+				buildHistory.SetBuildHistoryID(1)
+				return nil
+			},
+		}
+
+		expectedResult := &BuildResult{
+			BuildHistoryID:   1,
+			Status:           "failed",
+			ErrorMessage:     "Tekton reported failure",
+			LatestCommitHash: "abc123", // Important metadata
+			ShouldBuild:      true,
+		}
+
+		mockBuildService := &mockOrchestratorBuildService{
+			buildContainerFunc: func(ctx context.Context, buildHistoryID uint, container *dto.BuildContainerInfo) (*BuildResult, error) {
+				// Return both result and error (common pattern in BuildService)
+				return expectedResult, fmt.Errorf("build failed")
+			},
+		}
+
+		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+
+		containers := []*dto.BuildContainerInfo{
+			{ContainerID: 1, Name: "test", Slug: "test"},
+		}
+
+		results, err := orchestrator.BuildAndWait(context.Background(), 10, containers)
+
+		// Should not return error (per current design - all errors absorbed)
+		assert.NoError(t, err)
+		require.Len(t, results, 1)
+
+		// CRITICAL: Must preserve the original BuildResult, not create generic fallback
+		assert.Equal(t, expectedResult.Status, results[0].Status)
+		assert.Equal(t, expectedResult.ErrorMessage, results[0].ErrorMessage)
+		assert.Equal(t, expectedResult.LatestCommitHash, results[0].LatestCommitHash)
+		assert.Equal(t, expectedResult.ShouldBuild, results[0].ShouldBuild)
+	})
+
+	t.Run("Create fallback for nil BuildResult with regular error", func(t *testing.T) {
+		// Only when service returns nil should we create a fallback
+
+		mockRepo := &mockOrchestratorBuildHistoryRepo{
+			createFunc: func(ctx context.Context, buildHistory *build_history.BuildHistory) error {
+				buildHistory.SetBuildHistoryID(1)
+				return nil
+			},
+		}
+
+		mockBuildService := &mockOrchestratorBuildService{
+			buildContainerFunc: func(ctx context.Context, buildHistoryID uint, container *dto.BuildContainerInfo) (*BuildResult, error) {
+				// Return nil result with error
+				return nil, fmt.Errorf("unexpected infrastructure error")
+			},
+		}
+
+		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+
+		containers := []*dto.BuildContainerInfo{
+			{ContainerID: 1, Name: "test", Slug: "test"},
+		}
+
+		results, err := orchestrator.BuildAndWait(context.Background(), 10, containers)
+
+		assert.NoError(t, err)
+		require.Len(t, results, 1)
+
+		// Should create fallback with generic "failed" status
+		assert.Equal(t, "failed", results[0].Status)
+		assert.Contains(t, results[0].ErrorMessage, "unexpected infrastructure error")
+		assert.True(t, results[0].ShouldBuild)
+	})
+
+	t.Run("Handle context.Canceled as non-terminal", func(t *testing.T) {
+		// PR #7 Option B: context cancellation returns nil result
+		// Orchestrator must not convert this to "failed" status
+		// BuildHistory should remain in non-terminal state
+
+		mockRepo := &mockOrchestratorBuildHistoryRepo{
+			createFunc: func(ctx context.Context, buildHistory *build_history.BuildHistory) error {
+				buildHistory.SetBuildHistoryID(1)
+				return nil
+			},
+		}
+
+		mockBuildService := &mockOrchestratorBuildService{
+			buildContainerFunc: func(ctx context.Context, buildHistoryID uint, container *dto.BuildContainerInfo) (*BuildResult, error) {
+				// Simulate PR #7 Option B behavior
+				return nil, context.Canceled
+			},
+		}
+
+		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+
+		containers := []*dto.BuildContainerInfo{
+			{ContainerID: 1, Name: "test", Slug: "test"},
+		}
+
+		results, err := orchestrator.BuildAndWait(context.Background(), 10, containers)
+
+		assert.NoError(t, err)
+		require.Len(t, results, 1)
+
+		// CRITICAL: Must return nil to indicate non-terminal state
+		// Not "failed" status which would undo PR #7 design
+		assert.Nil(t, results[0], "context cancellation should result in nil BuildResult, not 'failed' status")
+	})
+
+	t.Run("Handle context.DeadlineExceeded as non-terminal", func(t *testing.T) {
+		mockRepo := &mockOrchestratorBuildHistoryRepo{
+			createFunc: func(ctx context.Context, buildHistory *build_history.BuildHistory) error {
+				buildHistory.SetBuildHistoryID(1)
+				return nil
+			},
+		}
+
+		mockBuildService := &mockOrchestratorBuildService{
+			buildContainerFunc: func(ctx context.Context, buildHistoryID uint, container *dto.BuildContainerInfo) (*BuildResult, error) {
+				// Simulate PR #7 Option B behavior
+				return nil, context.DeadlineExceeded
+			},
+		}
+
+		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+
+		containers := []*dto.BuildContainerInfo{
+			{ContainerID: 1, Name: "test", Slug: "test"},
+		}
+
+		results, err := orchestrator.BuildAndWait(context.Background(), 10, containers)
+
+		assert.NoError(t, err)
+		require.Len(t, results, 1)
+
+		// Same as Canceled - must preserve non-terminal state
+		assert.Nil(t, results[0], "deadline exceeded should result in nil BuildResult, not 'failed' status")
+	})
 }

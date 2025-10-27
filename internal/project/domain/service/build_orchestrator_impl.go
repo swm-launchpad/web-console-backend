@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -219,12 +220,36 @@ func (o *buildOrchestratorImpl) collectBuildResults(
 	// Collect all results from channel
 	for task := range resultChan {
 		if task.err != nil {
-			// If BuildService returned an error, create a failed BuildResult
-			resultMap[task.index] = &BuildResult{
-				BuildHistoryID: task.buildHistory.BuildHistoryID,
-				Status:         "failed",
-				ErrorMessage:   task.err.Error(),
-				ShouldBuild:    true,
+			// If BuildResult is present, preserve it even with error
+			// BuildService returns both result and error for terminal states
+			// (monitoring timeout, terminal failure with metadata, etc.)
+			if task.buildResult != nil {
+				resultMap[task.index] = task.buildResult
+			} else {
+				// Only create fallback when service returned nil BuildResult
+				// Check if this is a context cancellation
+				if errors.Is(task.err, context.Canceled) || errors.Is(task.err, context.DeadlineExceeded) {
+					// Context cancellation - preserve as non-terminal state
+					// This allows higher layers to distinguish cancellation from real failure
+					// BuildHistory remains in non-terminal state for future reconciliation
+					o.logger.Warn(context.Background(), "build cancelled via context",
+						zap.Int("index", task.index),
+						zap.Uint("container_id", task.container.ContainerID),
+						zap.Uint("build_history_id", task.buildHistory.BuildHistoryID),
+						zap.Error(task.err),
+					)
+					// Return nil to indicate non-terminal state
+					// Parent goroutine should handle this appropriately
+					resultMap[task.index] = nil
+				} else {
+					// Real failure with no BuildResult - create fallback
+					resultMap[task.index] = &BuildResult{
+						BuildHistoryID: task.buildHistory.BuildHistoryID,
+						Status:         "failed",
+						ErrorMessage:   task.err.Error(),
+						ShouldBuild:    true,
+					}
+				}
 			}
 		} else {
 			resultMap[task.index] = task.buildResult
@@ -247,9 +272,16 @@ func (o *buildOrchestratorImpl) logBuildSummary(
 ) {
 	successCount := 0
 	failedCount := 0
+	cancelledCount := 0
 	otherCount := 0
 
 	for _, result := range results {
+		// nil result indicates context cancellation (non-terminal state)
+		if result == nil {
+			cancelledCount++
+			continue
+		}
+
 		switch result.Status {
 		case "success":
 			successCount++
@@ -267,6 +299,7 @@ func (o *buildOrchestratorImpl) logBuildSummary(
 		zap.Int("total_builds", len(results)),
 		zap.Int("success_count", successCount),
 		zap.Int("failed_count", failedCount),
+		zap.Int("cancelled_count", cancelledCount),
 		zap.Int("other_count", otherCount),
 	)
 }
