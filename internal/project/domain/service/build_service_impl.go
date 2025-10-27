@@ -362,13 +362,17 @@ func (s *buildServiceImpl) monitorBuildStatus(
 
 	// Initial status check (don't wait for first tick)
 	result, err := s.checkBuildStatus(ctx, buildHistory, pipelineRunName)
+	// Return immediately if terminal state reached, even if error is present
+	// This ensures we don't keep retrying after marking BuildHistory as terminal
+	if result != nil {
+		return result, err // Terminal state reached
+	}
+	// Only retry on non-terminal errors
 	if err != nil {
 		s.logger.Warn(ctx, "initial status check failed, will retry",
 			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
 			zap.Error(err),
 		)
-	} else if result != nil {
-		return result, nil // Already in terminal state
 	}
 
 	for {

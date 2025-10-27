@@ -683,6 +683,53 @@ func TestBuildService_FastBuildStartedAt(t *testing.T) {
 	})
 }
 
+// TestBuildService_InitialCheckTerminalError tests that monitorBuildStatus returns
+// immediately when the first checkBuildStatus call returns a terminal result with error
+// (regression test for infinite retry bug when PipelineRun is deleted before polling starts)
+func TestBuildService_InitialCheckTerminalError(t *testing.T) {
+	ctx := context.Background()
+
+	// Mock: PipelineRun deleted before monitoring starts
+	mockKubeClient := &mockKubeBuildClient{
+		getPipelineRunStatusFunc: func(ctx context.Context, pipelineRunName string) (*dto.PipelineRun, error) {
+			return nil, projecterrors.ErrKubePipelineRunNotFound
+		},
+	}
+
+	var savedBuildHistory *build_history.BuildHistory
+	mockBuildHistoryRepo := &mockBuildHistoryRepository{
+		saveFunc: func(ctx context.Context, bh *build_history.BuildHistory) error {
+			savedBuildHistory = bh
+			return nil
+		},
+	}
+
+	buildService := &buildServiceImpl{
+		buildHistoryRepo: mockBuildHistoryRepo,
+		kubeBuildClient:  mockKubeClient,
+		logger:           logger.NewForTest(),
+	}
+
+	buildHistory := build_history.NewBuildHistory(1)
+	buildHistory.SetBuildHistoryID(1)
+	if err := buildHistory.UpdateRunningStatus(nil, nil); err != nil {
+		t.Fatalf("Failed to set running status: %v", err)
+	}
+
+	// Call monitorBuildStatus - should return immediately without infinite loop
+	result, err := buildService.monitorBuildStatus(ctx, buildHistory, "test-pipeline-run")
+
+	// Should return terminal result with error (not retry infinitely)
+	require.Error(t, err, "Should return error for terminal failure")
+	require.NotNil(t, result, "Should return terminal result")
+	assert.Equal(t, "failed", result.Status, "Status should be failed")
+	assert.Contains(t, result.ErrorMessage, "not found in Kubernetes")
+
+	// BuildHistory should be in terminal state
+	require.NotNil(t, savedBuildHistory, "BuildHistory should be saved")
+	assert.Equal(t, build_history.BuildHistoryStatusBackendTrackingFailed, savedBuildHistory.Status())
+}
+
 // Helper functions
 
 func createTestBuildService() BuildService {
