@@ -436,3 +436,178 @@ func TestBuildPostProcessor_BuildVarsComparison(t *testing.T) {
 		assert.True(t, hasChanged)
 	})
 }
+
+func TestBuildPostProcessor_UpdateContainerAfterBuild_SkippedBuild(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+
+	var savedContainer *containermodel.Container
+	previousHash := "previous-commit-456"
+
+	mockRepo := &mockPostProcessorContainerRepo{
+		findByIDForUpdateFunc: func(ctx context.Context, containerID uint) (*containermodel.Container, error) {
+			// Create container with existing commit hash
+			slug, _ := containervalue.NewContainerSlug("test-container")
+			gitConfig, _ := containervalue.NewGitConfig("https://github.com/test/repo", "main", nil)
+			cpu := uint32(1000)
+			mem := uint32(512)
+			resourceLimits, _ := containervalue.NewResourceLimits(&cpu, &mem)
+
+			container, _ := containermodel.NewContainer(
+				1,
+				"test",
+				slug,
+				gitConfig,
+				resourceLimits,
+				nil,
+				nil,
+				nil,
+			)
+
+			// Set previous commit hash and needs_build=true
+			container.SetLastBuiltCommitHash(&previousHash)
+			container.MarkNeedsBuild()
+
+			return container, nil
+		},
+		saveFunc: func(ctx context.Context, container *containermodel.Container) error {
+			savedContainer = container
+			return nil
+		},
+	}
+	mockTxMgr := &mockPostProcessorTxManager{}
+
+	processor := NewBuildPostProcessor(mockRepo, mockTxMgr, testLogger)
+
+	// Test data - skipped build result
+	buildResult := &BuildResult{
+		BuildHistoryID:   1,
+		Status:           "skipped", // Skipped build (should_build=false)
+		LatestCommitHash: "",        // No new commit hash for skipped builds
+		ImageTag:         "latest",
+		ShouldBuild:      false,
+	}
+
+	snapshot := &dto.BuildContainerInfo{
+		ContainerID:      10,
+		GitRepositoryURL: "https://github.com/test/repo",
+		GitBranch:        "main",
+		TemplateID:       nil,
+		BuildVars:        map[string]string{},
+	}
+
+	// Execute
+	err := processor.UpdateContainerAfterBuild(ctx, 10, buildResult, snapshot)
+
+	// Verify
+	assert.NoError(t, err)
+	assert.NotNil(t, savedContainer)
+
+	// Previous commit hash should be preserved (not overwritten)
+	commitHash := savedContainer.LastBuiltGitCommitHash()
+	assert.NotNil(t, commitHash)
+	assert.Equal(t, previousHash, *commitHash)
+
+	// needs_build should be cleared even for skipped builds
+	assert.False(t, savedContainer.NeedsBuild())
+}
+
+func TestBuildPostProcessor_InstallationIDChanged(t *testing.T) {
+	// Setup
+	testLogger := logger.NewForTest()
+
+	processor := NewBuildPostProcessor(nil, nil, testLogger).(*buildPostProcessorImpl)
+
+	// Create test container with installation ID
+	slug, _ := containervalue.NewContainerSlug("test-container")
+	gitConfig, _ := containervalue.NewGitConfig("https://github.com/test/repo", "main", nil)
+	cpu := uint32(1000)
+	mem := uint32(512)
+	resourceLimits, _ := containervalue.NewResourceLimits(&cpu, &mem)
+
+	installationID := int64(12345678)
+	container, _ := containermodel.NewContainer(
+		1,
+		"test",
+		slug,
+		gitConfig,
+		resourceLimits,
+		nil,
+		nil,
+		&installationID,
+	)
+
+	t.Run("No change - identical installation IDs", func(t *testing.T) {
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil,
+			BuildVars:        map[string]string{},
+			InstallationID:   &installationID,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.False(t, hasChanged)
+	})
+
+	t.Run("Change detected - different installation ID", func(t *testing.T) {
+		differentID := int64(87654321)
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil,
+			BuildVars:        map[string]string{},
+			InstallationID:   &differentID,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+
+	t.Run("Change detected - installation ID added", func(t *testing.T) {
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil,
+			BuildVars:        map[string]string{},
+			InstallationID:   nil, // Snapshot has no installation ID
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+
+	t.Run("Change detected - installation ID removed", func(t *testing.T) {
+		// Create container without installation ID
+		containerNoID, _ := containermodel.NewContainer(
+			1,
+			"test",
+			slug,
+			gitConfig,
+			resourceLimits,
+			nil,
+			nil,
+			nil, // No installation ID
+		)
+
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil,
+			BuildVars:        map[string]string{},
+			InstallationID:   &installationID, // Snapshot has installation ID
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, containerNoID)
+		assert.True(t, hasChanged)
+	})
+}

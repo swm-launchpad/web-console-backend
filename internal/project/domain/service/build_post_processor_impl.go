@@ -47,8 +47,9 @@ func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
 		zap.String("build_status", buildResult.Status),
 	)
 
-	// Only update container if build was successful
-	if buildResult.Status != "success" {
+	// Only update container if build was successful or skipped
+	// Skipped builds (should_build=false) also need to clear needs_build flag
+	if buildResult.Status != "success" && buildResult.Status != "skipped" {
 		p.logger.Info(ctx, "Skipping container update due to non-success build status",
 			zap.Uint("container_id", containerID),
 			zap.String("status", buildResult.Status),
@@ -78,23 +79,33 @@ func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
 			return nil
 		}
 
-		// Step 3: Update container state after successful build
-		p.logger.Info(txCtx, "Updating container after successful build",
+		// Step 3: Update container state after successful/skipped build
+		p.logger.Info(txCtx, "Updating container after build",
 			zap.Uint("container_id", containerID),
+			zap.String("status", buildResult.Status),
 			zap.String("commit_hash", buildResult.LatestCommitHash),
 		)
 
-		// Update last built commit hash only if not empty
-		// Empty hash can occur with skipped builds or pipeline bugs
-		if buildResult.LatestCommitHash != "" {
-			currentContainer.SetLastBuiltCommitHash(&buildResult.LatestCommitHash)
+		// Update last built commit hash only for successful builds (not skipped)
+		// Skipped builds (should_build=false) keep the existing commit hash
+		if buildResult.Status == "success" {
+			// Update commit hash only if not empty
+			// Empty hash can occur with pipeline bugs
+			if buildResult.LatestCommitHash != "" {
+				currentContainer.SetLastBuiltCommitHash(&buildResult.LatestCommitHash)
+			} else {
+				p.logger.Warn(txCtx, "Build returned empty commit hash, keeping previous value",
+					zap.Uint("container_id", containerID),
+				)
+			}
 		} else {
-			p.logger.Warn(txCtx, "Build returned empty commit hash, keeping previous value",
+			// Skipped build - keep existing commit hash
+			p.logger.Info(txCtx, "Skipped build - keeping existing commit hash",
 				zap.Uint("container_id", containerID),
 			)
 		}
 
-		// Clear needs_build flag
+		// Clear needs_build flag for both success and skipped
 		currentContainer.ClearNeedsBuild()
 
 		// Step 4: Save updated container
@@ -159,6 +170,13 @@ func (p *buildPostProcessorImpl) hasBuildParametersChanged(
 		return true
 	}
 
+	// Check GitHub installation ID (for private repository access)
+	currentInstallationID := current.GitHubInstallationID()
+	//nolint:staticcheck // S1008: Keeping consistent with other parameter checks above
+	if !areInstallationIDsEqual(snapshot.InstallationID, currentInstallationID) {
+		return true
+	}
+
 	return false
 }
 
@@ -175,6 +193,17 @@ func areOptionalStringsEqual(a, b *string) bool {
 
 // areTemplateIDsEqual compares two optional template ID pointers
 func areTemplateIDsEqual(a, b *uint) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+// areInstallationIDsEqual compares two optional GitHub installation ID pointers
+func areInstallationIDsEqual(a, b *int64) bool {
 	if a == nil && b == nil {
 		return true
 	}
