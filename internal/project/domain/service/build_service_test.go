@@ -217,6 +217,7 @@ func TestBuildService_BuildContainer_TriggerFailure(t *testing.T) {
 }
 
 func TestBuildService_BuildContainer_FindPipelineRunFailure(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	testLogger := logger.NewForTest()
 
@@ -243,7 +244,15 @@ func TestBuildService_BuildContainer_FindPipelineRunFailure(t *testing.T) {
 		},
 	}
 
-	service := NewBuildService(buildHistoryRepo, tektonBuildClient, kubeBuildClient, testLogger)
+	// Use short intervals for test (100ms instead of 10s)
+	service := &buildServiceImpl{
+		buildHistoryRepo:             buildHistoryRepo,
+		tektonBuildClient:            tektonBuildClient,
+		kubeBuildClient:              kubeBuildClient,
+		logger:                       testLogger,
+		pollingInterval:              100 * time.Millisecond,
+		findPipelineRunRetryInterval: 100 * time.Millisecond,
+	}
 
 	testTemplate := "FROM alpine:latest"
 	container := &dto.BuildContainerInfo{
@@ -508,7 +517,9 @@ func TestBuildService_CheckBuildStatus(t *testing.T) {
 // TestBuildService_FastBuildStartedAt tests that started_at is set for fast builds
 // that complete before the first monitoring poll (regression test for Issue #548)
 func TestBuildService_FastBuildStartedAt(t *testing.T) {
+	t.Parallel()
 	t.Run("success - started_at set from PipelineRun.StartTime", func(t *testing.T) {
+		t.Parallel()
 		testTemplate := "FROM alpine:latest"
 		container := &dto.BuildContainerInfo{
 			ProjectID:        10,
@@ -569,10 +580,12 @@ func TestBuildService_FastBuildStartedAt(t *testing.T) {
 		}
 
 		buildService := &buildServiceImpl{
-			buildHistoryRepo:  mockRepo,
-			tektonBuildClient: mockTektonClient,
-			kubeBuildClient:   mockKubeClient,
-			logger:            logger.NewForTest(),
+			buildHistoryRepo:             mockRepo,
+			tektonBuildClient:            mockTektonClient,
+			kubeBuildClient:              mockKubeClient,
+			logger:                       logger.NewForTest(),
+			pollingInterval:              100 * time.Millisecond,
+			findPipelineRunRetryInterval: 100 * time.Millisecond,
 		}
 
 		// Execute
@@ -599,6 +612,7 @@ func TestBuildService_FastBuildStartedAt(t *testing.T) {
 	})
 
 	t.Run("failure - started_at set from PipelineRun.StartTime", func(t *testing.T) {
+		t.Parallel()
 		testTemplate := "FROM alpine:latest"
 		container := &dto.BuildContainerInfo{
 			ProjectID:        10,
@@ -655,10 +669,12 @@ func TestBuildService_FastBuildStartedAt(t *testing.T) {
 		}
 
 		buildService := &buildServiceImpl{
-			buildHistoryRepo:  mockRepo,
-			tektonBuildClient: mockTektonClient,
-			kubeBuildClient:   mockKubeClient,
-			logger:            logger.NewForTest(),
+			buildHistoryRepo:             mockRepo,
+			tektonBuildClient:            mockTektonClient,
+			kubeBuildClient:              mockKubeClient,
+			logger:                       logger.NewForTest(),
+			pollingInterval:              100 * time.Millisecond,
+			findPipelineRunRetryInterval: 100 * time.Millisecond,
 		}
 
 		// Execute
@@ -705,9 +721,11 @@ func TestBuildService_InitialCheckTerminalError(t *testing.T) {
 	}
 
 	buildService := &buildServiceImpl{
-		buildHistoryRepo: mockBuildHistoryRepo,
-		kubeBuildClient:  mockKubeClient,
-		logger:           logger.NewForTest(),
+		buildHistoryRepo:             mockBuildHistoryRepo,
+		kubeBuildClient:              mockKubeClient,
+		logger:                       logger.NewForTest(),
+		pollingInterval:              100 * time.Millisecond,
+		findPipelineRunRetryInterval: 100 * time.Millisecond,
 	}
 
 	buildHistory := build_history.NewBuildHistory(1)

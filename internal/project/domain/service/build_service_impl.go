@@ -18,10 +18,12 @@ import (
 
 // buildServiceImpl implements the BuildService interface
 type buildServiceImpl struct {
-	buildHistoryRepo  repository.BuildHistoryRepository
-	tektonBuildClient infrastructure.TektonBuildClient
-	kubeBuildClient   infrastructure.KubeBuildClient
-	logger            logger.Logger
+	buildHistoryRepo             repository.BuildHistoryRepository
+	tektonBuildClient            infrastructure.TektonBuildClient
+	kubeBuildClient              infrastructure.KubeBuildClient
+	logger                       logger.Logger
+	pollingInterval              time.Duration // Polling interval for monitoring build status
+	findPipelineRunRetryInterval time.Duration // Retry interval for finding PipelineRun by EventID
 }
 
 // NewBuildService creates a new BuildService instance
@@ -32,10 +34,12 @@ func NewBuildService(
 	logger logger.Logger,
 ) BuildService {
 	return &buildServiceImpl{
-		buildHistoryRepo:  buildHistoryRepo,
-		tektonBuildClient: tektonBuildClient,
-		kubeBuildClient:   kubeBuildClient,
-		logger:            logger,
+		buildHistoryRepo:             buildHistoryRepo,
+		tektonBuildClient:            tektonBuildClient,
+		kubeBuildClient:              kubeBuildClient,
+		logger:                       logger,
+		pollingInterval:              30 * time.Second, // Default: poll every 30 seconds
+		findPipelineRunRetryInterval: 10 * time.Second, // Default: retry every 10 seconds
 	}
 }
 
@@ -280,19 +284,24 @@ func (s *buildServiceImpl) prepareBuildRequest(container *dto.BuildContainerInfo
 }
 
 // findPipelineRunWithRetry attempts to find PipelineRun by EventID with retries
-// Retries every 10 seconds for up to 5 minutes
+// Retries periodically for up to 5 minutes or 300 attempts, whichever comes first
 func (s *buildServiceImpl) findPipelineRunWithRetry(
 	ctx context.Context,
 	buildHistory *build_history.BuildHistory,
 	eventID string,
 ) (string, error) {
 	const (
-		maxRetries    = 30               // 30 retries
-		retryInterval = 10 * time.Second // Every 10 seconds
-		totalTimeout  = 5 * time.Minute  // 5 minutes total
+		totalTimeout    = 5 * time.Minute // 5 minutes total
+		maxRetriesLimit = 300             // Maximum retry attempts
 	)
 
-	ticker := time.NewTicker(retryInterval)
+	calculatedRetries := int(totalTimeout / s.findPipelineRunRetryInterval)
+	maxRetries := calculatedRetries
+	if maxRetries > maxRetriesLimit {
+		maxRetries = maxRetriesLimit
+	}
+
+	ticker := time.NewTicker(s.findPipelineRunRetryInterval)
 	defer ticker.Stop()
 
 	timeout := time.After(totalTimeout)
@@ -343,7 +352,7 @@ func (s *buildServiceImpl) findPipelineRunWithRetry(
 	return "", fmt.Errorf("PipelineRun not found after %d attempts", maxRetries)
 }
 
-// monitorBuildStatus monitors the PipelineRun status every 30 seconds
+// monitorBuildStatus monitors the PipelineRun status periodically
 // Returns when the build reaches a terminal state or times out
 func (s *buildServiceImpl) monitorBuildStatus(
 	ctx context.Context,
@@ -351,11 +360,10 @@ func (s *buildServiceImpl) monitorBuildStatus(
 	pipelineRunName string,
 ) (*BuildResult, error) {
 	const (
-		pollingInterval = 30 * time.Second // Poll every 30 seconds
-		totalTimeout    = 30 * time.Minute // 30 minutes total
+		totalTimeout = 30 * time.Minute // 30 minutes total
 	)
 
-	ticker := time.NewTicker(pollingInterval)
+	ticker := time.NewTicker(s.pollingInterval)
 	defer ticker.Stop()
 
 	timeout := time.After(totalTimeout)
