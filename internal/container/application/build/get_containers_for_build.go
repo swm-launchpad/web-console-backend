@@ -59,10 +59,18 @@ func (uc *GetContainersForBuildUseCase) Execute(ctx context.Context, input GetCo
 	}
 
 	for _, container := range containers {
-		// Build build vars map
+		// Build build vars map (defensive copy to prevent aliasing)
 		buildVars := make(map[string]string)
 		for _, bv := range container.BuildVars() {
 			buildVars[bv.Key()] = bv.Value()
+		}
+
+		// Deep copy template config to prevent snapshot aliasing
+		// Maps are reference types - direct assignment would allow later mutations
+		// to affect the snapshot, defeating change detection
+		templateConfig := make(map[string]interface{})
+		for k, v := range container.TemplateConfig() {
+			templateConfig[k] = v
 		}
 
 		// Get template body if template is configured
@@ -83,7 +91,7 @@ func (uc *GetContainersForBuildUseCase) Execute(ctx context.Context, input GetCo
 			Slug:                container.Slug().String(),
 			TemplateID:          container.TemplateID(),
 			TemplateBody:        templateBody,
-			TemplateConfig:      container.TemplateConfig(),
+			TemplateConfig:      templateConfig,
 			GitRepositoryURL:    container.GitConfig().RepositoryURL(),
 			GitBranch:           container.GitConfig().Branch(),
 			GitDirectoryPath:    container.GitConfig().DirectoryPath(),
