@@ -143,17 +143,69 @@ func (s *buildServiceImpl) BuildContainer(
 	)
 
 	// Update build history with Tekton event ID
+	// EventID is CRITICAL for tracking and recovery - without it, the build cannot be monitored
 	if updateErr := buildHistory.InitTektonInfo(&buildResponse.EventID, nil); updateErr != nil {
-		s.logger.Warn(ctx, "failed to update build history with event ID",
+		s.logger.Error(ctx, "CRITICAL: failed to update build history with event ID - build tracking impossible without EventID",
 			zap.Uint("build_history_id", buildHistoryID),
 			zap.String("event_id", buildResponse.EventID),
 			zap.Error(updateErr),
 		)
-	} else if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
-		s.logger.Warn(ctx, "failed to persist event ID to build history",
+
+		// Update to backend_tracking_failed since we cannot track this build
+		summary := fmt.Sprintf("Failed to save EventID to build history: %v. EventID is required for tracking.", updateErr)
+		if statusErr := buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary); statusErr != nil {
+			s.logger.Error(ctx, "failed to update build history to tracking_failed",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(statusErr),
+			)
+			return nil, fmt.Errorf("failed to update build history status: %w", statusErr)
+		}
+
+		if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+			s.logger.Error(ctx, "failed to persist terminal state (backend_tracking_failed)",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(saveErr),
+			)
+			return nil, fmt.Errorf("failed to persist terminal state (backend_tracking_failed): %w", saveErr)
+		}
+
+		return &BuildResult{
+			BuildHistoryID: buildHistoryID,
+			Status:         "failed",
+			ErrorMessage:   summary,
+		}, updateErr
+	}
+
+	if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+		s.logger.Error(ctx, "CRITICAL: failed to persist event ID to build history - build tracking impossible without EventID",
 			zap.Uint("build_history_id", buildHistoryID),
+			zap.String("event_id", buildResponse.EventID),
 			zap.Error(saveErr),
 		)
+
+		// Update to backend_tracking_failed since we cannot track this build
+		summary := fmt.Sprintf("Failed to persist EventID to build history: %v. EventID is required for tracking.", saveErr)
+		if statusErr := buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary); statusErr != nil {
+			s.logger.Error(ctx, "failed to update build history to tracking_failed",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(statusErr),
+			)
+			return nil, fmt.Errorf("failed to update build history status: %w", statusErr)
+		}
+
+		if saveErr2 := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr2 != nil {
+			s.logger.Error(ctx, "failed to persist terminal state (backend_tracking_failed)",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(saveErr2),
+			)
+			return nil, fmt.Errorf("failed to persist terminal state (backend_tracking_failed): %w", saveErr2)
+		}
+
+		return &BuildResult{
+			BuildHistoryID: buildHistoryID,
+			Status:         "failed",
+			ErrorMessage:   summary,
+		}, saveErr
 	}
 
 	// Step 2: Find PipelineRun name by EventID (with timeout and retries)
