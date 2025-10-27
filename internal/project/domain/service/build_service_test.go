@@ -447,7 +447,33 @@ func TestBuildService_CheckBuildStatus(t *testing.T) {
 		assert.Equal(t, "abc123", result.LatestCommitHash)
 	})
 
-	t.Run("GetPipelineRunStatus error", func(t *testing.T) {
+	t.Run("PipelineRun deleted - terminal failure", func(t *testing.T) {
+		kubeBuildClient := &mockKubeBuildClient{
+			getPipelineRunStatusFunc: func(ctx context.Context, pipelineRunName string) (*dto.PipelineRun, error) {
+				return nil, projecterrors.ErrKubePipelineRunNotFound
+			},
+		}
+
+		service := &buildServiceImpl{
+			buildHistoryRepo: buildHistoryRepo,
+			kubeBuildClient:  kubeBuildClient,
+			logger:           testLogger,
+		}
+
+		buildHistory := build_history.NewBuildHistory(1)
+		buildHistory.SetBuildHistoryID(1)
+
+		result, err := service.checkBuildStatus(ctx, buildHistory, "test-run")
+
+		// Should return both result and error for terminal state
+		require.Error(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, "failed", result.Status)
+		assert.Contains(t, result.ErrorMessage, "not found in Kubernetes")
+		assert.Equal(t, build_history.BuildHistoryStatusBackendTrackingFailed, buildHistory.Status())
+	})
+
+	t.Run("GetPipelineRunStatus transient error", func(t *testing.T) {
 		kubeBuildClient := &mockKubeBuildClient{
 			getPipelineRunStatusFunc: func(ctx context.Context, pipelineRunName string) (*dto.PipelineRun, error) {
 				return nil, errors.New("network error")
@@ -461,12 +487,14 @@ func TestBuildService_CheckBuildStatus(t *testing.T) {
 		}
 
 		buildHistory := build_history.NewBuildHistory(1)
+		buildHistory.SetBuildHistoryID(1)
 
 		result, err := service.checkBuildStatus(ctx, buildHistory, "test-run")
 
 		require.Error(t, err)
-		assert.Nil(t, result)
+		assert.Nil(t, result) // Transient error - no terminal result
 		assert.Contains(t, err.Error(), "failed to get PipelineRun status")
+		assert.Equal(t, build_history.BuildHistoryStatusBackendTrackingLost, buildHistory.Status())
 	})
 }
 
