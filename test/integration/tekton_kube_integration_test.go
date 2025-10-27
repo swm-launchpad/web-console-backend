@@ -685,6 +685,8 @@ func verifyBuildResults(t *testing.T, results map[string]string, expectedShouldB
 // - Kubernetes API server must be accessible with build-pipeline namespace
 // - Environment variables must be set in .env.test
 func TestTektonBuildKubeIntegration(t *testing.T) {
+	t.Parallel() // Enable parallel execution with build_service_integration_test.go tests
+
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
