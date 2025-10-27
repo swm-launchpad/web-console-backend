@@ -374,9 +374,13 @@ func (s *buildServiceImpl) monitorBuildStatus(
 	for {
 		select {
 		case <-ctx.Done():
-			// Context cancelled - monitoring goroutine exits but PipelineRun continues
-			// The actual PipelineRun status will be reflected in next polling cycle or force refresh
-			// This matches the DeploymentService pattern
+			// Context cancelled - monitoring goroutine exits but PipelineRun continues in Tekton
+			// The BuildHistory record may remain in running/backend_tracking_lost state temporarily
+			// This is acceptable because:
+			// 1. Users can trigger force refresh to update the status
+			// 2. Periodic batch jobs will reconcile stale records
+			// 3. Tekton PipelineRun continues executing and will eventually complete
+			// This matches the DeploymentService pattern (deploy_service.go:938)
 			s.logger.Info(ctx, "build monitoring context cancelled",
 				zap.Uint("build_history_id", buildHistory.BuildHistoryID),
 				zap.String("pipeline_run_name", pipelineRunName),
@@ -568,6 +572,23 @@ func (s *buildServiceImpl) handleBuildSuccess(
 		status = "skipped"
 	}
 
+	// Ensure started_at is set for fast builds (completed before first poll)
+	// This prevents BUILD_HISTORY.started_at from being NULL
+	if _, hasStartedAt := buildHistory.StartedAt(); !hasStartedAt && !buildHistory.IsCompleted() {
+		startedAt := time.Now()
+		if pipelineRun.StartTime != nil {
+			startedAt = *pipelineRun.StartTime
+		}
+		runningSummary := "Build started"
+		if err := buildHistory.UpdateRunningStatus(&runningSummary, &startedAt); err != nil {
+			s.logger.Warn(ctx, "failed to set started_at for fast build",
+				zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+				zap.Error(err),
+			)
+			// Continue with completion - this is not critical
+		}
+	}
+
 	// Update build history
 	// Use Tekton's CompletionTime if available, fallback to time.Now()
 	finishedAt := time.Now()
@@ -637,6 +658,23 @@ func (s *buildServiceImpl) handleBuildFailure(
 	} else {
 		status = build_history.BuildHistoryStatusFailed
 		resultStatus = "failed"
+	}
+
+	// Ensure started_at is set for fast builds (completed before first poll)
+	// This prevents BUILD_HISTORY.started_at from being NULL
+	if _, hasStartedAt := buildHistory.StartedAt(); !hasStartedAt && !buildHistory.IsCompleted() {
+		startedAt := time.Now()
+		if pipelineRun.StartTime != nil {
+			startedAt = *pipelineRun.StartTime
+		}
+		runningSummary := "Build started"
+		if err := buildHistory.UpdateRunningStatus(&runningSummary, &startedAt); err != nil {
+			s.logger.Warn(ctx, "failed to set started_at for fast build",
+				zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+				zap.Error(err),
+			)
+			// Continue with completion - this is not critical
+		}
 	}
 
 	// Update build history

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -504,7 +505,185 @@ func TestBuildService_CheckBuildStatus(t *testing.T) {
 	})
 }
 
-// Helper function
+// TestBuildService_FastBuildStartedAt tests that started_at is set for fast builds
+// that complete before the first monitoring poll (regression test for Issue #548)
+func TestBuildService_FastBuildStartedAt(t *testing.T) {
+	t.Run("success - started_at set from PipelineRun.StartTime", func(t *testing.T) {
+		testTemplate := "FROM alpine:latest"
+		container := &dto.BuildContainerInfo{
+			ProjectID:        10,
+			ContainerID:      1,
+			Name:             "fast-build",
+			Slug:             "fast-build-test",
+			TemplateBody:     &testTemplate,
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			NeedsBuild:       true,
+		}
+
+		buildHistory := build_history.NewBuildHistory(container.ContainerID)
+		buildHistory.SetBuildHistoryID(1)
+
+		// Mock repository to save BuildHistory
+		var savedBuildHistory *build_history.BuildHistory
+		mockRepo := &mockBuildHistoryRepository{
+			saveFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+				savedBuildHistory = b
+				return nil
+			},
+		}
+
+		// Mock Tekton client
+		eventID := "test-event-123"
+		mockTektonClient := &mockTektonBuildClient{
+			triggerBuildFunc: func(ctx context.Context, req *dto.TektonBuildRequest) (*dto.TektonBuildResponse, error) {
+				return &dto.TektonBuildResponse{EventID: eventID}, nil
+			},
+		}
+
+		// Mock Kube client - PipelineRun already completed before first poll
+		pipelineRunName := "build-run-123"
+		startTime := parseTime(t, "2024-01-01T10:00:00Z")
+		completionTime := parseTime(t, "2024-01-01T10:01:30Z") // 90 seconds build
+
+		mockKubeClient := &mockKubeBuildClient{
+			findPipelineRunNameByEventIDFunc: func(ctx context.Context, eventID string) (string, error) {
+				return pipelineRunName, nil
+			},
+			getPipelineRunStatusFunc: func(ctx context.Context, pipelineRunName string) (*dto.PipelineRun, error) {
+				// Return completed status on first poll
+				return &dto.PipelineRun{
+					Name:           pipelineRunName,
+					Status:         "True",
+					Reason:         "Succeeded",
+					Message:        "Build completed",
+					StartTime:      &startTime,
+					CompletionTime: &completionTime,
+					Results: map[string]string{
+						"latest_commit_hash": "abc123",
+						"image_tag":          "abc123",
+						"should_build":       "true",
+					},
+				}, nil
+			},
+		}
+
+		buildService := &buildServiceImpl{
+			buildHistoryRepo:  mockRepo,
+			tektonBuildClient: mockTektonClient,
+			kubeBuildClient:   mockKubeClient,
+			logger:            logger.NewForTest(),
+		}
+
+		// Execute
+		ctx := context.Background()
+		result, err := buildService.BuildContainer(ctx, buildHistory.BuildHistoryID, container)
+
+		// Verify result
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, "success", result.Status)
+		assert.Equal(t, "abc123", result.LatestCommitHash)
+		assert.True(t, result.ShouldBuild)
+
+		// Verify BuildHistory started_at is set
+		require.NotNil(t, savedBuildHistory, "BuildHistory should be saved")
+		savedStartedAt, hasStartedAt := savedBuildHistory.StartedAt()
+		assert.True(t, hasStartedAt, "started_at should be set for fast builds")
+		assert.Equal(t, startTime, savedStartedAt, "started_at should match PipelineRun.StartTime")
+
+		// Verify finished_at is also set
+		savedFinishedAt, hasFinishedAt := savedBuildHistory.FinishedAt()
+		assert.True(t, hasFinishedAt, "finished_at should be set")
+		assert.Equal(t, completionTime, savedFinishedAt, "finished_at should match PipelineRun.CompletionTime")
+	})
+
+	t.Run("failure - started_at set from PipelineRun.StartTime", func(t *testing.T) {
+		testTemplate := "FROM alpine:latest"
+		container := &dto.BuildContainerInfo{
+			ProjectID:        10,
+			ContainerID:      2,
+			Name:             "fast-failed-build",
+			Slug:             "fast-failed-build-test",
+			TemplateBody:     &testTemplate,
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			NeedsBuild:       true,
+		}
+
+		buildHistory := build_history.NewBuildHistory(container.ContainerID)
+		buildHistory.SetBuildHistoryID(2)
+
+		// Mock repository to save BuildHistory
+		var savedBuildHistory *build_history.BuildHistory
+		mockRepo := &mockBuildHistoryRepository{
+			saveFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+				savedBuildHistory = b
+				return nil
+			},
+		}
+
+		// Mock Tekton client
+		eventID := "test-event-456"
+		mockTektonClient := &mockTektonBuildClient{
+			triggerBuildFunc: func(ctx context.Context, req *dto.TektonBuildRequest) (*dto.TektonBuildResponse, error) {
+				return &dto.TektonBuildResponse{EventID: eventID}, nil
+			},
+		}
+
+		// Mock Kube client - PipelineRun failed before first poll
+		pipelineRunName := "build-run-456"
+		startTime := parseTime(t, "2024-01-01T11:00:00Z")
+		completionTime := parseTime(t, "2024-01-01T11:00:45Z") // 45 seconds before failure
+
+		mockKubeClient := &mockKubeBuildClient{
+			findPipelineRunNameByEventIDFunc: func(ctx context.Context, eventID string) (string, error) {
+				return pipelineRunName, nil
+			},
+			getPipelineRunStatusFunc: func(ctx context.Context, pipelineRunName string) (*dto.PipelineRun, error) {
+				// Return failed status on first poll
+				return &dto.PipelineRun{
+					Name:           pipelineRunName,
+					Status:         "False",
+					Reason:         "Failed",
+					Message:        "Build failed: compilation error",
+					StartTime:      &startTime,
+					CompletionTime: &completionTime,
+					Results:        map[string]string{},
+				}, nil
+			},
+		}
+
+		buildService := &buildServiceImpl{
+			buildHistoryRepo:  mockRepo,
+			tektonBuildClient: mockTektonClient,
+			kubeBuildClient:   mockKubeClient,
+			logger:            logger.NewForTest(),
+		}
+
+		// Execute
+		ctx := context.Background()
+		result, err := buildService.BuildContainer(ctx, buildHistory.BuildHistoryID, container)
+
+		// Verify result
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.Equal(t, "failed", result.Status)
+
+		// Verify BuildHistory started_at is set even for failed builds
+		require.NotNil(t, savedBuildHistory, "BuildHistory should be saved")
+		savedStartedAt, hasStartedAt := savedBuildHistory.StartedAt()
+		assert.True(t, hasStartedAt, "started_at should be set for fast failed builds")
+		assert.Equal(t, startTime, savedStartedAt, "started_at should match PipelineRun.StartTime")
+
+		// Verify finished_at is also set
+		savedFinishedAt, hasFinishedAt := savedBuildHistory.FinishedAt()
+		assert.True(t, hasFinishedAt, "finished_at should be set")
+		assert.Equal(t, completionTime, savedFinishedAt, "finished_at should match PipelineRun.CompletionTime")
+	})
+}
+
+// Helper functions
 
 func createTestBuildService() BuildService {
 	return &buildServiceImpl{
@@ -513,4 +692,11 @@ func createTestBuildService() BuildService {
 		kubeBuildClient:   &mockKubeBuildClient{},
 		logger:            logger.NewForTest(),
 	}
+}
+
+func parseTime(t *testing.T, timeStr string) time.Time {
+	t.Helper()
+	parsedTime, err := time.Parse(time.RFC3339, timeStr)
+	require.NoError(t, err, "Failed to parse time: %s", timeStr)
+	return parsedTime
 }
