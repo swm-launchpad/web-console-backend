@@ -19,6 +19,10 @@ type BuildContainerInfo struct {
 	// Slug is the container slug identifier (required)
 	Slug string `json:"slug"`
 
+	// TemplateID is the ID of the template used (optional)
+	// This is used to detect template changes during build
+	TemplateID *uint `json:"template_id,omitempty"`
+
 	// TemplateBody is the Dockerfile template content (optional)
 	// If provided, it will be used to generate the Dockerfile during build
 	TemplateBody *string `json:"template_body,omitempty"`

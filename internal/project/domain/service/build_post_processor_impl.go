@@ -84,8 +84,15 @@ func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
 			zap.String("commit_hash", buildResult.LatestCommitHash),
 		)
 
-		// Update last built commit hash
-		currentContainer.SetLastBuiltCommitHash(&buildResult.LatestCommitHash)
+		// Update last built commit hash only if not empty
+		// Empty hash can occur with skipped builds or pipeline bugs
+		if buildResult.LatestCommitHash != "" {
+			currentContainer.SetLastBuiltCommitHash(&buildResult.LatestCommitHash)
+		} else {
+			p.logger.Warn(txCtx, "Build returned empty commit hash, keeping previous value",
+				zap.Uint("container_id", containerID),
+			)
+		}
 
 		// Clear needs_build flag
 		currentContainer.ClearNeedsBuild()
@@ -136,21 +143,19 @@ func (p *buildPostProcessorImpl) hasBuildParametersChanged(
 		return true
 	}
 
-	// Check template ID
+	// Check template ID (actual value comparison)
 	currentTemplateID := current.TemplateID()
-	if !areOptionalUintsEqual(snapshot.TemplateBody, currentTemplateID) {
-		// Note: TemplateBody in snapshot indicates template usage
-		// If snapshot has TemplateBody (not nil), it means template was used
-		// We compare with current TemplateID existence
-		snapshotHasTemplate := (snapshot.TemplateBody != nil)
-		currentHasTemplate := (currentTemplateID != nil)
-		if snapshotHasTemplate != currentHasTemplate {
-			return true
-		}
+	if !areTemplateIDsEqual(snapshot.TemplateID, currentTemplateID) {
+		return true
 	}
 
 	// Check template config (deep comparison using JSON)
 	if !areTemplateConfigsEqual(snapshot.TemplateConfig, current.TemplateConfig()) {
+		return true
+	}
+
+	// Check build-time environment variables
+	if !areBuildVarsEqual(snapshot.BuildVars, current.BuildVars()) {
 		return true
 	}
 
@@ -168,15 +173,48 @@ func areOptionalStringsEqual(a, b *string) bool {
 	return *a == *b
 }
 
-// areOptionalUintsEqual compares template existence
-// Since we can't directly compare template body with ID, we check existence
-func areOptionalUintsEqual(templateBody *string, templateID *uint) bool {
-	// If both are nil or both are non-nil, consider them equal
-	// This is a simplified check - actual template content comparison would require
-	// fetching the template body from the database
-	hasTemplateBody := (templateBody != nil)
-	hasTemplateID := (templateID != nil)
-	return hasTemplateBody == hasTemplateID
+// areTemplateIDsEqual compares two optional template ID pointers
+func areTemplateIDsEqual(a, b *uint) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
+}
+
+// areBuildVarsEqual compares snapshot BuildVars (map) with current BuildVars (slice)
+func areBuildVarsEqual(snapshotVars map[string]string, currentVars []containermodel.BuildVar) bool {
+	// Convert current BuildVars slice to map for comparison
+	currentVarsMap := make(map[string]string, len(currentVars))
+	for _, v := range currentVars {
+		currentVarsMap[v.Key()] = v.Value()
+	}
+
+	// Handle nil or empty maps
+	snapshotLen := len(snapshotVars)
+	currentLen := len(currentVarsMap)
+
+	// Both empty - equal
+	if snapshotLen == 0 && currentLen == 0 {
+		return true
+	}
+
+	// Different sizes - not equal
+	if snapshotLen != currentLen {
+		return false
+	}
+
+	// Compare each key-value pair
+	for key, snapshotValue := range snapshotVars {
+		currentValue, exists := currentVarsMap[key]
+		if !exists || currentValue != snapshotValue {
+			return false
+		}
+	}
+
+	return true
 }
 
 // areTemplateConfigsEqual compares two template configs using JSON serialization

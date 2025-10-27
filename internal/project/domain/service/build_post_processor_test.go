@@ -189,8 +189,10 @@ func TestBuildPostProcessor_HasBuildParametersChanged(t *testing.T) {
 			GitRepositoryURL: "https://github.com/test/repo",
 			GitBranch:        "main",
 			GitDirectoryPath: nil,
+			TemplateID:       nil,
 			TemplateBody:     nil,
 			TemplateConfig:   nil,
+			BuildVars:        map[string]string{},
 		}
 
 		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
@@ -203,8 +205,10 @@ func TestBuildPostProcessor_HasBuildParametersChanged(t *testing.T) {
 			GitRepositoryURL: "https://github.com/test/different-repo",
 			GitBranch:        "main",
 			GitDirectoryPath: nil,
+			TemplateID:       nil,
 			TemplateBody:     nil,
 			TemplateConfig:   nil,
+			BuildVars:        map[string]string{},
 		}
 
 		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
@@ -217,8 +221,215 @@ func TestBuildPostProcessor_HasBuildParametersChanged(t *testing.T) {
 			GitRepositoryURL: "https://github.com/test/repo",
 			GitBranch:        "develop",
 			GitDirectoryPath: nil,
+			TemplateID:       nil,
 			TemplateBody:     nil,
 			TemplateConfig:   nil,
+			BuildVars:        nil,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+
+	t.Run("Template ID changed - should return true", func(t *testing.T) {
+		templateID := uint(999)
+		snapshot := &dto.BuildContainerInfo{
+			ContainerID:      1,
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       &templateID, // Different template ID
+			TemplateBody:     nil,
+			TemplateConfig:   nil,
+			BuildVars:        nil,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+
+	t.Run("BuildVars changed - should return true", func(t *testing.T) {
+		snapshot := &dto.BuildContainerInfo{
+			ContainerID:      1,
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateBody:     nil,
+			TemplateConfig:   nil,
+			BuildVars: map[string]string{
+				"NEW_VAR": "new_value",
+			},
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+}
+
+func TestBuildPostProcessor_UpdateContainerAfterBuild_EmptyCommitHash(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+
+	var savedContainer *containermodel.Container
+	mockRepo := &mockPostProcessorContainerRepo{
+		findByIDForUpdateFunc: func(ctx context.Context, containerID uint) (*containermodel.Container, error) {
+			// Create container with existing commit hash
+			slug, _ := containervalue.NewContainerSlug("test-container")
+			gitConfig, _ := containervalue.NewGitConfig("https://github.com/test/repo", "main", nil)
+			cpu := uint32(1000)
+			mem := uint32(512)
+			resourceLimits, _ := containervalue.NewResourceLimits(&cpu, &mem)
+
+			container, _ := containermodel.NewContainer(
+				1,
+				"test",
+				slug,
+				gitConfig,
+				resourceLimits,
+				nil,
+				nil,
+				nil,
+			)
+
+			// Set previous commit hash
+			previousHash := "previous-commit-123"
+			container.SetLastBuiltCommitHash(&previousHash)
+
+			return container, nil
+		},
+		saveFunc: func(ctx context.Context, container *containermodel.Container) error {
+			savedContainer = container
+			return nil
+		},
+	}
+	mockTxMgr := &mockPostProcessorTxManager{}
+
+	processor := NewBuildPostProcessor(mockRepo, mockTxMgr, testLogger)
+
+	// Test data - build result with empty commit hash
+	buildResult := &BuildResult{
+		BuildHistoryID:   1,
+		Status:           "success",
+		LatestCommitHash: "", // Empty hash (e.g., skipped build)
+		ImageTag:         "latest",
+		ShouldBuild:      false,
+	}
+
+	snapshot := &dto.BuildContainerInfo{
+		ContainerID:      10,
+		GitRepositoryURL: "https://github.com/test/repo",
+		GitBranch:        "main",
+		TemplateID:       nil,
+		BuildVars:        map[string]string{},
+	}
+
+	// Execute
+	err := processor.UpdateContainerAfterBuild(ctx, 10, buildResult, snapshot)
+
+	// Verify
+	assert.NoError(t, err)
+	assert.NotNil(t, savedContainer)
+
+	// Previous commit hash should be preserved (not overwritten with empty string)
+	commitHash := savedContainer.LastBuiltGitCommitHash()
+	assert.NotNil(t, commitHash)
+	assert.Equal(t, "previous-commit-123", *commitHash)
+
+	// needs_build should still be cleared
+	assert.False(t, savedContainer.NeedsBuild())
+}
+
+func TestBuildPostProcessor_BuildVarsComparison(t *testing.T) {
+	testLogger := logger.NewForTest()
+	processor := NewBuildPostProcessor(nil, nil, testLogger).(*buildPostProcessorImpl)
+
+	// Create container with build vars
+	slug, _ := containervalue.NewContainerSlug("test-container")
+	gitConfig, _ := containervalue.NewGitConfig("https://github.com/test/repo", "main", nil)
+	cpu := uint32(1000)
+	mem := uint32(512)
+	resourceLimits, _ := containervalue.NewResourceLimits(&cpu, &mem)
+
+	container, _ := containermodel.NewContainer(
+		1,
+		"test",
+		slug,
+		gitConfig,
+		resourceLimits,
+		nil,
+		nil,
+		nil,
+	)
+	container.SetContainerID(1) // Required for AddBuildVar
+
+	// Add build vars to container
+	container.AddBuildVar("VAR1", "value1")
+	container.AddBuildVar("VAR2", "value2")
+
+	t.Run("Identical build vars - no change detected", func(t *testing.T) {
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil,
+			BuildVars: map[string]string{
+				"VAR1": "value1",
+				"VAR2": "value2",
+			},
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.False(t, hasChanged)
+	})
+
+	t.Run("Different build var values - change detected", func(t *testing.T) {
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil,
+			BuildVars: map[string]string{
+				"VAR1": "different_value",
+				"VAR2": "value2",
+			},
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+
+	t.Run("Additional build var - change detected", func(t *testing.T) {
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil,
+			BuildVars: map[string]string{
+				"VAR1": "value1",
+				"VAR2": "value2",
+				"VAR3": "value3",
+			},
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+
+	t.Run("Missing build var - change detected", func(t *testing.T) {
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil,
+			BuildVars: map[string]string{
+				"VAR1": "value1",
+			},
 		}
 
 		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
