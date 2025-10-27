@@ -103,12 +103,6 @@ func TestTektonKubeIntegration(t *testing.T) {
 	})
 
 	t.Run("KubeClient - List PipelineRuns for project", func(t *testing.T) {
-		// Fix CA cert path for tests (relative to test working directory)
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Given - Create KubeClient
 		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
@@ -142,12 +136,6 @@ func TestTektonKubeIntegration(t *testing.T) {
 	})
 
 	t.Run("KubeClient - Get PipelineRun status (if exists)", func(t *testing.T) {
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Given - Create KubeClient
 		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
@@ -205,12 +193,6 @@ func TestTektonKubeIntegration(t *testing.T) {
 	})
 
 	t.Run("KubeClient - Get PipelineRun logs (if exists)", func(t *testing.T) {
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Given - Create KubeClient
 		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
@@ -256,12 +238,6 @@ func TestTektonKubeIntegration(t *testing.T) {
 	})
 
 	t.Run("KubeClient - Get non-existent PipelineRun status (error case)", func(t *testing.T) {
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Given - Create KubeClient
 		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
@@ -281,12 +257,6 @@ func TestTektonKubeIntegration(t *testing.T) {
 	})
 
 	t.Run("KubeClient - Get non-existent PipelineRun logs (error case)", func(t *testing.T) {
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Given - Create KubeClient
 		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
@@ -306,12 +276,6 @@ func TestTektonKubeIntegration(t *testing.T) {
 	})
 
 	t.Run("KubeClient - Find PipelineRun name by EventID (success case)", func(t *testing.T) {
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Given - Create KubeClient
 		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
@@ -365,12 +329,6 @@ func TestTektonKubeIntegration(t *testing.T) {
 	})
 
 	t.Run("KubeClient - Find PipelineRun by non-existent EventID (error case)", func(t *testing.T) {
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Given - Create KubeClient
 		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
 		if err != nil {
@@ -777,12 +735,6 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 		require.NotEmpty(t, response.EventID, "EventID should be set")
 		t.Logf("Build triggered - EventID: %s", response.EventID)
 
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Create KubeBuildClient
 		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
 		if err != nil {
@@ -860,12 +812,6 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 		require.NotNil(t, response, "Response should not be nil")
 		require.NotEmpty(t, response.EventID, "EventID should be set")
 		t.Logf("Build triggered - EventID: %s", response.EventID)
-
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
 
 		// Create KubeBuildClient
 		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
@@ -960,12 +906,6 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 		require.NotEmpty(t, response.EventID, "EventID should be set")
 		t.Logf("Build triggered - EventID: %s", response.EventID)
 
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Create KubeBuildClient
 		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
 		if err != nil {
@@ -988,12 +928,6 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 	})
 
 	t.Run("KubeBuildClient - Find build PipelineRun by EventID", func(t *testing.T) {
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Given - Create KubeBuildClient
 		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
 		if err != nil {
@@ -1012,12 +946,6 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 	})
 
 	t.Run("KubeBuildClient - Get build PipelineRun status with results", func(t *testing.T) {
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
-
 		// Given - Create KubeBuildClient
 		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
 		if err != nil {
@@ -1053,12 +981,6 @@ func TestTektonBuildClient_FullBuildFlow(t *testing.T) {
 	// Create clients
 	tektonBuildClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
 	require.NoError(t, err, "Failed to create TektonBuildClient")
-
-	// Fix CA cert path for tests
-	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-	if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-		_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-	}
 
 	kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
 	require.NoError(t, err, "Failed to create KubeBuildClient")

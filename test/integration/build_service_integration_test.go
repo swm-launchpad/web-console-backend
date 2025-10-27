@@ -105,7 +105,7 @@ func setupBuildServiceIntegrationTest(t *testing.T) context.Context {
 // - Kubernetes API server must be accessible
 // - Environment variables must be set in .env.test
 func TestBuildServiceIntegration_SpringHelloWorld(t *testing.T) {
-	t.Parallel() // Top-level parallel test - safe with t.Setenv()
+	t.Parallel() // Enable parallel execution for long-running build test
 
 	ctx := setupBuildServiceIntegrationTest(t)
 
@@ -158,12 +158,6 @@ func TestBuildServiceIntegration_SpringHelloWorld(t *testing.T) {
 
 	buildHistoryID := bh.BuildHistoryID
 	t.Logf("Created BuildHistory with ID: %d", buildHistoryID)
-
-	// Fix CA cert path for tests (use t.Setenv for parallel-safe env var modification)
-	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-	if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-		t.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-	}
 
 	// Create real TektonBuildClient
 	tektonClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
@@ -222,7 +216,7 @@ func TestBuildServiceIntegration_SpringHelloWorld(t *testing.T) {
 // - Kubernetes API server must be accessible
 // - Environment variables must be set in .env.test
 func TestBuildServiceIntegration_MySQL(t *testing.T) {
-	t.Parallel() // Top-level parallel test - safe with t.Setenv()
+	t.Parallel() // Enable parallel execution for long-running build test
 
 	ctx := setupBuildServiceIntegrationTest(t)
 
@@ -276,12 +270,6 @@ func TestBuildServiceIntegration_MySQL(t *testing.T) {
 
 	buildHistoryID := bh.BuildHistoryID
 	t.Logf("Created BuildHistory with ID: %d", buildHistoryID)
-
-	// Fix CA cert path for tests (use t.Setenv for parallel-safe env var modification)
-	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-	if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-		t.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-	}
 
 	// Create real clients
 	tektonClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
@@ -340,7 +328,7 @@ func TestBuildServiceIntegration_MySQL(t *testing.T) {
 // - Environment variables must be set in .env.test
 // - GITHUB_APP_INSTALLATION_ID must be set for private repository access
 func TestBuildServiceIntegration_SpringMySQLDemo(t *testing.T) {
-	t.Parallel() // Top-level parallel test - safe with t.Setenv()
+	t.Parallel() // Enable parallel execution for long-running build test
 
 	ctx := setupBuildServiceIntegrationTest(t)
 
@@ -409,12 +397,6 @@ func TestBuildServiceIntegration_SpringMySQLDemo(t *testing.T) {
 
 	buildHistoryID := bh.BuildHistoryID
 	t.Logf("Created BuildHistory with ID: %d", buildHistoryID)
-
-	// Fix CA cert path for tests (use t.Setenv for parallel-safe env var modification)
-	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-	if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-		t.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-	}
 
 	// Create real clients
 	tektonClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
