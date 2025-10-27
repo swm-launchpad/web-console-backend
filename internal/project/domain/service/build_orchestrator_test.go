@@ -531,8 +531,8 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("Handle context.Canceled as non-terminal", func(t *testing.T) {
-		// PR #7 Option B: context cancellation returns nil result
-		// Orchestrator must not convert this to "failed" status
+		// Context cancellation returns concrete BuildResult with backend_tracking_lost status
+		// This prevents panic in downstream consumers while preserving non-terminal semantics
 		// BuildHistory should remain in non-terminal state
 
 		mockRepo := &mockOrchestratorBuildHistoryRepo{
@@ -544,7 +544,7 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 
 		mockBuildService := &mockOrchestratorBuildService{
 			buildContainerFunc: func(ctx context.Context, buildHistoryID uint, container *dto.BuildContainerInfo) (*BuildResult, error) {
-				// Simulate PR #7 Option B behavior
+				// Simulate context cancellation (returns nil BuildResult)
 				return nil, context.Canceled
 			},
 		}
@@ -559,10 +559,13 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 
 		assert.NoError(t, err)
 		require.Len(t, results, 1)
+		require.NotNil(t, results[0], "BuildResult must not be nil to prevent panic")
 
-		// CRITICAL: Must return nil to indicate non-terminal state
-		// Not "failed" status which would undo PR #7 design
-		assert.Nil(t, results[0], "context cancellation should result in nil BuildResult, not 'failed' status")
+		// CRITICAL: Must return backend_tracking_lost status (non-terminal)
+		// Not "failed" status which would mark BuildHistory as terminal
+		assert.Equal(t, "backend_tracking_lost", results[0].Status, "context cancellation should use backend_tracking_lost status")
+		assert.Contains(t, results[0].ErrorMessage, "Context cancelled")
+		assert.True(t, results[0].ShouldBuild)
 	})
 
 	t.Run("Handle context.DeadlineExceeded as non-terminal", func(t *testing.T) {
@@ -575,7 +578,7 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 
 		mockBuildService := &mockOrchestratorBuildService{
 			buildContainerFunc: func(ctx context.Context, buildHistoryID uint, container *dto.BuildContainerInfo) (*BuildResult, error) {
-				// Simulate PR #7 Option B behavior
+				// Simulate context deadline exceeded (returns nil BuildResult)
 				return nil, context.DeadlineExceeded
 			},
 		}
@@ -590,8 +593,11 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 
 		assert.NoError(t, err)
 		require.Len(t, results, 1)
+		require.NotNil(t, results[0], "BuildResult must not be nil to prevent panic")
 
 		// Same as Canceled - must preserve non-terminal state
-		assert.Nil(t, results[0], "deadline exceeded should result in nil BuildResult, not 'failed' status")
+		assert.Equal(t, "backend_tracking_lost", results[0].Status, "deadline exceeded should use backend_tracking_lost status")
+		assert.Contains(t, results[0].ErrorMessage, "Context cancelled")
+		assert.True(t, results[0].ShouldBuild)
 	})
 }

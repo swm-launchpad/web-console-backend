@@ -229,7 +229,7 @@ func (o *buildOrchestratorImpl) collectBuildResults(
 				// Only create fallback when service returned nil BuildResult
 				// Check if this is a context cancellation
 				if errors.Is(task.err, context.Canceled) || errors.Is(task.err, context.DeadlineExceeded) {
-					// Context cancellation - preserve as non-terminal state
+					// Context cancellation - use backend_tracking_lost status (non-terminal)
 					// This allows higher layers to distinguish cancellation from real failure
 					// BuildHistory remains in non-terminal state for future reconciliation
 					o.logger.Warn(context.Background(), "build cancelled via context",
@@ -238,9 +238,14 @@ func (o *buildOrchestratorImpl) collectBuildResults(
 						zap.Uint("build_history_id", task.buildHistory.BuildHistoryID),
 						zap.Error(task.err),
 					)
-					// Return nil to indicate non-terminal state
-					// Parent goroutine should handle this appropriately
-					resultMap[task.index] = nil
+					// Return concrete BuildResult with backend_tracking_lost status
+					// This prevents panic in downstream consumers (e.g., BuildPostProcessor)
+					resultMap[task.index] = &BuildResult{
+						BuildHistoryID: task.buildHistory.BuildHistoryID,
+						Status:         "backend_tracking_lost",
+						ErrorMessage:   fmt.Sprintf("Context cancelled during build monitoring: %v", task.err),
+						ShouldBuild:    true,
+					}
 				} else {
 					// Real failure with no BuildResult - create fallback
 					resultMap[task.index] = &BuildResult{
@@ -272,22 +277,16 @@ func (o *buildOrchestratorImpl) logBuildSummary(
 ) {
 	successCount := 0
 	failedCount := 0
-	cancelledCount := 0
 	otherCount := 0
 
 	for _, result := range results {
-		// nil result indicates context cancellation (non-terminal state)
-		if result == nil {
-			cancelledCount++
-			continue
-		}
-
 		switch result.Status {
 		case "success":
 			successCount++
 		case "failed":
 			failedCount++
 		default:
+			// Includes "backend_tracking_lost", "skipped", etc.
 			otherCount++
 		}
 	}
@@ -299,7 +298,6 @@ func (o *buildOrchestratorImpl) logBuildSummary(
 		zap.Int("total_builds", len(results)),
 		zap.Int("success_count", successCount),
 		zap.Int("failed_count", failedCount),
-		zap.Int("cancelled_count", cancelledCount),
 		zap.Int("other_count", otherCount),
 	)
 }
