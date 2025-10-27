@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
@@ -242,7 +244,16 @@ func (s *buildServiceImpl) findPipelineRunWithRetry(
 				return pipelineRunName, nil
 			}
 
-			// Log retry attempt
+			// Distinguish between "not found yet" (retriable) vs other errors (connection/auth issues)
+			if !errors.Is(err, projecterrors.ErrKubePipelineRunNotFound) {
+				// Transient error (network, authentication) → backend_tracking_lost
+				msg := fmt.Sprintf("Failed to find PipelineRun by EventID %s: %v", eventID, err)
+				_ = buildHistory.UpdateBackendStatus(
+					build_history.BuildHistoryStatusBackendTrackingLost, &msg)
+				_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+			}
+
+			// Log retry attempt (for both not-found and transient errors)
 			if attempt%3 == 0 { // Log every 30 seconds
 				s.logger.Info(ctx, "waiting for PipelineRun to be created",
 					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
@@ -353,6 +364,27 @@ func (s *buildServiceImpl) checkBuildStatus(
 ) (*BuildResult, error) {
 	pipelineRun, err := s.kubeBuildClient.GetPipelineRunStatus(ctx, pipelineRunName)
 	if err != nil {
+		// Distinguish between "PipelineRun deleted" (terminal) vs transient errors (retriable)
+		if errors.Is(err, projecterrors.ErrKubePipelineRunNotFound) {
+			// PipelineRun was deleted from Kubernetes → terminal failure
+			msg := fmt.Sprintf("PipelineRun %s not found in Kubernetes", pipelineRunName)
+			_ = buildHistory.UpdateBackendStatus(
+				build_history.BuildHistoryStatusBackendTrackingFailed, &msg)
+			_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+
+			return &BuildResult{
+				BuildHistoryID: buildHistory.BuildHistoryID,
+				Status:         "failed",
+				ErrorMessage:   msg,
+			}, fmt.Errorf("PipelineRun deleted")
+		}
+
+		// Transient error (network, authentication) → backend_tracking_lost
+		msg := fmt.Sprintf("Failed to get PipelineRun status: %v", err)
+		_ = buildHistory.UpdateBackendStatus(
+			build_history.BuildHistoryStatusBackendTrackingLost, &msg)
+		_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+
 		return nil, fmt.Errorf("failed to get PipelineRun status: %w", err)
 	}
 
@@ -368,8 +400,15 @@ func (s *buildServiceImpl) checkBuildStatus(
 		// Build is still running
 		if buildHistory.Status() != build_history.BuildHistoryStatusRunning {
 			summary := "Build is running"
-			startedAt := time.Now()
-			if err := buildHistory.UpdateRunningStatus(&summary, &startedAt); err != nil {
+			// Use Tekton's StartTime if available, fallback to time.Now()
+			var startedAt *time.Time
+			if pipelineRun.StartTime != nil {
+				startedAt = pipelineRun.StartTime
+			} else {
+				now := time.Now()
+				startedAt = &now
+			}
+			if err := buildHistory.UpdateRunningStatus(&summary, startedAt); err != nil {
 				// Log error but continue monitoring - non-terminal state update failure is not critical
 				s.logger.Warn(ctx, "failed to update build history to running status",
 					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
@@ -431,7 +470,11 @@ func (s *buildServiceImpl) handleBuildSuccess(
 	}
 
 	// Update build history
+	// Use Tekton's CompletionTime if available, fallback to time.Now()
 	finishedAt := time.Now()
+	if pipelineRun.CompletionTime != nil {
+		finishedAt = *pipelineRun.CompletionTime
+	}
 	summary := fmt.Sprintf("Build %s", status)
 
 	var commitHashPtr *string
@@ -498,7 +541,11 @@ func (s *buildServiceImpl) handleBuildFailure(
 	}
 
 	// Update build history
+	// Use Tekton's CompletionTime if available, fallback to time.Now()
 	finishedAt := time.Now()
+	if pipelineRun.CompletionTime != nil {
+		finishedAt = *pipelineRun.CompletionTime
+	}
 	summary := fmt.Sprintf("Build %s: %s", resultStatus, pipelineRun.Message)
 
 	// Try to extract commit hash if available
