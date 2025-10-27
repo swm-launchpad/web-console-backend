@@ -365,8 +365,8 @@ func TestBuildPostProcessor_BuildVarsComparison(t *testing.T) {
 	container.SetContainerID(1) // Required for AddBuildVar
 
 	// Add build vars to container
-	container.AddBuildVar("VAR1", "value1")
-	container.AddBuildVar("VAR2", "value2")
+	_, _ = container.AddBuildVar("VAR1", "value1")
+	_, _ = container.AddBuildVar("VAR2", "value2")
 
 	t.Run("Identical build vars - no change detected", func(t *testing.T) {
 		snapshot := &dto.BuildContainerInfo{

@@ -52,6 +52,8 @@ func TestGetContainersForBuildUseCase_Execute_Success(t *testing.T) {
 	assert.Equal(t, uint(1), c1.ContainerID)
 	assert.Equal(t, "build-container-with-template", c1.Name)
 	assert.Equal(t, "c2025011812000011111111", c1.Slug)
+	assert.NotNil(t, c1.TemplateID)
+	assert.Equal(t, templateID, *c1.TemplateID)
 	assert.NotNil(t, c1.TemplateBody)
 	assert.Equal(t, templateBody, *c1.TemplateBody)
 	assert.Equal(t, "https://github.com/test/repo", c1.GitRepositoryURL)
@@ -67,6 +69,7 @@ func TestGetContainersForBuildUseCase_Execute_Success(t *testing.T) {
 	c2 := output.Containers[1]
 	assert.Equal(t, uint(2), c2.ContainerID)
 	assert.Equal(t, "build-container-without-template", c2.Name)
+	assert.Nil(t, c2.TemplateID)
 	assert.Nil(t, c2.TemplateBody)
 	assert.Len(t, c2.BuildVars, 0)
 

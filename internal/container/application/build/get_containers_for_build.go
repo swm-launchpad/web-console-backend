@@ -15,6 +15,7 @@ type BuildContainerOutput struct {
 	ContainerID         uint                   `json:"container_id"`
 	Name                string                 `json:"name"`
 	Slug                string                 `json:"slug"`
+	TemplateID          *uint                  `json:"template_id,omitempty"`
 	TemplateBody        *string                `json:"template_body,omitempty"`
 	TemplateConfig      map[string]interface{} `json:"template_config"`
 	GitRepositoryURL    string                 `json:"git_repository_url"`
@@ -80,6 +81,7 @@ func (uc *GetContainersForBuildUseCase) Execute(ctx context.Context, input GetCo
 			ContainerID:         container.ContainerID(),
 			Name:                container.Name(),
 			Slug:                container.Slug().String(),
+			TemplateID:          container.TemplateID(),
 			TemplateBody:        templateBody,
 			TemplateConfig:      container.TemplateConfig(),
 			GitRepositoryURL:    container.GitConfig().RepositoryURL(),
