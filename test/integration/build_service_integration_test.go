@@ -67,14 +67,9 @@ func (m *mockBuildHistoryRepository) FindActiveByContainerID(ctx context.Context
 	return nil, nil
 }
 
-// TestBuildServiceIntegration tests the BuildService with actual Tekton pipeline integration.
-// This test requires actual Tekton and Kubernetes infrastructure to be available.
-//
-// Prerequisites:
-// - Tekton EventListener for builds must be accessible
-// - Kubernetes API server must be accessible
-// - Environment variables must be set in .env.test
-func TestBuildServiceIntegration(t *testing.T) {
+// setupBuildServiceIntegrationTest performs common setup for build service integration tests.
+// Returns context and performs environment validation.
+func setupBuildServiceIntegrationTest(t *testing.T) context.Context {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
@@ -99,344 +94,372 @@ func TestBuildServiceIntegration(t *testing.T) {
 		}
 	}
 
-	ctx := context.Background()
+	return context.Background()
+}
 
-	t.Run("Spring Hello World - BuildService Integration", func(t *testing.T) {
-		t.Parallel()
+// TestBuildServiceIntegration_SpringHelloWorld tests BuildService with a Spring Boot Maven project.
+// This test requires actual Tekton and Kubernetes infrastructure to be available.
+//
+// Prerequisites:
+// - Tekton EventListener for builds must be accessible
+// - Kubernetes API server must be accessible
+// - Environment variables must be set in .env.test
+func TestBuildServiceIntegration_SpringHelloWorld(t *testing.T) {
+	t.Parallel() // Top-level parallel test - safe with t.Setenv()
 
-		// Test configuration
-		githubURL := "https://github.com/paulczar/spring-helloworld.git"
-		githubBranch := "master"
-		imageName := "spring-helloworld-buildservice-test-01"
-		directoryPath := "."
-		templatePath := "/workspace/user-workload-infra/tekton-pipelines/image-build-push/test/templates/springboot-maven.dockerfile.tmpl"
+	ctx := setupBuildServiceIntegrationTest(t)
 
-		// Read template
-		templateBytes, err := os.ReadFile(templatePath)
-		if err != nil {
-			t.Skipf("Skipping test: template file not found: %v", err)
-		}
-		templateContent := string(templateBytes)
+	// Test configuration
+	githubURL := "https://github.com/paulczar/spring-helloworld.git"
+	githubBranch := "master"
+	imageName := "spring-helloworld-buildservice-test-01"
+	directoryPath := "."
+	templatePath := "/workspace/user-workload-infra/tekton-pipelines/image-build-push/test/templates/springboot-maven.dockerfile.tmpl"
 
-		// Template configuration
-		templateConfig := map[string]interface{}{
-			"maven_version": "3.6",
-			"java_version":  "11",
-			"app_port":      "8080",
-		}
+	// Read template
+	templateBytes, err := os.ReadFile(templatePath)
+	if err != nil {
+		t.Skipf("Skipping test: template file not found: %v", err)
+	}
+	templateContent := string(templateBytes)
 
-		// Build environment variables
-		buildVars := map[string]string{}
+	// Template configuration
+	templateConfig := map[string]interface{}{
+		"maven_version": "3.6",
+		"java_version":  "11",
+		"app_port":      "8080",
+	}
 
-		// Create BuildContainerInfo
-		container := &dto.BuildContainerInfo{
-			ProjectID:        0,
-			ContainerID:      1,
-			Name:             "spring-hello-world",
-			Slug:             imageName,
-			TemplateBody:     &templateContent,
-			TemplateConfig:   templateConfig,
-			GitRepositoryURL: githubURL,
-			GitBranch:        githubBranch,
-			GitDirectoryPath: &directoryPath,
-			NeedsBuild:       true,
-			BuildVars:        buildVars,
-		}
+	// Build environment variables
+	buildVars := map[string]string{}
 
-		// Create mock repository
-		mockRepo := newMockBuildHistoryRepository()
+	// Create BuildContainerInfo
+	container := &dto.BuildContainerInfo{
+		ProjectID:        11, // Test ID range: 1-100
+		ContainerID:      1,
+		Name:             "spring-hello-world",
+		Slug:             imageName,
+		TemplateBody:     &templateContent,
+		TemplateConfig:   templateConfig,
+		GitRepositoryURL: githubURL,
+		GitBranch:        githubBranch,
+		GitDirectoryPath: &directoryPath,
+		NeedsBuild:       true,
+		BuildVars:        buildVars,
+	}
 
-		// Create BuildHistory record
-		bh := build_history.NewBuildHistory(container.ContainerID)
-		err = mockRepo.Create(ctx, bh)
-		require.NoError(t, err, "Failed to create BuildHistory")
+	// Create mock repository
+	mockRepo := newMockBuildHistoryRepository()
 
-		buildHistoryID := bh.BuildHistoryID
-		t.Logf("Created BuildHistory with ID: %d", buildHistoryID)
+	// Create BuildHistory record
+	bh := build_history.NewBuildHistory(container.ContainerID)
+	err = mockRepo.Create(ctx, bh)
+	require.NoError(t, err, "Failed to create BuildHistory")
 
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
+	buildHistoryID := bh.BuildHistoryID
+	t.Logf("Created BuildHistory with ID: %d", buildHistoryID)
 
-		// Create real TektonBuildClient
-		tektonClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
-		if err != nil {
-			t.Skipf("Skipping test: Failed to create TektonBuildClient: %v", err)
-		}
+	// Fix CA cert path for tests (use t.Setenv for parallel-safe env var modification)
+	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+	if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+		t.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+	}
 
-		// Create real KubeBuildClient
-		kubeClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
-		if err != nil {
-			t.Skipf("Skipping test: Failed to create KubeBuildClient: %v", err)
-		}
+	// Create real TektonBuildClient
+	tektonClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
+	if err != nil {
+		t.Skipf("Skipping test: Failed to create TektonBuildClient: %v", err)
+	}
 
-		// Create BuildService with real clients and mock repository
-		buildService := service.NewBuildService(
-			mockRepo,
-			tektonClient,
-			kubeClient,
-			logger.NewForTest(),
-		)
+	// Create real KubeBuildClient
+	kubeClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
+	if err != nil {
+		t.Skipf("Skipping test: Failed to create KubeBuildClient: %v", err)
+	}
 
-		// Execute build (this will take several minutes)
-		t.Logf("Starting build for container: %s", container.Name)
-		startTime := time.Now()
+	// Create BuildService with real clients and mock repository
+	buildService := service.NewBuildService(
+		mockRepo,
+		tektonClient,
+		kubeClient,
+		logger.NewForTest(),
+	)
 
-		result, err := buildService.BuildContainer(ctx, buildHistoryID, container)
+	// Execute build (this will take several minutes)
+	t.Logf("Starting build for container: %s", container.Name)
+	startTime := time.Now()
 
-		elapsed := time.Since(startTime)
-		t.Logf("Build completed in %v", elapsed)
+	result, err := buildService.BuildContainer(ctx, buildHistoryID, container)
 
-		// Verify result
-		require.NoError(t, err, "BuildContainer should not return error")
-		require.NotNil(t, result, "BuildResult should not be nil")
+	elapsed := time.Since(startTime)
+	t.Logf("Build completed in %v", elapsed)
 
-		assert.Equal(t, buildHistoryID, result.BuildHistoryID, "BuildHistoryID should match")
-		assert.Equal(t, "success", result.Status, "Build should succeed")
-		assert.True(t, result.ShouldBuild, "ShouldBuild should be true")
-		assert.NotEmpty(t, result.LatestCommitHash, "LatestCommitHash should be set")
-		assert.NotEmpty(t, result.ImageTag, "ImageTag should be set")
-		assert.Empty(t, result.ErrorMessage, "ErrorMessage should be empty")
+	// Verify result
+	require.NoError(t, err, "BuildContainer should not return error")
+	require.NotNil(t, result, "BuildResult should not be nil")
 
-		t.Logf("Build Result: Status=%s, CommitHash=%s, ImageTag=%s",
-			result.Status, result.LatestCommitHash, result.ImageTag)
+	assert.Equal(t, buildHistoryID, result.BuildHistoryID, "BuildHistoryID should match")
+	assert.Equal(t, "success", result.Status, "Build should succeed")
+	assert.True(t, result.ShouldBuild, "ShouldBuild should be true")
+	assert.NotEmpty(t, result.LatestCommitHash, "LatestCommitHash should be set")
+	assert.NotEmpty(t, result.ImageTag, "ImageTag should be set")
+	assert.Empty(t, result.ErrorMessage, "ErrorMessage should be empty")
 
-		// Verify BuildHistory was updated
-		updatedBH, err := mockRepo.FindByID(ctx, buildHistoryID)
-		require.NoError(t, err, "Should find updated BuildHistory")
-		assert.Equal(t, build_history.BuildHistoryStatusSuccess, updatedBH.Status(), "BuildHistory status should be success")
-	})
+	t.Logf("Build Result: Status=%s, CommitHash=%s, ImageTag=%s",
+		result.Status, result.LatestCommitHash, result.ImageTag)
 
-	t.Run("MySQL - No GitHub, BuildService Integration", func(t *testing.T) {
-		t.Parallel()
+	// Verify BuildHistory was updated
+	updatedBH, err := mockRepo.FindByID(ctx, buildHistoryID)
+	require.NoError(t, err, "Should find updated BuildHistory")
+	assert.Equal(t, build_history.BuildHistoryStatusSuccess, updatedBH.Status(), "BuildHistory status should be success")
+}
 
-		// Test configuration
-		imageName := "mysql-custom-buildservice-test-01"
-		templatePath := "/workspace/user-workload-infra/tekton-pipelines/image-build-push/test/templates/mysql.dockerfile.tmpl"
+// TestBuildServiceIntegration_MySQL tests BuildService with MySQL custom build (no GitHub).
+// This test requires actual Tekton and Kubernetes infrastructure to be available.
+//
+// Prerequisites:
+// - Tekton EventListener for builds must be accessible
+// - Kubernetes API server must be accessible
+// - Environment variables must be set in .env.test
+func TestBuildServiceIntegration_MySQL(t *testing.T) {
+	t.Parallel() // Top-level parallel test - safe with t.Setenv()
 
-		// Read template
-		templateBytes, err := os.ReadFile(templatePath)
-		if err != nil {
-			t.Skipf("Skipping test: template file not found: %v", err)
-		}
-		templateContent := string(templateBytes)
+	ctx := setupBuildServiceIntegrationTest(t)
 
-		// Template configuration for MySQL
-		templateConfig := map[string]interface{}{
-			"mysql_version":           "8.0",
-			"charset":                 "utf8mb4",
-			"collation":               "utf8mb4_unicode_ci",
-			"max_connections":         "300",
-			"max_allowed_packet":      "128M",
-			"innodb_buffer_pool_size": "2G",
-			"innodb_log_file_size":    "512M",
-			"mysql_port":              "3306",
-		}
+	// Test configuration
+	imageName := "mysql-custom-buildservice-test-01"
+	templatePath := "/workspace/user-workload-infra/tekton-pipelines/image-build-push/test/templates/mysql.dockerfile.tmpl"
 
-		// Build environment variables
-		buildVars := map[string]string{
-			"TZ": "UTC",
-		}
+	// Read template
+	templateBytes, err := os.ReadFile(templatePath)
+	if err != nil {
+		t.Skipf("Skipping test: template file not found: %v", err)
+	}
+	templateContent := string(templateBytes)
 
-		// Create BuildContainerInfo without GitHub URL
-		container := &dto.BuildContainerInfo{
-			ProjectID:      0,
-			ContainerID:    2,
-			Name:           "mysql-custom",
-			Slug:           imageName,
-			TemplateBody:   &templateContent,
-			TemplateConfig: templateConfig,
-			NeedsBuild:     true,
-			BuildVars:      buildVars,
-		}
+	// Template configuration for MySQL
+	templateConfig := map[string]interface{}{
+		"mysql_version":           "8.0",
+		"charset":                 "utf8mb4",
+		"collation":               "utf8mb4_unicode_ci",
+		"max_connections":         "300",
+		"max_allowed_packet":      "128M",
+		"innodb_buffer_pool_size": "2G",
+		"innodb_log_file_size":    "512M",
+		"mysql_port":              "3306",
+	}
 
-		// Create mock repository
-		mockRepo := newMockBuildHistoryRepository()
+	// Build environment variables
+	buildVars := map[string]string{
+		"TZ": "UTC",
+	}
 
-		// Create BuildHistory record
-		bh := build_history.NewBuildHistory(container.ContainerID)
-		err = mockRepo.Create(ctx, bh)
-		require.NoError(t, err, "Failed to create BuildHistory")
+	// Create BuildContainerInfo without GitHub URL
+	container := &dto.BuildContainerInfo{
+		ProjectID:      12, // Test ID range: 1-100
+		ContainerID:    2,
+		Name:           "mysql-custom",
+		Slug:           imageName,
+		TemplateBody:   &templateContent,
+		TemplateConfig: templateConfig,
+		NeedsBuild:     true,
+		BuildVars:      buildVars,
+	}
 
-		buildHistoryID := bh.BuildHistoryID
-		t.Logf("Created BuildHistory with ID: %d", buildHistoryID)
+	// Create mock repository
+	mockRepo := newMockBuildHistoryRepository()
 
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
+	// Create BuildHistory record
+	bh := build_history.NewBuildHistory(container.ContainerID)
+	err = mockRepo.Create(ctx, bh)
+	require.NoError(t, err, "Failed to create BuildHistory")
 
-		// Create real clients
-		tektonClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
-		if err != nil {
-			t.Skipf("Skipping test: Failed to create TektonBuildClient: %v", err)
-		}
+	buildHistoryID := bh.BuildHistoryID
+	t.Logf("Created BuildHistory with ID: %d", buildHistoryID)
 
-		kubeClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
-		if err != nil {
-			t.Skipf("Skipping test: Failed to create KubeBuildClient: %v", err)
-		}
+	// Fix CA cert path for tests (use t.Setenv for parallel-safe env var modification)
+	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+	if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+		t.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+	}
 
-		// Create BuildService
-		buildService := service.NewBuildService(
-			mockRepo,
-			tektonClient,
-			kubeClient,
-			logger.NewForTest(),
-		)
+	// Create real clients
+	tektonClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
+	if err != nil {
+		t.Skipf("Skipping test: Failed to create TektonBuildClient: %v", err)
+	}
 
-		// Execute build
-		t.Logf("Starting build for container: %s", container.Name)
-		startTime := time.Now()
+	kubeClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
+	if err != nil {
+		t.Skipf("Skipping test: Failed to create KubeBuildClient: %v", err)
+	}
 
-		result, err := buildService.BuildContainer(ctx, buildHistoryID, container)
+	// Create BuildService
+	buildService := service.NewBuildService(
+		mockRepo,
+		tektonClient,
+		kubeClient,
+		logger.NewForTest(),
+	)
 
-		elapsed := time.Since(startTime)
-		t.Logf("Build completed in %v", elapsed)
+	// Execute build
+	t.Logf("Starting build for container: %s", container.Name)
+	startTime := time.Now()
 
-		// Verify result
-		require.NoError(t, err, "BuildContainer should not return error")
-		require.NotNil(t, result, "BuildResult should not be nil")
+	result, err := buildService.BuildContainer(ctx, buildHistoryID, container)
 
-		assert.Equal(t, buildHistoryID, result.BuildHistoryID, "BuildHistoryID should match")
-		assert.Equal(t, "success", result.Status, "Build should succeed")
-		assert.True(t, result.ShouldBuild, "ShouldBuild should be true")
-		assert.Equal(t, "latest", result.ImageTag, "ImageTag should be 'latest' for no-GitHub builds")
-		assert.Empty(t, result.ErrorMessage, "ErrorMessage should be empty")
-		assert.Empty(t, result.LatestCommitHash, "LatestCommitHash should be empty for no-GitHub builds")
+	elapsed := time.Since(startTime)
+	t.Logf("Build completed in %v", elapsed)
 
-		t.Logf("Build Result: Status=%s, CommitHash=%s, ImageTag=%s",
-			result.Status, result.LatestCommitHash, result.ImageTag)
+	// Verify result
+	require.NoError(t, err, "BuildContainer should not return error")
+	require.NotNil(t, result, "BuildResult should not be nil")
 
-		// Verify BuildHistory was updated
-		updatedBH, err := mockRepo.FindByID(ctx, buildHistoryID)
-		require.NoError(t, err, "Should find updated BuildHistory")
-		assert.Equal(t, build_history.BuildHistoryStatusSuccess, updatedBH.Status(), "BuildHistory status should be success")
-	})
+	assert.Equal(t, buildHistoryID, result.BuildHistoryID, "BuildHistoryID should match")
+	assert.Equal(t, "success", result.Status, "Build should succeed")
+	assert.True(t, result.ShouldBuild, "ShouldBuild should be true")
+	assert.Equal(t, "latest", result.ImageTag, "ImageTag should be 'latest' for no-GitHub builds")
+	assert.Empty(t, result.ErrorMessage, "ErrorMessage should be empty")
+	assert.Empty(t, result.LatestCommitHash, "LatestCommitHash should be empty for no-GitHub builds")
 
-	t.Run("Spring MySQL Demo - Private Repo, BuildService Integration", func(t *testing.T) {
-		t.Parallel()
+	t.Logf("Build Result: Status=%s, CommitHash=%s, ImageTag=%s",
+		result.Status, result.LatestCommitHash, result.ImageTag)
 
-		// Check GITHUB_APP_INSTALLATION_ID is set (required for private repository)
-		installationIDStr := os.Getenv("GITHUB_APP_INSTALLATION_ID")
-		if installationIDStr == "" {
-			t.Skip("Skipping test: GITHUB_APP_INSTALLATION_ID not set in environment")
-		}
+	// Verify BuildHistory was updated
+	updatedBH, err := mockRepo.FindByID(ctx, buildHistoryID)
+	require.NoError(t, err, "Should find updated BuildHistory")
+	assert.Equal(t, build_history.BuildHistoryStatusSuccess, updatedBH.Status(), "BuildHistory status should be success")
+}
 
-		var installationID int64
-		_, err := fmt.Sscanf(installationIDStr, "%d", &installationID)
-		if err != nil {
-			t.Skipf("Skipping test: invalid GITHUB_APP_INSTALLATION_ID format: %v", err)
-		}
+// TestBuildServiceIntegration_SpringMySQLDemo tests BuildService with a private Spring Boot Gradle project.
+// This test requires actual Tekton and Kubernetes infrastructure to be available.
+//
+// Prerequisites:
+// - Tekton EventListener for builds must be accessible
+// - Kubernetes API server must be accessible
+// - Environment variables must be set in .env.test
+// - GITHUB_APP_INSTALLATION_ID must be set for private repository access
+func TestBuildServiceIntegration_SpringMySQLDemo(t *testing.T) {
+	t.Parallel() // Top-level parallel test - safe with t.Setenv()
 
-		// Test configuration
-		githubURL := "https://github.com/swm-launchpad/spring-mysql-demo.git"
-		githubBranch := "main"
-		imageName := "spring-mysql-demo-buildservice-test-01"
-		directoryPath := "."
-		templatePath := "/workspace/user-workload-infra/tekton-pipelines/image-build-push/test/templates/springboot-gradle.dockerfile.tmpl"
+	ctx := setupBuildServiceIntegrationTest(t)
 
-		// Read template
-		templateBytes, err := os.ReadFile(templatePath)
-		if err != nil {
-			t.Skipf("Skipping test: template file not found: %v", err)
-		}
-		templateContent := string(templateBytes)
+	// Check GITHUB_APP_INSTALLATION_ID is set (required for private repository)
+	installationIDStr := os.Getenv("GITHUB_APP_INSTALLATION_ID")
+	if installationIDStr == "" {
+		t.Skip("Skipping test: GITHUB_APP_INSTALLATION_ID not set in environment")
+	}
 
-		// Template configuration
-		templateConfig := map[string]interface{}{
-			"gradle_version": "8.5",
-			"java_version":   "21",
-			"app_port":       "8080",
-		}
+	var installationID int64
+	_, err := fmt.Sscanf(installationIDStr, "%d", &installationID)
+	if err != nil {
+		t.Skipf("Skipping test: invalid GITHUB_APP_INSTALLATION_ID format: %v", err)
+	}
 
-		// Build environment variables
-		buildVars := map[string]string{
-			"TZ":   "Asia/Seoul",
-			"LANG": "en_US.UTF-8",
-		}
+	// Test configuration
+	githubURL := "https://github.com/swm-launchpad/spring-mysql-demo.git"
+	githubBranch := "main"
+	imageName := "spring-mysql-demo-buildservice-test-01"
+	directoryPath := "."
+	templatePath := "/workspace/user-workload-infra/tekton-pipelines/image-build-push/test/templates/springboot-gradle.dockerfile.tmpl"
 
-		// Create BuildContainerInfo for private repository
-		container := &dto.BuildContainerInfo{
-			ProjectID:        0,
-			ContainerID:      3,
-			Name:             "spring-mysql-demo",
-			Slug:             imageName,
-			TemplateBody:     &templateContent,
-			TemplateConfig:   templateConfig,
-			GitRepositoryURL: githubURL,
-			GitBranch:        githubBranch,
-			GitDirectoryPath: &directoryPath,
-			NeedsBuild:       true,
-			BuildVars:        buildVars,
-			InstallationID:   &installationID,
-		}
+	// Read template
+	templateBytes, err := os.ReadFile(templatePath)
+	if err != nil {
+		t.Skipf("Skipping test: template file not found: %v", err)
+	}
+	templateContent := string(templateBytes)
 
-		// Create mock repository
-		mockRepo := newMockBuildHistoryRepository()
+	// Template configuration
+	templateConfig := map[string]interface{}{
+		"gradle_version": "8.5",
+		"java_version":   "21",
+		"app_port":       "8080",
+	}
 
-		// Create BuildHistory record
-		bh := build_history.NewBuildHistory(container.ContainerID)
-		err = mockRepo.Create(ctx, bh)
-		require.NoError(t, err, "Failed to create BuildHistory")
+	// Build environment variables
+	buildVars := map[string]string{
+		"TZ":   "Asia/Seoul",
+		"LANG": "en_US.UTF-8",
+	}
 
-		buildHistoryID := bh.BuildHistoryID
-		t.Logf("Created BuildHistory with ID: %d", buildHistoryID)
+	// Create BuildContainerInfo for private repository
+	container := &dto.BuildContainerInfo{
+		ProjectID:        13, // Test ID range: 1-100
+		ContainerID:      3,
+		Name:             "spring-mysql-demo",
+		Slug:             imageName,
+		TemplateBody:     &templateContent,
+		TemplateConfig:   templateConfig,
+		GitRepositoryURL: githubURL,
+		GitBranch:        githubBranch,
+		GitDirectoryPath: &directoryPath,
+		NeedsBuild:       true,
+		BuildVars:        buildVars,
+		InstallationID:   &installationID,
+	}
 
-		// Fix CA cert path for tests
-		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
-		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
-			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
-		}
+	// Create mock repository
+	mockRepo := newMockBuildHistoryRepository()
 
-		// Create real clients
-		tektonClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
-		if err != nil {
-			t.Skipf("Skipping test: Failed to create TektonBuildClient: %v", err)
-		}
+	// Create BuildHistory record
+	bh := build_history.NewBuildHistory(container.ContainerID)
+	err = mockRepo.Create(ctx, bh)
+	require.NoError(t, err, "Failed to create BuildHistory")
 
-		kubeClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
-		if err != nil {
-			t.Skipf("Skipping test: Failed to create KubeBuildClient: %v", err)
-		}
+	buildHistoryID := bh.BuildHistoryID
+	t.Logf("Created BuildHistory with ID: %d", buildHistoryID)
 
-		// Create BuildService
-		buildService := service.NewBuildService(
-			mockRepo,
-			tektonClient,
-			kubeClient,
-			logger.NewForTest(),
-		)
+	// Fix CA cert path for tests (use t.Setenv for parallel-safe env var modification)
+	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+	if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+		t.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+	}
 
-		// Execute build
-		t.Logf("Starting build for container: %s (private repository)", container.Name)
-		startTime := time.Now()
+	// Create real clients
+	tektonClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
+	if err != nil {
+		t.Skipf("Skipping test: Failed to create TektonBuildClient: %v", err)
+	}
 
-		result, err := buildService.BuildContainer(ctx, buildHistoryID, container)
+	kubeClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
+	if err != nil {
+		t.Skipf("Skipping test: Failed to create KubeBuildClient: %v", err)
+	}
 
-		elapsed := time.Since(startTime)
-		t.Logf("Build completed in %v", elapsed)
+	// Create BuildService
+	buildService := service.NewBuildService(
+		mockRepo,
+		tektonClient,
+		kubeClient,
+		logger.NewForTest(),
+	)
 
-		// Verify result
-		require.NoError(t, err, "BuildContainer should not return error")
-		require.NotNil(t, result, "BuildResult should not be nil")
+	// Execute build
+	t.Logf("Starting build for container: %s (private repository)", container.Name)
+	startTime := time.Now()
 
-		assert.Equal(t, buildHistoryID, result.BuildHistoryID, "BuildHistoryID should match")
-		assert.Equal(t, "success", result.Status, "Build should succeed")
-		assert.True(t, result.ShouldBuild, "ShouldBuild should be true")
-		assert.NotEmpty(t, result.LatestCommitHash, "LatestCommitHash should be set")
-		assert.NotEmpty(t, result.ImageTag, "ImageTag should be set")
-		assert.Empty(t, result.ErrorMessage, "ErrorMessage should be empty")
+	result, err := buildService.BuildContainer(ctx, buildHistoryID, container)
 
-		t.Logf("Build Result: Status=%s, CommitHash=%s, ImageTag=%s",
-			result.Status, result.LatestCommitHash, result.ImageTag)
+	elapsed := time.Since(startTime)
+	t.Logf("Build completed in %v", elapsed)
 
-		// Verify BuildHistory was updated
-		updatedBH, err := mockRepo.FindByID(ctx, buildHistoryID)
-		require.NoError(t, err, "Should find updated BuildHistory")
-		assert.Equal(t, build_history.BuildHistoryStatusSuccess, updatedBH.Status(), "BuildHistory status should be success")
-	})
+	// Verify result
+	require.NoError(t, err, "BuildContainer should not return error")
+	require.NotNil(t, result, "BuildResult should not be nil")
+
+	assert.Equal(t, buildHistoryID, result.BuildHistoryID, "BuildHistoryID should match")
+	assert.Equal(t, "success", result.Status, "Build should succeed")
+	assert.True(t, result.ShouldBuild, "ShouldBuild should be true")
+	assert.NotEmpty(t, result.LatestCommitHash, "LatestCommitHash should be set")
+	assert.NotEmpty(t, result.ImageTag, "ImageTag should be set")
+	assert.Empty(t, result.ErrorMessage, "ErrorMessage should be empty")
+
+	t.Logf("Build Result: Status=%s, CommitHash=%s, ImageTag=%s",
+		result.Status, result.LatestCommitHash, result.ImageTag)
+
+	// Verify BuildHistory was updated
+	updatedBH, err := mockRepo.FindByID(ctx, buildHistoryID)
+	require.NoError(t, err, "Should find updated BuildHistory")
+	assert.Equal(t, build_history.BuildHistoryStatusSuccess, updatedBH.Status(), "BuildHistory status should be success")
 }

@@ -146,11 +146,13 @@ func TestBuildService_PrepareBuildRequest(t *testing.T) {
 	})
 
 	t.Run("success with minimal fields", func(t *testing.T) {
+		minimalTemplate := "FROM alpine:latest"
 		container := &dto.BuildContainerInfo{
 			ProjectID:        10,
 			ContainerID:      1,
 			Name:             "test-container",
 			Slug:             "test-slug",
+			TemplateBody:     &minimalTemplate, // Template is required
 			GitRepositoryURL: "https://github.com/test/repo",
 			GitBranch:        "main",
 			NeedsBuild:       false,
@@ -163,7 +165,7 @@ func TestBuildService_PrepareBuildRequest(t *testing.T) {
 		assert.Equal(t, "false", request.ForceBuild)
 		assert.Equal(t, "", request.DirectoryPath)
 		assert.Equal(t, "", request.LastBuildCommitHash)
-		assert.Equal(t, "", request.Template)
+		assert.Equal(t, "FROM alpine:latest", request.Template)
 		assert.Equal(t, "", request.InstallationID)
 	})
 }
@@ -193,11 +195,13 @@ func TestBuildService_BuildContainer_TriggerFailure(t *testing.T) {
 
 	service := NewBuildService(buildHistoryRepo, tektonBuildClient, kubeBuildClient, testLogger)
 
+	testTemplate := "FROM alpine:latest"
 	container := &dto.BuildContainerInfo{
 		ProjectID:        10,
 		ContainerID:      1,
 		Name:             "test-container",
 		Slug:             "test-slug",
+		TemplateBody:     &testTemplate, // Template is required
 		GitRepositoryURL: "https://github.com/test/repo",
 		GitBranch:        "main",
 		NeedsBuild:       true,
@@ -240,11 +244,13 @@ func TestBuildService_BuildContainer_FindPipelineRunFailure(t *testing.T) {
 
 	service := NewBuildService(buildHistoryRepo, tektonBuildClient, kubeBuildClient, testLogger)
 
+	testTemplate := "FROM alpine:latest"
 	container := &dto.BuildContainerInfo{
 		ProjectID:        10,
 		ContainerID:      1,
 		Name:             "test-container",
 		Slug:             "test-slug",
+		TemplateBody:     &testTemplate, // Template is required
 		GitRepositoryURL: "https://github.com/test/repo",
 		GitBranch:        "main",
 		NeedsBuild:       true,

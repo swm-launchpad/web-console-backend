@@ -72,8 +72,21 @@ func (s *buildServiceImpl) BuildContainer(
 
 		// Update build history to backend_trigger_failed
 		summary := fmt.Sprintf("Failed to prepare build request: %v", err)
-		_ = buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTriggerFailed, &summary)
-		_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+		if updateErr := buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTriggerFailed, &summary); updateErr != nil {
+			s.logger.Error(ctx, "failed to update build history status",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(updateErr),
+			)
+			return nil, fmt.Errorf("failed to update build history status: %w", updateErr)
+		}
+
+		if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+			s.logger.Error(ctx, "failed to persist build history",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(saveErr),
+			)
+			return nil, fmt.Errorf("failed to persist terminal state (backend_trigger_failed): %w", saveErr)
+		}
 
 		return &BuildResult{
 			BuildHistoryID: buildHistoryID,
@@ -97,8 +110,21 @@ func (s *buildServiceImpl) BuildContainer(
 
 		// Update build history to backend_trigger_failed
 		summary := fmt.Sprintf("Failed to trigger Tekton build: %v", err)
-		_ = buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTriggerFailed, &summary)
-		_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+		if updateErr := buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTriggerFailed, &summary); updateErr != nil {
+			s.logger.Error(ctx, "failed to update build history status",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(updateErr),
+			)
+			return nil, fmt.Errorf("failed to update build history status: %w", updateErr)
+		}
+
+		if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+			s.logger.Error(ctx, "failed to persist build history",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(saveErr),
+			)
+			return nil, fmt.Errorf("failed to persist terminal state (backend_trigger_failed): %w", saveErr)
+		}
 
 		return &BuildResult{
 			BuildHistoryID: buildHistoryID,
@@ -113,8 +139,18 @@ func (s *buildServiceImpl) BuildContainer(
 	)
 
 	// Update build history with Tekton event ID
-	_ = buildHistory.InitTektonInfo(&buildResponse.EventID, nil)
-	_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+	if updateErr := buildHistory.InitTektonInfo(&buildResponse.EventID, nil); updateErr != nil {
+		s.logger.Warn(ctx, "failed to update build history with event ID",
+			zap.Uint("build_history_id", buildHistoryID),
+			zap.String("event_id", buildResponse.EventID),
+			zap.Error(updateErr),
+		)
+	} else if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+		s.logger.Warn(ctx, "failed to persist event ID to build history",
+			zap.Uint("build_history_id", buildHistoryID),
+			zap.Error(saveErr),
+		)
+	}
 
 	// Step 2: Find PipelineRun name by EventID (with timeout and retries)
 	pipelineRunName, err := s.findPipelineRunWithRetry(ctx, buildHistory, buildResponse.EventID)
@@ -127,8 +163,21 @@ func (s *buildServiceImpl) BuildContainer(
 
 		// Update build history to backend_tracking_failed
 		summary := fmt.Sprintf("Failed to find PipelineRun within 5 minutes: %v", err)
-		_ = buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary)
-		_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+		if updateErr := buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary); updateErr != nil {
+			s.logger.Error(ctx, "failed to update build history status",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(updateErr),
+			)
+			return nil, fmt.Errorf("failed to update build history status: %w", updateErr)
+		}
+
+		if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+			s.logger.Error(ctx, "failed to persist build history",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.Error(saveErr),
+			)
+			return nil, fmt.Errorf("failed to persist terminal state (backend_tracking_failed): %w", saveErr)
+		}
 
 		return &BuildResult{
 			BuildHistoryID: buildHistoryID,
@@ -143,8 +192,18 @@ func (s *buildServiceImpl) BuildContainer(
 	)
 
 	// Update build history with PipelineRun name
-	_ = buildHistory.InitTektonInfo(nil, &pipelineRunName)
-	_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+	if updateErr := buildHistory.InitTektonInfo(nil, &pipelineRunName); updateErr != nil {
+		s.logger.Warn(ctx, "failed to update build history with PipelineRun name",
+			zap.Uint("build_history_id", buildHistoryID),
+			zap.String("pipeline_run_name", pipelineRunName),
+			zap.Error(updateErr),
+		)
+	} else if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+		s.logger.Warn(ctx, "failed to persist PipelineRun name to build history",
+			zap.Uint("build_history_id", buildHistoryID),
+			zap.Error(saveErr),
+		)
+	}
 
 	// Step 3: Monitor PipelineRun status every 30 seconds
 	result, err := s.monitorBuildStatus(ctx, buildHistory, pipelineRunName)
@@ -168,6 +227,12 @@ func (s *buildServiceImpl) BuildContainer(
 
 // prepareBuildRequest converts BuildContainerInfo to TektonBuildRequest
 func (s *buildServiceImpl) prepareBuildRequest(container *dto.BuildContainerInfo) (*dto.TektonBuildRequest, error) {
+	// Validate template requirement
+	// Template is required for build pipeline (apply-dockerfile-config task)
+	if container.TemplateBody == nil || *container.TemplateBody == "" {
+		return nil, fmt.Errorf("template is required for build but not configured for container %s (ID: %d)", container.Slug, container.ContainerID)
+	}
+
 	// Convert template_config map to JSON
 	var templateConfigJSON json.RawMessage
 	if container.TemplateConfig != nil {
@@ -248,9 +313,19 @@ func (s *buildServiceImpl) findPipelineRunWithRetry(
 			if !errors.Is(err, projecterrors.ErrKubePipelineRunNotFound) {
 				// Transient error (network, authentication) → backend_tracking_lost
 				msg := fmt.Sprintf("Failed to find PipelineRun by EventID %s: %v", eventID, err)
-				_ = buildHistory.UpdateBackendStatus(
-					build_history.BuildHistoryStatusBackendTrackingLost, &msg)
-				_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+				if updateErr := buildHistory.UpdateBackendStatus(
+					build_history.BuildHistoryStatusBackendTrackingLost, &msg); updateErr != nil {
+					s.logger.Warn(ctx, "failed to update build history to tracking_lost",
+						zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+						zap.String("event_id", eventID),
+						zap.Error(updateErr),
+					)
+				} else if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+					s.logger.Warn(ctx, "failed to persist tracking_lost state",
+						zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+						zap.Error(saveErr),
+					)
+				}
 			}
 
 			// Log retry attempt (for both not-found and transient errors)
@@ -370,9 +445,22 @@ func (s *buildServiceImpl) checkBuildStatus(
 		if errors.Is(err, projecterrors.ErrKubePipelineRunNotFound) {
 			// PipelineRun was deleted from Kubernetes → terminal failure
 			msg := fmt.Sprintf("PipelineRun %s not found in Kubernetes", pipelineRunName)
-			_ = buildHistory.UpdateBackendStatus(
-				build_history.BuildHistoryStatusBackendTrackingFailed, &msg)
-			_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+			if updateErr := buildHistory.UpdateBackendStatus(
+				build_history.BuildHistoryStatusBackendTrackingFailed, &msg); updateErr != nil {
+				s.logger.Error(ctx, "failed to update build history status",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.Error(updateErr),
+				)
+				return nil, fmt.Errorf("failed to update build history status: %w", updateErr)
+			}
+
+			if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+				s.logger.Error(ctx, "failed to persist build history",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.Error(saveErr),
+				)
+				return nil, fmt.Errorf("failed to persist terminal state (backend_tracking_failed): %w", saveErr)
+			}
 
 			return &BuildResult{
 				BuildHistoryID: buildHistory.BuildHistoryID,
@@ -383,9 +471,18 @@ func (s *buildServiceImpl) checkBuildStatus(
 
 		// Transient error (network, authentication) → backend_tracking_lost
 		msg := fmt.Sprintf("Failed to get PipelineRun status: %v", err)
-		_ = buildHistory.UpdateBackendStatus(
-			build_history.BuildHistoryStatusBackendTrackingLost, &msg)
-		_ = s.buildHistoryRepo.Save(ctx, buildHistory)
+		if updateErr := buildHistory.UpdateBackendStatus(
+			build_history.BuildHistoryStatusBackendTrackingLost, &msg); updateErr != nil {
+			s.logger.Warn(ctx, "failed to update build history to tracking_lost",
+				zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+				zap.Error(updateErr),
+			)
+		} else if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+			s.logger.Warn(ctx, "failed to persist tracking_lost state",
+				zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+				zap.Error(saveErr),
+			)
+		}
 
 		return nil, fmt.Errorf("failed to get PipelineRun status: %w", err)
 	}
