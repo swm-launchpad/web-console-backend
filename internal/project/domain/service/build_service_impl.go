@@ -165,7 +165,18 @@ func (s *buildServiceImpl) BuildContainer(
 			zap.Error(err),
 		)
 
-		// Update build history to backend_tracking_failed
+		// Special case: Context cancellation should not mark build as terminal failure
+		// This matches the Option B approach in monitorBuildStatus (line 376-388)
+		// The build state remains untouched and can be reconciled later via force refresh or batch jobs
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			s.logger.Info(ctx, "build context cancelled during PipelineRun lookup - leaving state untouched",
+				zap.Uint("build_history_id", buildHistoryID),
+				zap.String("event_id", buildResponse.EventID),
+			)
+			return nil, err
+		}
+
+		// Update build history to backend_tracking_failed for non-context errors
 		summary := fmt.Sprintf("Failed to find PipelineRun within 5 minutes: %v", err)
 		if updateErr := buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary); updateErr != nil {
 			s.logger.Error(ctx, "failed to update build history status",

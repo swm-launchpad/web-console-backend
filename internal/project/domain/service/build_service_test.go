@@ -274,6 +274,84 @@ func TestBuildService_BuildContainer_FindPipelineRunFailure(t *testing.T) {
 	assert.Contains(t, result.ErrorMessage, "Failed to find PipelineRun")
 }
 
+// TestBuildService_BuildContainer_ContextCancellation tests that context cancellation
+// during PipelineRun lookup does NOT mark the build as terminal failure (Option B)
+func TestBuildService_BuildContainer_ContextCancellation(t *testing.T) {
+	t.Parallel()
+	testLogger := logger.NewForTest()
+
+	var savedBuildHistory *build_history.BuildHistory
+	buildHistoryRepo := &mockBuildHistoryRepository{
+		findByIDFunc: func(ctx context.Context, id uint) (*build_history.BuildHistory, error) {
+			bh := build_history.NewBuildHistory(1)
+			bh.SetBuildHistoryID(id)
+			return bh, nil
+		},
+		saveFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+			savedBuildHistory = b
+			return nil
+		},
+	}
+
+	tektonBuildClient := &mockTektonBuildClient{
+		triggerBuildFunc: func(ctx context.Context, request *dto.TektonBuildRequest) (*dto.TektonBuildResponse, error) {
+			return &dto.TektonBuildResponse{EventID: "test-event-123"}, nil
+		},
+	}
+
+	// Mock: Return context.Canceled on first call
+	callCount := 0
+	kubeBuildClient := &mockKubeBuildClient{
+		findPipelineRunNameByEventIDFunc: func(ctx context.Context, eventID string) (string, error) {
+			callCount++
+			if callCount == 1 {
+				// Simulate context cancellation
+				return "", context.Canceled
+			}
+			return "", projecterrors.ErrKubePipelineRunNotFound
+		},
+	}
+
+	// Use short intervals for test (100ms instead of 10s)
+	service := &buildServiceImpl{
+		buildHistoryRepo:             buildHistoryRepo,
+		tektonBuildClient:            tektonBuildClient,
+		kubeBuildClient:              kubeBuildClient,
+		logger:                       testLogger,
+		pollingInterval:              100 * time.Millisecond,
+		findPipelineRunRetryInterval: 100 * time.Millisecond,
+	}
+
+	testTemplate := "FROM alpine:latest"
+	container := &dto.BuildContainerInfo{
+		ProjectID:        10,
+		ContainerID:      1,
+		Name:             "test-container",
+		Slug:             "test-slug",
+		TemplateBody:     &testTemplate,
+		GitRepositoryURL: "https://github.com/test/repo",
+		GitBranch:        "main",
+		NeedsBuild:       true,
+	}
+
+	// Create context that will be cancelled
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	result, err := service.BuildContainer(ctx, 1, container)
+
+	// Should return context.Canceled error without marking build as terminal failure
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled, "Should return context.Canceled error")
+	assert.Nil(t, result, "Should not return BuildResult for context cancellation")
+
+	// BuildHistory should NOT be in terminal failure state (Option B)
+	// It should remain in untracked state (initial state after creation)
+	require.NotNil(t, savedBuildHistory, "BuildHistory should be saved (EventID update)")
+	assert.NotEqual(t, build_history.BuildHistoryStatusBackendTrackingFailed, savedBuildHistory.Status(),
+		"BuildHistory should NOT be in backend_tracking_failed state on context cancellation")
+}
+
 func TestBuildService_HandleBuildSuccess(t *testing.T) {
 	ctx := context.Background()
 	testLogger := logger.NewForTest()
