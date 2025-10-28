@@ -1165,6 +1165,20 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 			containerPointers[i],
 		)
 		if err != nil {
+			// Check if container changed during build (parameters drift)
+			if errors.Is(err, projecterrors.ErrContainerChangedDuringBuild) {
+				s.logger.Error(ctx, "container changed during build, cannot proceed with deployment",
+					zap.Uint("project_id", projectID),
+					zap.Uint("container_id", containerPointers[i].ContainerID),
+					zap.String("reason", "parameters changed mid-build, built image is stale"),
+					zap.String("mitigation", "needs_build flag remains true, rebuild required"),
+				)
+				msg := fmt.Sprintf("Container %d changed during build, deployment aborted. Rebuild required.", containerPointers[i].ContainerID)
+				s.handleBuildError(ctx, projectID, &msg)
+				return
+			}
+
+			// Other update errors
 			s.logger.Error(ctx, "failed to update container after build, aborting",
 				zap.Uint("project_id", projectID),
 				zap.Uint("container_id", containerPointers[i].ContainerID),

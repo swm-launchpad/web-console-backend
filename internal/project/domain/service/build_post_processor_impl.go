@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 )
 
@@ -53,6 +54,18 @@ func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
 		return fmt.Errorf("failed to update container after build: %w", err)
 	}
 
+	// Critical: If build was successful but update was skipped, parameters changed mid-build.
+	// This means the built image is now stale and should not be deployed.
+	// needs_build flag remains true, which is our signal that the image is stale.
+	if buildResult.Status == "success" && !wasUpdated {
+		p.logger.Error(ctx, "Container parameters changed during build, aborting deployment",
+			zap.Uint("container_id", containerID),
+			zap.String("build_status", buildResult.Status),
+			zap.String("reason", "snapshot comparison failed - parameters changed mid-build"),
+		)
+		return projecterrors.ErrContainerChangedDuringBuild
+	}
+
 	// Log based on whether update was actually performed
 	if wasUpdated {
 		p.logger.Info(ctx, "Successfully updated container after build",
@@ -60,11 +73,11 @@ func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
 			zap.String("build_status", buildResult.Status),
 		)
 	} else {
-		// Update was skipped (e.g., build parameters changed mid-flight or non-success status)
-		p.logger.Info(ctx, "Container update skipped",
+		// Build failed - update correctly not performed
+		p.logger.Info(ctx, "Container update skipped for non-success build",
 			zap.Uint("container_id", containerID),
 			zap.String("build_status", buildResult.Status),
-			zap.String("reason", "build parameters changed or non-success status"),
+			zap.String("reason", "build did not succeed"),
 		)
 	}
 

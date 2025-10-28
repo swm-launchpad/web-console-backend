@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 )
 
@@ -208,4 +209,40 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_BackendTrackingLost(t *tes
 	// Should delegate to updater even for non-terminal states
 	assert.NoError(t, err)
 	assert.True(t, updaterCalled)
+}
+
+// TestBuildPostProcessor_UpdateContainerAfterBuild_ParametersChangedDuringBuild tests the snapshot drift scenario
+func TestBuildPostProcessor_UpdateContainerAfterBuild_ParametersChangedDuringBuild(t *testing.T) {
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+
+	// Mock: Updater returns wasUpdated=false for success status
+	// This simulates container parameters changing mid-build
+	mockUpdater := &mockContainerUpdater{
+		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) (bool, error) {
+			// Return wasUpdated=false to indicate snapshot comparison failed
+			return false, nil
+		},
+	}
+
+	processor := NewBuildPostProcessor(mockUpdater, testLogger)
+
+	buildResult := &BuildResult{
+		BuildHistoryID:   1,
+		Status:           "success", // Build succeeded
+		LatestCommitHash: "abc123",
+		ShouldBuild:      true,
+	}
+
+	snapshot := &dto.BuildContainerInfo{
+		ContainerID:      10,
+		GitRepositoryURL: "https://github.com/test/repo",
+		GitBranch:        "main",
+	}
+
+	err := processor.UpdateContainerAfterBuild(ctx, 10, buildResult, snapshot)
+
+	// Should return ErrContainerChangedDuringBuild
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, projecterrors.ErrContainerChangedDuringBuild)
 }

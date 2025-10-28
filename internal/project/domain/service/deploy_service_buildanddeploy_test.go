@@ -283,3 +283,287 @@ func TestBuildAndDeployProject_ProjectNotFound(t *testing.T) {
 	mockContainerClient.AssertExpectations(t)
 	mockProjectRepo.AssertExpectations(t)
 }
+
+// ==================== Background Flow Tests ====================
+
+// TestBuildAndDeployInBackground_Success tests the successful background flow
+func TestBuildAndDeployInBackground_Success(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	mockBuildOrchestrator := &MockBuildOrchestrator{}
+	mockBuildPostProcessor := &MockBuildPostProcessor{}
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:          mockTxManager,
+		projectRepo:        mockProjectRepo,
+		containerClient:    mockContainerClient,
+		buildOrchestrator:  mockBuildOrchestrator,
+		buildPostProcessor: mockBuildPostProcessor,
+		logger:             testLogger,
+	}
+
+	containerConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{
+				ProjectID:   projectID,
+				ContainerID: 1,
+				Name:        "test-container",
+				Slug:        "test-slug",
+			},
+		},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
+		Return(containerConfig, nil)
+
+	// Mock: BuildOrchestrator returns success
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
+		return []*BuildResult{
+			{
+				BuildHistoryID:   1,
+				Status:           "success",
+				LatestCommitHash: "abc123",
+				ImageTag:         "latest",
+			},
+		}, nil
+	}
+
+	// Mock: BuildPostProcessor succeeds
+	mockBuildPostProcessor.UpdateContainerAfterBuildFunc = func(ctx context.Context, containerID uint, result *BuildResult, snapshot *dto.BuildContainerInfo) error {
+		return nil
+	}
+
+	// Mock: Project status update (CompleteBuild)
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusBuilding)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(proj, nil)
+	mockProjectRepo.On("Save", mock.Anything, mock.Anything).
+		Return(nil)
+
+	// Act
+	service.buildAndDeployInBackground(ctx, projectID)
+
+	// Assert
+	mockContainerClient.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+// TestBuildAndDeployInBackground_BuildOrchestrationFailure tests build orchestration failure
+func TestBuildAndDeployInBackground_BuildOrchestrationFailure(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	mockBuildOrchestrator := &MockBuildOrchestrator{}
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:         mockTxManager,
+		projectRepo:       mockProjectRepo,
+		containerClient:   mockContainerClient,
+		buildOrchestrator: mockBuildOrchestrator,
+		logger:            testLogger,
+	}
+
+	containerConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{ProjectID: projectID, ContainerID: 1},
+		},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
+		Return(containerConfig, nil)
+
+	// Mock: BuildOrchestrator returns error
+	orchError := errors.New("orchestration failed")
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
+		return nil, orchError
+	}
+
+	// Mock: handleBuildError will try to reset project status
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusBuilding)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(proj, nil)
+	mockProjectRepo.On("Save", mock.Anything, mock.Anything).
+		Return(nil)
+
+	// Act
+	service.buildAndDeployInBackground(ctx, projectID)
+
+	// Assert
+	mockContainerClient.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+// TestBuildAndDeployInBackground_BuildFailures tests when builds fail
+func TestBuildAndDeployInBackground_BuildFailures(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	mockBuildOrchestrator := &MockBuildOrchestrator{}
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:         mockTxManager,
+		projectRepo:       mockProjectRepo,
+		containerClient:   mockContainerClient,
+		buildOrchestrator: mockBuildOrchestrator,
+		logger:            testLogger,
+	}
+
+	containerConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{ProjectID: projectID, ContainerID: 1},
+			{ProjectID: projectID, ContainerID: 2},
+		},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
+		Return(containerConfig, nil)
+
+	// Mock: BuildOrchestrator returns with one failure
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
+		return []*BuildResult{
+			{BuildHistoryID: 1, Status: "success"},
+			{BuildHistoryID: 2, Status: "failed"}, // One failed
+		}, nil
+	}
+
+	// Mock: handleBuildError will try to reset project status
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusBuilding)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(proj, nil)
+	mockProjectRepo.On("Save", mock.Anything, mock.Anything).
+		Return(nil)
+
+	// Act
+	service.buildAndDeployInBackground(ctx, projectID)
+
+	// Assert
+	mockContainerClient.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+// TestBuildAndDeployInBackground_ContainerChangedDuringBuild tests the snapshot drift scenario
+func TestBuildAndDeployInBackground_ContainerChangedDuringBuild(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	mockBuildOrchestrator := &MockBuildOrchestrator{}
+	mockBuildPostProcessor := &MockBuildPostProcessor{}
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:          mockTxManager,
+		projectRepo:        mockProjectRepo,
+		containerClient:    mockContainerClient,
+		buildOrchestrator:  mockBuildOrchestrator,
+		buildPostProcessor: mockBuildPostProcessor,
+		logger:             testLogger,
+	}
+
+	containerConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{ProjectID: projectID, ContainerID: 1},
+		},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
+		Return(containerConfig, nil)
+
+	// Mock: BuildOrchestrator succeeds
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
+		return []*BuildResult{
+			{BuildHistoryID: 1, Status: "success", LatestCommitHash: "abc123"},
+		}, nil
+	}
+
+	// Mock: BuildPostProcessor returns ErrContainerChangedDuringBuild
+	mockBuildPostProcessor.UpdateContainerAfterBuildFunc = func(ctx context.Context, containerID uint, result *BuildResult, snapshot *dto.BuildContainerInfo) error {
+		return projecterrors.ErrContainerChangedDuringBuild
+	}
+
+	// Mock: handleBuildError will try to reset project status
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusBuilding)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(proj, nil)
+	mockProjectRepo.On("Save", mock.Anything, mock.Anything).
+		Return(nil)
+
+	// Act
+	service.buildAndDeployInBackground(ctx, projectID)
+
+	// Assert
+	mockContainerClient.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+// TestBuildAndDeployInBackground_PostProcessorError tests other post-processor errors
+func TestBuildAndDeployInBackground_PostProcessorError(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	mockBuildOrchestrator := &MockBuildOrchestrator{}
+	mockBuildPostProcessor := &MockBuildPostProcessor{}
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:          mockTxManager,
+		projectRepo:        mockProjectRepo,
+		containerClient:    mockContainerClient,
+		buildOrchestrator:  mockBuildOrchestrator,
+		buildPostProcessor: mockBuildPostProcessor,
+		logger:             testLogger,
+	}
+
+	containerConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{ProjectID: projectID, ContainerID: 1},
+		},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
+		Return(containerConfig, nil)
+
+	// Mock: BuildOrchestrator succeeds
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
+		return []*BuildResult{
+			{BuildHistoryID: 1, Status: "success"},
+		}, nil
+	}
+
+	// Mock: BuildPostProcessor returns generic error
+	mockBuildPostProcessor.UpdateContainerAfterBuildFunc = func(ctx context.Context, containerID uint, result *BuildResult, snapshot *dto.BuildContainerInfo) error {
+		return errors.New("database error")
+	}
+
+	// Mock: handleBuildError will try to reset project status
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusBuilding)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(proj, nil)
+	mockProjectRepo.On("Save", mock.Anything, mock.Anything).
+		Return(nil)
+
+	// Act
+	service.buildAndDeployInBackground(ctx, projectID)
+
+	// Assert
+	mockContainerClient.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
