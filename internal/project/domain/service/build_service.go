@@ -52,6 +52,10 @@ type BuildResult struct {
 	// BuildHistoryID is the ID of the BUILD_HISTORY record
 	BuildHistoryID uint
 
+	// ContainerID is the ID of the container that was built
+	// This is used to map build results back to container configurations
+	ContainerID uint
+
 	// Status represents the final build status
 	// Possible values: "success", "failed", "cancelled", "skipped"
 	Status string

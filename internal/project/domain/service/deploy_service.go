@@ -1083,6 +1083,11 @@ func (s *deployService) deployProjectInternal(
 			zap.Uint("project_id", projectID),
 			zap.Error(err),
 		)
+		// Transaction failed before deployment was created - reset project status
+		// The project is still in 'building' status from buildAndDeployInBackground
+		// We must reset it to 'nothing' to avoid leaving it stuck
+		msg := fmt.Sprintf("Failed to create deployment in transaction: %v", err)
+		s.handleBuildError(ctx, projectID, &msg)
 		return err
 	}
 
@@ -1467,8 +1472,47 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 	// all other configuration (env vars, secrets, volumes, networks) from the snapshot.
 	// This ensures we deploy the newly built images with the consistent configuration
 	// that existed when the user initiated the build+deploy operation.
-	for i, result := range buildResults {
-		if result == nil {
+	//
+	// IMPORTANT: We map by ContainerID, not by index, because GetContainerBuildConfig and
+	// GetContainerConfig may return containers in different orders. Mapping by index would
+	// risk deploying the wrong image tags.
+
+	// Build map of ContainerID → BuildResult
+	buildResultByContainerID := make(map[uint]*BuildResult)
+	for _, result := range buildResults {
+		if result != nil {
+			buildResultByContainerID[result.ContainerID] = result
+		}
+	}
+
+	// Build map of Slug → ContainerID from build config
+	slugToContainerID := make(map[string]uint)
+	for _, buildContainer := range buildConfig.Containers {
+		slugToContainerID[buildContainer.Slug] = buildContainer.ContainerID
+	}
+
+	// Update deployment config by matching containers by slug → containerID → build result
+	for i := range deploymentConfig.Containers {
+		containerSlug := deploymentConfig.Containers[i].Name // Name field contains the slug
+
+		// Look up ContainerID by slug
+		containerID, found := slugToContainerID[containerSlug]
+		if !found {
+			s.logger.Warn(ctx, "deployment config container not found in build config",
+				zap.Uint("project_id", projectID),
+				zap.String("container_slug", containerSlug),
+			)
+			continue
+		}
+
+		// Look up build result by ContainerID
+		result, found := buildResultByContainerID[containerID]
+		if !found {
+			s.logger.Warn(ctx, "build result not found for container",
+				zap.Uint("project_id", projectID),
+				zap.Uint("container_id", containerID),
+				zap.String("container_slug", containerSlug),
+			)
 			continue
 		}
 
@@ -1484,7 +1528,8 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 
 			s.logger.Info(ctx, "updating deployment config with new image tag",
 				zap.Uint("project_id", projectID),
-				zap.Int("container_index", i),
+				zap.Uint("container_id", containerID),
+				zap.String("container_slug", containerSlug),
 				zap.String("old_image_tag", deploymentConfig.Containers[i].ImageTag),
 				zap.String("new_image_tag", newImageTag),
 				zap.String("commit_hash", commitHash),

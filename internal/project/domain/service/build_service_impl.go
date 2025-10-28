@@ -98,6 +98,7 @@ func (s *buildServiceImpl) BuildContainer(
 
 		return &BuildResult{
 			BuildHistoryID: buildHistoryID,
+			ContainerID:    container.ContainerID,
 			Status:         "failed",
 			ErrorMessage:   summary,
 		}, err
@@ -136,6 +137,7 @@ func (s *buildServiceImpl) BuildContainer(
 
 		return &BuildResult{
 			BuildHistoryID: buildHistoryID,
+			ContainerID:    container.ContainerID,
 			Status:         "failed",
 			ErrorMessage:   summary,
 		}, err
@@ -267,6 +269,7 @@ func (s *buildServiceImpl) BuildContainer(
 
 		return &BuildResult{
 			BuildHistoryID: buildHistoryID,
+			ContainerID:    container.ContainerID,
 			Status:         "failed",
 			ErrorMessage:   summary,
 		}, err
@@ -545,6 +548,7 @@ func (s *buildServiceImpl) monitorBuildStatus(
 
 			return &BuildResult{
 				BuildHistoryID: buildHistory.BuildHistoryID,
+				ContainerID:    buildHistory.ContainerID(),
 				Status:         "failed",
 				ErrorMessage:   summary,
 			}, fmt.Errorf("build monitoring timeout")
@@ -600,6 +604,7 @@ func (s *buildServiceImpl) checkBuildStatus(
 
 			return &BuildResult{
 				BuildHistoryID: buildHistory.BuildHistoryID,
+				ContainerID:    buildHistory.ContainerID(),
 				Status:         "failed",
 				ErrorMessage:   msg,
 			}, fmt.Errorf("PipelineRun deleted")
@@ -761,6 +766,7 @@ func (s *buildServiceImpl) handleBuildSuccess(
 
 	return &BuildResult{
 		BuildHistoryID:   buildHistory.BuildHistoryID,
+		ContainerID:      buildHistory.ContainerID(),
 		Status:           status,
 		LatestCommitHash: commitHash,
 		ImageTag:         imageTag,
@@ -844,6 +850,7 @@ func (s *buildServiceImpl) handleBuildFailure(
 
 	return &BuildResult{
 		BuildHistoryID:   buildHistory.BuildHistoryID,
+		ContainerID:      buildHistory.ContainerID(),
 		Status:           resultStatus,
 		LatestCommitHash: commitHash,
 		ErrorMessage:     pipelineRun.Message,
