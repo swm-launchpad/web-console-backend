@@ -14,7 +14,7 @@ import (
 // Mock ContainerUpdater for testing
 
 type mockContainerUpdater struct {
-	updateAfterBuildFunc func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) error
+	updateAfterBuildFunc func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) (bool, error)
 }
 
 func (m *mockContainerUpdater) UpdateAfterBuild(
@@ -23,11 +23,11 @@ func (m *mockContainerUpdater) UpdateAfterBuild(
 	buildStatus string,
 	commitHash string,
 	snapshot *dto.BuildContainerInfo,
-) error {
+) (bool, error) {
 	if m.updateAfterBuildFunc != nil {
 		return m.updateAfterBuildFunc(ctx, containerID, buildStatus, commitHash, snapshot)
 	}
-	return nil
+	return true, nil // Default: return wasUpdated=true
 }
 
 // Test cases
@@ -42,12 +42,12 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_Success(t *testing.T) {
 	var capturedSnapshot *dto.BuildContainerInfo
 
 	mockUpdater := &mockContainerUpdater{
-		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) error {
+		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) (bool, error) {
 			capturedContainerID = containerID
 			capturedBuildStatus = buildStatus
 			capturedCommitHash = commitHash
 			capturedSnapshot = snapshot
-			return nil
+			return true, nil // Return wasUpdated=true
 		},
 	}
 
@@ -81,9 +81,9 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_NonSuccessStatus(t *testin
 
 	var updaterCalled bool
 	mockUpdater := &mockContainerUpdater{
-		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) error {
+		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) (bool, error) {
 			updaterCalled = true
-			return nil
+			return false, nil // Return wasUpdated=false for non-success status
 		},
 	}
 
@@ -116,8 +116,8 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_UpdaterError(t *testing.T)
 
 	expectedErr := errors.New("update failed")
 	mockUpdater := &mockContainerUpdater{
-		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) error {
-			return expectedErr
+		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) (bool, error) {
+			return false, expectedErr
 		},
 	}
 
@@ -148,9 +148,9 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_SkippedBuild(t *testing.T)
 
 	var capturedBuildStatus string
 	mockUpdater := &mockContainerUpdater{
-		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) error {
+		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) (bool, error) {
 			capturedBuildStatus = buildStatus
-			return nil
+			return true, nil // Skipped builds still update (clear needs_build flag)
 		},
 	}
 
@@ -181,9 +181,9 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_BackendTrackingLost(t *tes
 
 	var updaterCalled bool
 	mockUpdater := &mockContainerUpdater{
-		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) error {
+		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) (bool, error) {
 			updaterCalled = true
-			return nil
+			return false, nil // Return wasUpdated=false for non-success status
 		},
 	}
 

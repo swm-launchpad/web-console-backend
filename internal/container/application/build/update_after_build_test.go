@@ -140,9 +140,10 @@ func TestUpdateContainerAfterBuildUseCase_Execute_Success(t *testing.T) {
 		},
 	}
 
-	err := useCase.Execute(ctx, input)
+	wasUpdated, err := useCase.Execute(ctx, input)
 
 	assert.NoError(t, err)
+	assert.True(t, wasUpdated, "container should be updated for successful build")
 	require.NotNil(t, savedContainer)
 	assert.False(t, savedContainer.NeedsBuild())
 	assert.Equal(t, commitHash, *savedContainer.LastBuiltGitCommitHash())
@@ -167,10 +168,11 @@ func TestUpdateContainerAfterBuildUseCase_Execute_FailedBuild(t *testing.T) {
 		},
 	}
 
-	err := useCase.Execute(ctx, input)
+	wasUpdated, err := useCase.Execute(ctx, input)
 
 	// Should not return error, just skip update
 	assert.NoError(t, err)
+	assert.False(t, wasUpdated, "container should not be updated for failed build")
 }
 
 func TestUpdateContainerAfterBuildUseCase_Execute_ParametersChanged(t *testing.T) {
@@ -223,9 +225,10 @@ func TestUpdateContainerAfterBuildUseCase_Execute_ParametersChanged(t *testing.T
 		},
 	}
 
-	err := useCase.Execute(ctx, input)
+	wasUpdated, err := useCase.Execute(ctx, input)
 
 	assert.NoError(t, err)
+	assert.False(t, wasUpdated, "container should not be updated when parameters changed")
 	assert.False(t, savedCalled, "Save should not be called when parameters changed")
 }
 
@@ -282,9 +285,10 @@ func TestUpdateContainerAfterBuildUseCase_Execute_SkippedBuild(t *testing.T) {
 		},
 	}
 
-	err := useCase.Execute(ctx, input)
+	wasUpdated, err := useCase.Execute(ctx, input)
 
 	assert.NoError(t, err)
+	assert.True(t, wasUpdated, "container should be updated for skipped build to clear needs_build flag")
 	require.NotNil(t, savedContainer)
 	assert.False(t, savedContainer.NeedsBuild())
 	// Commit hash should be preserved for skipped builds
@@ -344,9 +348,10 @@ func TestUpdateContainerAfterBuildUseCase_Execute_EmptyCommitHash(t *testing.T) 
 		},
 	}
 
-	err := useCase.Execute(ctx, input)
+	wasUpdated, err := useCase.Execute(ctx, input)
 
 	assert.NoError(t, err)
+	assert.True(t, wasUpdated, "container should be updated even with empty commit hash")
 	require.NotNil(t, savedContainer)
 	assert.False(t, savedContainer.NeedsBuild())
 	// Previous commit hash should be preserved
@@ -377,7 +382,7 @@ func TestUpdateContainerAfterBuildUseCase_Execute_RepositoryError(t *testing.T) 
 		},
 	}
 
-	err := useCase.Execute(ctx, input)
+	_, err := useCase.Execute(ctx, input)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to update container after build")

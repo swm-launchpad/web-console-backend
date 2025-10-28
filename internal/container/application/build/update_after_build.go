@@ -54,10 +54,11 @@ func NewUpdateContainerAfterBuildUseCase(
 }
 
 // Execute updates container after build completion
+// Returns wasUpdated=true if the container was actually updated, false if skipped
 func (uc *UpdateContainerAfterBuildUseCase) Execute(
 	ctx context.Context,
 	input UpdateContainerAfterBuildInput,
-) error {
+) (wasUpdated bool, err error) {
 	uc.logger.Info(ctx, "Starting post-build container update",
 		zap.Uint("container_id", input.ContainerID),
 		zap.String("build_status", input.BuildStatus),
@@ -70,11 +71,14 @@ func (uc *UpdateContainerAfterBuildUseCase) Execute(
 			zap.Uint("container_id", input.ContainerID),
 			zap.String("status", input.BuildStatus),
 		)
-		return nil
+		return false, nil
 	}
 
+	// Track whether update was performed
+	updated := false
+
 	// Execute update in transaction
-	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+	txErr := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Step 1: Acquire row lock and fetch current container state
 		currentContainer, err := uc.containerRepo.FindByIDForUpdate(txCtx, input.ContainerID)
 		if err != nil {
@@ -92,6 +96,7 @@ func (uc *UpdateContainerAfterBuildUseCase) Execute(
 			uc.logger.Warn(txCtx, "Build parameters changed during build, skipping update",
 				zap.Uint("container_id", input.ContainerID),
 			)
+			// Don't set updated=true, just return without error
 			return nil
 		}
 
@@ -138,14 +143,16 @@ func (uc *UpdateContainerAfterBuildUseCase) Execute(
 			zap.Bool("needs_build", currentContainer.NeedsBuild()),
 		)
 
+		// Mark as updated since we successfully saved the container
+		updated = true
 		return nil
 	})
 
-	if err != nil {
-		return fmt.Errorf("failed to update container after build: %w", err)
+	if txErr != nil {
+		return false, fmt.Errorf("failed to update container after build: %w", txErr)
 	}
 
-	return nil
+	return updated, nil
 }
 
 // hasBuildParametersChanged compares build parameters between snapshot and current state

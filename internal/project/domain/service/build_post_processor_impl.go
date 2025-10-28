@@ -41,7 +41,7 @@ func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
 	)
 
 	// Delegate to container updater (dependency inversion principle)
-	err := p.containerUpdater.UpdateAfterBuild(
+	wasUpdated, err := p.containerUpdater.UpdateAfterBuild(
 		ctx,
 		containerID,
 		buildResult.Status,
@@ -53,12 +53,18 @@ func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
 		return fmt.Errorf("failed to update container after build: %w", err)
 	}
 
-	// Only log success for statuses that actually trigger container updates
-	// Non-success statuses (failed, backend_tracking_lost) skip updates
-	if buildResult.Status == "success" || buildResult.Status == "skipped" {
-		p.logger.Info(ctx, "Successfully updated container",
+	// Log based on whether update was actually performed
+	if wasUpdated {
+		p.logger.Info(ctx, "Successfully updated container after build",
 			zap.Uint("container_id", containerID),
 			zap.String("build_status", buildResult.Status),
+		)
+	} else {
+		// Update was skipped (e.g., build parameters changed mid-flight or non-success status)
+		p.logger.Info(ctx, "Container update skipped",
+			zap.Uint("container_id", containerID),
+			zap.String("build_status", buildResult.Status),
+			zap.String("reason", "build parameters changed or non-success status"),
 		)
 	}
 

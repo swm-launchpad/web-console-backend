@@ -13,11 +13,16 @@ type ContainerUpdater interface {
 	// UpdateAfterBuild updates a container's state after a build completes
 	// It compares the snapshot taken before the build with the current state to detect changes
 	// and only updates if no build parameters have changed during the build process
+	//
+	// Returns:
+	//   - wasUpdated: true if the container was actually updated, false if update was skipped
+	//                 (e.g., due to build parameters changing mid-flight)
+	//   - error: any error that occurred during the update process
 	UpdateAfterBuild(
 		ctx context.Context,
 		containerID uint,
 		buildStatus string,
 		commitHash string,
 		snapshotBeforeBuild *dto.BuildContainerInfo,
-	) error
+	) (wasUpdated bool, err error)
 }

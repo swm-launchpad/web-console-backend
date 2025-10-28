@@ -38,14 +38,14 @@ func (a *ContainerUpdateAdapter) UpdateAfterBuild(
 	buildStatus string,
 	commitHash string,
 	snapshotBeforeBuild *dto.BuildContainerInfo,
-) error {
+) (wasUpdated bool, err error) {
 	// Deep copy TemplateConfig to prevent snapshot aliasing
-	templateConfig, err := deepCopyTemplateConfig(snapshotBeforeBuild.TemplateConfig)
-	if err != nil {
+	templateConfig, copyErr := deepCopyTemplateConfig(snapshotBeforeBuild.TemplateConfig)
+	if copyErr != nil {
 		// Log serialization error for diagnostic purposes
 		a.logger.Warn(ctx, "Failed to deep copy template config, using nil",
 			zap.Uint("container_id", containerID),
-			zap.Error(err),
+			zap.Error(copyErr),
 		)
 		templateConfig = nil
 	}
