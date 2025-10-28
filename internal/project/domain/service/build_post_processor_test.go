@@ -246,3 +246,40 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_ParametersChangedDuringBui
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, projecterrors.ErrContainerChangedDuringBuild)
 }
+
+// TestBuildPostProcessor_UpdateContainerAfterBuild_SkippedBuildWithParametersChanged tests the skipped build drift scenario
+func TestBuildPostProcessor_UpdateContainerAfterBuild_SkippedBuildWithParametersChanged(t *testing.T) {
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+
+	// Mock: Updater returns wasUpdated=false for skipped status
+	// This simulates container parameters changing during a skipped build
+	mockUpdater := &mockContainerUpdater{
+		updateAfterBuildFunc: func(ctx context.Context, containerID uint, buildStatus string, commitHash string, snapshot *dto.BuildContainerInfo) (bool, error) {
+			// Return wasUpdated=false to indicate snapshot comparison failed
+			return false, nil
+		},
+	}
+
+	processor := NewBuildPostProcessor(mockUpdater, testLogger)
+
+	buildResult := &BuildResult{
+		BuildHistoryID:   1,
+		Status:           "skipped", // Build was skipped by Tekton
+		LatestCommitHash: "",
+		ShouldBuild:      false,
+	}
+
+	snapshot := &dto.BuildContainerInfo{
+		ContainerID:      10,
+		GitRepositoryURL: "https://github.com/test/repo",
+		GitBranch:        "main",
+	}
+
+	err := processor.UpdateContainerAfterBuild(ctx, 10, buildResult, snapshot)
+
+	// Should return ErrContainerChangedDuringBuild even for skipped builds
+	// because parameters changed mid-flight, making any cached image stale
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, projecterrors.ErrContainerChangedDuringBuild)
+}

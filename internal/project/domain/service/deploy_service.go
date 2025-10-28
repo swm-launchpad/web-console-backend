@@ -1113,6 +1113,17 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 		zap.Int("container_count", len(containerConfig.Containers)),
 	)
 
+	// Guard: Verify containers still exist (race condition: container deleted between validation and here)
+	if len(containerConfig.Containers) == 0 {
+		s.logger.Error(ctx, "no containers found for build after status flip",
+			zap.Uint("project_id", projectID),
+			zap.String("reason", "containers were deleted between initial validation and background execution"),
+		)
+		msg := "No containers found for build (deleted after status flip)"
+		s.handleBuildError(ctx, projectID, &msg)
+		return
+	}
+
 	// Convert []BuildContainerInfo to []*BuildContainerInfo
 	containerPointers := make([]*dto.BuildContainerInfo, len(containerConfig.Containers))
 	for i := range containerConfig.Containers {

@@ -567,3 +567,54 @@ func TestBuildAndDeployInBackground_PostProcessorError(t *testing.T) {
 	mockContainerClient.AssertExpectations(t)
 	mockProjectRepo.AssertExpectations(t)
 }
+
+// TestBuildAndDeployInBackground_ContainersDeletedAfterStatusFlip tests the race condition where
+// containers are deleted between the initial validation and the background goroutine execution
+func TestBuildAndDeployInBackground_ContainersDeletedAfterStatusFlip(t *testing.T) {
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+	projectID := uint(1)
+
+	// Setup mocks
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	mockBuildOrchestrator := &MockBuildOrchestrator{}
+	mockBuildPostProcessor := &MockBuildPostProcessor{}
+
+	service := &deployService{
+		txManager:          mockTxManager,
+		projectRepo:        mockProjectRepo,
+		containerClient:    mockContainerClient,
+		buildOrchestrator:  mockBuildOrchestrator,
+		buildPostProcessor: mockBuildPostProcessor,
+		logger:             testLogger,
+	}
+
+	// Mock: GetContainerBuildConfig returns empty list (containers deleted after status flip)
+	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
+		Return(&dto.ContainerBuildConfig{
+			Containers: []dto.BuildContainerInfo{}, // Empty list
+		}, nil)
+
+	// Mock: BuildOrchestrator should NOT be called - fail the test if it is
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
+		t.Fatalf("BuildAndWait should not be called when containers are deleted after status flip")
+		return nil, nil
+	}
+
+	// Mock: handleBuildError will try to reset project status
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusBuilding)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(proj, nil)
+	mockProjectRepo.On("Save", mock.Anything, mock.Anything).
+		Return(nil)
+
+	// Act
+	service.buildAndDeployInBackground(ctx, projectID)
+
+	// Assert: handleBuildError should be called, build should not proceed
+	mockContainerClient.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+	// Note: If the guard regresses, BuildAndWait will be called and t.Fatalf will trigger
+}

@@ -54,10 +54,12 @@ func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
 		return fmt.Errorf("failed to update container after build: %w", err)
 	}
 
-	// Critical: If build was successful but update was skipped, parameters changed mid-build.
+	// Critical: If build completed (success or skipped) but update was skipped, parameters changed mid-build.
 	// This means the built image is now stale and should not be deployed.
 	// needs_build flag remains true, which is our signal that the image is stale.
-	if buildResult.Status == "success" && !wasUpdated {
+	// Note: "skipped" builds can also have parameter drift - Tekton skips the build but parameters may have changed,
+	// leading to the same stale-image deployment risk once PR#10 wires in the deploy step.
+	if (buildResult.Status == "success" || buildResult.Status == "skipped") && !wasUpdated {
 		p.logger.Error(ctx, "Container parameters changed during build, aborting deployment",
 			zap.Uint("container_id", containerID),
 			zap.String("build_status", buildResult.Status),
