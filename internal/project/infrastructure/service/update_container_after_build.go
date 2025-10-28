@@ -289,12 +289,13 @@ func (uc *UpdateContainerAfterBuildUseCase) UpdateAfterBuild(
 	snapshotBeforeBuild *dto.BuildContainerInfo,
 ) error {
 	// Convert dto.BuildContainerInfo to BuildParametersSnapshot
+	// Deep copy TemplateConfig to prevent snapshot aliasing
 	snapshot := &BuildParametersSnapshot{
 		GitRepositoryURL: snapshotBeforeBuild.GitRepositoryURL,
 		GitBranch:        snapshotBeforeBuild.GitBranch,
 		GitDirectoryPath: snapshotBeforeBuild.GitDirectoryPath,
 		TemplateID:       snapshotBeforeBuild.TemplateID,
-		TemplateConfig:   snapshotBeforeBuild.TemplateConfig,
+		TemplateConfig:   deepCopyTemplateConfig(snapshotBeforeBuild.TemplateConfig),
 		BuildVars:        snapshotBeforeBuild.BuildVars,
 		InstallationID:   snapshotBeforeBuild.InstallationID,
 	}
@@ -308,4 +309,28 @@ func (uc *UpdateContainerAfterBuildUseCase) UpdateAfterBuild(
 	}
 
 	return uc.Execute(ctx, input)
+}
+
+// deepCopyTemplateConfig performs a deep copy of template config using JSON serialization
+// This ensures nested maps/slices are fully cloned, preventing snapshot aliasing
+func deepCopyTemplateConfig(src map[string]interface{}) map[string]interface{} {
+	if src == nil {
+		return nil
+	}
+
+	// Use JSON round-trip for deep copy
+	// This handles arbitrary nesting of maps, slices, and primitives
+	data, err := json.Marshal(src)
+	if err != nil {
+		// If marshaling fails, return empty map to be safe
+		return make(map[string]interface{})
+	}
+
+	var dst map[string]interface{}
+	if err := json.Unmarshal(data, &dst); err != nil {
+		// If unmarshaling fails, return empty map to be safe
+		return make(map[string]interface{})
+	}
+
+	return dst
 }

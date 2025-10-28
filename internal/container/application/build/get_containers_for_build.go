@@ -2,6 +2,7 @@ package build
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
@@ -66,12 +67,9 @@ func (uc *GetContainersForBuildUseCase) Execute(ctx context.Context, input GetCo
 		}
 
 		// Deep copy template config to prevent snapshot aliasing
-		// Maps are reference types - direct assignment would allow later mutations
+		// Maps are reference types - shallow copy would allow nested mutations
 		// to affect the snapshot, defeating change detection
-		templateConfig := make(map[string]interface{})
-		for k, v := range container.TemplateConfig() {
-			templateConfig[k] = v
-		}
+		templateConfig := deepCopyTemplateConfig(container.TemplateConfig())
 
 		// Get template body if template is configured
 		var templateBody *string
@@ -105,4 +103,28 @@ func (uc *GetContainersForBuildUseCase) Execute(ctx context.Context, input GetCo
 	}
 
 	return output, nil
+}
+
+// deepCopyTemplateConfig performs a deep copy of template config using JSON serialization
+// This ensures nested maps/slices are fully cloned, preventing snapshot aliasing
+func deepCopyTemplateConfig(src map[string]interface{}) map[string]interface{} {
+	if src == nil {
+		return nil
+	}
+
+	// Use JSON round-trip for deep copy
+	// This handles arbitrary nesting of maps, slices, and primitives
+	data, err := json.Marshal(src)
+	if err != nil {
+		// If marshaling fails, return empty map to be safe
+		return make(map[string]interface{})
+	}
+
+	var dst map[string]interface{}
+	if err := json.Unmarshal(data, &dst); err != nil {
+		// If unmarshaling fails, return empty map to be safe
+		return make(map[string]interface{})
+	}
+
+	return dst
 }

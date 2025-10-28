@@ -10,16 +10,11 @@ import (
 // This service is responsible for updating container state after a build completes,
 // including last_built_commit_hash and needs_build flags.
 type BuildPostProcessor interface {
-	// UpdateContainerAfterBuild updates container information after a successful build.
-	// This method:
-	//  1. Acquires a row lock (FOR UPDATE) on the container record
-	//  2. Compares the snapshot taken before build with current database state
-	//  3. If build parameters haven't changed during the build:
-	//     - Updates last_built_git_commit_hash from BuildResult
-	//     - Sets needs_build = false
-	//     - Updates updated_at timestamp
-	//  4. If build parameters changed during the build:
-	//     - Skips update (needs_build remains true for next build)
+	// UpdateContainerAfterBuild updates container information after a build completes.
+	// This method delegates to ContainerUpdater which handles:
+	//  - Acquiring row lock and comparing build parameter snapshots
+	//  - Updating last_built_git_commit_hash and needs_build flags
+	//  - Skipping updates if parameters changed during the build
 	//
 	// Parameters:
 	//   - ctx: Context for cancellation and deadline control
@@ -28,9 +23,7 @@ type BuildPostProcessor interface {
 	//   - snapshotBeforeBuild: Container configuration snapshot taken before build started
 	//
 	// Returns:
-	//   - error: Returns error if update fails or lock cannot be acquired
-	//
-	// Note: This method should be called within a transaction to ensure consistency
+	//   - error: Returns error if update fails
 	UpdateContainerAfterBuild(
 		ctx context.Context,
 		containerID uint,
