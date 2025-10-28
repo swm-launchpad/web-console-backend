@@ -1343,26 +1343,17 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 	)
 
 	// Step 1: Get container build configuration AND deployment configuration
-	// We capture both snapshots BEFORE starting builds to ensure consistency.
-	// This way, the deployment uses the same configuration state that existed when builds started.
-	buildConfig, err := s.containerClient.GetContainerBuildConfig(ctx, projectID)
+	// We use the unified GetContainerConfigs method to capture both snapshots from a SINGLE database query.
+	// This ensures perfect snapshot consistency and eliminates the risk of divergence between
+	// build and deployment configurations (P1 Badge fix: prevents deploying containers that weren't built).
+	// The deployment uses the same configuration state that existed when builds started.
+	buildConfig, deploymentConfig, err := s.containerClient.GetContainerConfigs(ctx, projectID)
 	if err != nil {
-		s.logger.Error(ctx, "failed to get container build config in background",
+		s.logger.Error(ctx, "failed to get container configs in background",
 			zap.Uint("project_id", projectID),
 			zap.Error(err),
 		)
-		msg := fmt.Sprintf("Failed to get container build config: %v", err)
-		s.handleBuildError(ctx, projectID, &msg)
-		return
-	}
-
-	deploymentConfig, err := s.containerClient.GetContainerConfig(ctx, projectID)
-	if err != nil {
-		s.logger.Error(ctx, "failed to get container deployment config in background",
-			zap.Uint("project_id", projectID),
-			zap.Error(err),
-		)
-		msg := fmt.Sprintf("Failed to get container deployment config: %v", err)
+		msg := fmt.Sprintf("Failed to get container configurations: %v", err)
 		s.handleBuildError(ctx, projectID, &msg)
 		return
 	}

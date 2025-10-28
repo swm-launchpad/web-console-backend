@@ -26,3 +26,19 @@ func (m *MockContainerClient) GetContainerBuildConfig(ctx context.Context, proje
 	}
 	return args.Get(0).(*dto.ContainerBuildConfig), args.Error(1)
 }
+
+func (m *MockContainerClient) GetContainerConfigs(ctx context.Context, projectID uint) (*dto.ContainerBuildConfig, *dto.ContainerDeploymentConfig, error) {
+	args := m.Called(ctx, projectID)
+
+	var buildConfig *dto.ContainerBuildConfig
+	if args.Get(0) != nil {
+		buildConfig = args.Get(0).(*dto.ContainerBuildConfig)
+	}
+
+	var deployConfig *dto.ContainerDeploymentConfig
+	if args.Get(1) != nil {
+		deployConfig = args.Get(1).(*dto.ContainerDeploymentConfig)
+	}
+
+	return buildConfig, deployConfig, args.Error(2)
+}

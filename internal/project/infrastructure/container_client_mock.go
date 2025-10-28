@@ -208,5 +208,21 @@ func (m *MockContainerClient) getMultiContainerBuildConfig() *dto.ContainerBuild
 	}
 }
 
+// GetContainerConfigs returns both build and deployment configurations in a single call.
+// Different project IDs return different scenarios:
+//   - projectID 1: Single container configs
+//   - projectID 2: Multi-container configs
+//   - Other IDs: Returns projecterrors.ErrProjectNotFound
+func (m *MockContainerClient) GetContainerConfigs(ctx context.Context, projectID uint) (*dto.ContainerBuildConfig, *dto.ContainerDeploymentConfig, error) {
+	switch projectID {
+	case 1:
+		return m.getSingleContainerBuildConfig(), m.getSingleContainerConfig(), nil
+	case 2:
+		return m.getMultiContainerBuildConfig(), m.getMultiContainerConfig(), nil
+	default:
+		return nil, nil, projecterrors.ErrProjectNotFound
+	}
+}
+
 // Compile-time assertion that MockContainerClient implements ContainerClient interface
 var _ infrastructure.ContainerClient = (*MockContainerClient)(nil)

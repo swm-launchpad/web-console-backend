@@ -18,6 +18,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	containerApp "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	containerBuild "github.com/swm-launchpad/web-console-backend/internal/container/application/build"
+	containerCombined "github.com/swm-launchpad/web-console-backend/internal/container/application/combined"
 	containerDeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 	containerService "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
@@ -114,9 +115,15 @@ func provideKubeClient(log logger.Logger) (projectDomainInfra.KubeClient, error)
 func provideContainerClient(
 	getContainersForDeploymentUseCase *containerDeployment.GetContainersForDeploymentUseCase,
 	getContainersForBuildUseCase *containerBuild.GetContainersForBuildUseCase,
+	getContainersForBuildAndDeployUseCase *containerCombined.GetContainersForBuildAndDeployUseCase,
 	log logger.Logger,
 ) projectDomainInfra.ContainerClient {
-	return projectInfra.NewContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, log)
+	return projectInfra.NewContainerClient(
+		getContainersForDeploymentUseCase,
+		getContainersForBuildUseCase,
+		getContainersForBuildAndDeployUseCase,
+		log,
+	)
 }
 
 // provideKubeBuildClient creates a Kubernetes build client from environment variables
@@ -336,6 +343,7 @@ func InitializeApp() (*App, error) {
 		containerApp.NewGetTemplateUseCase,
 		containerDeployment.NewGetContainersForDeploymentUseCase,
 		containerBuild.NewGetContainersForBuildUseCase,
+		containerCombined.NewGetContainersForBuildAndDeployUseCase,
 		containerBuild.NewUpdateContainerAfterBuildUseCase,
 
 		// HTTP handlers

@@ -18,6 +18,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	application3 "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/build"
+	"github.com/swm-launchpad/web-console-backend/internal/container/application/combined"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 	service3 "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	handler3 "github.com/swm-launchpad/web-console-backend/internal/container/handler"
@@ -113,7 +114,8 @@ func InitializeApp() (*App, error) {
 	getContainersForDeploymentUseCase := deployment.NewGetContainersForDeploymentUseCase(containerService)
 	templateRepository := infrastructure2.NewTemplateRepository(db, logger)
 	getContainersForBuildUseCase := build.NewGetContainersForBuildUseCase(containerService, templateRepository, logger)
-	containerClient := provideContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, logger)
+	getContainersForBuildAndDeployUseCase := combined.NewGetContainersForBuildAndDeployUseCase(containerService, templateRepository, logger)
+	containerClient := provideContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, getContainersForBuildAndDeployUseCase, logger)
 	tektonClient, err := provideTektonClient(logger)
 	if err != nil {
 		return nil, err
@@ -250,9 +252,15 @@ func provideKubeClient(log logger.Logger) (infrastructure3.KubeClient, error) {
 func provideContainerClient(
 	getContainersForDeploymentUseCase *deployment.GetContainersForDeploymentUseCase,
 	getContainersForBuildUseCase *build.GetContainersForBuildUseCase,
+	getContainersForBuildAndDeployUseCase *combined.GetContainersForBuildAndDeployUseCase,
 	log logger.Logger,
 ) infrastructure3.ContainerClient {
-	return infrastructure4.NewContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, log)
+	return infrastructure4.NewContainerClient(
+		getContainersForDeploymentUseCase,
+		getContainersForBuildUseCase,
+		getContainersForBuildAndDeployUseCase,
+		log,
+	)
 }
 
 // provideKubeBuildClient creates a Kubernetes build client from environment variables

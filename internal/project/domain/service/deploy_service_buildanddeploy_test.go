@@ -329,13 +329,11 @@ func TestBuildAndDeployInBackground_Success(t *testing.T) {
 			},
 		},
 	}
-	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
-		Return(buildContainerConfig, nil)
 
-	// Mock: GetContainerConfig (deployment snapshot) - return error to stop at deployment phase
+	// Mock: GetContainerConfigs returns build config but deployment config error
 	// This allows us to test the build phase without having to mock the entire deployment flow
-	mockContainerClient.On("GetContainerConfig", mock.Anything, projectID).
-		Return(nil, errors.New("deployment config not found"))
+	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
+		Return(buildContainerConfig, nil, errors.New("deployment config not found"))
 
 	// Mock: BuildOrchestrator returns success
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
@@ -396,8 +394,9 @@ func TestBuildAndDeployInBackground_BuildOrchestrationFailure(t *testing.T) {
 			{ProjectID: projectID, ContainerID: 1},
 		},
 	}
-	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
-		Return(containerConfig, nil)
+	// Mock: GetContainerConfigs returns configs (orchestration will fail, so deployment config not used)
+	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
+		Return(containerConfig, nil, errors.New("deployment config not needed for this test"))
 
 	// Mock: BuildOrchestrator returns error
 	orchError := errors.New("orchestration failed")
@@ -446,8 +445,9 @@ func TestBuildAndDeployInBackground_BuildFailures(t *testing.T) {
 			{ProjectID: projectID, ContainerID: 2},
 		},
 	}
-	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
-		Return(containerConfig, nil)
+	// Mock: GetContainerConfigs returns configs (build will fail, so deployment config not used)
+	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
+		Return(containerConfig, nil, errors.New("deployment config not needed for this test"))
 
 	// Mock: BuildOrchestrator returns with one failure
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
@@ -499,8 +499,9 @@ func TestBuildAndDeployInBackground_ContainerChangedDuringBuild(t *testing.T) {
 			{ProjectID: projectID, ContainerID: 1},
 		},
 	}
-	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
-		Return(containerConfig, nil)
+	// Mock: GetContainerConfigs returns configs (post-processor will fail, so deployment config not used)
+	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
+		Return(containerConfig, nil, errors.New("deployment config not needed for this test"))
 
 	// Mock: BuildOrchestrator succeeds
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
@@ -556,8 +557,9 @@ func TestBuildAndDeployInBackground_PostProcessorError(t *testing.T) {
 			{ProjectID: projectID, ContainerID: 1},
 		},
 	}
-	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
-		Return(containerConfig, nil)
+	// Mock: GetContainerConfigs returns configs (post-processor will fail, so deployment config not used)
+	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
+		Return(containerConfig, nil, errors.New("deployment config not needed for this test"))
 
 	// Mock: BuildOrchestrator succeeds
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
@@ -609,14 +611,13 @@ func TestBuildAndDeployInBackground_ContainersDeletedAfterStatusFlip(t *testing.
 		logger:             testLogger,
 	}
 
-	// Mock: GetContainerBuildConfig returns empty list (containers deleted after status flip)
-	mockContainerClient.On("GetContainerBuildConfig", mock.Anything, projectID).
+	// Mock: GetContainerConfigs returns empty list (containers deleted after status flip)
+	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
 		Return(&dto.ContainerBuildConfig{
 			Containers: []dto.BuildContainerInfo{}, // Empty list
-		}, nil)
+		}, nil, errors.New("deployment config not needed for this test"))
 
-	// Note: GetContainerConfig should NOT be called since we fail early on empty containers
-	// If this gets called, it means the guard failed
+	// Note: We fail early on empty containers before even checking deployment config
 
 	// Mock: BuildOrchestrator should NOT be called - fail the test if it is
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {

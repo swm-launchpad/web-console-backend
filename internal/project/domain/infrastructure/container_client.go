@@ -65,4 +65,34 @@ type ContainerClient interface {
 	//           container.Name, container.GitBranch, container.NeedsBuild)
 	//   }
 	GetContainerBuildConfig(ctx context.Context, projectID uint) (*dto.ContainerBuildConfig, error)
+
+	// GetContainerConfigs retrieves both build and deployment configurations in a single call.
+	// This method executes a single database query and transforms the result into both formats,
+	// ensuring perfect snapshot consistency and eliminating the risk of configuration divergence
+	// between build and deployment phases (P1 Badge fix).
+	//
+	// This method should be preferred over calling GetContainerBuildConfig and GetContainerConfig
+	// separately when you need both configurations, as it:
+	// - Reduces database queries by 50% (1 query instead of 2)
+	// - Guarantees snapshot consistency (no time gap between queries)
+	// - Prevents configuration divergence (e.g., deploying containers that weren't built)
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - *dto.ContainerBuildConfig: Container build configuration if found
+	//   - *dto.ContainerDeploymentConfig: Container deployment configuration if found
+	//   - error: An error if the operation fails or the project is not found
+	//
+	// Example usage:
+	//   buildConfig, deployConfig, err := client.GetContainerConfigs(ctx, 123)
+	//   if err != nil {
+	//       return err
+	//   }
+	//   // Both configs are guaranteed to be from the same database snapshot
+	//   fmt.Printf("Build containers: %d, Deploy containers: %d\n",
+	//       len(buildConfig.Containers), len(deployConfig.Containers))
+	GetContainerConfigs(ctx context.Context, projectID uint) (*dto.ContainerBuildConfig, *dto.ContainerDeploymentConfig, error)
 }
