@@ -480,6 +480,39 @@ func (p *Project) updateTimestamp() {
 	p.updatedAt = now
 }
 
+// StartBuild transitions the project to building status
+// Returns error if project is already in an active operation
+func (p *Project) StartBuild() error {
+	if p.isDeleted {
+		return projecterrors.ErrCannotModifyDeletedProject
+	}
+
+	if p.operationStatus != value.ProjectOperationStatusNothing {
+		return projecterrors.ErrInvalidStatusTransition
+	}
+
+	p.operationStatus = value.ProjectOperationStatusBuilding
+	p.updateTimestamp()
+	return nil
+}
+
+// CompleteBuild resets the operation status to nothing after build completes
+// This is called when a build completes (success or failure)
+func (p *Project) CompleteBuild() error {
+	if p.isDeleted {
+		return projecterrors.ErrCannotModifyDeletedProject
+	}
+
+	// Only reset if project is in building status
+	if p.operationStatus != value.ProjectOperationStatusBuilding {
+		return projecterrors.ErrInvalidStatusTransition
+	}
+
+	p.operationStatus = value.ProjectOperationStatusNothing
+	p.updateTimestamp()
+	return nil
+}
+
 // StartDeploy transitions the project to deploying status and records which deployment owns the lock
 // Returns error if project is already in an active operation
 func (p *Project) StartDeploy(deploymentID uint) error {

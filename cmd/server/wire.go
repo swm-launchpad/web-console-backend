@@ -31,6 +31,7 @@ import (
 	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	projectSqlc "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
+	projectInfraService "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -148,6 +149,8 @@ func provideDeployService(
 	containerClient projectDomainInfra.ContainerClient,
 	tektonClient projectDomainInfra.TektonClient,
 	kubeClient projectDomainInfra.KubeClient,
+	buildOrchestrator projectService.BuildOrchestrator,
+	buildPostProcessor projectService.BuildPostProcessor,
 	log logger.Logger,
 ) projectService.DeployService {
 	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
@@ -165,6 +168,8 @@ func provideDeployService(
 		containerClient,
 		tektonClient,
 		kubeClient,
+		buildOrchestrator,
+		buildPostProcessor,
 		deployNamespace,
 		projectServiceName,
 		log,
@@ -263,9 +268,14 @@ func InitializeApp() (*App, error) {
 		projectRepo.NewProjectRepository,
 		projectRepo.NewVolumeRepository,
 		projectRepo.NewDeploymentRepository,
+		projectRepo.NewBuildHistoryRepository,
 		provideTektonClient,
 		provideKubeClient,
 		provideContainerClient,
+		provideTektonBuildClient,
+		provideKubeBuildClient,
+		projectInfraService.NewContainerUpdateAdapter,
+		wire.Bind(new(projectService.ContainerUpdater), new(*projectInfraService.ContainerUpdateAdapter)),
 
 		// Project domain services
 		projectService.NewSlugService,
@@ -273,6 +283,9 @@ func InitializeApp() (*App, error) {
 		projectService.NewProjectService,
 		projectService.NewVolumeService,
 		projectService.NewPermissionService,
+		projectService.NewBuildService,
+		projectService.NewBuildOrchestrator,
+		projectService.NewBuildPostProcessor,
 		provideDeployService,
 
 		// Project use cases
@@ -323,6 +336,7 @@ func InitializeApp() (*App, error) {
 		containerApp.NewGetTemplateUseCase,
 		containerDeployment.NewGetContainersForDeploymentUseCase,
 		containerBuild.NewGetContainersForBuildUseCase,
+		containerBuild.NewUpdateContainerAfterBuildUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,

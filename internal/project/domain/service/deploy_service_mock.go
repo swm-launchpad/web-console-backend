@@ -38,3 +38,9 @@ func (m *MockDeployService) RefreshActiveDeployment(ctx context.Context, project
 	}
 	return args.Get(0).(*deployment.Deployment), args.Error(1)
 }
+
+// BuildAndDeployProject mocks the BuildAndDeployProject method
+func (m *MockDeployService) BuildAndDeployProject(ctx context.Context, projectID uint) error {
+	args := m.Called(ctx, projectID)
+	return args.Error(0)
+}
