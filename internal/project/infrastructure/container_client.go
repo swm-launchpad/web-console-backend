@@ -67,6 +67,8 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 		imageName := container.Slug
 
 		// Image tag: use first 7 characters of last_built_git_commit_hash
+		// For first-time builds, last_built_git_commit_hash is NULL, so we use a placeholder
+		// that will be updated from BuildResult before deployment
 		var imageTag string
 		if container.LastBuiltGitCommitHash != nil && *container.LastBuiltGitCommitHash != "" {
 			commitHash := *container.LastBuiltGitCommitHash
@@ -76,12 +78,14 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 				imageTag = commitHash
 			}
 		} else {
-			// No last built commit hash - cannot deploy
-			c.logger.Error(ctx, "container client container missing last built commit hash",
+			// First-time build: use placeholder tag
+			// This will be updated from BuildResult.LatestCommitHash before deployment
+			imageTag = "pending"
+			c.logger.Info(ctx, "container client using placeholder image tag for first build",
 				zap.Uint("project_id", projectID),
 				zap.String("container_name", container.Name),
+				zap.String("placeholder_tag", imageTag),
 			)
-			return nil, fmt.Errorf("container %s has no last_built_git_commit_hash", container.Name)
 		}
 
 		// Health check: always "none"
