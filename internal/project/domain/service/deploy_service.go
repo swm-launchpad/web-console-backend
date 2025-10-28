@@ -1146,13 +1146,16 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 	)
 
 	// Step 4: Update container information after successful builds
+	// If any update fails, we must abort to avoid deploying with stale metadata
 	for i, result := range buildResults {
 		if result == nil {
-			s.logger.Warn(ctx, "build result is nil, skipping container update",
+			s.logger.Error(ctx, "build result is nil, aborting post-build updates",
 				zap.Uint("project_id", projectID),
 				zap.Int("index", i),
 			)
-			continue
+			msg := fmt.Sprintf("Build result is nil for container at index %d", i)
+			s.handleBuildError(ctx, projectID, &msg)
+			return
 		}
 
 		err := s.buildPostProcessor.UpdateContainerAfterBuild(
@@ -1162,12 +1165,14 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 			containerPointers[i],
 		)
 		if err != nil {
-			s.logger.Error(ctx, "failed to update container after build",
+			s.logger.Error(ctx, "failed to update container after build, aborting",
 				zap.Uint("project_id", projectID),
-				zap.Uint("container_id", containerConfig.Containers[i].ContainerID),
+				zap.Uint("container_id", containerPointers[i].ContainerID),
 				zap.Error(err),
 			)
-			// Continue with other containers even if one update fails
+			msg := fmt.Sprintf("Failed to update container %d after build: %v", containerPointers[i].ContainerID, err)
+			s.handleBuildError(ctx, projectID, &msg)
+			return
 		}
 	}
 
@@ -1202,6 +1207,10 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 			zap.Uint("project_id", projectID),
 			zap.Error(err),
 		)
+		// Critical: If we can't reset the status, the project will be stuck in 'building' state
+		// Call handleBuildError to attempt recovery with a fresh context and timeout
+		msg := fmt.Sprintf("Failed to reset project status after successful build: %v", err)
+		s.handleBuildError(ctx, projectID, &msg)
 		return
 	}
 

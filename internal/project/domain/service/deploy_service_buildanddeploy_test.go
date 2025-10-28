@@ -1,0 +1,285 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/common/db"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
+	projectmodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
+)
+
+// TestBuildAndDeployProject_ContainerConfigNotFound tests validation failure when no containers are found
+func TestBuildAndDeployProject_ContainerConfigNotFound(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:       mockTxManager,
+		containerClient: mockContainerClient,
+		logger:          testLogger,
+	}
+
+	// Mock: GetContainerBuildConfig returns error
+	mockContainerClient.On("GetContainerBuildConfig", ctx, projectID).
+		Return(nil, projecterrors.ErrContainerConfigNotFound)
+
+	// Act
+	err := service.BuildAndDeployProject(ctx, projectID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, projecterrors.ErrContainerConfigNotFound)
+	mockContainerClient.AssertExpectations(t)
+}
+
+// TestBuildAndDeployProject_EmptyContainers tests validation failure when container list is empty
+func TestBuildAndDeployProject_EmptyContainers(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:       mockTxManager,
+		containerClient: mockContainerClient,
+		logger:          testLogger,
+	}
+
+	// Mock: GetContainerBuildConfig returns empty container list
+	emptyConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", ctx, projectID).
+		Return(emptyConfig, nil)
+
+	// Act
+	err := service.BuildAndDeployProject(ctx, projectID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, projecterrors.ErrContainerConfigNotFound)
+	mockContainerClient.AssertExpectations(t)
+}
+
+// TestBuildAndDeployProject_ProjectAlreadyDeploying tests status validation
+func TestBuildAndDeployProject_ProjectAlreadyDeploying(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:       mockTxManager,
+		projectRepo:     mockProjectRepo,
+		containerClient: mockContainerClient,
+		logger:          testLogger,
+	}
+
+	// Mock: GetContainerBuildConfig returns valid containers
+	containerConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{
+				ProjectID:   projectID,
+				ContainerID: 1,
+				Name:        "test-container",
+				Slug:        "test-slug",
+			},
+		},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", ctx, projectID).
+		Return(containerConfig, nil)
+
+	// Mock: Project is already in 'deploying' state
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusDeploying)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(proj, nil).Once()
+
+	// Act
+	err := service.BuildAndDeployProject(ctx, projectID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, projecterrors.ErrProjectAlreadyDeploying)
+	mockContainerClient.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+// TestBuildAndDeployProject_Success tests the happy path (validation only, background goroutine not tested)
+func TestBuildAndDeployProject_Success(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	mockBuildOrchestrator := &MockBuildOrchestrator{}
+	mockBuildPostProcessor := &MockBuildPostProcessor{}
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:          mockTxManager,
+		projectRepo:        mockProjectRepo,
+		containerClient:    mockContainerClient,
+		buildOrchestrator:  mockBuildOrchestrator,
+		buildPostProcessor: mockBuildPostProcessor,
+		logger:             testLogger,
+	}
+
+	// Mock: GetContainerBuildConfig returns valid containers
+	containerConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{
+				ProjectID:   projectID,
+				ContainerID: 1,
+				Name:        "test-container",
+				Slug:        "test-slug",
+			},
+		},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", ctx, projectID).
+		Return(containerConfig, nil)
+
+	// Mock: Project is in 'nothing' state and can transition to 'building'
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(proj, nil)
+	mockProjectRepo.On("Save", mock.Anything, mock.MatchedBy(func(p *projectmodel.Project) bool {
+		// Verify project status changed to 'building' or back to 'nothing'
+		return p.OperationStatus() == value.ProjectOperationStatusBuilding ||
+			p.OperationStatus() == value.ProjectOperationStatusNothing
+	})).Return(nil)
+
+	// Act
+	err := service.BuildAndDeployProject(ctx, projectID)
+
+	// Assert
+	assert.NoError(t, err)
+	mockContainerClient.AssertExpectations(t)
+	// Note: We don't assert on projectRepo calls because the background goroutine
+	// will make additional calls that we're not testing here
+
+	// Note: Background goroutine execution is not tested here
+	// Integration tests should cover the full build+deploy flow
+	// Sleep briefly to allow goroutine to start (not a guarantee, just best effort for this unit test)
+	time.Sleep(10 * time.Millisecond)
+}
+
+// TestBuildAndDeployProject_SaveFailure tests save failure during status update
+func TestBuildAndDeployProject_SaveFailure(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(1)
+
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:       mockTxManager,
+		projectRepo:     mockProjectRepo,
+		containerClient: mockContainerClient,
+		logger:          testLogger,
+	}
+
+	// Mock: GetContainerBuildConfig returns valid containers
+	containerConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{
+				ProjectID:   projectID,
+				ContainerID: 1,
+				Name:        "test-container",
+				Slug:        "test-slug",
+			},
+		},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", ctx, projectID).
+		Return(containerConfig, nil)
+
+	// Mock: Save fails
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(proj, nil).Once()
+
+	saveError := errors.New("save failed")
+	mockProjectRepo.On("Save", mock.Anything, mock.Anything).
+		Return(saveError).Once()
+
+	// Act
+	err := service.BuildAndDeployProject(ctx, projectID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Equal(t, saveError, err)
+	mockContainerClient.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
+
+// TestBuildAndDeployProject_ProjectNotFound tests project not found during transaction
+func TestBuildAndDeployProject_ProjectNotFound(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	projectID := uint(999)
+
+	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
+	mockContainerClient := new(infrastructure.MockContainerClient)
+	testLogger := logger.NewForTest()
+
+	service := &deployService{
+		txManager:       mockTxManager,
+		projectRepo:     mockProjectRepo,
+		containerClient: mockContainerClient,
+		logger:          testLogger,
+	}
+
+	// Mock: GetContainerBuildConfig returns valid containers
+	containerConfig := &dto.ContainerBuildConfig{
+		Containers: []dto.BuildContainerInfo{
+			{
+				ProjectID:   projectID,
+				ContainerID: 1,
+				Name:        "test-container",
+				Slug:        "test-slug",
+			},
+		},
+	}
+	mockContainerClient.On("GetContainerBuildConfig", ctx, projectID).
+		Return(containerConfig, nil)
+
+	// Mock: Project not found in transaction
+	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
+		Return(nil, projecterrors.ErrProjectNotFound).Once()
+
+	// Act
+	err := service.BuildAndDeployProject(ctx, projectID)
+
+	// Assert
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, projecterrors.ErrProjectNotFound)
+	mockContainerClient.AssertExpectations(t)
+	mockProjectRepo.AssertExpectations(t)
+}
