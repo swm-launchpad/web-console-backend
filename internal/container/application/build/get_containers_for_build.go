@@ -116,14 +116,16 @@ func deepCopyTemplateConfig(src map[string]interface{}) map[string]interface{} {
 	// This handles arbitrary nesting of maps, slices, and primitives
 	data, err := json.Marshal(src)
 	if err != nil {
-		// If marshaling fails, return empty map to be safe
-		return make(map[string]interface{})
+		// If marshaling fails, return nil to preserve nil/empty distinction
+		// This prevents Tekton from receiving {} when no config was supplied
+		return nil
 	}
 
 	var dst map[string]interface{}
 	if err := json.Unmarshal(data, &dst); err != nil {
-		// If unmarshaling fails, return empty map to be safe
-		return make(map[string]interface{})
+		// If unmarshaling fails, return nil to preserve nil/empty distinction
+		// This prevents Tekton from receiving {} when no config was supplied
+		return nil
 	}
 
 	return dst

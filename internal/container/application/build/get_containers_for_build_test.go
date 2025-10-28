@@ -414,3 +414,74 @@ func createMockTemplate(templateID uint, templateBody *string) *templatemodel.Te
 		time.Now(),
 	)
 }
+
+func TestDeepCopyTemplateConfig_NilInput(t *testing.T) {
+	// nil input should return nil to preserve nil/empty distinction for Tekton
+	result := deepCopyTemplateConfig(nil)
+	assert.Nil(t, result)
+}
+
+func TestDeepCopyTemplateConfig_EmptyMap(t *testing.T) {
+	// Empty map should return empty map (not nil)
+	src := make(map[string]interface{})
+	result := deepCopyTemplateConfig(src)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, 0, len(result))
+}
+
+func TestDeepCopyTemplateConfig_SimpleMap(t *testing.T) {
+	// Simple map should be deep copied
+	src := map[string]interface{}{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": true,
+	}
+
+	result := deepCopyTemplateConfig(src)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "value1", result["key1"])
+	assert.Equal(t, "value2", result["key2"])
+	assert.Equal(t, true, result["key3"])
+
+	// Verify it's a deep copy by modifying the result
+	result["key1"] = "modified"
+	assert.Equal(t, "value1", src["key1"], "Original should not be affected")
+}
+
+func TestDeepCopyTemplateConfig_NestedMap(t *testing.T) {
+	// Nested structures should be deep copied
+	src := map[string]interface{}{
+		"database": map[string]interface{}{
+			"host": "localhost",
+			"port": "5432",
+		},
+		"features": []interface{}{"auth", "logging"},
+	}
+
+	result := deepCopyTemplateConfig(src)
+
+	assert.NotNil(t, result)
+
+	// Verify values are copied correctly
+	dbMap := result["database"].(map[string]interface{})
+	assert.Equal(t, "localhost", dbMap["host"])
+	assert.Equal(t, "5432", dbMap["port"])
+
+	features := result["features"].([]interface{})
+	assert.Equal(t, "auth", features[0])
+	assert.Equal(t, "logging", features[1])
+
+	// Verify nested map is deep copied
+	dbMap["host"] = "modified"
+
+	originalNested := src["database"].(map[string]interface{})
+	assert.Equal(t, "localhost", originalNested["host"], "Original nested map should not be affected")
+
+	// Verify nested slice is deep copied
+	features[0] = "modified"
+
+	originalSlice := src["features"].([]interface{})
+	assert.Equal(t, "auth", originalSlice[0], "Original nested slice should not be affected")
+}
