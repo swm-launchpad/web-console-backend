@@ -24,6 +24,8 @@ type buildServiceImpl struct {
 	logger                       logger.Logger
 	pollingInterval              time.Duration // Polling interval for monitoring build status
 	findPipelineRunRetryInterval time.Duration // Retry interval for finding PipelineRun by EventID
+	findPipelineRunTotalTimeout  time.Duration // Total timeout for finding PipelineRun
+	findPipelineRunMaxRetries    int           // Maximum retry attempts for finding PipelineRun
 }
 
 // NewBuildService creates a new BuildService instance
@@ -40,6 +42,8 @@ func NewBuildService(
 		logger:                       logger,
 		pollingInterval:              30 * time.Second, // Default: poll every 30 seconds
 		findPipelineRunRetryInterval: 10 * time.Second, // Default: retry every 10 seconds
+		findPipelineRunTotalTimeout:  5 * time.Minute,  // Default: 5 minutes total timeout
+		findPipelineRunMaxRetries:    300,              // Default: maximum 300 retry attempts
 	}
 }
 
@@ -228,18 +232,33 @@ func (s *buildServiceImpl) BuildContainer(
 			return nil, err
 		}
 
-		// Update build history to backend_tracking_failed for non-context errors
-		summary := fmt.Sprintf("Failed to find PipelineRun within 5 minutes: %v", err)
-		if updateErr := buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary); updateErr != nil {
-			s.logger.Error(ctx, "failed to update build history status",
+		// Note: findPipelineRunWithRetry may have already updated BUILD_HISTORY to backend_tracking_failed
+		// If so, the entity is already mutated but might not be persisted (if Save failed)
+		summary := fmt.Sprintf("Failed to find PipelineRun within %v: %v", s.findPipelineRunTotalTimeout, err)
+
+		// Update buildHistory if not yet in terminal state
+		if !buildHistory.IsCompleted() {
+			if updateErr := buildHistory.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &summary); updateErr != nil {
+				s.logger.Error(ctx, "failed to update build history status",
+					zap.Uint("build_history_id", buildHistoryID),
+					zap.Error(updateErr),
+				)
+				return nil, fmt.Errorf("failed to update build history status: %w", updateErr)
+			}
+		} else {
+			s.logger.Info(ctx, "build history already in terminal state from findPipelineRunWithRetry",
 				zap.Uint("build_history_id", buildHistoryID),
-				zap.Error(updateErr),
+				zap.String("current_status", string(buildHistory.Status())),
 			)
-			return nil, fmt.Errorf("failed to update build history status: %w", updateErr)
 		}
 
+		// ALWAYS save to DB, even if already completed
+		// This handles the case where findPipelineRunWithRetry mutated the entity but failed to persist:
+		// - If findPipelineRunWithRetry succeeded in saving: this is an idempotent update (safe)
+		// - If findPipelineRunWithRetry failed to save: this retry ensures DB consistency
+		// Without this, the entity would be marked completed in-memory but DB would remain 'untracked'
 		if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
-			s.logger.Error(ctx, "failed to persist build history",
+			s.logger.Error(ctx, "failed to persist build history to DB",
 				zap.Uint("build_history_id", buildHistoryID),
 				zap.Error(saveErr),
 			)
@@ -347,16 +366,14 @@ func (s *buildServiceImpl) prepareBuildRequest(container *dto.BuildContainerInfo
 }
 
 // findPipelineRunWithRetry attempts to find PipelineRun by EventID with retries
-// Retries periodically for up to 5 minutes or 300 attempts, whichever comes first
+// Retries periodically for up to totalTimeout or maxRetries attempts, whichever comes first
 func (s *buildServiceImpl) findPipelineRunWithRetry(
 	ctx context.Context,
 	buildHistory *build_history.BuildHistory,
 	eventID string,
 ) (string, error) {
-	const (
-		totalTimeout    = 5 * time.Minute // 5 minutes total
-		maxRetriesLimit = 300             // Maximum retry attempts
-	)
+	totalTimeout := s.findPipelineRunTotalTimeout
+	maxRetriesLimit := s.findPipelineRunMaxRetries
 
 	calculatedRetries := int(totalTimeout / s.findPipelineRunRetryInterval)
 	maxRetries := calculatedRetries
@@ -374,7 +391,27 @@ func (s *buildServiceImpl) findPipelineRunWithRetry(
 		case <-ctx.Done():
 			return "", ctx.Err()
 		case <-timeout:
-			return "", fmt.Errorf("timeout waiting for PipelineRun (5 minutes)")
+			// Permanent failure: timeout expired without finding PipelineRun
+			msg := fmt.Sprintf("Timeout waiting for PipelineRun (%v) for EventID %s", totalTimeout, eventID)
+			s.logger.Error(ctx, "timeout waiting for PipelineRun",
+				zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+				zap.String("event_id", eventID),
+				zap.Duration("timeout", totalTimeout),
+			)
+			if updateErr := buildHistory.UpdateBackendStatus(
+				build_history.BuildHistoryStatusBackendTrackingFailed, &msg); updateErr != nil {
+				s.logger.Warn(ctx, "failed to update build history to tracking_failed",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.String("event_id", eventID),
+					zap.Error(updateErr),
+				)
+			} else if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+				s.logger.Warn(ctx, "failed to persist tracking_failed state",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.Error(saveErr),
+				)
+			}
+			return "", fmt.Errorf("timeout waiting for PipelineRun (%v)", totalTimeout)
 		case <-ticker.C:
 			pipelineRunName, err := s.kubeBuildClient.FindPipelineRunNameByEventID(ctx, eventID)
 			if err == nil {
@@ -412,6 +449,26 @@ func (s *buildServiceImpl) findPipelineRunWithRetry(
 		}
 	}
 
+	// Permanent failure: exhausted all retry attempts without finding PipelineRun
+	msg := fmt.Sprintf("PipelineRun not found after %d attempts for EventID %s", maxRetries, eventID)
+	s.logger.Error(ctx, "exhausted retries waiting for PipelineRun",
+		zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+		zap.String("event_id", eventID),
+		zap.Int("max_attempts", maxRetries),
+	)
+	if updateErr := buildHistory.UpdateBackendStatus(
+		build_history.BuildHistoryStatusBackendTrackingFailed, &msg); updateErr != nil {
+		s.logger.Warn(ctx, "failed to update build history to tracking_failed",
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+			zap.String("event_id", eventID),
+			zap.Error(updateErr),
+		)
+	} else if saveErr := s.buildHistoryRepo.Save(ctx, buildHistory); saveErr != nil {
+		s.logger.Warn(ctx, "failed to persist tracking_failed state",
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+			zap.Error(saveErr),
+		)
+	}
 	return "", fmt.Errorf("PipelineRun not found after %d attempts", maxRetries)
 }
 
