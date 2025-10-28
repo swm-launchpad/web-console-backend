@@ -117,7 +117,7 @@ func (h *DeploymentHandler) DeployProject(c *gin.Context) {
 		zap.Uint("user_id", userID.(uint)),
 		zap.Uint("project_id", project.ProjectID()),
 		zap.String("slug", slug),
-		zap.Uint64("deployment_id", output.DeploymentID),
+		zap.String("message", output.Message),
 	)
 
 	response.Accepted(c, output)
