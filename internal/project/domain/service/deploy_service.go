@@ -1046,14 +1046,17 @@ func (s *deployService) deployProjectInternal(
 			return err
 		}
 
-		// Check if project is in 'building' status
-		// It should be 'building' since we're called from buildAndDeployInBackground
-		if proj.OperationStatus() != value.ProjectOperationStatusBuilding {
-			s.logger.Error(ctx, "project not in building status",
+		// Verify project is in an appropriate state for deployment
+		// Expected: 'building' (from BuildAndDeployProject flow)
+		// Also acceptable: 'nothing' (for future standalone deploy scenarios)
+		// StartDeploy() will validate and reject invalid transitions
+		if proj.OperationStatus() != value.ProjectOperationStatusBuilding &&
+			proj.OperationStatus() != value.ProjectOperationStatusNothing {
+			s.logger.Error(ctx, "project in unexpected status for deployment",
 				zap.Uint("project_id", projectID),
 				zap.String("operation_status", string(proj.OperationStatus())),
 			)
-			return fmt.Errorf("project not in building status: %s", proj.OperationStatus())
+			return fmt.Errorf("project in unexpected status: %s", proj.OperationStatus())
 		}
 
 		// Create deployment record with status 'untracked' FIRST

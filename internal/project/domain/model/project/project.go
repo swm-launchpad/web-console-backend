@@ -514,13 +514,16 @@ func (p *Project) CompleteBuild() error {
 }
 
 // StartDeploy transitions the project to deploying status and records which deployment owns the lock
-// Returns error if project is already in an active operation
+// Accepts transitions from 'nothing' (standalone deploy) or 'building' (build+deploy flow)
+// Returns error if project is already deploying or deleted
 func (p *Project) StartDeploy(deploymentID uint) error {
 	if p.isDeleted {
 		return projecterrors.ErrCannotModifyDeletedProject
 	}
 
-	if p.operationStatus != value.ProjectOperationStatusNothing {
+	// Allow transition from 'nothing' (standalone deploy) or 'building' (build+deploy flow)
+	if p.operationStatus != value.ProjectOperationStatusNothing &&
+		p.operationStatus != value.ProjectOperationStatusBuilding {
 		return projecterrors.ErrInvalidStatusTransition
 	}
 
