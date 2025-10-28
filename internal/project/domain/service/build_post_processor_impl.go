@@ -53,9 +53,14 @@ func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
 		return fmt.Errorf("failed to update container after build: %w", err)
 	}
 
-	p.logger.Info(ctx, "Successfully updated container",
-		zap.Uint("container_id", containerID),
-	)
+	// Only log success for statuses that actually trigger container updates
+	// Non-success statuses (failed, backend_tracking_lost) skip updates
+	if buildResult.Status == "success" || buildResult.Status == "skipped" {
+		p.logger.Info(ctx, "Successfully updated container",
+			zap.Uint("container_id", containerID),
+			zap.String("build_status", buildResult.Status),
+		)
+	}
 
 	return nil
 }

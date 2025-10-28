@@ -492,3 +492,134 @@ func TestUpdateContainerAfterBuildUseCase_TemplateConfigComparison(t *testing.T)
 		assert.True(t, hasChanged)
 	})
 }
+
+func TestUpdateContainerAfterBuildUseCase_InstallationIDComparison(t *testing.T) {
+	testLogger := logger.NewForTest()
+	useCase := NewUpdateContainerAfterBuildUseCase(nil, nil, testLogger)
+
+	slug, _ := containervalue.NewContainerSlug("test-container")
+	gitConfig, _ := containervalue.NewGitConfig("https://github.com/test/repo", "main", nil)
+	cpu := uint32(1000)
+	mem := uint32(512)
+	resourceLimits, _ := containervalue.NewResourceLimits(&cpu, &mem)
+
+	t.Run("Both nil - no change", func(t *testing.T) {
+		container, _ := containermodel.NewContainer(
+			1,
+			"test",
+			slug,
+			gitConfig,
+			resourceLimits,
+			nil,
+			nil,
+			nil,
+		)
+
+		snapshot := &BuildParametersSnapshot{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			InstallationID:   nil,
+			BuildVars:        map[string]string{},
+		}
+
+		hasChanged := useCase.hasBuildParametersChanged(snapshot, container)
+		assert.False(t, hasChanged)
+	})
+
+	t.Run("Same installation ID - no change", func(t *testing.T) {
+		installationID := int64(12345)
+		container, _ := containermodel.NewContainer(
+			1,
+			"test",
+			slug,
+			gitConfig,
+			resourceLimits,
+			nil,
+			nil,
+			&installationID,
+		)
+
+		snapshot := &BuildParametersSnapshot{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			InstallationID:   &installationID,
+			BuildVars:        map[string]string{},
+		}
+
+		hasChanged := useCase.hasBuildParametersChanged(snapshot, container)
+		assert.False(t, hasChanged)
+	})
+
+	t.Run("Different installation ID - change detected", func(t *testing.T) {
+		currentID := int64(12345)
+		container, _ := containermodel.NewContainer(
+			1,
+			"test",
+			slug,
+			gitConfig,
+			resourceLimits,
+			nil,
+			nil,
+			&currentID,
+		)
+
+		snapshotID := int64(67890)
+		snapshot := &BuildParametersSnapshot{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			InstallationID:   &snapshotID,
+			BuildVars:        map[string]string{},
+		}
+
+		hasChanged := useCase.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+
+	t.Run("nil to non-nil - change detected", func(t *testing.T) {
+		container, _ := containermodel.NewContainer(
+			1,
+			"test",
+			slug,
+			gitConfig,
+			resourceLimits,
+			nil,
+			nil,
+			nil,
+		)
+
+		snapshotID := int64(12345)
+		snapshot := &BuildParametersSnapshot{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			InstallationID:   &snapshotID,
+			BuildVars:        map[string]string{},
+		}
+
+		hasChanged := useCase.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+
+	t.Run("non-nil to nil - change detected", func(t *testing.T) {
+		currentID := int64(12345)
+		container, _ := containermodel.NewContainer(
+			1,
+			"test",
+			slug,
+			gitConfig,
+			resourceLimits,
+			nil,
+			nil,
+			&currentID,
+		)
+
+		snapshot := &BuildParametersSnapshot{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			InstallationID:   nil,
+			BuildVars:        map[string]string{},
+		}
+
+		hasChanged := useCase.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged)
+	})
+}
