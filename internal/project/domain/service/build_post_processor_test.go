@@ -611,3 +611,198 @@ func TestBuildPostProcessor_InstallationIDChanged(t *testing.T) {
 		assert.True(t, hasChanged)
 	})
 }
+
+func TestBuildPostProcessor_TemplateConfigChanged(t *testing.T) {
+	// Test TemplateConfig change detection logic
+	testLogger := logger.NewForTest()
+	mockRepo := &mockPostProcessorContainerRepo{}
+	mockTxMgr := &mockPostProcessorTxManager{}
+
+	processor := NewBuildPostProcessor(mockRepo, mockTxMgr, testLogger).(*buildPostProcessorImpl)
+
+	// Helper to create basic container
+	createContainer := func(templateConfig map[string]interface{}) *containermodel.Container {
+		slug, _ := containervalue.NewContainerSlug("test")
+		gitConfig, _ := containervalue.NewGitConfig(
+			"https://github.com/test/repo",
+			"main",
+			nil,
+		)
+		cpu := uint32(1000)
+		mem := uint32(512)
+		resourceLimits, _ := containervalue.NewResourceLimits(&cpu, &mem)
+
+		container, _ := containermodel.NewContainer(
+			1,
+			"test",
+			slug,
+			gitConfig,
+			resourceLimits,
+			nil,
+			templateConfig, // Pass templateConfig in constructor
+			nil,
+		)
+
+		return container
+	}
+
+	t.Run("TemplateConfig identical - no change", func(t *testing.T) {
+		templateConfig := map[string]interface{}{
+			"port":    float64(8080),
+			"command": "npm start",
+		}
+
+		container := createContainer(templateConfig)
+
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   templateConfig,
+			BuildVars:        map[string]string{},
+			InstallationID:   nil,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.False(t, hasChanged, "Identical TemplateConfig should not be detected as changed")
+	})
+
+	t.Run("TemplateConfig value changed - detect change", func(t *testing.T) {
+		snapshotConfig := map[string]interface{}{
+			"port":    float64(8080),
+			"command": "npm start",
+		}
+
+		currentConfig := map[string]interface{}{
+			"port":    float64(3000), // Changed port
+			"command": "npm start",
+		}
+
+		container := createContainer(currentConfig)
+
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   snapshotConfig,
+			BuildVars:        map[string]string{},
+			InstallationID:   nil,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged, "Changed TemplateConfig value should be detected")
+	})
+
+	t.Run("TemplateConfig key added - detect change", func(t *testing.T) {
+		snapshotConfig := map[string]interface{}{
+			"port": float64(8080),
+		}
+
+		currentConfig := map[string]interface{}{
+			"port":    float64(8080),
+			"command": "npm start", // Added key
+		}
+
+		container := createContainer(currentConfig)
+
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   snapshotConfig,
+			BuildVars:        map[string]string{},
+			InstallationID:   nil,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged, "Added TemplateConfig key should be detected")
+	})
+
+	t.Run("TemplateConfig key removed - detect change", func(t *testing.T) {
+		snapshotConfig := map[string]interface{}{
+			"port":    float64(8080),
+			"command": "npm start",
+		}
+
+		currentConfig := map[string]interface{}{
+			"port": float64(8080), // Removed "command" key
+		}
+
+		container := createContainer(currentConfig)
+
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   snapshotConfig,
+			BuildVars:        map[string]string{},
+			InstallationID:   nil,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged, "Removed TemplateConfig key should be detected")
+	})
+
+	t.Run("TemplateConfig nil to non-nil - detect change", func(t *testing.T) {
+		currentConfig := map[string]interface{}{
+			"port": float64(8080),
+		}
+
+		container := createContainer(currentConfig)
+
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil, // Snapshot has nil config
+			BuildVars:        map[string]string{},
+			InstallationID:   nil,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged, "TemplateConfig change from nil to non-nil should be detected")
+	})
+
+	t.Run("TemplateConfig non-nil to nil - detect change", func(t *testing.T) {
+		snapshotConfig := map[string]interface{}{
+			"port": float64(8080),
+		}
+
+		container := createContainer(nil) // Current has nil config
+
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   snapshotConfig,
+			BuildVars:        map[string]string{},
+			InstallationID:   nil,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.True(t, hasChanged, "TemplateConfig change from non-nil to nil should be detected")
+	})
+
+	t.Run("TemplateConfig both nil - no change", func(t *testing.T) {
+		container := createContainer(nil)
+
+		snapshot := &dto.BuildContainerInfo{
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			GitDirectoryPath: nil,
+			TemplateID:       nil,
+			TemplateConfig:   nil,
+			BuildVars:        map[string]string{},
+			InstallationID:   nil,
+		}
+
+		hasChanged := processor.hasBuildParametersChanged(snapshot, container)
+		assert.False(t, hasChanged, "Both nil TemplateConfig should not be detected as changed")
+	})
+}
