@@ -25,14 +25,20 @@ func TestBuildAndDeployProject_ContainerConfigNotFound(t *testing.T) {
 	projectID := uint(1)
 
 	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
 	mockContainerClient := new(infrastructure.MockContainerClient)
 	testLogger := logger.NewForTest()
 
 	service := &deployService{
 		txManager:       mockTxManager,
+		projectRepo:     mockProjectRepo,
 		containerClient: mockContainerClient,
 		logger:          testLogger,
 	}
+
+	// Mock: Project exists (authorization check passes)
+	project := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
 
 	// Mock: GetContainerBuildConfig returns error
 	mockContainerClient.On("GetContainerBuildConfig", ctx, projectID).
@@ -44,6 +50,7 @@ func TestBuildAndDeployProject_ContainerConfigNotFound(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, projecterrors.ErrContainerConfigNotFound)
+	mockProjectRepo.AssertExpectations(t)
 	mockContainerClient.AssertExpectations(t)
 }
 
@@ -54,14 +61,20 @@ func TestBuildAndDeployProject_EmptyContainers(t *testing.T) {
 	projectID := uint(1)
 
 	mockTxManager := db.NewStubTxManager()
+	mockProjectRepo := new(repository.MockProjectRepository)
 	mockContainerClient := new(infrastructure.MockContainerClient)
 	testLogger := logger.NewForTest()
 
 	service := &deployService{
 		txManager:       mockTxManager,
+		projectRepo:     mockProjectRepo,
 		containerClient: mockContainerClient,
 		logger:          testLogger,
 	}
+
+	// Mock: Project exists (authorization check passes)
+	project := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
 
 	// Mock: GetContainerBuildConfig returns empty container list
 	emptyConfig := &dto.ContainerBuildConfig{
@@ -76,6 +89,7 @@ func TestBuildAndDeployProject_EmptyContainers(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, projecterrors.ErrContainerConfigNotFound)
+	mockProjectRepo.AssertExpectations(t)
 	mockContainerClient.AssertExpectations(t)
 }
 
@@ -97,6 +111,10 @@ func TestBuildAndDeployProject_ProjectAlreadyDeploying(t *testing.T) {
 		logger:          testLogger,
 	}
 
+	// Mock: Project exists (authorization check passes)
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusDeploying)
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(proj, nil)
+
 	// Mock: GetContainerBuildConfig returns valid containers
 	containerConfig := &dto.ContainerBuildConfig{
 		Containers: []dto.BuildContainerInfo{
@@ -112,7 +130,6 @@ func TestBuildAndDeployProject_ProjectAlreadyDeploying(t *testing.T) {
 		Return(containerConfig, nil)
 
 	// Mock: Project is already in 'deploying' state
-	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusDeploying)
 	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
 		Return(proj, nil).Once()
 
@@ -148,6 +165,10 @@ func TestBuildAndDeployProject_Success(t *testing.T) {
 		logger:             testLogger,
 	}
 
+	// Mock: Project exists (authorization check passes)
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(proj, nil)
+
 	// Mock: GetContainerBuildConfig returns valid containers
 	containerConfig := &dto.ContainerBuildConfig{
 		Containers: []dto.BuildContainerInfo{
@@ -163,7 +184,6 @@ func TestBuildAndDeployProject_Success(t *testing.T) {
 		Return(containerConfig, nil)
 
 	// Mock: Project is in 'nothing' state and can transition to 'building'
-	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
 	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
 		Return(proj, nil)
 	mockProjectRepo.On("Save", mock.Anything, mock.MatchedBy(func(p *projectmodel.Project) bool {
@@ -205,6 +225,10 @@ func TestBuildAndDeployProject_SaveFailure(t *testing.T) {
 		logger:          testLogger,
 	}
 
+	// Mock: Project exists (authorization check passes)
+	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
+	mockProjectRepo.On("FindByID", ctx, projectID).Return(proj, nil)
+
 	// Mock: GetContainerBuildConfig returns valid containers
 	containerConfig := &dto.ContainerBuildConfig{
 		Containers: []dto.BuildContainerInfo{
@@ -220,7 +244,6 @@ func TestBuildAndDeployProject_SaveFailure(t *testing.T) {
 		Return(containerConfig, nil)
 
 	// Mock: Save fails
-	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
 	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
 		Return(proj, nil).Once()
 
@@ -256,23 +279,9 @@ func TestBuildAndDeployProject_ProjectNotFound(t *testing.T) {
 		logger:          testLogger,
 	}
 
-	// Mock: GetContainerBuildConfig returns valid containers
-	containerConfig := &dto.ContainerBuildConfig{
-		Containers: []dto.BuildContainerInfo{
-			{
-				ProjectID:   projectID,
-				ContainerID: 1,
-				Name:        "test-container",
-				Slug:        "test-slug",
-			},
-		},
-	}
-	mockContainerClient.On("GetContainerBuildConfig", ctx, projectID).
-		Return(containerConfig, nil)
-
-	// Mock: Project not found in transaction
-	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).
-		Return(nil, projecterrors.ErrProjectNotFound).Once()
+	// Mock: Project not found (authorization check fails)
+	mockProjectRepo.On("FindByID", ctx, projectID).
+		Return(nil, projecterrors.ErrProjectNotFound)
 
 	// Act
 	err := service.BuildAndDeployProject(ctx, projectID)
@@ -280,8 +289,8 @@ func TestBuildAndDeployProject_ProjectNotFound(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, projecterrors.ErrProjectNotFound)
-	mockContainerClient.AssertExpectations(t)
 	mockProjectRepo.AssertExpectations(t)
+	// Note: containerClient should NOT be called when project doesn't exist (authorization fails first)
 }
 
 // ==================== Background Flow Tests ====================

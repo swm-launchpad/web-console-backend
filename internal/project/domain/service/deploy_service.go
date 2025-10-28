@@ -1002,8 +1002,19 @@ func (s *deployService) BuildAndDeployProject(ctx context.Context, projectID uin
 		zap.Uint("project_id", projectID),
 	)
 
-	// Phase 1: Validation
-	// Step 1: Validate project exists and check container configuration
+	// Phase 1: Validate project exists first (authorization/ownership check must come before resource checks)
+	// This ensures we return ErrProjectNotFound for non-existent/unauthorized projects,
+	// not ErrContainerConfigNotFound which would leak information about other users' projects
+	_, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		s.logger.Error(ctx, "failed to find project",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return err // Returns ErrProjectNotFound if project doesn't exist
+	}
+
+	// Phase 2: Check container configuration (only after confirming project exists)
 	containerConfig, err := s.containerClient.GetContainerBuildConfig(ctx, projectID)
 	if err != nil {
 		s.logger.Error(ctx, "failed to get container build config",
@@ -1020,9 +1031,9 @@ func (s *deployService) BuildAndDeployProject(ctx context.Context, projectID uin
 		return projecterrors.ErrContainerConfigNotFound
 	}
 
-	// Phase 2: Atomically change project status to 'building'
+	// Phase 3: Atomically change project status to 'building'
 	err = s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
-		// Load project with FOR UPDATE lock
+		// Reload project with FOR UPDATE lock (need to lock for status update)
 		proj, err := s.projectRepo.FindByIDForUpdate(txCtx, projectID)
 		if err != nil {
 			s.logger.Error(ctx, "failed to find project for update",
