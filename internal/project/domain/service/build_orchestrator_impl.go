@@ -86,6 +86,7 @@ func (o *buildOrchestratorImpl) createBuildHistories(
 	containers []*dto.BuildContainerInfo,
 ) ([]*build_history.BuildHistory, error) {
 	buildHistories := make([]*build_history.BuildHistory, len(containers))
+	createdCount := 0
 
 	for i, container := range containers {
 		// Create new BuildHistory in untracked status
@@ -98,10 +99,16 @@ func (o *buildOrchestratorImpl) createBuildHistories(
 				zap.Uint("container_id", container.ContainerID),
 				zap.String("container_name", container.Name),
 			)
+
+			// Best-effort cleanup: delete previously created records
+			// to avoid orphaned BUILD_HISTORY entries
+			o.cleanupBuildHistories(ctx, buildHistories[:createdCount])
+
 			return nil, fmt.Errorf("failed to create build history for container %d: %w", container.ContainerID, err)
 		}
 
 		buildHistories[i] = buildHist
+		createdCount++
 
 		o.logger.Info(ctx, "Created build history record",
 			zap.Uint("build_history_id", buildHist.BuildHistoryID),
@@ -116,7 +123,7 @@ func (o *buildOrchestratorImpl) createBuildHistories(
 // executeBuildsConcurrently spawns goroutines for each build and collects results
 func (o *buildOrchestratorImpl) executeBuildsConcurrently(
 	ctx context.Context,
-	projectID uint,
+	_ uint, // projectID - unused but kept for consistency
 	containers []*dto.BuildContainerInfo,
 	buildHistories []*build_history.BuildHistory,
 ) []*BuildResult {
@@ -143,7 +150,7 @@ func (o *buildOrchestratorImpl) executeBuildsConcurrently(
 	}()
 
 	// Collect results from channel
-	return o.collectBuildResults(resultChan, len(containers))
+	return o.collectBuildResults(ctx, resultChan, len(containers))
 }
 
 // buildContainerWorker executes a single container build in a goroutine
@@ -171,6 +178,25 @@ func (o *buildOrchestratorImpl) buildContainerWorker(
 		container,
 	)
 
+	// Validate BuildService contract: NEVER return (nil, nil)
+	// This catches bugs in BuildService implementations or mocks
+	if result == nil && err == nil {
+		o.logger.Error(ctx, "CRITICAL: BuildService contract violation - returned (nil, nil)",
+			zap.Int("index", index),
+			zap.Uint("container_id", container.ContainerID),
+			zap.String("container_name", container.Name),
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+		)
+		// Treat as a backend error - create synthetic error and result
+		err = fmt.Errorf("BuildService contract violation: returned (nil, nil)")
+		result = &BuildResult{
+			BuildHistoryID: buildHistory.BuildHistoryID,
+			Status:         "failed",
+			ErrorMessage:   "Internal error: BuildService returned invalid response",
+			ShouldBuild:    true,
+		}
+	}
+
 	task := buildTask{
 		index:        index,
 		container:    container,
@@ -196,13 +222,23 @@ func (o *buildOrchestratorImpl) buildContainerWorker(
 			zap.String("container_name", container.Name),
 			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
 		)
-	} else {
+	} else if result != nil && result.Status == "success" {
+		// Success case - safe to dereference result.LatestCommitHash
 		o.logger.Info(ctx, "Build completed successfully",
 			zap.Int("index", index),
 			zap.Uint("container_id", container.ContainerID),
 			zap.String("container_name", container.Name),
 			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
 			zap.String("commit_hash", result.LatestCommitHash),
+		)
+	} else {
+		// Unexpected case: err == nil but result == nil
+		// This should not happen per BuildService contract, but handle defensively
+		o.logger.Warn(ctx, "Build returned nil result without error",
+			zap.Int("index", index),
+			zap.Uint("container_id", container.ContainerID),
+			zap.String("container_name", container.Name),
+			zap.Uint("build_history_id", buildHistory.BuildHistoryID),
 		)
 	}
 
@@ -211,6 +247,7 @@ func (o *buildOrchestratorImpl) buildContainerWorker(
 
 // collectBuildResults collects results from channel and orders them by index
 func (o *buildOrchestratorImpl) collectBuildResults(
+	ctx context.Context,
 	resultChan <-chan buildTask,
 	expectedCount int,
 ) []*BuildResult {
@@ -232,7 +269,7 @@ func (o *buildOrchestratorImpl) collectBuildResults(
 					// Context cancellation - use backend_tracking_lost status (non-terminal)
 					// This allows higher layers to distinguish cancellation from real failure
 					// BuildHistory remains in non-terminal state for future reconciliation
-					o.logger.Warn(context.Background(), "build cancelled via context",
+					o.logger.Warn(ctx, "build cancelled via context",
 						zap.Int("index", task.index),
 						zap.Uint("container_id", task.container.ContainerID),
 						zap.Uint("build_history_id", task.buildHistory.BuildHistoryID),
@@ -263,7 +300,7 @@ func (o *buildOrchestratorImpl) collectBuildResults(
 
 	// Convert map to ordered slice
 	results := make([]*BuildResult, expectedCount)
-	for i := 0; i < expectedCount; i++ {
+	for i := range expectedCount {
 		results[i] = resultMap[i]
 	}
 
@@ -278,8 +315,15 @@ func (o *buildOrchestratorImpl) logBuildSummary(
 	successCount := 0
 	failedCount := 0
 	otherCount := 0
+	nilCount := 0
 
 	for _, result := range results {
+		// Handle nil results defensively
+		if result == nil {
+			nilCount++
+			continue
+		}
+
 		switch result.Status {
 		case "success":
 			successCount++
@@ -293,11 +337,69 @@ func (o *buildOrchestratorImpl) logBuildSummary(
 
 	// Use background context for logging summary
 	ctx := context.Background()
-	o.logger.Info(ctx, "Build orchestration completed",
+
+	logFields := []zap.Field{
 		zap.Uint("project_id", projectID),
 		zap.Int("total_builds", len(results)),
 		zap.Int("success_count", successCount),
 		zap.Int("failed_count", failedCount),
 		zap.Int("other_count", otherCount),
+	}
+
+	// Only log nil_count if there are nil results (unexpected case)
+	if nilCount > 0 {
+		logFields = append(logFields, zap.Int("nil_count", nilCount))
+	}
+
+	o.logger.Info(ctx, "Build orchestration completed", logFields...)
+}
+
+// cleanupBuildHistories performs best-effort cleanup of created BUILD_HISTORY records
+// This is called when BUILD_HISTORY creation fails partway through to avoid orphaned records
+func (o *buildOrchestratorImpl) cleanupBuildHistories(
+	ctx context.Context,
+	buildHistories []*build_history.BuildHistory,
+) {
+	if len(buildHistories) == 0 {
+		return
+	}
+
+	o.logger.Warn(ctx, "Cleaning up BUILD_HISTORY records after partial failure",
+		zap.Int("count", len(buildHistories)),
 	)
+
+	// Best-effort deletion - log errors but don't fail
+	// These records are in "untracked" status and won't affect builds
+	for _, buildHist := range buildHistories {
+		if buildHist == nil {
+			continue
+		}
+
+		// Mark as backend_trigger_failed to indicate cleanup
+		// This is appropriate since orchestration was aborted before Tekton was triggered
+		summary := "Orchestration aborted during BUILD_HISTORY creation"
+		if err := buildHist.UpdateBackendStatus(
+			build_history.BuildHistoryStatusBackendTriggerFailed,
+			&summary,
+		); err != nil {
+			// Log but continue - best effort only
+			o.logger.Warn(ctx, "Failed to update BUILD_HISTORY status during cleanup",
+				zap.Error(err),
+				zap.Uint("build_history_id", buildHist.BuildHistoryID),
+			)
+			continue
+		}
+
+		if err := o.buildHistoryRepo.Save(ctx, buildHist); err != nil {
+			// Log but continue - best effort only
+			o.logger.Warn(ctx, "Failed to save BUILD_HISTORY during cleanup",
+				zap.Error(err),
+				zap.Uint("build_history_id", buildHist.BuildHistoryID),
+			)
+		} else {
+			o.logger.Info(ctx, "Marked BUILD_HISTORY as backend_trigger_failed during cleanup",
+				zap.Uint("build_history_id", buildHist.BuildHistoryID),
+			)
+		}
+	}
 }

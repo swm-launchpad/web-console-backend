@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -11,8 +11,19 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	containermodel "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 )
+
+// BuildParametersSnapshot represents a snapshot of build-affecting parameters
+// This is used to detect if any build parameters changed during the build process
+type BuildParametersSnapshot struct {
+	GitRepositoryURL string
+	GitBranch        string
+	GitDirectoryPath *string
+	TemplateID       *uint
+	TemplateConfig   map[string]interface{}
+	BuildVars        map[string]string
+	InstallationID   *int64
+}
 
 // UpdateContainerAfterBuildInput contains input parameters for container update after build
 type UpdateContainerAfterBuildInput struct {
@@ -277,71 +288,4 @@ func areTemplateConfigsEqual(a, b map[string]interface{}) bool {
 	}
 
 	return string(aJSON) == string(bJSON)
-}
-
-// UpdateAfterBuild implements the ContainerUpdater interface
-// This adapter method converts from the domain interface to the use case input
-func (uc *UpdateContainerAfterBuildUseCase) UpdateAfterBuild(
-	ctx context.Context,
-	containerID uint,
-	buildStatus string,
-	commitHash string,
-	snapshotBeforeBuild *dto.BuildContainerInfo,
-) error {
-	// Convert dto.BuildContainerInfo to BuildParametersSnapshot
-	// Deep copy TemplateConfig to prevent snapshot aliasing
-	templateConfig, err := deepCopyTemplateConfig(snapshotBeforeBuild.TemplateConfig)
-	if err != nil {
-		// Log serialization error for diagnostic purposes
-		uc.logger.Warn(ctx, "Failed to deep copy template config, using nil",
-			zap.Uint("container_id", containerID),
-			zap.Error(err),
-		)
-		templateConfig = nil
-	}
-
-	snapshot := &BuildParametersSnapshot{
-		GitRepositoryURL: snapshotBeforeBuild.GitRepositoryURL,
-		GitBranch:        snapshotBeforeBuild.GitBranch,
-		GitDirectoryPath: snapshotBeforeBuild.GitDirectoryPath,
-		TemplateID:       snapshotBeforeBuild.TemplateID,
-		TemplateConfig:   templateConfig,
-		BuildVars:        snapshotBeforeBuild.BuildVars,
-		InstallationID:   snapshotBeforeBuild.InstallationID,
-	}
-
-	// Build input and execute
-	input := UpdateContainerAfterBuildInput{
-		ContainerID:    containerID,
-		BuildStatus:    buildStatus,
-		CommitHash:     commitHash,
-		SnapshotBefore: snapshot,
-	}
-
-	return uc.Execute(ctx, input)
-}
-
-// deepCopyTemplateConfig performs a deep copy of template config using JSON serialization
-// This ensures nested maps/slices are fully cloned, preventing snapshot aliasing
-// Returns error if serialization fails to help diagnose unexpected template payloads
-func deepCopyTemplateConfig(src map[string]interface{}) (map[string]interface{}, error) {
-	if src == nil {
-		return nil, nil
-	}
-
-	// Use JSON round-trip for deep copy
-	// This handles arbitrary nesting of maps, slices, and primitives
-	data, err := json.Marshal(src)
-	if err != nil {
-		// Return error to help diagnose unexpected template payloads
-		return nil, fmt.Errorf("failed to marshal template config: %w", err)
-	}
-
-	var dst map[string]interface{}
-	if err := json.Unmarshal(data, &dst); err != nil {
-		// Return error to help diagnose unexpected template payloads
-		return nil, fmt.Errorf("failed to unmarshal template config: %w", err)
-	}
-
-	return dst, nil
 }

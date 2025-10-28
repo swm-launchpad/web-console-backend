@@ -352,6 +352,62 @@ func TestBuildOrchestrator_BuildAndWait_BuildHistoryCreationFails(t *testing.T) 
 	assert.Contains(t, err.Error(), "failed to create build histories")
 }
 
+func TestBuildOrchestrator_BuildAndWait_PartialBuildHistoryCreationFails(t *testing.T) {
+	// Test that when BUILD_HISTORY creation fails partway through,
+	// previously created records are marked as backend_trigger_failed
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+
+	createdBuildHistories := []*build_history.BuildHistory{}
+	savedBuildHistories := []*build_history.BuildHistory{}
+	createCount := 0
+
+	mockRepo := &mockOrchestratorBuildHistoryRepo{
+		createFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+			createCount++
+			// First container succeeds
+			if createCount == 1 {
+				b.SetBuildHistoryID(uint(createCount))
+				createdBuildHistories = append(createdBuildHistories, b)
+				return nil
+			}
+			// Second container fails
+			return errors.New("database error on second container")
+		},
+		saveFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+			savedBuildHistories = append(savedBuildHistories, b)
+			return nil
+		},
+	}
+
+	mockBuildService := &mockOrchestratorBuildService{}
+	orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+
+	containers := []*dto.BuildContainerInfo{
+		{ContainerID: 1, Name: "web", Slug: "web"},
+		{ContainerID: 2, Name: "api", Slug: "api"},
+	}
+
+	// Execute
+	results, err := orchestrator.BuildAndWait(ctx, 1, containers)
+
+	// Verify error returned
+	require.Error(t, err)
+	assert.Nil(t, results)
+	assert.Contains(t, err.Error(), "failed to create build history for container 2")
+
+	// Verify cleanup was called
+	require.Len(t, createdBuildHistories, 1, "First BUILD_HISTORY should have been created")
+	require.Len(t, savedBuildHistories, 1, "Cleanup should have saved first BUILD_HISTORY")
+
+	// Verify first BUILD_HISTORY was marked as backend_trigger_failed
+	cleanedHistory := savedBuildHistories[0]
+	assert.Equal(t, build_history.BuildHistoryStatusBackendTriggerFailed, cleanedHistory.Status())
+	summary, hasSummary := cleanedHistory.Summary()
+	assert.True(t, hasSummary)
+	assert.Contains(t, summary, "Orchestration aborted")
+}
+
 func TestBuildOrchestrator_BuildAndWait_MultipleContainers(t *testing.T) {
 	// Setup
 	ctx := context.Background()
@@ -598,6 +654,44 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 		// Same as Canceled - must preserve non-terminal state
 		assert.Equal(t, "backend_tracking_lost", results[0].Status, "deadline exceeded should use backend_tracking_lost status")
 		assert.Contains(t, results[0].ErrorMessage, "Context cancelled")
+		assert.True(t, results[0].ShouldBuild)
+	})
+
+	t.Run("ContractViolation_NilResultWithoutError", func(t *testing.T) {
+		// Tests contract violation detection when BuildService returns (nil, nil)
+		// This should NEVER happen per BuildService contract, but we handle it defensively
+		mockRepo := &mockOrchestratorBuildHistoryRepo{
+			createFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+				b.SetBuildHistoryID(1)
+				return nil
+			},
+		}
+
+		mockBuildService := &mockOrchestratorBuildService{
+			buildContainerFunc: func(ctx context.Context, buildHistoryID uint, container *dto.BuildContainerInfo) (*BuildResult, error) {
+				// Contract violation: returns (nil, nil)
+				// This violates BuildService's documented contract
+				return nil, nil
+			},
+		}
+
+		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+
+		containers := []*dto.BuildContainerInfo{
+			{ContainerID: 1, Name: "test", Slug: "test"},
+		}
+
+		results, err := orchestrator.BuildAndWait(context.Background(), 10, containers)
+
+		// Should complete without panic - contract violation is caught and handled
+		assert.NoError(t, err, "orchestrator should handle contract violation gracefully")
+		require.Len(t, results, 1)
+		require.NotNil(t, results[0], "orchestrator should create synthetic result for contract violation")
+
+		// Contract violation is converted to a failed build
+		assert.Equal(t, "failed", results[0].Status, "contract violation should be treated as failed build")
+		assert.Contains(t, results[0].ErrorMessage, "Internal error", "should indicate internal error")
+		assert.Equal(t, uint(1), results[0].BuildHistoryID)
 		assert.True(t, results[0].ShouldBuild)
 	})
 }
