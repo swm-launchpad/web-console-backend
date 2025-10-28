@@ -111,7 +111,7 @@ func InitializeApp() (*App, error) {
 	containerService := service3.NewContainerService(containerRepository, serviceSlugService, logger)
 	getContainersForDeploymentUseCase := deployment.NewGetContainersForDeploymentUseCase(containerService)
 	templateRepository := infrastructure2.NewTemplateRepository(db, logger)
-	getContainersForBuildUseCase := build.NewGetContainersForBuildUseCase(containerService, templateRepository)
+	getContainersForBuildUseCase := build.NewGetContainersForBuildUseCase(containerService, templateRepository, logger)
 	containerClient := provideContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, logger)
 	tektonClient, err := provideTektonClient(logger)
 	if err != nil {

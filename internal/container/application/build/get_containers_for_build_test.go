@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	containermodel "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
@@ -17,7 +18,7 @@ import (
 func TestGetContainersForBuildUseCase_Execute_Success(t *testing.T) {
 	mockService := new(infrastructure.MockContainerService)
 	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
-	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo)
+	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo, logger.NewForTest())
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -80,7 +81,7 @@ func TestGetContainersForBuildUseCase_Execute_Success(t *testing.T) {
 func TestGetContainersForBuildUseCase_Execute_EmptyList(t *testing.T) {
 	mockService := new(infrastructure.MockContainerService)
 	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
-	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo)
+	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo, logger.NewForTest())
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -106,7 +107,7 @@ func TestGetContainersForBuildUseCase_Execute_EmptyList(t *testing.T) {
 func TestGetContainersForBuildUseCase_Execute_ServiceError(t *testing.T) {
 	mockService := new(infrastructure.MockContainerService)
 	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
-	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo)
+	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo, logger.NewForTest())
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -129,7 +130,7 @@ func TestGetContainersForBuildUseCase_Execute_ServiceError(t *testing.T) {
 func TestGetContainersForBuildUseCase_Execute_TemplateNotFound(t *testing.T) {
 	mockService := new(infrastructure.MockContainerService)
 	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
-	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo)
+	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo, logger.NewForTest())
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -160,7 +161,7 @@ func TestGetContainersForBuildUseCase_Execute_TemplateNotFound(t *testing.T) {
 func TestGetContainersForBuildUseCase_Execute_TemplateRepositoryError(t *testing.T) {
 	mockService := new(infrastructure.MockContainerService)
 	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
-	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo)
+	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo, logger.NewForTest())
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -194,7 +195,7 @@ func TestGetContainersForBuildUseCase_Execute_TemplateRepositoryError(t *testing
 func TestGetContainersForBuildUseCase_Execute_WithGitDirectoryPath(t *testing.T) {
 	mockService := new(infrastructure.MockContainerService)
 	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
-	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo)
+	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo, logger.NewForTest())
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -225,7 +226,7 @@ func TestGetContainersForBuildUseCase_Execute_WithGitDirectoryPath(t *testing.T)
 func TestGetContainersForBuildUseCase_Execute_WithGitHubInstallationID(t *testing.T) {
 	mockService := new(infrastructure.MockContainerService)
 	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
-	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo)
+	useCase := NewGetContainersForBuildUseCase(mockService, mockTemplateRepo, logger.NewForTest())
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -417,15 +418,17 @@ func createMockTemplate(templateID uint, templateBody *string) *templatemodel.Te
 
 func TestDeepCopyTemplateConfig_NilInput(t *testing.T) {
 	// nil input should return nil to preserve nil/empty distinction for Tekton
-	result := deepCopyTemplateConfig(nil)
+	result, err := deepCopyTemplateConfig(nil)
+	assert.NoError(t, err)
 	assert.Nil(t, result)
 }
 
 func TestDeepCopyTemplateConfig_EmptyMap(t *testing.T) {
 	// Empty map should return empty map (not nil)
 	src := make(map[string]interface{})
-	result := deepCopyTemplateConfig(src)
+	result, err := deepCopyTemplateConfig(src)
 
+	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, 0, len(result))
 }
@@ -438,8 +441,9 @@ func TestDeepCopyTemplateConfig_SimpleMap(t *testing.T) {
 		"key3": true,
 	}
 
-	result := deepCopyTemplateConfig(src)
+	result, err := deepCopyTemplateConfig(src)
 
+	assert.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Equal(t, "value1", result["key1"])
 	assert.Equal(t, "value2", result["key2"])
@@ -460,8 +464,9 @@ func TestDeepCopyTemplateConfig_NestedMap(t *testing.T) {
 		"features": []interface{}{"auth", "logging"},
 	}
 
-	result := deepCopyTemplateConfig(src)
+	result, err := deepCopyTemplateConfig(src)
 
+	assert.NoError(t, err)
 	assert.NotNil(t, result)
 
 	// Verify values are copied correctly

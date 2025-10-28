@@ -3,7 +3,11 @@ package build
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
+	"go.uber.org/zap"
+
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 )
@@ -35,15 +39,18 @@ type GetContainersForBuildOutput struct {
 type GetContainersForBuildUseCase struct {
 	containerService   service.ContainerService
 	templateRepository repository.TemplateRepository
+	logger             logger.Logger
 }
 
 func NewGetContainersForBuildUseCase(
 	containerService service.ContainerService,
 	templateRepository repository.TemplateRepository,
+	log logger.Logger,
 ) *GetContainersForBuildUseCase {
 	return &GetContainersForBuildUseCase{
 		containerService:   containerService,
 		templateRepository: templateRepository,
+		logger:             log,
 	}
 }
 
@@ -69,7 +76,15 @@ func (uc *GetContainersForBuildUseCase) Execute(ctx context.Context, input GetCo
 		// Deep copy template config to prevent snapshot aliasing
 		// Maps are reference types - shallow copy would allow nested mutations
 		// to affect the snapshot, defeating change detection
-		templateConfig := deepCopyTemplateConfig(container.TemplateConfig())
+		templateConfig, err := deepCopyTemplateConfig(container.TemplateConfig())
+		if err != nil {
+			// Log serialization error for diagnostic purposes
+			uc.logger.Warn(ctx, "Failed to deep copy template config, using nil",
+				zap.Uint("container_id", container.ContainerID()),
+				zap.Error(err),
+			)
+			templateConfig = nil
+		}
 
 		// Get template body if template is configured
 		var templateBody *string
@@ -107,26 +122,25 @@ func (uc *GetContainersForBuildUseCase) Execute(ctx context.Context, input GetCo
 
 // deepCopyTemplateConfig performs a deep copy of template config using JSON serialization
 // This ensures nested maps/slices are fully cloned, preventing snapshot aliasing
-func deepCopyTemplateConfig(src map[string]interface{}) map[string]interface{} {
+// Returns error if serialization fails to help diagnose unexpected template payloads
+func deepCopyTemplateConfig(src map[string]interface{}) (map[string]interface{}, error) {
 	if src == nil {
-		return nil
+		return nil, nil
 	}
 
 	// Use JSON round-trip for deep copy
 	// This handles arbitrary nesting of maps, slices, and primitives
 	data, err := json.Marshal(src)
 	if err != nil {
-		// If marshaling fails, return nil to preserve nil/empty distinction
-		// This prevents Tekton from receiving {} when no config was supplied
-		return nil
+		// Return error to help diagnose unexpected template payloads
+		return nil, fmt.Errorf("failed to marshal template config: %w", err)
 	}
 
 	var dst map[string]interface{}
 	if err := json.Unmarshal(data, &dst); err != nil {
-		// If unmarshaling fails, return nil to preserve nil/empty distinction
-		// This prevents Tekton from receiving {} when no config was supplied
-		return nil
+		// Return error to help diagnose unexpected template payloads
+		return nil, fmt.Errorf("failed to unmarshal template config: %w", err)
 	}
 
-	return dst
+	return dst, nil
 }

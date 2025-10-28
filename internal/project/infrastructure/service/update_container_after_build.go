@@ -290,12 +290,22 @@ func (uc *UpdateContainerAfterBuildUseCase) UpdateAfterBuild(
 ) error {
 	// Convert dto.BuildContainerInfo to BuildParametersSnapshot
 	// Deep copy TemplateConfig to prevent snapshot aliasing
+	templateConfig, err := deepCopyTemplateConfig(snapshotBeforeBuild.TemplateConfig)
+	if err != nil {
+		// Log serialization error for diagnostic purposes
+		uc.logger.Warn(ctx, "Failed to deep copy template config, using nil",
+			zap.Uint("container_id", containerID),
+			zap.Error(err),
+		)
+		templateConfig = nil
+	}
+
 	snapshot := &BuildParametersSnapshot{
 		GitRepositoryURL: snapshotBeforeBuild.GitRepositoryURL,
 		GitBranch:        snapshotBeforeBuild.GitBranch,
 		GitDirectoryPath: snapshotBeforeBuild.GitDirectoryPath,
 		TemplateID:       snapshotBeforeBuild.TemplateID,
-		TemplateConfig:   deepCopyTemplateConfig(snapshotBeforeBuild.TemplateConfig),
+		TemplateConfig:   templateConfig,
 		BuildVars:        snapshotBeforeBuild.BuildVars,
 		InstallationID:   snapshotBeforeBuild.InstallationID,
 	}
@@ -313,26 +323,25 @@ func (uc *UpdateContainerAfterBuildUseCase) UpdateAfterBuild(
 
 // deepCopyTemplateConfig performs a deep copy of template config using JSON serialization
 // This ensures nested maps/slices are fully cloned, preventing snapshot aliasing
-func deepCopyTemplateConfig(src map[string]interface{}) map[string]interface{} {
+// Returns error if serialization fails to help diagnose unexpected template payloads
+func deepCopyTemplateConfig(src map[string]interface{}) (map[string]interface{}, error) {
 	if src == nil {
-		return nil
+		return nil, nil
 	}
 
 	// Use JSON round-trip for deep copy
 	// This handles arbitrary nesting of maps, slices, and primitives
 	data, err := json.Marshal(src)
 	if err != nil {
-		// If marshaling fails, return nil to preserve nil/empty distinction
-		// This prevents Tekton from receiving {} when no config was supplied
-		return nil
+		// Return error to help diagnose unexpected template payloads
+		return nil, fmt.Errorf("failed to marshal template config: %w", err)
 	}
 
 	var dst map[string]interface{}
 	if err := json.Unmarshal(data, &dst); err != nil {
-		// If unmarshaling fails, return nil to preserve nil/empty distinction
-		// This prevents Tekton from receiving {} when no config was supplied
-		return nil
+		// Return error to help diagnose unexpected template payloads
+		return nil, fmt.Errorf("failed to unmarshal template config: %w", err)
 	}
 
-	return dst
+	return dst, nil
 }
