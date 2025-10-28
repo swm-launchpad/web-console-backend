@@ -1460,11 +1460,43 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 		zap.Uint("project_id", projectID),
 	)
 
-	// Step 5: Proceed to deployment using the snapshot captured before builds started.
-	// We use the deployment config snapshot to ensure consistency - it represents the exact
-	// state when the user initiated the build+deploy operation.
-	// If we fetch it now, we might pick up user edits that happened mid-build,
-	// which would be inconsistent with the artifacts we just built.
+	// Step 4.5: Update deployment config with newly built image tags
+	// The deployment config snapshot was captured before builds started, so it contains
+	// old image tags based on last_built_git_commit_hash at that time.
+	// We update ONLY the image tags with the newly built commit hashes while keeping
+	// all other configuration (env vars, secrets, volumes, networks) from the snapshot.
+	// This ensures we deploy the newly built images with the consistent configuration
+	// that existed when the user initiated the build+deploy operation.
+	for i, result := range buildResults {
+		if result == nil {
+			continue
+		}
+
+		// Only update image tag for successful builds with a commit hash
+		if result.Status == "success" && result.LatestCommitHash != "" {
+			commitHash := result.LatestCommitHash
+			var newImageTag string
+			if len(commitHash) >= 7 {
+				newImageTag = commitHash[:7]
+			} else {
+				newImageTag = commitHash
+			}
+
+			s.logger.Info(ctx, "updating deployment config with new image tag",
+				zap.Uint("project_id", projectID),
+				zap.Int("container_index", i),
+				zap.String("old_image_tag", deploymentConfig.Containers[i].ImageTag),
+				zap.String("new_image_tag", newImageTag),
+				zap.String("commit_hash", commitHash),
+			)
+
+			deploymentConfig.Containers[i].ImageTag = newImageTag
+		}
+	}
+
+	// Step 5: Proceed to deployment using the updated snapshot
+	// The snapshot maintains consistent configuration (captured before builds)
+	// but now has the correct image tags (updated with build results)
 	s.logger.Info(ctx, "proceeding to deployment",
 		zap.Uint("project_id", projectID),
 	)
