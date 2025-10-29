@@ -25,10 +25,10 @@ func TestNewResourceLimits(t *testing.T) {
 	})
 
 	t.Run("성공: 최소 유효 값", func(t *testing.T) {
-		cpu := uint32(100)
-		memoryLimit := uint32(128)
-		disk := uint32(128)
-		traffic := uint32(128)
+		cpu := uint32(500)         // MinCPULimit
+		memoryLimit := uint32(512) // MinMemoryLimit
+		disk := uint32(1024)       // MinDiskLimit
+		traffic := uint32(128)     // MinTrafficLimit
 
 		limits, err := NewResourceLimits(cpu, memoryLimit, disk, traffic)
 
@@ -140,7 +140,7 @@ func TestNewResourceLimits(t *testing.T) {
 func TestResourceLimits_Getters(t *testing.T) {
 	cpu := uint32(1000)
 	memoryLimit := uint32(2048)
-	disk := uint32(512)
+	disk := uint32(1024) // MinDiskLimit
 	traffic := uint32(256)
 	limits, err := NewResourceLimits(cpu, memoryLimit, disk, traffic)
 	require.NoError(t, err)
@@ -168,10 +168,10 @@ func TestResourceLimits_Getters(t *testing.T) {
 	})
 
 	t.Run("최소 값 getter", func(t *testing.T) {
-		minLimits, _ := NewResourceLimits(100, 128, 128, 128)
-		assert.Equal(t, uint32(100), minLimits.CPULimit())
-		assert.Equal(t, uint32(128), minLimits.MemoryLimit())
-		assert.Equal(t, uint32(128), minLimits.DiskLimit())
+		minLimits, _ := NewResourceLimits(500, 512, 1024, 128)
+		assert.Equal(t, uint32(500), minLimits.CPULimit())
+		assert.Equal(t, uint32(512), minLimits.MemoryLimit())
+		assert.Equal(t, uint32(1024), minLimits.DiskLimit())
 		assert.Equal(t, uint32(128), minLimits.TrafficLimit())
 	})
 }
@@ -180,8 +180,8 @@ func TestResourceLimits_Equals(t *testing.T) {
 	t.Run("동일한 리소스 제한", func(t *testing.T) {
 		cpu := uint32(1000)
 		memoryLimit := uint32(2048)
-		limits1, _ := NewResourceLimits(cpu, memoryLimit, 128, 128)
-		limits2, _ := NewResourceLimits(cpu, memoryLimit, 128, 128)
+		limits1, _ := NewResourceLimits(cpu, memoryLimit, 1024, 128)
+		limits2, _ := NewResourceLimits(cpu, memoryLimit, 1024, 128)
 
 		assert.True(t, limits1.Equals(*limits2))
 	})
@@ -189,22 +189,22 @@ func TestResourceLimits_Equals(t *testing.T) {
 	t.Run("다른 CPU 제한", func(t *testing.T) {
 		cpu1 := uint32(1000)
 		cpu2 := uint32(2000)
-		limits1, _ := NewResourceLimits(cpu1, 128, 128, 128)
-		limits2, _ := NewResourceLimits(cpu2, 128, 128, 128)
+		limits1, _ := NewResourceLimits(cpu1, 512, 1024, 128)
+		limits2, _ := NewResourceLimits(cpu2, 512, 1024, 128)
 
 		assert.False(t, limits1.Equals(*limits2))
 	})
 
 	t.Run("최소값 vs 일반값", func(t *testing.T) {
 		limits1, _ := NewResourceLimits(1000, 2048, 2048, 256)
-		limits2, _ := NewResourceLimits(100, 128, 128, 128)
+		limits2, _ := NewResourceLimits(500, 512, 1024, 128)
 
 		assert.False(t, limits1.Equals(*limits2))
 	})
 
 	t.Run("모두 최소값", func(t *testing.T) {
-		limits1, _ := NewResourceLimits(100, 128, 128, 128)
-		limits2, _ := NewResourceLimits(100, 128, 128, 128)
+		limits1, _ := NewResourceLimits(500, 512, 1024, 128)
+		limits2, _ := NewResourceLimits(500, 512, 1024, 128)
 
 		assert.True(t, limits1.Equals(*limits2))
 	})

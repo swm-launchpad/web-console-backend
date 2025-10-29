@@ -37,21 +37,32 @@ const (
 	GiBToMi   = 1024        // 1 GiB = 1024 Mi
 )
 
+// Default resource allocation for Eco and Pro plans (base included resources)
+const (
+	DefaultCPULimit    = 1000 // 1 core (1000 millicores)
+	DefaultMemoryLimit = 1024 // 1GB (1024 Mi)
+	DefaultDiskLimit   = 1024 // 1GB (1024 Mi)
+)
+
 // System-wide absolute resource limits for security and resource management
 const (
 	// CPU limits in millicores (1000 = 1 CPU core)
-	MinCPULimit = 100  // 0.1 cores
-	MaxCPULimit = 4000 // 4 cores
+	// Step: 500 millicores (0.5 core)
+	MinCPULimit = 500  // 0.5 cores
+	MaxCPULimit = 8000 // 8 cores
 
 	// Memory limits in Mi (Mebibytes)
-	MinMemoryLimit = 128  // 128 Mi
-	MaxMemoryLimit = 8192 // 8192 Mi = ~8GB
+	// Step: 512 Mi (0.5 GB)
+	MinMemoryLimit = 512   // 512 Mi = 0.5GB
+	MaxMemoryLimit = 16384 // 16384 Mi = 16GB
 
 	// Storage limits in Mi (Mebibytes)
-	MinDiskLimit = 128          // 128 Mi
-	MaxDiskLimit = 10 * GiBToMi // 10 GB = 10240 Mi
+	// Step: 512 Mi (0.5 GB)
+	MinDiskLimit = 1024         // 1024 Mi = 1GB
+	MaxDiskLimit = 32 * GiBToMi // 32 GB = 32768 Mi
 
 	// Traffic limits in Mi (Mebibytes) per month
+	// Traffic is not pre-allocated, maintained for backward compatibility
 	MinTrafficLimit = 128                // 128 Mi
 	MaxTrafficLimit = 1024 * 1024 * 1024 // 1 TB = 1048576 Mi
 )
