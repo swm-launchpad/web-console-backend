@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	domaininfra "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/test/helper"
@@ -492,6 +495,15 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen]
 }
 
+func mustRawMessage(t *testing.T, value string) json.RawMessage {
+	t.Helper()
+	if value == "" {
+		return nil
+	}
+	require.True(t, json.Valid([]byte(value)), "invalid JSON provided to mustRawMessage: %s", value)
+	return json.RawMessage([]byte(value))
+}
+
 // retryWithBackoff retries a function up to maxAttempts times with a 1-second interval.
 // It returns true if the condition is met, false if all attempts fail.
 func retryWithBackoff(maxAttempts int, interval time.Duration, fn func() bool) bool {
@@ -504,6 +516,165 @@ func retryWithBackoff(maxAttempts int, interval time.Duration, fn func() bool) b
 		}
 	}
 	return false
+}
+
+// Note: We use hardcoded commit hashes to avoid git operations during tests.
+// The actual commit hash will be fetched by the Tekton pipeline.
+
+// waitForBuildPipeline waits for a build PipelineRun to reach a terminal state.
+// It polls the Kubernetes API using the KubeBuildClient.
+func waitForBuildPipeline(t *testing.T, kubeBuildClient domaininfra.KubeBuildClient, ctx context.Context, eventID string, maxAttempts int, pollInterval time.Duration) *dto.PipelineRun {
+	t.Helper()
+
+	t.Logf("Waiting for PipelineRun with EventID: %s", eventID)
+
+	var pipelineRunName string
+	var status *dto.PipelineRun
+
+	// First, find the PipelineRun by EventID (with retry)
+	foundPipelineRun := retryWithBackoff(10, 1*time.Second, func() bool {
+		var err error
+		pipelineRunName, err = kubeBuildClient.FindPipelineRunNameByEventID(ctx, eventID)
+		if err != nil {
+			t.Logf("Attempt to find PipelineRun by EventID failed: %v", err)
+			return false
+		}
+		return pipelineRunName != ""
+	})
+
+	if !foundPipelineRun {
+		t.Fatalf("Failed to find PipelineRun with EventID: %s", eventID)
+	}
+
+	t.Logf("Found PipelineRun: %s", pipelineRunName)
+
+	// Poll for terminal status
+	for attempt := range maxAttempts {
+		var err error
+		status, err = kubeBuildClient.GetPipelineRunStatus(ctx, pipelineRunName)
+		if err != nil {
+			t.Logf("Attempt %d: Failed to get PipelineRun status: %v", attempt+1, err)
+			time.Sleep(pollInterval)
+			continue
+		}
+
+		t.Logf("Attempt %d: PipelineRun status: %s, reason: %s", attempt+1, status.Status, status.Reason)
+
+		// Check for terminal states
+		// Status: "True" = Succeeded, "False" = Failed
+		switch status.Status {
+		case "True":
+			t.Logf("PipelineRun completed successfully")
+			return status
+		case "False":
+			t.Logf("PipelineRun failed with reason: %s, message: %s", status.Reason, status.Message)
+			return status
+		}
+
+		// Continue polling
+		time.Sleep(pollInterval)
+	}
+
+	t.Fatalf("Timeout waiting for PipelineRun to complete after %d attempts", maxAttempts)
+	return nil
+}
+
+// verifyBuildExecution verifies that build tasks were executed or skipped correctly.
+// It checks the PipelineRun completion message to ensure the correct number of tasks
+// were executed versus skipped based on the should_build decision.
+// expectedSkippedCount: expected number of skipped tasks (0 if github_url provided, 1 if not)
+func verifyBuildExecution(t *testing.T, pipelineRun *dto.PipelineRun, expectedShouldBuild string, expectedSkippedCount int) {
+	t.Helper()
+
+	t.Log("Verifying build execution status")
+	t.Logf("PipelineRun Message: %s", pipelineRun.Message)
+
+	// Parse message format: "Tasks Completed: X (Failed: Y, Cancelled Z), Skipped: W"
+	if expectedShouldBuild == "true" {
+		// Build should have been executed
+		// Task count depends on whether github_url is provided:
+		//   With github_url (Skipped: 0):
+		//     1. check-build-necessity
+		//     2. git-clone
+		//     3. ecr-repository-check
+		//     4. apply-dockerfile-config
+		//     5. build-and-push
+		//   Without github_url (Skipped: 1):
+		//     1. check-build-necessity
+		//     2. git-clone (SKIPPED - no github_url)
+		//     3. ecr-repository-check
+		//     4. apply-dockerfile-config
+		//     5. build-and-push
+		expectedMsg := fmt.Sprintf("Skipped: %d", expectedSkippedCount)
+		assert.Contains(t, pipelineRun.Message, expectedMsg,
+			"Expected %d task(s) to be skipped when should_build=true", expectedSkippedCount)
+
+		expectedCompleted := 5 - expectedSkippedCount
+		expectedCompletedMsg := fmt.Sprintf("Tasks Completed: %d", expectedCompleted)
+		assert.Contains(t, pipelineRun.Message, expectedCompletedMsg,
+			"Expected %d task(s) to complete when should_build=true", expectedCompleted)
+
+		if expectedSkippedCount == 0 {
+			t.Log("✓ Verified: All build tasks were executed (none skipped)")
+		} else {
+			t.Logf("✓ Verified: Build tasks executed with %d task(s) skipped (git-clone)", expectedSkippedCount)
+		}
+	} else {
+		// Build should have been skipped - build tasks should be skipped
+		// Only 1 task (check-build-necessity) should complete
+		// 4 tasks should be skipped:
+		//   - git-clone (skipped via whenExpression)
+		//   - ecr-repository-check (skipped via whenExpression)
+		//   - apply-dockerfile-config (skipped via whenExpression)
+		//   - build-and-push (skipped via whenExpression)
+		assert.Contains(t, pipelineRun.Message, "Skipped: 4",
+			"Build tasks should be skipped when should_build=false")
+
+		assert.Contains(t, pipelineRun.Message, "Tasks Completed: 1",
+			"Only build check task should complete when skipping build")
+
+		t.Log("✓ Verified: Build tasks were correctly skipped (4 tasks)")
+	}
+
+	t.Log("Build execution verification passed")
+}
+
+// verifyBuildResults verifies the build results from a PipelineRun.
+func verifyBuildResults(t *testing.T, results map[string]string, expectedShouldBuild string, expectedCommitHash string) {
+	t.Helper()
+
+	t.Log("Verifying build results")
+	t.Logf("Results: %+v", results)
+
+	// Extract values
+	shouldBuild, hasShouldBuild := results["should_build"]
+	latestCommitHash, hasLatestCommitHash := results["latest_commit_hash"]
+	imageTag, hasImageTag := results["image_tag"]
+
+	// Verify should_build
+	require.True(t, hasShouldBuild, "Result 'should_build' should be present")
+	assert.Equal(t, expectedShouldBuild, shouldBuild, "should_build mismatch")
+
+	// Verify commit hash if provided
+	if expectedCommitHash != "" && expectedCommitHash != "any" {
+		require.True(t, hasLatestCommitHash, "Result 'latest_commit_hash' should be present")
+		assert.Equal(t, expectedCommitHash, latestCommitHash, "latest_commit_hash mismatch")
+	}
+
+	// Verify image_tag format
+	require.True(t, hasImageTag, "Result 'image_tag' should be present")
+	if shouldBuild == "true" {
+		if hasLatestCommitHash && latestCommitHash != "" {
+			// Should be first 7 characters of commit hash
+			expectedTag := latestCommitHash[:7]
+			assert.Equal(t, expectedTag, imageTag, "image_tag should be first 7 chars of commit hash")
+		} else {
+			// Should be "latest" when no github_url
+			assert.Equal(t, "latest", imageTag, "image_tag should be 'latest' when no github_url")
+		}
+	}
+
+	t.Log("Build results verification passed")
 }
 
 // TestTektonBuildKubeIntegration tests the integration between TektonBuildClient and KubeBuildClient.
@@ -540,111 +711,278 @@ func TestTektonBuildKubeIntegration(t *testing.T) {
 
 	ctx := context.Background()
 
-	t.Run("TektonBuildClient - Build request with template only", func(t *testing.T) {
-		// Given - Create TektonBuildClient
+	// Build integration tests based on /workspace/user-workload-infra/tekton-pipelines/image-build-push/test/
+	// Simplified to 3 force-build tests only
+
+	t.Run("Spring Hello World - Force Build (should_build=true)", func(t *testing.T) {
+		t.Parallel()
+
+		// Test configuration
+		githubURL := "https://github.com/paulczar/spring-helloworld.git"
+		githubBranch := "master"
+		imageName := "spring-helloworld-test-03"
+		forceBuild := "true" // Force build
+		templatePath := "/workspace/user-workload-infra/tekton-pipelines/image-build-push/test/templates/springboot-maven.dockerfile.tmpl"
+
+		// Read template
+		templateBytes, err := os.ReadFile(templatePath)
+		if err != nil {
+			t.Skipf("Skipping test: template file not found: %v", err)
+		}
+		templateContent := string(templateBytes)
+
+		// Use dummy commit hash (force_build=true will build regardless)
+		latestCommit := "1234567890abcdef1234567890abcdef12345678"
+
+		t.Logf("Latest commit (dummy value, force_build=true): %s", latestCommit)
+
+		// Create TektonBuildClient
 		tektonBuildClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
 		require.NoError(t, err, "Failed to create TektonBuildClient")
 
-		// Use MySQL template from test directory
-		// This template uses gomplate variables like {{ .mysql_version }}
-		mysqlTemplate := `FROM mysql:{{ .mysql_version }}
+		// Dockerfile configuration
+		dockerfileConfigJSON := mustRawMessage(t, `{
+			"maven_version": "3.6",
+			"java_version": "11",
+			"app_port": "8080"
+		}`)
 
-# MySQL configuration
-RUN echo "[mysqld]" > /etc/mysql/conf.d/custom.cnf && \
-    echo "character-set-server={{ .charset }}" >> /etc/mysql/conf.d/custom.cnf && \
-    echo "collation-server={{ .collation }}" >> /etc/mysql/conf.d/custom.cnf && \
-    echo "max_connections={{ .max_connections }}" >> /etc/mysql/conf.d/custom.cnf
+		// Build environment variables - empty for this test
+		buildEnvJSON := mustRawMessage(t, `{}`)
 
-# Expose MySQL port
-EXPOSE {{ .mysql_port }}`
-
-		// Create a build request with template only (no GitHub repo)
+		// Create build request with force_build=true
 		buildRequest := &dto.TektonBuildRequest{
 			ProjectID:            "0",
 			ContainerID:          "0",
-			ImageName:            "integration-test-mysql",
-			ForceBuild:           "true",
-			Template:             mysqlTemplate,
-			DockerfileConfigJSON: `{"mysql_version":"8.0","charset":"utf8mb4","collation":"utf8mb4_unicode_ci","max_connections":"200","mysql_port":"3306"}`,
-			BuildEnvJSON:         `{"TZ":"Asia/Seoul"}`,
+			ImageName:            imageName,
+			GitHubURL:            githubURL,
+			GitHubBranch:         githubBranch,
+			DirectoryPath:        ".",
+			ForceBuild:           forceBuild,
+			LastBuildCommitHash:  latestCommit, // Even with latest commit, force_build should trigger build
+			Template:             templateContent,
+			DockerfileConfigJSON: dockerfileConfigJSON,
+			BuildEnvJSON:         buildEnvJSON,
 		}
 
-		// When - Trigger build
+		// Trigger build
 		response, err := tektonBuildClient.TriggerBuild(ctx, buildRequest)
-
-		// Then - Request should be accepted
 		if err != nil {
-			t.Logf("Build request failed: %v", err)
-			t.Skip("Skipping test - Tekton build API not available or rejected request")
-		} else {
-			require.NotNil(t, response, "Response should not be nil")
-			assert.NotEmpty(t, response.EventListener, "EventListener should be set")
-			assert.NotEmpty(t, response.EventID, "EventID should be set")
-			t.Logf("Build triggered - EventID: %s, EventListener: %s", response.EventID, response.EventListener)
+			t.Skipf("Skipping test: build trigger failed: %v", err)
 		}
+
+		require.NotNil(t, response, "Response should not be nil")
+		require.NotEmpty(t, response.EventID, "EventID should be set")
+		t.Logf("Build triggered - EventID: %s", response.EventID)
+
+		// Fix CA cert path for tests
+		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+		}
+
+		// Create KubeBuildClient
+		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
+		if err != nil {
+			t.Skipf("Skipping test: KubeBuildClient creation failed: %v", err)
+		}
+
+		// Wait for pipeline to complete (max 60 attempts, 10 second interval = 10 minutes)
+		pipelineRun := waitForBuildPipeline(t, kubeBuildClient, ctx, response.EventID, 60, 10*time.Second)
+		require.NotNil(t, pipelineRun, "PipelineRun should not be nil")
+
+		// Verify pipeline completed successfully
+		assert.Equal(t, "True", pipelineRun.Status, "PipelineRun should succeed")
+
+		// Verify build execution (tasks were actually executed, not skipped)
+		// expectedSkippedCount = 0 because github_url is provided
+		verifyBuildExecution(t, pipelineRun, "true", 0)
+
+		// Verify results - should_build should be true (force_build overrides, commit hash from Tekton)
+		verifyBuildResults(t, pipelineRun.Results, "true", "any")
 	})
 
-	t.Run("TektonBuildClient - Build request with GitHub repository", func(t *testing.T) {
-		// Given - Create TektonBuildClient
+	t.Run("MySQL - No GitHub, Force Build (should_build=true)", func(t *testing.T) {
+		t.Parallel()
+
+		// Test configuration
+		imageName := "mysql-custom-test-05"
+		forceBuild := "true"
+		templatePath := "/workspace/user-workload-infra/tekton-pipelines/image-build-push/test/templates/mysql.dockerfile.tmpl"
+
+		// Read template
+		templateBytes, err := os.ReadFile(templatePath)
+		if err != nil {
+			t.Skipf("Skipping test: template file not found: %v", err)
+		}
+		templateContent := string(templateBytes)
+
+		// Create TektonBuildClient
 		tektonBuildClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
 		require.NoError(t, err, "Failed to create TektonBuildClient")
 
-		// Use Node.js template with gomplate variables
-		nodeTemplate := `FROM node:{{ .node_version }}-alpine
+		// Dockerfile configuration for MySQL
+		dockerfileConfigJSON := mustRawMessage(t, `{
+			"mysql_version": "8.0",
+			"charset": "utf8mb4",
+			"collation": "utf8mb4_unicode_ci",
+			"max_connections": "300",
+			"max_allowed_packet": "128M",
+			"innodb_buffer_pool_size": "2G",
+			"innodb_log_file_size": "512M",
+			"mysql_port": "3306"
+		}`)
 
-WORKDIR /app
+		// Build environment variables
+		buildEnvJSON := mustRawMessage(t, `{
+			"TZ": "UTC"
+		}`)
 
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application code
-COPY . .
-
-# Expose port
-EXPOSE {{ .app_port }}
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD node --version || exit 1
-
-# Run application
-CMD ["node", "{{ .entry_point }}"]`
-
-		// Create a build request with GitHub repository
-		// This uses the test repository from user-workload-infra/tekton-pipelines/image-build-push/test/
+		// Create build request without GitHub URL but with force_build
 		buildRequest := &dto.TektonBuildRequest{
 			ProjectID:            "0",
 			ContainerID:          "0",
-			ImageName:            "integration-test-nodejs",
-			GitHubURL:            "https://github.com/hakumizuki/cicd-test",
-			GitHubBranch:         "main",
-			DirectoryPath:        ".",
-			ForceBuild:           "true", // Force build for testing
-			LastBuildCommitHash:  "",     // Empty means first build
-			Template:             nodeTemplate,
-			DockerfileConfigJSON: `{"node_version":"18","app_port":"3000","entry_point":"index.js"}`,
-			BuildEnvJSON:         `{"NODE_ENV":"production","TZ":"Asia/Seoul"}`,
-			// RegistryURL is not set, will use environment variable
+			ImageName:            imageName,
+			ForceBuild:           forceBuild,
+			Template:             templateContent,
+			DockerfileConfigJSON: dockerfileConfigJSON,
+			BuildEnvJSON:         buildEnvJSON,
 		}
 
-		// When - Trigger build
+		// Trigger build
 		response, err := tektonBuildClient.TriggerBuild(ctx, buildRequest)
-
-		// Then - Request should be accepted
 		if err != nil {
-			t.Logf("Build request failed: %v", err)
-			t.Skip("Skipping test - Tekton build API not available or rejected request")
-		} else {
-			require.NotNil(t, response, "Response should not be nil")
-			assert.NotEmpty(t, response.EventListener, "EventListener should be set")
-			assert.NotEmpty(t, response.EventID, "EventID should be set")
-			assert.Equal(t, "image-build-push-listener", response.EventListener, "EventListener should be image-build-push-listener")
-			assert.Equal(t, "build-pipeline", response.Namespace, "Namespace should be build-pipeline")
-			t.Logf("Build triggered - EventID: %s", response.EventID)
+			t.Skipf("Skipping test: build trigger failed: %v", err)
 		}
+
+		require.NotNil(t, response, "Response should not be nil")
+		require.NotEmpty(t, response.EventID, "EventID should be set")
+		t.Logf("Build triggered - EventID: %s", response.EventID)
+
+		// Fix CA cert path for tests
+		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+		}
+
+		// Create KubeBuildClient
+		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
+		if err != nil {
+			t.Skipf("Skipping test: KubeBuildClient creation failed: %v", err)
+		}
+
+		// Wait for pipeline to complete (max 60 attempts, 10 second interval = 10 minutes)
+		pipelineRun := waitForBuildPipeline(t, kubeBuildClient, ctx, response.EventID, 60, 10*time.Second)
+		require.NotNil(t, pipelineRun, "PipelineRun should not be nil")
+
+		// Verify pipeline completed successfully
+		assert.Equal(t, "True", pipelineRun.Status, "PipelineRun should succeed")
+
+		// Verify build execution (tasks were actually executed, not skipped)
+		// expectedSkippedCount = 1 because github_url is NOT provided (git-clone task is skipped)
+		verifyBuildExecution(t, pipelineRun, "true", 1)
+
+		// Verify results - should_build should be true (force_build)
+		verifyBuildResults(t, pipelineRun.Results, "true", "")
+	})
+
+	t.Run("Spring MySQL Demo - Force Build (should_build=true)", func(t *testing.T) {
+		t.Parallel()
+
+		// Check GITHUB_APP_INSTALLATION_ID is set (required for private repository)
+		installationID := os.Getenv("GITHUB_APP_INSTALLATION_ID")
+		if installationID == "" {
+			t.Skip("Skipping test: GITHUB_APP_INSTALLATION_ID not set in environment")
+		}
+
+		// Test configuration
+		githubURL := "https://github.com/swm-launchpad/spring-mysql-demo.git"
+		githubBranch := "main"
+		imageName := "spring-mysql-demo-test-08"
+		forceBuild := "true" // Force build
+		templatePath := "/workspace/user-workload-infra/tekton-pipelines/image-build-push/test/templates/springboot-gradle.dockerfile.tmpl"
+
+		// Read template
+		templateBytes, err := os.ReadFile(templatePath)
+		if err != nil {
+			t.Skipf("Skipping test: template file not found: %v", err)
+		}
+		templateContent := string(templateBytes)
+
+		// Use hardcoded old commit hash (actual latest commit will be fetched by Tekton)
+		oldCommit := "abcdef9876543210abcdef9876543210abcdef98"
+
+		t.Logf("Old commit (hardcoded): %s", oldCommit)
+		t.Logf("Build will fetch actual latest commit from private repository")
+
+		// Create TektonBuildClient
+		tektonBuildClient, err := infrastructure.NewTektonBuildClient(logger.NewForTest())
+		require.NoError(t, err, "Failed to create TektonBuildClient")
+
+		// Dockerfile configuration
+		dockerfileConfigJSON := mustRawMessage(t, `{
+			"gradle_version": "8.5",
+			"java_version": "21",
+			"app_port": "8080"
+		}`)
+
+		// Build environment variables
+		buildEnvJSON := mustRawMessage(t, `{
+			"TZ": "Asia/Seoul",
+			"LANG": "en_US.UTF-8"
+		}`)
+
+		// Create build request for private repo
+		buildRequest := &dto.TektonBuildRequest{
+			ProjectID:            "0",
+			ContainerID:          "0",
+			ImageName:            imageName,
+			GitHubURL:            githubURL,
+			GitHubBranch:         githubBranch,
+			DirectoryPath:        ".",
+			ForceBuild:           forceBuild,
+			LastBuildCommitHash:  oldCommit,
+			InstallationID:       installationID,
+			Template:             templateContent,
+			DockerfileConfigJSON: dockerfileConfigJSON,
+			BuildEnvJSON:         buildEnvJSON,
+		}
+
+		// Trigger build
+		response, err := tektonBuildClient.TriggerBuild(ctx, buildRequest)
+		if err != nil {
+			t.Skipf("Skipping test: build trigger failed: %v", err)
+		}
+
+		require.NotNil(t, response, "Response should not be nil")
+		require.NotEmpty(t, response.EventID, "EventID should be set")
+		t.Logf("Build triggered - EventID: %s", response.EventID)
+
+		// Fix CA cert path for tests
+		caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+		if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+			_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+		}
+
+		// Create KubeBuildClient
+		kubeBuildClient, err := infrastructure.NewKubeBuildClient(logger.NewForTest())
+		if err != nil {
+			t.Skipf("Skipping test: KubeBuildClient creation failed: %v", err)
+		}
+
+		// Wait for pipeline to complete (max 60 attempts, 10 second interval = 10 minutes)
+		pipelineRun := waitForBuildPipeline(t, kubeBuildClient, ctx, response.EventID, 60, 10*time.Second)
+		require.NotNil(t, pipelineRun, "PipelineRun should not be nil")
+
+		// Verify pipeline completed successfully
+		assert.Equal(t, "True", pipelineRun.Status, "PipelineRun should succeed")
+
+		// Verify build execution (tasks were actually executed, not skipped)
+		// expectedSkippedCount = 0 because github_url is provided
+		verifyBuildExecution(t, pipelineRun, "true", 0)
+
+		// Verify results (commit hash will be fetched by Tekton)
+		verifyBuildResults(t, pipelineRun.Results, "true", "any")
 	})
 
 	t.Run("KubeBuildClient - Find build PipelineRun by EventID", func(t *testing.T) {
@@ -732,8 +1070,8 @@ func TestTektonBuildClient_FullBuildFlow(t *testing.T) {
 		ForceBuild:           "true",
 		LastBuildCommitHash:  "",
 		Template:             "FROM node:18-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install\nEXPOSE 3000\nCMD [\"node\", \"index.js\"]",
-		DockerfileConfigJSON: "",
-		BuildEnvJSON:         `{"NODE_ENV":"test"}`,
+		DockerfileConfigJSON: nil,
+		BuildEnvJSON:         mustRawMessage(t, `{"NODE_ENV":"test"}`),
 		RegistryURL:          "registry.launchpad.kr/",
 	}
 

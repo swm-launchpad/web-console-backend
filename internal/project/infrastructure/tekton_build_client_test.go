@@ -151,8 +151,8 @@ func TestTektonBuildClient_TriggerBuild(t *testing.T) {
 				ForceBuild:           "false",
 				LastBuildCommitHash:  "abc123def456",
 				Template:             "FROM node:18\nCOPY . /app",
-				DockerfileConfigJSON: `{"base_image":"node:18"}`,
-				BuildEnvJSON:         `{"NODE_ENV":"production"}`,
+				DockerfileConfigJSON: rawJSON(`{"base_image":"node:18"}`),
+				BuildEnvJSON:         rawJSON(`{"NODE_ENV":"production"}`),
 				RegistryURL:          "registry.launchpad.kr/",
 				InstallationID:       "12345678",
 			},
@@ -446,8 +446,8 @@ func TestTektonBuildClient_TriggerBuild_RequestValidation(t *testing.T) {
 			ForceBuild:           "false",
 			LastBuildCommitHash:  "xyz789abc123",
 			Template:             "FROM golang:1.21\nCOPY . /app",
-			DockerfileConfigJSON: `{"version":"1.0"}`,
-			BuildEnvJSON:         `{"ENV":"staging"}`,
+			DockerfileConfigJSON: rawJSON(`{"version":"1.0"}`),
+			BuildEnvJSON:         rawJSON(`{"ENV":"staging"}`),
 			RegistryURL:          "custom-registry.example.com/",
 			InstallationID:       "99887766",
 		}
@@ -472,4 +472,11 @@ func TestTektonBuildClient_TriggerBuild_RequestValidation(t *testing.T) {
 		assert.Equal(t, expectedRequest.RegistryURL, receivedRequest.RegistryURL)
 		assert.Equal(t, expectedRequest.InstallationID, receivedRequest.InstallationID)
 	})
+}
+
+func rawJSON(value string) json.RawMessage {
+	if value == "" {
+		return nil
+	}
+	return json.RawMessage([]byte(value))
 }

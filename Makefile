@@ -83,7 +83,7 @@ integration-test:
 	@echo "Starting test database..."
 	@docker-compose --env-file .env.test -f docker-compose.test.yml up -d --wait
 	@echo "Running integration tests..."
-	@go test ./test/integration/... -v -race -timeout 60s; \
+	@go test ./test/integration/... -v -race -timeout 15m; \
 	EXIT_CODE=$$?; \
 	echo "Stopping test database..."; \
 	docker-compose --env-file .env.test -f docker-compose.test.yml down; \
@@ -103,7 +103,7 @@ integration-e2e-test:
 	@echo "Starting test database..."
 	@docker-compose --env-file .env.test -f docker-compose.test.yml up -d --wait
 	@echo "Running integration tests..."
-	@go test ./test/integration/... -v -race -timeout 60s; \
+	@go test ./test/integration/... -v -race -timeout 15m; \
 	INTEGRATION_EXIT=$$?; \
 	echo ""; \
 	echo "Running E2E tests..."; \
