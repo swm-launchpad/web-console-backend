@@ -132,37 +132,24 @@ func formatCPULimit(cpuLimit *uint32) string {
 }
 
 // formatMemoryRequest converts memory limit to memory request (same value for now)
+// Note: memoryLimit is already in MiB units, not bytes
 func formatMemoryRequest(memoryLimit *uint32) string {
 	if memoryLimit == nil {
 		return "512Mi" // Default 512Mi
 	}
-	return formatBytes(*memoryLimit)
+	return fmt.Sprintf("%dMi", *memoryLimit)
 }
 
-// formatMemoryLimit converts memory limit from bytes to Kubernetes format
+// formatMemoryLimit converts memory limit to Kubernetes format
+// Note: memoryLimit is already in MiB units, not bytes
 func formatMemoryLimit(memoryLimit *uint32) string {
 	if memoryLimit == nil {
 		return "1Gi" // Default 1Gi
 	}
-	return formatBytes(*memoryLimit)
+	return fmt.Sprintf("%dMi", *memoryLimit)
 }
 
 // formatMillicores formats CPU millicores for Kubernetes
 func formatMillicores(millicores uint32) string {
 	return fmt.Sprintf("%dm", millicores)
-}
-
-// formatBytes formats bytes for Kubernetes (simplified version)
-func formatBytes(bytes uint32) string {
-	// This is a simplified implementation
-	// In production, you might want more sophisticated formatting
-	const (
-		Mi = 1024 * 1024
-		Gi = 1024 * Mi
-	)
-
-	if bytes >= Gi {
-		return fmt.Sprintf("%dGi", bytes/Gi)
-	}
-	return fmt.Sprintf("%dMi", bytes/Mi)
 }
