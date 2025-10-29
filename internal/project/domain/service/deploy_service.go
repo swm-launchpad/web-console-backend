@@ -1223,9 +1223,13 @@ func (s *deployService) deployProjectInternal(
 					zap.Uint("deployment_id", d.DeploymentID),
 					zap.String("status", string(refreshedDeployment.Status())),
 				)
-				// Deployment completed - exit monitoring
+				// Deployment completed - check if it succeeded or failed
 				// Note: refreshDeploymentStatus already handled project status reset
-				return nil
+				if refreshedDeployment.Status() == deployment.DeploymentStatusSuccess {
+					return nil
+				}
+				// Deployment failed, cancelled, or tracking failed
+				return fmt.Errorf("deployment completed with status: %s", refreshedDeployment.Status())
 			}
 		}
 	}
@@ -1498,11 +1502,12 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 	// Call deployProjectInternal with the captured deployment configuration
 	// This method will handle the deployment, monitoring, and project status updates
 	if err := s.deployProjectInternal(ctx, projectID, deploymentConfig); err != nil {
-		s.logger.Error(ctx, "deployment failed",
+		s.logger.Error(ctx, "build and deploy background operation completed with deployment failure",
 			zap.Uint("project_id", projectID),
 			zap.Error(err),
 		)
 		// deployProjectInternal handles its own cleanup via handleDeployFailure
+		// Builds were successful, but deployment failed
 		return
 	}
 
