@@ -17,6 +17,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
 	application3 "github.com/swm-launchpad/web-console-backend/internal/container/application"
+	"github.com/swm-launchpad/web-console-backend/internal/container/application/build"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 	service3 "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	handler3 "github.com/swm-launchpad/web-console-backend/internal/container/handler"
@@ -109,7 +110,9 @@ func InitializeApp() (*App, error) {
 	serviceSlugService := service3.NewSlugService(containerRepository, logger)
 	containerService := service3.NewContainerService(containerRepository, serviceSlugService, logger)
 	getContainersForDeploymentUseCase := deployment.NewGetContainersForDeploymentUseCase(containerService)
-	containerClient := provideContainerClient(getContainersForDeploymentUseCase, logger)
+	templateRepository := infrastructure2.NewTemplateRepository(db, logger)
+	getContainersForBuildUseCase := build.NewGetContainersForBuildUseCase(containerService, templateRepository)
+	containerClient := provideContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, logger)
 	tektonClient, err := provideTektonClient(logger)
 	if err != nil {
 		return nil, err
@@ -145,7 +148,6 @@ func InitializeApp() (*App, error) {
 	addMountUseCase := application3.NewAddMountUseCase(containerRepository, servicePermissionService, volumeService, txManager, logger)
 	deleteMountUseCase := application3.NewDeleteMountUseCase(containerRepository, servicePermissionService, txManager, logger)
 	containerHandler := handler3.NewContainerHandler(createContainerUseCase, getContainerUseCase, updateContainerUseCase, deleteContainerUseCase, listContainersUseCase, addEnvVarUseCase, updateEnvVarUseCase, deleteEnvVarUseCase, addNetworkUseCase, deleteNetworkUseCase, addSecretUseCase, updateSecretUseCase, deleteSecretUseCase, addBuildVarUseCase, updateBuildVarUseCase, deleteBuildVarUseCase, addMountUseCase, deleteMountUseCase, projectService, containerService, logger)
-	templateRepository := infrastructure2.NewTemplateRepository(db, logger)
 	getTemplatesUseCase := application3.NewGetTemplatesUseCase(templateRepository, logger)
 	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository, logger)
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase, logger)
@@ -231,10 +233,11 @@ func provideKubeClient(log logger.Logger) (infrastructure3.KubeClient, error) {
 
 // provideContainerClient creates a container client
 func provideContainerClient(
-	getContainersUseCase *deployment.GetContainersForDeploymentUseCase,
+	getContainersForDeploymentUseCase *deployment.GetContainersForDeploymentUseCase,
+	getContainersForBuildUseCase *build.GetContainersForBuildUseCase,
 	log logger.Logger,
 ) infrastructure3.ContainerClient {
-	return infrastructure4.NewContainerClient(getContainersUseCase, log)
+	return infrastructure4.NewContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, log)
 }
 
 // provideKubeBuildClient creates a Kubernetes build client from environment variables

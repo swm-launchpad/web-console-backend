@@ -41,4 +41,28 @@ type ContainerClient interface {
 	//           container.Name, container.ImageName, container.ImageTag)
 	//   }
 	GetContainerConfig(ctx context.Context, projectID uint) (*dto.ContainerDeploymentConfig, error)
+
+	// GetContainerBuildConfig retrieves container-specific build configuration for a project.
+	// This includes container build information such as template, git configuration,
+	// build variables, and other build-related settings.
+	// It does NOT include project metadata like project_id, service_name, or namespace.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - *dto.ContainerBuildConfig: Container build configuration if found
+	//   - error: An error if the operation fails or the project is not found
+	//
+	// Example usage:
+	//   config, err := client.GetContainerBuildConfig(ctx, 123)
+	//   if err != nil {
+	//       return err
+	//   }
+	//   for _, container := range config.Containers {
+	//       fmt.Printf("Container: %s, Branch: %s, NeedsBuild: %v\n",
+	//           container.Name, container.GitBranch, container.NeedsBuild)
+	//   }
+	GetContainerBuildConfig(ctx context.Context, projectID uint) (*dto.ContainerBuildConfig, error)
 }
