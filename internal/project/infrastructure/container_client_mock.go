@@ -352,5 +352,22 @@ func (m *MockContainerClient) getMultiContainerUnifiedConfig() *dto.UnifiedConta
 	}
 }
 
+// GetContainerIDsByProjectID returns mock container basic information based on project ID
+func (m *MockContainerClient) GetContainerIDsByProjectID(ctx context.Context, projectID uint) ([]dto.ContainerBasicInfo, error) {
+	switch projectID {
+	case 1:
+		return []dto.ContainerBasicInfo{
+			{ContainerID: 1, Name: "backend"},
+		}, nil
+	case 2:
+		return []dto.ContainerBasicInfo{
+			{ContainerID: 1, Name: "backend"},
+			{ContainerID: 2, Name: "mysql"},
+		}, nil
+	default:
+		return nil, projecterrors.ErrProjectNotFound
+	}
+}
+
 // Compile-time assertion that MockContainerClient implements ContainerClient interface
 var _ infrastructure.ContainerClient = (*MockContainerClient)(nil)

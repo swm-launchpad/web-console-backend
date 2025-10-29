@@ -72,6 +72,16 @@ type VolumeMount struct {
 	MountPath string `json:"mount_path"`
 }
 
+// ContainerBasicInfo represents basic container information (ID and name only).
+// This is a lightweight DTO used for status queries that don't need full container configuration.
+type ContainerBasicInfo struct {
+	// ContainerID is the unique identifier of the container (required)
+	ContainerID uint `json:"container_id"`
+
+	// Name is the container name (required)
+	Name string `json:"name"`
+}
+
 // ContainerDeploymentConfig represents container-specific deployment configuration.
 // This is provided by the Container bounded context and contains only container-level settings.
 // Project metadata (project_id, service_name, namespace, stable_window), ConfigMaps, and Volumes

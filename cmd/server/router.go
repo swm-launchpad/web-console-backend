@@ -24,6 +24,7 @@ type Router struct {
 	projectHandler       *projectHTTP.ProjectHandler
 	volumeHandler        *projectHTTP.VolumeHandler
 	deploymentHandler    *projectHTTP.DeploymentHandler
+	projectStatusHandler *projectHTTP.ProjectStatusHandler
 	containerHandler     *containerHTTP.ContainerHandler
 	templateHandler      *containerHTTP.TemplateHandler
 	authMiddleware       *middleware.AuthMiddleware
@@ -41,6 +42,7 @@ func NewRouter(
 	projectHandler *projectHTTP.ProjectHandler,
 	volumeHandler *projectHTTP.VolumeHandler,
 	deploymentHandler *projectHTTP.DeploymentHandler,
+	projectStatusHandler *projectHTTP.ProjectStatusHandler,
 	containerHandler *containerHTTP.ContainerHandler,
 	templateHandler *containerHTTP.TemplateHandler,
 	authMiddleware *middleware.AuthMiddleware,
@@ -72,6 +74,7 @@ func NewRouter(
 		projectHandler:       projectHandler,
 		volumeHandler:        volumeHandler,
 		deploymentHandler:    deploymentHandler,
+		projectStatusHandler: projectStatusHandler,
 		containerHandler:     containerHandler,
 		templateHandler:      templateHandler,
 		authMiddleware:       authMiddleware,
@@ -148,8 +151,10 @@ func (r *Router) Setup() {
 
 			// Deployment routes
 			projects.POST("/:slug/deploy", r.deploymentHandler.DeployProject)
-			projects.GET("/:slug/deployments/latest", r.deploymentHandler.GetDeployment)
-			projects.POST("/:slug/deployments/refresh", r.deploymentHandler.RefreshDeployment)
+
+			// Status routes (integrated build and deployment status)
+			projects.GET("/:slug/status", r.projectStatusHandler.GetProjectStatus)
+			projects.GET("/:slug/status/refresh", r.projectStatusHandler.RefreshProjectStatus)
 
 			// Container routes under project (RESTful)
 			projects.POST("/:slug/containers", r.containerHandler.CreateContainer)

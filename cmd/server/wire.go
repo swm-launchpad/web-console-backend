@@ -306,8 +306,8 @@ func InitializeApp() (*App, error) {
 		projectApp.NewGetVolumesUseCase,
 		projectApp.NewRemoveVolumeUseCase,
 		projectApp.NewDeployProjectUseCase,
-		projectApp.NewGetDeploymentUseCase,
-		projectApp.NewRefreshDeploymentUseCase,
+		projectApp.NewGetProjectStatusUseCase,
+		projectApp.NewRefreshProjectStatusUseCase,
 
 		// Container infrastructure
 		containerInfra.NewContainerRepository,
@@ -355,6 +355,7 @@ func InitializeApp() (*App, error) {
 		projectHTTP.NewProjectHandler,
 		projectHTTP.NewVolumeHandler,
 		projectHTTP.NewDeploymentHandler,
+		projectHTTP.NewProjectStatusHandler,
 		containerHTTP.NewContainerHandler,
 		containerHTTP.NewTemplateHandler,
 
