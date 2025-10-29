@@ -190,6 +190,7 @@ func (c *containerClient) GetContainerBuildConfig(ctx context.Context, projectID
 
 	for _, container := range containersOutput.Containers {
 		containerInfo := dto.BuildContainerInfo{
+			ProjectID:           uint(projectID),
 			ContainerID:         container.ContainerID,
 			Name:                container.Name,
 			Slug:                container.Slug,

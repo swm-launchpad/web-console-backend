@@ -51,6 +51,19 @@ func LoadTestEnv(t *testing.T) {
 	if !loaded {
 		t.Logf("Warning: Failed to load .env.test file (environment variables might already be set): %v", err)
 	}
+
+	// Fix CA cert path for integration tests
+	// Integration tests run from test/integration directory, so we need to adjust the relative path
+	adjustCACertPath()
+}
+
+// adjustCACertPath adjusts KUBE_CA_CERT_PATH if it points to a relative path
+// This is needed because integration tests run from test/integration directory
+func adjustCACertPath() {
+	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+	if caCertPath == "./ca.crt" || caCertPath == "ca.crt" {
+		_ = os.Setenv("KUBE_CA_CERT_PATH", "../../ca.crt")
+	}
 }
 
 // findProjectRoot finds the project root by looking for go.mod file
