@@ -484,7 +484,10 @@ func (c *containerClient) GetUnifiedContainerConfig(ctx context.Context, project
 			if i == 0 {
 				port = int(net.InternalPort)
 				if net.FQDN != "" {
-					domain = &net.FQDN
+					// Copy FQDN to local variable before taking address
+					// to avoid capturing loop variable pointer
+					fqdn := net.FQDN
+					domain = &fqdn
 				}
 			}
 		}
