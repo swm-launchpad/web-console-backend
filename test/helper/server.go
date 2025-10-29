@@ -16,6 +16,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/email"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	"github.com/swm-launchpad/web-console-backend/internal/common/settings"
 	containerApp "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	containerService "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
@@ -76,12 +77,17 @@ func SetupTestServer(t *testing.T) *TestServer {
 	updateUserUseCase := application.NewUpdateUserUseCase(userService, testLogger)
 	changePasswordUseCase := application.NewChangePasswordUseCase(userService, authService, testLogger)
 
+	// Settings service (for validation)
+	settingsRepo := settings.NewSettingsRepository(testDB.DB)
+	settingsSvc := settings.NewSettingsService(settingsRepo)
+
 	// Project dependencies
 	projectRepository := projectRepo.NewProjectRepository(testDB.DB, testLogger)
 	volumeRepo := projectRepo.NewVolumeRepository(testDB.DB, testLogger)
 	slugService := projectService.NewSlugService(projectRepository, testLogger)
 	volumeSlugService := projectService.NewVolumeSlugService(volumeRepo, testLogger)
-	projectSvc := projectService.NewProjectService(projectRepository, slugService, testLogger)
+	validationService := projectService.NewValidationService(projectRepository, settingsSvc)
+	projectSvc := projectService.NewProjectService(projectRepository, slugService, validationService, testLogger)
 	volumeSvc := projectService.NewVolumeService(volumeRepo, projectRepository, volumeSlugService, testLogger)
 	permissionSvc := projectService.NewPermissionService(projectRepository, volumeRepo, testLogger)
 
@@ -141,6 +147,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 		listProjectsUseCase,
 		permissionSvc,
 		projectSvc,
+		settingsSvc,
 		testLogger,
 	)
 	volumeHandler := projectHTTP.NewVolumeHandler(
