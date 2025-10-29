@@ -597,6 +597,312 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	})
 }
 
+// TestProjectService_UpdateProject_FreePlanQuota tests the Free plan quota validation logic
+func TestProjectService_UpdateProject_FreePlanQuota(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("성공: Free plan 프로젝트 이름 변경 (플랜 변경 없음)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		freePlan := value.PlanFree
+		project := createTestProject(projectID, "Free Project", *slug, actingUserID)
+		err := project.SetPlan(freePlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			return p.SetName("Updated Name")
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		assert.Equal(t, "Updated Name", updatedProject.Name())
+		assert.False(t, freePlanLimitCalled, "ValidateFreePlanLimit should NOT be called when plan doesn't change")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("성공: Free plan 프로젝트 리소스 변경 (플랜 변경 없음)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		freePlan := value.PlanFree
+		project := createTestProject(projectID, "Free Project", *slug, actingUserID)
+		err := project.SetPlan(freePlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			// Update resource limits (while staying in Free plan)
+			limits, _ := value.NewResourceLimits(500, 1024, 2048, 1000)
+			return p.SetResourceLimits(*limits)
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		assert.False(t, freePlanLimitCalled, "ValidateFreePlanLimit should NOT be called when plan doesn't change")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("성공: Eco → Free plan 변경 시 쿼터 검증 수행", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		ecoPlan := value.PlanEco
+		freePlan := value.PlanFree
+		project := createTestProject(projectID, "Eco Project", *slug, actingUserID)
+		err := project.SetPlan(ecoPlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			return p.SetPlan(freePlan)
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		plan, hasPlan := updatedProject.Plan()
+		assert.True(t, hasPlan)
+		assert.Equal(t, freePlan, plan)
+		assert.True(t, freePlanLimitCalled, "ValidateFreePlanLimit SHOULD be called when plan changes to Free")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("실패: Eco → Free plan 변경 시 쿼터 초과", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				return projecterrors.ErrFreePlanLimitExceeded
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		ecoPlan := value.PlanEco
+		freePlan := value.PlanFree
+		project := createTestProject(projectID, "Eco Project", *slug, actingUserID)
+		err := project.SetPlan(ecoPlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			return p.SetPlan(freePlan)
+		})
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrFreePlanLimitExceeded, err)
+		assert.Nil(t, updatedProject)
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("성공: NULL plan (Eco 기본값) 프로젝트를 Free로 변경 시 쿼터 검증", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		freePlan := value.PlanFree
+		// Create project without plan (NULL, defaults to Eco)
+		project := createTestProject(projectID, "Legacy Project", *slug, actingUserID)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			return p.SetPlan(freePlan)
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		assert.True(t, freePlanLimitCalled, "ValidateFreePlanLimit SHOULD be called when NULL → Free (treated as Eco → Free)")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+}
+
+// TestProjectService_UpdateProjectBySlug_FreePlanQuota tests the Free plan quota validation logic for UpdateProjectBySlug
+func TestProjectService_UpdateProjectBySlug_FreePlanQuota(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("성공: Free plan 프로젝트 이름 변경 (플랜 변경 없음)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		actingUserID := uint(1)
+		slug := "p2025011812000012345678"
+		projectSlug, _ := value.NewProjectSlug(slug)
+		freePlan := value.PlanFree
+		project := createTestProject(1, "Free Project", *projectSlug, actingUserID)
+		err := project.SetPlan(freePlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindBySlug", ctx, slug).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProjectBySlug(ctx, slug, actingUserID, func(p *model.Project) error {
+			return p.SetName("Updated Name")
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		assert.Equal(t, "Updated Name", updatedProject.Name())
+		assert.False(t, freePlanLimitCalled, "ValidateFreePlanLimit should NOT be called when plan doesn't change")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("성공: Eco → Free plan 변경 시 쿼터 검증 수행", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		actingUserID := uint(1)
+		slug := "p2025011812000012345678"
+		projectSlug, _ := value.NewProjectSlug(slug)
+		ecoPlan := value.PlanEco
+		freePlan := value.PlanFree
+		project := createTestProject(1, "Eco Project", *projectSlug, actingUserID)
+		err := project.SetPlan(ecoPlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindBySlug", ctx, slug).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProjectBySlug(ctx, slug, actingUserID, func(p *model.Project) error {
+			return p.SetPlan(freePlan)
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		plan, hasPlan := updatedProject.Plan()
+		assert.True(t, hasPlan)
+		assert.Equal(t, freePlan, plan)
+		assert.True(t, freePlanLimitCalled, "ValidateFreePlanLimit SHOULD be called when plan changes to Free")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+}
+
 func createTestProject(id uint, name string, slug value.ProjectSlug, ownerID uint) *model.Project {
 	project, _ := model.NewProject(name, slug, ownerID, defaultLimits(), nil, nil)
 	project.SetProjectID(id)

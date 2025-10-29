@@ -255,6 +255,13 @@ func (s *projectService) UpdateProject(ctx context.Context, projectID uint, acti
 		return nil, err
 	}
 
+	// Store original plan before update
+	originalPlan, hadPlan := project.Plan()
+	if !hadPlan {
+		// Pre-existing projects without a plan default to Eco
+		originalPlan = value.PlanEco
+	}
+
 	// Apply the update function
 	if err := updateFn(project); err != nil {
 		s.logger.Error(ctx, "failed to apply update function",
@@ -292,8 +299,9 @@ func (s *projectService) UpdateProject(ctx context.Context, projectID uint, acti
 		return nil, err
 	}
 
-	// If converting to Free plan, check project count for the acting user
-	if plan == value.PlanFree {
+	// If converting to Free plan (not already Free), check project count for the acting user
+	// This prevents blocking updates to existing Free plan projects (e.g., renaming)
+	if plan == value.PlanFree && originalPlan != value.PlanFree {
 		if err := s.validationService.ValidateFreePlanLimit(ctx, actingUserID, plan); err != nil {
 			s.logger.Error(ctx, "free plan limit validation failed",
 				zap.Uint("project_id", projectID),
@@ -344,6 +352,13 @@ func (s *projectService) UpdateProjectBySlug(ctx context.Context, slug string, a
 		return nil, err
 	}
 
+	// Store original plan before update
+	originalPlan, hadPlan := project.Plan()
+	if !hadPlan {
+		// Pre-existing projects without a plan default to Eco
+		originalPlan = value.PlanEco
+	}
+
 	// Apply the update function
 	if err := updateFn(project); err != nil {
 		s.logger.Error(ctx, "failed to apply update function",
@@ -381,8 +396,9 @@ func (s *projectService) UpdateProjectBySlug(ctx context.Context, slug string, a
 		return nil, err
 	}
 
-	// If converting to Free plan, check project count for the acting user
-	if plan == value.PlanFree {
+	// If converting to Free plan (not already Free), check project count for the acting user
+	// This prevents blocking updates to existing Free plan projects (e.g., renaming)
+	if plan == value.PlanFree && originalPlan != value.PlanFree {
 		if err := s.validationService.ValidateFreePlanLimit(ctx, actingUserID, plan); err != nil {
 			s.logger.Error(ctx, "free plan limit validation failed",
 				zap.String("slug", slug),
