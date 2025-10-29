@@ -109,6 +109,7 @@ func InitializeApp() (*App, error) {
 	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager, logger)
 	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService, volumeService, logger)
 	deploymentRepository := repository.NewDeploymentRepository(db, logger)
+	buildHistoryRepository := repository.NewBuildHistoryRepository(db, logger)
 	containerRepository := infrastructure2.NewContainerRepository(db, logger)
 	serviceSlugService := service3.NewSlugService(containerRepository, logger)
 	containerService := service3.NewContainerService(containerRepository, serviceSlugService, logger)
@@ -125,12 +126,11 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	buildHistoryRepository := repository.NewBuildHistoryRepository(db, logger)
-	tektonBuildClient, err := provideTektonBuildClient(logger)
+	kubeBuildClient, err := provideKubeBuildClient(logger)
 	if err != nil {
 		return nil, err
 	}
-	kubeBuildClient, err := provideKubeBuildClient(logger)
+	tektonBuildClient, err := provideTektonBuildClient(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -139,11 +139,11 @@ func InitializeApp() (*App, error) {
 	updateContainerAfterBuildUseCase := build.NewUpdateContainerAfterBuildUseCase(containerRepository, txManager, logger)
 	containerUpdateAdapter := infrastructure3.NewContainerUpdateAdapter(updateContainerAfterBuildUseCase, logger)
 	postProcessor := build2.NewPostProcessor(containerUpdateAdapter, logger)
-	deployer := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient, orchestrator, postProcessor, logger)
+	deployer := provideDeployService(txManager, projectRepository, deploymentRepository, buildHistoryRepository, volumeRepository, containerClient, tektonClient, kubeClient, kubeBuildClient, orchestrator, postProcessor, logger)
 	deployProjectUseCase := application2.NewDeployProjectUseCase(deployer, logger)
 	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, permissionService, projectService, logger)
 	getProjectStatusUseCase := application2.NewGetProjectStatusUseCase(projectRepository, deploymentRepository, buildHistoryRepository, containerClient, logger)
-	refreshProjectStatusUseCase := application2.NewRefreshProjectStatusUseCase(projectRepository, deploymentRepository, buildHistoryRepository, containerClient, kubeClient, kubeBuildClient, logger)
+	refreshProjectStatusUseCase := application2.NewRefreshProjectStatusUseCase(projectRepository, deployer, logger)
 	projectStatusHandler := handler2.NewProjectStatusHandler(getProjectStatusUseCase, refreshProjectStatusUseCase, permissionService, projectService, logger)
 	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository, logger)
 	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository, logger)
@@ -290,10 +290,12 @@ func provideDeployService(
 	txManager db.TxManager,
 	projectRepository repository2.ProjectRepository,
 	deploymentRepo repository2.DeploymentRepository,
+	buildHistoryRepo repository2.BuildHistoryRepository,
 	volumeRepo repository2.VolumeRepository,
 	containerClient infrastructure4.ContainerClient,
 	tektonClient infrastructure4.TektonClient,
 	kubeClient infrastructure4.KubeClient,
+	kubeBuildClient infrastructure4.KubeBuildClient,
 	buildOrchestrator build2.Orchestrator,
 	buildPostProcessor build2.PostProcessor,
 	log logger.Logger,
@@ -309,10 +311,12 @@ func provideDeployService(
 		txManager,
 		projectRepository,
 		deploymentRepo,
+		buildHistoryRepo,
 		volumeRepo,
 		containerClient,
 		tektonClient,
 		kubeClient,
+		kubeBuildClient,
 		buildOrchestrator,
 		buildPostProcessor,
 		deployNamespace,

@@ -8,6 +8,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/build_history"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build"
 )
@@ -130,6 +131,44 @@ type Deployer interface {
 	//   log.Printf("Refreshed status: %s", deployment.Status)
 	RefreshActiveDeployment(ctx context.Context, projectID uint) (*deployment.Deployment, error)
 
+	// RefreshActiveBuildStatuses queries Kubernetes for all active builds of a project
+	// and updates the database accordingly. This method handles the complete build refresh
+	// workflow including project status reset when all builds complete.
+	//
+	// This method:
+	//   - Fetches all containers for the project
+	//   - Refreshes build history for each container from Kubernetes (if not terminal)
+	//   - Automatically resets project.operation_status to 'nothing' when all builds complete
+	//   - Prevents projects from being stuck in 'building' state
+	//
+	// This method is useful when:
+	//   - User wants to force refresh build statuses
+	//   - Background monitoring goroutine crashed and builds need manual refresh
+	//   - Frontend needs immediate build status update
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - []*build_history.BuildHistory: List of build histories with latest status from Kubernetes
+	//   - bool: true if project status was reset to 'nothing' (all builds completed)
+	//   - error: An error if the operation fails
+	//
+	// Error cases:
+	//   - ErrProjectNotFound: Project does not exist
+	//   - ErrContainerNotFound: No containers configured for the project
+	//   - ErrKubePipelineRunNotFound: PipelineRun no longer exists in Kubernetes
+	//   - ErrKubeConnectionFailed: Cannot connect to Kubernetes API
+	//
+	// Example usage:
+	//   buildHistories, projectReset, err := deployService.RefreshActiveBuildStatuses(ctx, 123)
+	//   if err != nil {
+	//       return err
+	//   }
+	//   log.Printf("Refreshed %d builds, project reset: %t", len(buildHistories), projectReset)
+	RefreshActiveBuildStatuses(ctx context.Context, projectID uint) ([]*build_history.BuildHistory, bool, error)
+
 	// BuildAndDeployProject builds all containers for a project, then deploys them.
 	// This method orchestrates the complete CI/CD pipeline: build → deploy.
 	//
@@ -178,10 +217,12 @@ type deployService struct {
 	txManager          db.TxManager
 	projectRepo        repository.ProjectRepository
 	deploymentRepo     repository.DeploymentRepository
+	buildHistoryRepo   repository.BuildHistoryRepository
 	volumeRepo         repository.VolumeRepository
 	containerClient    infrastructure.ContainerClient
 	tektonClient       infrastructure.TektonClient
 	kubeClient         infrastructure.KubeClient
+	kubeBuildClient    infrastructure.KubeBuildClient
 	buildOrchestrator  build.Orchestrator
 	buildPostProcessor build.PostProcessor
 	deployNamespace    string
@@ -194,10 +235,12 @@ func NewDeployer(
 	txManager db.TxManager,
 	projectRepo repository.ProjectRepository,
 	deploymentRepo repository.DeploymentRepository,
+	buildHistoryRepo repository.BuildHistoryRepository,
 	volumeRepo repository.VolumeRepository,
 	containerClient infrastructure.ContainerClient,
 	tektonClient infrastructure.TektonClient,
 	kubeClient infrastructure.KubeClient,
+	kubeBuildClient infrastructure.KubeBuildClient,
 	buildOrchestrator build.Orchestrator,
 	buildPostProcessor build.PostProcessor,
 	deployNamespace string,
@@ -208,10 +251,12 @@ func NewDeployer(
 		txManager:          txManager,
 		projectRepo:        projectRepo,
 		deploymentRepo:     deploymentRepo,
+		buildHistoryRepo:   buildHistoryRepo,
 		volumeRepo:         volumeRepo,
 		containerClient:    containerClient,
 		tektonClient:       tektonClient,
 		kubeClient:         kubeClient,
+		kubeBuildClient:    kubeBuildClient,
 		buildOrchestrator:  buildOrchestrator,
 		buildPostProcessor: buildPostProcessor,
 		deployNamespace:    deployNamespace,

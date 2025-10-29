@@ -11,6 +11,7 @@ import (
 
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/build_history"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 )
@@ -472,4 +473,312 @@ func (s *deployService) RefreshActiveDeployment(ctx context.Context, projectID u
 	return d, nil
 }
 
-// monitorDeployment monitors a deployment in the background
+// RefreshActiveBuildStatuses refreshes all build statuses for a project from Kubernetes
+func (s *deployService) RefreshActiveBuildStatuses(ctx context.Context, projectID uint) ([]*build_history.BuildHistory, bool, error) {
+	s.logger.Info(ctx, "refresh active build statuses started",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Get containers for this project
+	containers, err := s.containerClient.GetContainerIDsByProjectID(ctx, projectID)
+	if err != nil {
+		s.logger.Error(ctx, "failed to get container IDs",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return nil, false, err
+	}
+
+	// For each container, get latest build history and refresh if not terminal
+	buildHistories := make([]*build_history.BuildHistory, 0, len(containers))
+	for _, container := range containers {
+		buildHistory, err := s.buildHistoryRepo.FindLatestByContainerID(ctx, container.ContainerID)
+		if err != nil {
+			// Container may not have any build history yet, skip it
+			s.logger.Warn(ctx, "no build history found for container",
+				zap.Uint("container_id", container.ContainerID),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		// If build is not completed, refresh from Kubernetes
+		if !buildHistory.IsCompleted() {
+			s.logger.Info(ctx, "refreshing non-terminal build from Kubernetes",
+				zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+				zap.Uint("container_id", container.ContainerID),
+				zap.String("status", string(buildHistory.Status())),
+			)
+
+			refreshedBuildHistory, err := s.refreshBuildHistoryStatus(ctx, buildHistory)
+			if err != nil {
+				s.logger.Error(ctx, "failed to refresh build history status",
+					zap.Uint("build_history_id", buildHistory.BuildHistoryID),
+					zap.Error(err),
+				)
+				// Use stale data if refresh fails
+			} else {
+				buildHistory = refreshedBuildHistory
+			}
+		}
+
+		buildHistories = append(buildHistories, buildHistory)
+	}
+
+	// Check if all builds are completed - if so, reset project status to 'nothing'
+	// This prevents projects from being stuck in 'building' state if the background goroutine crashes
+	allCompleted := true
+	for _, bh := range buildHistories {
+		status := bh.Status()
+		if status != build_history.BuildHistoryStatusSuccess &&
+			status != build_history.BuildHistoryStatusSkipped &&
+			status != build_history.BuildHistoryStatusFailed &&
+			status != build_history.BuildHistoryStatusCancelled &&
+			status != build_history.BuildHistoryStatusBackendTrackingFailed {
+			allCompleted = false
+			break
+		}
+	}
+
+	projectReset := false
+	if allCompleted && len(buildHistories) > 0 {
+		s.logger.Info(ctx, "all builds completed, resetting project status to nothing",
+			zap.Uint("project_id", projectID),
+		)
+
+		// Reset project status using FindByIDForUpdate to prevent race conditions
+		proj, err := s.projectRepo.FindByIDForUpdate(ctx, projectID)
+		if err != nil {
+			s.logger.Error(ctx, "failed to find project for status reset",
+				zap.Uint("project_id", projectID),
+				zap.Error(err),
+			)
+			// Don't fail the entire refresh - just log the error
+		} else {
+			// Only reset if project is still in 'building' status
+			if proj.OperationStatus() == value.ProjectOperationStatusBuilding {
+				if err := proj.CompleteBuild(); err != nil {
+					s.logger.Error(ctx, "failed to complete build operation",
+						zap.Uint("project_id", projectID),
+						zap.Error(err),
+					)
+				} else {
+					if err := s.projectRepo.Save(ctx, proj); err != nil {
+						s.logger.Error(ctx, "failed to save project after status reset",
+							zap.Uint("project_id", projectID),
+							zap.Error(err),
+						)
+					} else {
+						s.logger.Info(ctx, "project status reset to nothing",
+							zap.Uint("project_id", projectID),
+						)
+						projectReset = true
+					}
+				}
+			}
+		}
+	}
+
+	s.logger.Info(ctx, "refresh active build statuses completed",
+		zap.Uint("project_id", projectID),
+		zap.Int("build_count", len(buildHistories)),
+		zap.Bool("project_reset", projectReset),
+	)
+
+	return buildHistories, projectReset, nil
+}
+
+// refreshBuildHistoryStatus refreshes a build history from Kubernetes API
+func (s *deployService) refreshBuildHistoryStatus(
+	ctx context.Context,
+	bh *build_history.BuildHistory,
+) (*build_history.BuildHistory, error) {
+	pipelineRunName, hasRunName := bh.TektonPipelineRunName()
+
+	// If no pipeline run name yet, try to find it via label-based lookup
+	if !hasRunName {
+		// Need TektonEventID to perform lookup
+		eventID, hasEventID := bh.TektonEventID()
+		if !hasEventID {
+			// Critical data inconsistency: build history has no event ID
+			s.logger.Error(ctx, "build history has no Tekton EventID",
+				zap.Uint("build_history_id", bh.BuildHistoryID),
+				zap.Uint("container_id", bh.ContainerID()),
+			)
+			msg := "Build history has no Tekton EventID (critical data inconsistency)"
+			if err := bh.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &msg); err != nil {
+				return nil, err
+			}
+			if err := s.buildHistoryRepo.Save(ctx, bh); err != nil {
+				return nil, err
+			}
+			return bh, nil
+		}
+
+		// Find pipeline run by event ID
+		var err error
+		pipelineRunName, err = s.kubeBuildClient.FindPipelineRunNameByEventID(ctx, eventID)
+		if err != nil {
+			// Check if the error is a "not found" error or a transient connectivity/auth issue
+			if errors.Is(err, projecterrors.ErrKubePipelineRunNotFound) {
+				// PipelineRun truly does not exist - only mark as terminal failure after 5 minute grace period
+				createdAt := bh.CreatedAt()
+				if time.Since(createdAt) > 5*time.Minute {
+					msg := "PipelineRun not found after 5 minutes"
+					if err := bh.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &msg); err != nil {
+						return nil, err
+					}
+					if err := s.buildHistoryRepo.Save(ctx, bh); err != nil {
+						return nil, err
+					}
+				}
+				return bh, nil
+			}
+
+			// Other errors (connection/authentication issues) are transient and retriable
+			msg := "Failed to find PipelineRun by EventID (transient error)"
+			if err := bh.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingLost, &msg); err != nil {
+				return nil, err
+			}
+			if err := s.buildHistoryRepo.Save(ctx, bh); err != nil {
+				return nil, err
+			}
+			return bh, nil
+		}
+
+		// Update build history with pipeline run name
+		runName := pipelineRunName
+		if err := bh.InitTektonInfo(nil, &runName); err != nil {
+			return nil, err
+		}
+	}
+
+	// Query Kubernetes for current status
+	status, err := s.kubeBuildClient.GetPipelineRunStatus(ctx, pipelineRunName)
+	if err != nil {
+		// If not found, mark as tracking failed (pipeline run deleted)
+		if errors.Is(err, projecterrors.ErrKubePipelineRunNotFound) {
+			msg := "PipelineRun not found in Kubernetes (deleted)"
+			if err := bh.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &msg); err != nil {
+				return nil, err
+			}
+			if err := s.buildHistoryRepo.Save(ctx, bh); err != nil {
+				return nil, err
+			}
+			return bh, nil
+		}
+
+		// Other errors (connection/authentication) are retriable
+		msg := "Failed to get PipelineRun status (transient error)"
+		if err := bh.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingLost, &msg); err != nil {
+			return nil, err
+		}
+		if err := s.buildHistoryRepo.Save(ctx, bh); err != nil {
+			return nil, err
+		}
+		return bh, nil
+	}
+
+	// Update build history status based on PipelineRun status
+	if err := s.updateBuildHistoryFromKubeStatus(ctx, bh, status); err != nil {
+		return nil, err
+	}
+
+	return bh, nil
+}
+
+// updateBuildHistoryFromKubeStatus updates build history based on Kubernetes PipelineRun status
+func (s *deployService) updateBuildHistoryFromKubeStatus(
+	ctx context.Context,
+	bh *build_history.BuildHistory,
+	status *dto.PipelineRun,
+) error {
+	// Similar logic to deployment status update
+
+	if status.Status == "Unknown" {
+		// PipelineRun is still running or pending
+		if bh.Status() != build_history.BuildHistoryStatusRunning {
+			// Initialize Tekton PipelineRun name if not set
+			if _, exists := bh.TektonPipelineRunName(); !exists && status.Name != "" {
+				name := status.Name
+				if err := bh.InitTektonInfo(nil, &name); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Update to running status
+		var summaryPtr *string
+		if status.Message != "" {
+			summaryPtr = &status.Message
+		}
+		if err := bh.UpdateRunningStatus(summaryPtr, status.StartTime); err != nil {
+			return err
+		}
+
+		return s.buildHistoryRepo.Save(ctx, bh)
+	}
+
+	if status.Status == "True" {
+		// PipelineRun succeeded
+		if !bh.IsCompleted() {
+			var summaryPtr *string
+			if status.Message != "" {
+				summaryPtr = &status.Message
+			}
+			// Check if build was skipped
+			buildStatus := build_history.BuildHistoryStatusSuccess
+			if status.Reason == "Skipped" {
+				buildStatus = build_history.BuildHistoryStatusSkipped
+			}
+
+			finishedAt := time.Now()
+			if status.CompletionTime != nil {
+				finishedAt = *status.CompletionTime
+			}
+
+			// Parse git commit hash from results if available
+			var gitCommitHashPtr *string
+			// TODO: Parse from status.Results if available
+
+			if err := bh.UpdateCompleteStatus(buildStatus, summaryPtr, gitCommitHashPtr, finishedAt); err != nil {
+				return err
+			}
+		}
+
+		return s.buildHistoryRepo.Save(ctx, bh)
+	}
+
+	if status.Status == "False" {
+		// PipelineRun failed or was cancelled
+		var buildStatus build_history.BuildHistoryStatus
+		reason := status.Reason
+		message := status.Message
+		if (reason != "" && (reason == "Cancelled" || reason == "PipelineRunCancelled")) ||
+			(message != "" && (message == "PipelineRun cancelled" || message == "TaskRun cancelled")) {
+			buildStatus = build_history.BuildHistoryStatusCancelled
+		} else {
+			buildStatus = build_history.BuildHistoryStatusFailed
+		}
+
+		if !bh.IsCompleted() {
+			var summaryPtr *string
+			if status.Message != "" {
+				summaryPtr = &status.Message
+			}
+			finishedAt := time.Now()
+			if status.CompletionTime != nil {
+				finishedAt = *status.CompletionTime
+			}
+
+			if err := bh.UpdateCompleteStatus(buildStatus, summaryPtr, nil, finishedAt); err != nil {
+				return err
+			}
+		}
+
+		return s.buildHistoryRepo.Save(ctx, bh)
+	}
+
+	// For unknown statuses, just save build history
+	return s.buildHistoryRepo.Save(ctx, bh)
+}
