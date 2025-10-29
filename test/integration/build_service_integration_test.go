@@ -13,7 +13,7 @@ import (
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/build_history"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/test/helper"
 )
@@ -172,7 +172,7 @@ func TestBuildServiceIntegration_SpringHelloWorld(t *testing.T) {
 	}
 
 	// Create BuildService with real clients and mock repository
-	buildService := service.NewBuildService(
+	buildService := build.NewBuilder(
 		mockRepo,
 		tektonClient,
 		kubeClient,
@@ -283,7 +283,7 @@ func TestBuildServiceIntegration_MySQL(t *testing.T) {
 	}
 
 	// Create BuildService
-	buildService := service.NewBuildService(
+	buildService := build.NewBuilder(
 		mockRepo,
 		tektonClient,
 		kubeClient,
@@ -410,7 +410,7 @@ func TestBuildServiceIntegration_SpringMySQLDemo(t *testing.T) {
 	}
 
 	// Create BuildService
-	buildService := service.NewBuildService(
+	buildService := build.NewBuilder(
 		mockRepo,
 		tektonClient,
 		kubeClient,

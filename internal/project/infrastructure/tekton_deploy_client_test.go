@@ -16,7 +16,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 )
 
-func TestNewTektonClient(t *testing.T) {
+func TestNewTektonDeployClient(t *testing.T) {
 	tests := []struct {
 		name           string
 		deployURL      string
@@ -90,7 +90,7 @@ func TestNewTektonClient(t *testing.T) {
 				}()
 			}
 
-			client, err := NewTektonClient(logger.NewForTest())
+			client, err := NewTektonDeployClient(logger.NewForTest())
 
 			if tt.expectedError != nil {
 				assert.Error(t, err)

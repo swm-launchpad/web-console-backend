@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -6,10 +6,10 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 )
 
-// BuildOrchestrator defines the interface for orchestrating multiple container builds.
+// Orchestrator defines the interface for orchestrating multiple container builds.
 // This service coordinates parallel builds for all containers in a project,
 // managing goroutines, collecting results, and handling errors.
-type BuildOrchestrator interface {
+type Orchestrator interface {
 	// BuildAndWait executes builds for all containers in parallel and waits for completion.
 	// This method:
 	//  1. Creates a BUILD_HISTORY record for each container (status=untracked)

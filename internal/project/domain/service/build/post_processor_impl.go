@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -8,28 +8,29 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 )
 
-// buildPostProcessorImpl implements BuildPostProcessor
-type buildPostProcessorImpl struct {
-	containerUpdater ContainerUpdater
+// postProcessorImpl implements PostProcessor
+type postProcessorImpl struct {
+	containerUpdater infrastructure.ContainerUpdater
 	logger           logger.Logger
 }
 
-// NewBuildPostProcessor creates a new BuildPostProcessor instance
-func NewBuildPostProcessor(
-	containerUpdater ContainerUpdater,
+// NewPostProcessor creates a new PostProcessor instance
+func NewPostProcessor(
+	containerUpdater infrastructure.ContainerUpdater,
 	log logger.Logger,
-) BuildPostProcessor {
-	return &buildPostProcessorImpl{
+) PostProcessor {
+	return &postProcessorImpl{
 		containerUpdater: containerUpdater,
 		logger:           log,
 	}
 }
 
 // UpdateContainerAfterBuild updates container information after a successful build
-func (p *buildPostProcessorImpl) UpdateContainerAfterBuild(
+func (p *postProcessorImpl) UpdateContainerAfterBuild(
 	ctx context.Context,
 	containerID uint,
 	buildResult *BuildResult,

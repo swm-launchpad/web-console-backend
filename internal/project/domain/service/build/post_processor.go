@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 // BuildPostProcessor defines the interface for post-build container updates.
 // This service is responsible for updating container state after a build completes,
 // including last_built_commit_hash and needs_build flags.
-type BuildPostProcessor interface {
+type PostProcessor interface {
 	// UpdateContainerAfterBuild updates container information after a build completes.
 	// This method delegates to ContainerUpdater which handles:
 	//  - Acquiring row lock and comparing build parameter snapshots

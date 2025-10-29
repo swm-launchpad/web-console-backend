@@ -1,9 +1,10 @@
-package service
+package deploy
 
 import (
 	"context"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/build_history"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 )
 
@@ -37,6 +38,15 @@ func (m *MockDeployService) RefreshActiveDeployment(ctx context.Context, project
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*deployment.Deployment), args.Error(1)
+}
+
+// RefreshActiveBuildStatuses mocks the RefreshActiveBuildStatuses method
+func (m *MockDeployService) RefreshActiveBuildStatuses(ctx context.Context, projectID uint) ([]*build_history.BuildHistory, bool, error) {
+	args := m.Called(ctx, projectID)
+	if args.Get(0) == nil {
+		return nil, args.Bool(1), args.Error(2)
+	}
+	return args.Get(0).([]*build_history.BuildHistory), args.Bool(1), args.Error(2)
 }
 
 // BuildAndDeployProject mocks the BuildAndDeployProject method

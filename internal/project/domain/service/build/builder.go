@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 // BuildService defines the interface for build operations
 // This service is responsible for building individual containers using Tekton pipelines
-type BuildService interface {
+type Builder interface {
 	// BuildContainer executes a build for a single container
 	// This method is designed to be called in a goroutine
 	// It triggers the Tekton build pipeline, monitors its status every 30 seconds,

@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -123,7 +123,7 @@ func TestBuildService_PrepareBuildRequest(t *testing.T) {
 			InstallationID:      &installationID,
 		}
 
-		request, err := service.(*buildServiceImpl).prepareBuildRequest(container)
+		request, err := service.(*builderImpl).prepareBuildRequest(container)
 
 		require.NoError(t, err)
 		assert.Equal(t, "test-slug", request.ImageName)
@@ -160,7 +160,7 @@ func TestBuildService_PrepareBuildRequest(t *testing.T) {
 			NeedsBuild:       false,
 		}
 
-		request, err := service.(*buildServiceImpl).prepareBuildRequest(container)
+		request, err := service.(*builderImpl).prepareBuildRequest(container)
 
 		require.NoError(t, err)
 		assert.Equal(t, "test-slug", request.ImageName)
@@ -195,7 +195,7 @@ func TestBuildService_BuildContainer_TriggerFailure(t *testing.T) {
 
 	kubeBuildClient := &mockKubeBuildClient{}
 
-	service := NewBuildService(buildHistoryRepo, tektonBuildClient, kubeBuildClient, testLogger)
+	service := NewBuilder(buildHistoryRepo, tektonBuildClient, kubeBuildClient, testLogger)
 
 	testTemplate := "FROM alpine:latest"
 	container := &dto.BuildContainerInfo{
@@ -246,7 +246,7 @@ func TestBuildService_BuildContainer_FindPipelineRunFailure(t *testing.T) {
 	}
 
 	// Use short intervals for test (100ms instead of 10s)
-	service := &buildServiceImpl{
+	service := &builderImpl{
 		buildHistoryRepo:             buildHistoryRepo,
 		tektonBuildClient:            tektonBuildClient,
 		kubeBuildClient:              kubeBuildClient,
@@ -314,7 +314,7 @@ func TestBuildService_BuildContainer_ContextCancellation(t *testing.T) {
 	}
 
 	// Use short intervals for test (100ms instead of 10s)
-	service := &buildServiceImpl{
+	service := &builderImpl{
 		buildHistoryRepo:             buildHistoryRepo,
 		tektonBuildClient:            tektonBuildClient,
 		kubeBuildClient:              kubeBuildClient,
@@ -365,7 +365,7 @@ func TestBuildService_HandleBuildSuccess(t *testing.T) {
 		},
 	}
 
-	service := &buildServiceImpl{
+	service := &builderImpl{
 		buildHistoryRepo: buildHistoryRepo,
 		logger:           testLogger,
 	}
@@ -430,7 +430,7 @@ func TestBuildService_HandleBuildFailure(t *testing.T) {
 		},
 	}
 
-	service := &buildServiceImpl{
+	service := &builderImpl{
 		buildHistoryRepo: buildHistoryRepo,
 		logger:           testLogger,
 	}
@@ -495,7 +495,7 @@ func TestBuildService_CheckBuildStatus(t *testing.T) {
 			},
 		}
 
-		service := &buildServiceImpl{
+		service := &builderImpl{
 			buildHistoryRepo: buildHistoryRepo,
 			kubeBuildClient:  kubeBuildClient,
 			logger:           testLogger,
@@ -527,7 +527,7 @@ func TestBuildService_CheckBuildStatus(t *testing.T) {
 			},
 		}
 
-		service := &buildServiceImpl{
+		service := &builderImpl{
 			buildHistoryRepo: buildHistoryRepo,
 			kubeBuildClient:  kubeBuildClient,
 			logger:           testLogger,
@@ -551,7 +551,7 @@ func TestBuildService_CheckBuildStatus(t *testing.T) {
 			},
 		}
 
-		service := &buildServiceImpl{
+		service := &builderImpl{
 			buildHistoryRepo: buildHistoryRepo,
 			kubeBuildClient:  kubeBuildClient,
 			logger:           testLogger,
@@ -577,7 +577,7 @@ func TestBuildService_CheckBuildStatus(t *testing.T) {
 			},
 		}
 
-		service := &buildServiceImpl{
+		service := &builderImpl{
 			buildHistoryRepo: buildHistoryRepo,
 			kubeBuildClient:  kubeBuildClient,
 			logger:           testLogger,
@@ -660,7 +660,7 @@ func TestBuildService_FastBuildStartedAt(t *testing.T) {
 			},
 		}
 
-		buildService := &buildServiceImpl{
+		buildService := &builderImpl{
 			buildHistoryRepo:             mockRepo,
 			tektonBuildClient:            mockTektonClient,
 			kubeBuildClient:              mockKubeClient,
@@ -751,7 +751,7 @@ func TestBuildService_FastBuildStartedAt(t *testing.T) {
 			},
 		}
 
-		buildService := &buildServiceImpl{
+		buildService := &builderImpl{
 			buildHistoryRepo:             mockRepo,
 			tektonBuildClient:            mockTektonClient,
 			kubeBuildClient:              mockKubeClient,
@@ -805,7 +805,7 @@ func TestBuildService_InitialCheckTerminalError(t *testing.T) {
 		},
 	}
 
-	buildService := &buildServiceImpl{
+	buildService := &builderImpl{
 		buildHistoryRepo:             mockBuildHistoryRepo,
 		kubeBuildClient:              mockKubeClient,
 		logger:                       logger.NewForTest(),
@@ -835,8 +835,8 @@ func TestBuildService_InitialCheckTerminalError(t *testing.T) {
 
 // Helper functions
 
-func createTestBuildService() BuildService {
-	return &buildServiceImpl{
+func createTestBuildService() Builder {
+	return &builderImpl{
 		buildHistoryRepo:  &mockBuildHistoryRepository{},
 		tektonBuildClient: &mockTektonBuildClient{},
 		kubeBuildClient:   &mockKubeBuildClient{},
@@ -875,7 +875,7 @@ func TestBuildService_FindPipelineRunWithRetry_Timeout(t *testing.T) {
 	// Create service with short timeout to test the actual time.After timeout path
 	// timeout=47ms, interval=10ms → calculatedRetries=4 (47/10 integer division)
 	// maxRetries=100 → min(4, 100)=4, so loop runs 4 times (40ms) then timeout fires at 47ms
-	service := &buildServiceImpl{
+	service := &builderImpl{
 		buildHistoryRepo:             mockBuildHistoryRepo,
 		kubeBuildClient:              mockKubeBuildClient,
 		logger:                       testLogger,
@@ -931,7 +931,7 @@ func TestBuildService_FindPipelineRunWithRetry_RetryExhaustion(t *testing.T) {
 	// Create service with settings that exhaust retries before timeout
 	// timeout=5s, interval=10ms, maxRetries=10 → retry exhaustion fires first
 	// 10 attempts × 10ms = 100ms << 5s
-	service := &buildServiceImpl{
+	service := &builderImpl{
 		buildHistoryRepo:             mockBuildHistoryRepo,
 		kubeBuildClient:              mockKubeBuildClient,
 		logger:                       testLogger,
@@ -978,7 +978,7 @@ func TestBuildService_FindPipelineRunWithRetry_UpdateFailure(t *testing.T) {
 		},
 	}
 
-	service := &buildServiceImpl{
+	service := &builderImpl{
 		buildHistoryRepo:             mockBuildHistoryRepo,
 		kubeBuildClient:              mockKubeBuildClient,
 		logger:                       testLogger,
@@ -1047,7 +1047,7 @@ func TestBuildService_BuildContainer_SaveRetryAfterFindPipelineRunFailure(t *tes
 		},
 	}
 
-	service := &buildServiceImpl{
+	service := &builderImpl{
 		buildHistoryRepo:             buildHistoryRepo,
 		tektonBuildClient:            tektonBuildClient,
 		kubeBuildClient:              kubeBuildClient,

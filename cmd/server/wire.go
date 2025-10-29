@@ -28,11 +28,12 @@ import (
 	projectDomainInfra "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	projectDomainRepo "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	projectBuildService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build"
+	projectDeployService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/deploy"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	projectSqlc "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
-	projectInfraService "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -101,14 +102,14 @@ func provideEmailService(cfg *config.Config, log logger.Logger) email.Service {
 	)
 }
 
-// provideTektonClient creates a Tekton client from environment variables
-func provideTektonClient(log logger.Logger) (projectDomainInfra.TektonClient, error) {
-	return projectInfra.NewTektonClient(log)
+// provideTektonDeployClient creates a Tekton client from environment variables
+func provideTektonDeployClient(log logger.Logger) (projectDomainInfra.TektonClient, error) {
+	return projectInfra.NewTektonDeployClient(log)
 }
 
-// provideKubeClient creates a Kubernetes client from environment variables
-func provideKubeClient(log logger.Logger) (projectDomainInfra.KubeClient, error) {
-	return projectInfra.NewKubeClient(log)
+// provideKubeDeployClient creates a Kubernetes client from environment variables
+func provideKubeDeployClient(log logger.Logger) (projectDomainInfra.KubeClient, error) {
+	return projectInfra.NewKubeDeployClient(log)
 }
 
 // provideContainerClient creates a container client
@@ -152,14 +153,16 @@ func provideDeployService(
 	txManager db.TxManager,
 	projectRepository projectDomainRepo.ProjectRepository,
 	deploymentRepo projectDomainRepo.DeploymentRepository,
+	buildHistoryRepo projectDomainRepo.BuildHistoryRepository,
 	volumeRepo projectDomainRepo.VolumeRepository,
 	containerClient projectDomainInfra.ContainerClient,
 	tektonClient projectDomainInfra.TektonClient,
 	kubeClient projectDomainInfra.KubeClient,
-	buildOrchestrator projectService.BuildOrchestrator,
-	buildPostProcessor projectService.BuildPostProcessor,
+	kubeBuildClient projectDomainInfra.KubeBuildClient,
+	buildOrchestrator projectBuildService.Orchestrator,
+	buildPostProcessor projectBuildService.PostProcessor,
 	log logger.Logger,
-) projectService.DeployService {
+) projectDeployService.Deployer {
 	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
 	if deployNamespace == "" {
 		deployNamespace = "default"
@@ -167,14 +170,16 @@ func provideDeployService(
 	// projectServiceName is not used in the actual implementation
 	projectServiceName := ""
 
-	return projectService.NewDeployService(
+	return projectDeployService.NewDeployer(
 		txManager,
 		projectRepository,
 		deploymentRepo,
+		buildHistoryRepo,
 		volumeRepo,
 		containerClient,
 		tektonClient,
 		kubeClient,
+		kubeBuildClient,
 		buildOrchestrator,
 		buildPostProcessor,
 		deployNamespace,
@@ -276,13 +281,13 @@ func InitializeApp() (*App, error) {
 		projectRepo.NewVolumeRepository,
 		projectRepo.NewDeploymentRepository,
 		projectRepo.NewBuildHistoryRepository,
-		provideTektonClient,
-		provideKubeClient,
+		provideTektonDeployClient,
+		provideKubeDeployClient,
 		provideContainerClient,
 		provideTektonBuildClient,
 		provideKubeBuildClient,
-		projectInfraService.NewContainerUpdateAdapter,
-		wire.Bind(new(projectService.ContainerUpdater), new(*projectInfraService.ContainerUpdateAdapter)),
+		projectInfra.NewContainerUpdateAdapter,
+		wire.Bind(new(projectDomainInfra.ContainerUpdater), new(*projectInfra.ContainerUpdateAdapter)),
 
 		// Project domain services
 		projectService.NewSlugService,
@@ -290,9 +295,9 @@ func InitializeApp() (*App, error) {
 		projectService.NewProjectService,
 		projectService.NewVolumeService,
 		projectService.NewPermissionService,
-		projectService.NewBuildService,
-		projectService.NewBuildOrchestrator,
-		projectService.NewBuildPostProcessor,
+		projectBuildService.NewBuilder,
+		projectBuildService.NewOrchestrator,
+		projectBuildService.NewPostProcessor,
 		provideDeployService,
 
 		// Project use cases

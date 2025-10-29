@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/deploy"
 	"go.uber.org/zap"
 )
 
@@ -18,12 +18,12 @@ type DeployProjectOutput struct {
 }
 
 type DeployProjectUseCase struct {
-	deployService service.DeployService
+	deployService deploy.Deployer
 	logger        logger.Logger
 }
 
 func NewDeployProjectUseCase(
-	deployService service.DeployService,
+	deployService deploy.Deployer,
 	log logger.Logger,
 ) *DeployProjectUseCase {
 	return &DeployProjectUseCase{
