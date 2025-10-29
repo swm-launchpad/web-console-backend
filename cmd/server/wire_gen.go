@@ -16,6 +16,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/github"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	"github.com/swm-launchpad/web-console-backend/internal/common/settings"
 	application3 "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/build"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/combined"
@@ -92,7 +93,10 @@ func InitializeApp() (*App, error) {
 	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, startInstallationUseCase, installationCallbackUseCase, configConfig, logger)
 	projectRepository := repository.NewProjectRepository(db, logger)
 	slugService := service2.NewSlugService(projectRepository, logger)
-	projectService := service2.NewProjectService(projectRepository, slugService, logger)
+	settingsRepository := settings.NewSettingsRepository(db)
+	settingsService := settings.NewSettingsService(settingsRepository)
+	validationService := service2.NewValidationService(projectRepository, settingsService)
+	projectService := service2.NewProjectService(projectRepository, slugService, validationService, logger)
 	createProjectUseCase := application2.NewCreateProjectUseCase(projectService, txManager, logger)
 	volumeRepository := repository.NewVolumeRepository(db, logger)
 	volumeSlugService := service2.NewVolumeSlugService(volumeRepository, logger)
@@ -103,7 +107,7 @@ func InitializeApp() (*App, error) {
 	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, txManager, logger)
 	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, logger)
 	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
-	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService, logger)
+	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService, settingsService, logger)
 	addVolumeUseCase := application2.NewAddVolumeUseCase(volumeService, txManager, logger)
 	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService, logger)
 	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager, logger)
@@ -170,9 +174,10 @@ func InitializeApp() (*App, error) {
 	getTemplatesUseCase := application3.NewGetTemplatesUseCase(templateRepository, logger)
 	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository, logger)
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase, logger)
+	settingsHandler := settings.NewSettingsHandler(settingsService, logger)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	loggingMiddleware := provideLoggingMiddleware(logger)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, authMiddleware, loggingMiddleware)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, settingsHandler, authMiddleware, loggingMiddleware)
 	app := NewApp(configConfig, db, router, oAuthStateRepository, logger)
 	return app, nil
 }

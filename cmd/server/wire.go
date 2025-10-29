@@ -16,6 +16,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/github"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	"github.com/swm-launchpad/web-console-backend/internal/common/settings"
 	containerApp "github.com/swm-launchpad/web-console-backend/internal/container/application"
 	containerBuild "github.com/swm-launchpad/web-console-backend/internal/container/application/build"
 	containerCombined "github.com/swm-launchpad/web-console-backend/internal/container/application/combined"
@@ -247,6 +248,11 @@ func InitializeApp() (*App, error) {
 		// GitHub client
 		provideGitHubClient,
 
+		// Settings service
+		settings.NewSettingsRepository,
+		settings.NewSettingsService,
+		settings.NewSettingsHandler,
+
 		// User infrastructure
 		infrastructure.NewUserRepository,
 		infrastructure.NewTokenRepository,
@@ -292,6 +298,7 @@ func InitializeApp() (*App, error) {
 		// Project domain services
 		projectService.NewSlugService,
 		projectService.NewVolumeSlugService,
+		projectService.NewValidationService,
 		projectService.NewProjectService,
 		projectService.NewVolumeService,
 		projectService.NewPermissionService,
