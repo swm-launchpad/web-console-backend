@@ -16,7 +16,7 @@ import (
 )
 
 func defaultLimits() value.ResourceLimits {
-	limits, _ := value.NewResourceLimits(100, 512, 1024, 1000)
+	limits, _ := value.NewResourceLimits(500, 512, 1024, 1000) // CPU: 100 → 500 (MinCPULimit)
 	return *limits
 }
 
@@ -26,8 +26,9 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("성공: 유효한 프로젝트 생성", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		name := "테스트 프로젝트"
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -53,8 +54,9 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: 빈 프로젝트 이름", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		project, err := service.CreateProject(ctx, "", 1, defaultLimits(), nil, nil)
 
@@ -69,8 +71,9 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: OwnerID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		name := "테스트 프로젝트"
 
@@ -87,8 +90,9 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: 프로젝트 이름이 이미 존재", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		name := "기존 프로젝트"
 		ownerID := uint(1)
@@ -109,8 +113,9 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: Slug 생성 실패", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		name := "테스트 프로젝트"
 		ownerID := uint(1)
@@ -132,8 +137,9 @@ func TestProjectService_CreateProject(t *testing.T) {
 	t.Run("실패: 저장소 생성 에러", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		name := "테스트 프로젝트"
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -160,8 +166,9 @@ func TestProjectService_GetProject(t *testing.T) {
 	t.Run("성공: 유효한 ID로 프로젝트 조회", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		projectID := uint(1)
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -181,8 +188,9 @@ func TestProjectService_GetProject(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		project, err := service.GetProject(ctx, 0)
 
@@ -196,8 +204,9 @@ func TestProjectService_GetProject(t *testing.T) {
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		projectID := uint(999)
 
@@ -219,17 +228,19 @@ func TestProjectService_UpdateProject(t *testing.T) {
 	t.Run("성공: 프로젝트 업데이트", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		projectID := uint(1)
+		actingUserID := uint(1)
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		project := createTestProject(projectID, "원래 이름", *slug, 1)
 
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
 		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
 
-		updatedProject, err := service.UpdateProject(ctx, projectID, func(p *model.Project) error {
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
 			return p.SetName("새로운 이름")
 		})
 
@@ -242,10 +253,11 @@ func TestProjectService_UpdateProject(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
-		updatedProject, err := service.UpdateProject(ctx, 0, func(p *model.Project) error {
+		updatedProject, err := service.UpdateProject(ctx, 0, 1, func(p *model.Project) error {
 			return nil
 		})
 
@@ -263,8 +275,9 @@ func TestProjectService_DeleteProject(t *testing.T) {
 	t.Run("성공: 프로젝트 삭제", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		projectID := uint(1)
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -283,8 +296,9 @@ func TestProjectService_DeleteProject(t *testing.T) {
 	t.Run("실패: ProjectID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		err := service.DeleteProject(ctx, 0)
 
@@ -301,8 +315,9 @@ func TestProjectService_ListProjects(t *testing.T) {
 	t.Run("성공: 사용자 프로젝트 목록 조회", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		userID := uint(1)
 		slug1, _ := value.NewProjectSlug("p2025011812000099999991")
@@ -326,8 +341,9 @@ func TestProjectService_ListProjects(t *testing.T) {
 	t.Run("실패: UserID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		projects, err := service.ListProjects(ctx, 0)
 
@@ -345,8 +361,9 @@ func TestProjectService_CountProjectsByUserID(t *testing.T) {
 	t.Run("성공: 활성 프로젝트 개수 조회", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		userID := uint(1)
 		slug1, _ := value.NewProjectSlug("p2025011812000099999993")
@@ -373,8 +390,9 @@ func TestProjectService_CountProjectsByUserID(t *testing.T) {
 	t.Run("실패: UserID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		count, err := service.CountProjectsByUserID(ctx, 0)
 
@@ -392,8 +410,9 @@ func TestProjectService_CheckProjectNameExists(t *testing.T) {
 	t.Run("성공: 프로젝트 이름 존재하지 않음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		name := "새로운 프로젝트"
 		userID := uint(1)
@@ -411,8 +430,9 @@ func TestProjectService_CheckProjectNameExists(t *testing.T) {
 	t.Run("성공: 프로젝트 이름 존재함", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		name := "기존 프로젝트"
 		userID := uint(1)
@@ -430,8 +450,9 @@ func TestProjectService_CheckProjectNameExists(t *testing.T) {
 	t.Run("실패: 빈 프로젝트 이름", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		exists, err := service.CheckProjectNameExists(ctx, "", 1)
 
@@ -445,8 +466,9 @@ func TestProjectService_CheckProjectNameExists(t *testing.T) {
 	t.Run("실패: UserID가 0", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		exists, err := service.CheckProjectNameExists(ctx, "테스트", 0)
 
@@ -464,8 +486,9 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("성공: 유효한 Slug로 프로젝트 조회", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		slug, _ := value.NewProjectSlug("p20250118120000abcd1234")
 		expectedProject := createTestProject(1, "테스트 프로젝트", *slug, 1)
@@ -484,8 +507,9 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: Slug가 너무 짧음 (20자)", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		invalidSlug := "p20250118120000abcd" // 20 chars instead of 23
 
@@ -501,8 +525,9 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: Slug가 너무 긺 (25자)", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		invalidSlug := "p20250118120000abcd123456" // 26 chars instead of 23
 
@@ -518,8 +543,9 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: 잘못된 접두사 (c 대신 p)", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		invalidSlug := "c20250118120000abcd1234" // Container prefix instead of Project
 
@@ -535,8 +561,9 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: 잘못된 형식 (타임스탬프 부분에 문자)", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		invalidSlug := "p2025abc8120000abcd1234" // Letters in timestamp
 
@@ -552,8 +579,9 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 	t.Run("실패: 프로젝트를 찾을 수 없음", func(t *testing.T) {
 		mockProjectRepo := new(repository.MockProjectRepository)
 		mockSlugService := new(MockSlugService)
+		mockValidationService := new(MockValidationService)
 		testLogger := logger.NewForTest()
-		service := NewProjectService(mockProjectRepo, mockSlugService, testLogger)
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
 		slug := "p20250118120000xyz91234"
 
@@ -564,6 +592,312 @@ func TestProjectService_GetProjectBySlug(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, projecterrors.ErrProjectNotFound, err)
 		assert.Nil(t, project)
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+}
+
+// TestProjectService_UpdateProject_FreePlanQuota tests the Free plan quota validation logic
+func TestProjectService_UpdateProject_FreePlanQuota(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("성공: Free plan 프로젝트 이름 변경 (플랜 변경 없음)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		freePlan := value.PlanFree
+		project := createTestProject(projectID, "Free Project", *slug, actingUserID)
+		err := project.SetPlan(freePlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			return p.SetName("Updated Name")
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		assert.Equal(t, "Updated Name", updatedProject.Name())
+		assert.False(t, freePlanLimitCalled, "ValidateFreePlanLimit should NOT be called when plan doesn't change")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("성공: Free plan 프로젝트 리소스 변경 (플랜 변경 없음)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		freePlan := value.PlanFree
+		project := createTestProject(projectID, "Free Project", *slug, actingUserID)
+		err := project.SetPlan(freePlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			// Update resource limits (while staying in Free plan)
+			limits, _ := value.NewResourceLimits(500, 1024, 2048, 1000)
+			return p.SetResourceLimits(*limits)
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		assert.False(t, freePlanLimitCalled, "ValidateFreePlanLimit should NOT be called when plan doesn't change")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("성공: Eco → Free plan 변경 시 쿼터 검증 수행", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		ecoPlan := value.PlanEco
+		freePlan := value.PlanFree
+		project := createTestProject(projectID, "Eco Project", *slug, actingUserID)
+		err := project.SetPlan(ecoPlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			return p.SetPlan(freePlan)
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		plan, hasPlan := updatedProject.Plan()
+		assert.True(t, hasPlan)
+		assert.Equal(t, freePlan, plan)
+		assert.True(t, freePlanLimitCalled, "ValidateFreePlanLimit SHOULD be called when plan changes to Free")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("실패: Eco → Free plan 변경 시 쿼터 초과", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				return projecterrors.ErrFreePlanLimitExceeded
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		ecoPlan := value.PlanEco
+		freePlan := value.PlanFree
+		project := createTestProject(projectID, "Eco Project", *slug, actingUserID)
+		err := project.SetPlan(ecoPlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			return p.SetPlan(freePlan)
+		})
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrFreePlanLimitExceeded, err)
+		assert.Nil(t, updatedProject)
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("성공: NULL plan (Eco 기본값) 프로젝트를 Free로 변경 시 쿼터 검증", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		projectID := uint(1)
+		actingUserID := uint(1)
+		slug, _ := value.NewProjectSlug("p2025011812000012345678")
+		freePlan := value.PlanFree
+		// Create project without plan (NULL, defaults to Eco)
+		project := createTestProject(projectID, "Legacy Project", *slug, actingUserID)
+
+		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProject(ctx, projectID, actingUserID, func(p *model.Project) error {
+			return p.SetPlan(freePlan)
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		assert.True(t, freePlanLimitCalled, "ValidateFreePlanLimit SHOULD be called when NULL → Free (treated as Eco → Free)")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+}
+
+// TestProjectService_UpdateProjectBySlug_FreePlanQuota tests the Free plan quota validation logic for UpdateProjectBySlug
+func TestProjectService_UpdateProjectBySlug_FreePlanQuota(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("성공: Free plan 프로젝트 이름 변경 (플랜 변경 없음)", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		actingUserID := uint(1)
+		slug := "p2025011812000012345678"
+		projectSlug, _ := value.NewProjectSlug(slug)
+		freePlan := value.PlanFree
+		project := createTestProject(1, "Free Project", *projectSlug, actingUserID)
+		err := project.SetPlan(freePlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindBySlug", ctx, slug).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProjectBySlug(ctx, slug, actingUserID, func(p *model.Project) error {
+			return p.SetName("Updated Name")
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		assert.Equal(t, "Updated Name", updatedProject.Name())
+		assert.False(t, freePlanLimitCalled, "ValidateFreePlanLimit should NOT be called when plan doesn't change")
+
+		mockProjectRepo.AssertExpectations(t)
+	})
+
+	t.Run("성공: Eco → Free plan 변경 시 쿼터 검증 수행", func(t *testing.T) {
+		mockProjectRepo := new(repository.MockProjectRepository)
+		mockSlugService := new(MockSlugService)
+		freePlanLimitCalled := false
+		mockValidationService := &MockValidationService{
+			ValidateFreeResourcesFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreeTierLimitsFunc: func(plan value.Plan, limits value.ResourceLimits) error {
+				return nil
+			},
+			ValidateFreePlanLimitFunc: func(ctx context.Context, userID uint, plan value.Plan) error {
+				freePlanLimitCalled = true
+				return nil
+			},
+		}
+		testLogger := logger.NewForTest()
+		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
+
+		actingUserID := uint(1)
+		slug := "p2025011812000012345678"
+		projectSlug, _ := value.NewProjectSlug(slug)
+		ecoPlan := value.PlanEco
+		freePlan := value.PlanFree
+		project := createTestProject(1, "Eco Project", *projectSlug, actingUserID)
+		err := project.SetPlan(ecoPlan)
+		require.NoError(t, err)
+
+		mockProjectRepo.On("FindBySlug", ctx, slug).Return(project, nil)
+		mockProjectRepo.On("Save", ctx, mock.Anything).Return(nil)
+
+		updatedProject, err := service.UpdateProjectBySlug(ctx, slug, actingUserID, func(p *model.Project) error {
+			return p.SetPlan(freePlan)
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, updatedProject)
+		plan, hasPlan := updatedProject.Plan()
+		assert.True(t, hasPlan)
+		assert.Equal(t, freePlan, plan)
+		assert.True(t, freePlanLimitCalled, "ValidateFreePlanLimit SHOULD be called when plan changes to Free")
 
 		mockProjectRepo.AssertExpectations(t)
 	})

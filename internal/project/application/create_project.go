@@ -14,7 +14,7 @@ type CreateProjectInput struct {
 	Name         string
 	OwnerID      uint
 	FQDN         *string
-	Plan         *string
+	Plan         *value.Plan
 	CPULimit     uint32
 	MemoryLimit  uint32
 	DiskLimit    uint32
@@ -120,7 +120,7 @@ func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProject
 		}
 
 		if p, ok := project.Plan(); ok {
-			plan = p
+			plan = p.String()
 			hasPlan = true
 		}
 

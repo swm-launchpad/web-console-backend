@@ -7,6 +7,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/middleware"
+	"github.com/swm-launchpad/web-console-backend/internal/common/settings"
 	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -27,6 +28,7 @@ type Router struct {
 	projectStatusHandler *projectHTTP.ProjectStatusHandler
 	containerHandler     *containerHTTP.ContainerHandler
 	templateHandler      *containerHTTP.TemplateHandler
+	settingsHandler      *settings.SettingsHandler
 	authMiddleware       *middleware.AuthMiddleware
 	loggingMiddleware    *logger.LoggingMiddleware
 }
@@ -45,6 +47,7 @@ func NewRouter(
 	projectStatusHandler *projectHTTP.ProjectStatusHandler,
 	containerHandler *containerHTTP.ContainerHandler,
 	templateHandler *containerHTTP.TemplateHandler,
+	settingsHandler *settings.SettingsHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	loggingMiddleware *logger.LoggingMiddleware,
 ) *Router {
@@ -77,6 +80,7 @@ func NewRouter(
 		projectStatusHandler: projectStatusHandler,
 		containerHandler:     containerHandler,
 		templateHandler:      templateHandler,
+		settingsHandler:      settingsHandler,
 		authMiddleware:       authMiddleware,
 		loggingMiddleware:    loggingMiddleware,
 	}
@@ -97,6 +101,12 @@ func (r *Router) Setup() {
 	// API v1 routes
 	v1 := r.engine.Group("/api/v1")
 	{
+		// Settings routes (public) - must be before auth routes
+		settingsGroup := v1.Group("/settings")
+		{
+			settingsGroup.GET("/public", r.settingsHandler.GetPublicSettings)
+		}
+
 		// Auth routes (public)
 		auth := v1.Group("/auth")
 		{

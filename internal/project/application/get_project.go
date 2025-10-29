@@ -114,7 +114,7 @@ func buildProjectOutput(ctx context.Context, project *model.Project, volumeServi
 	}
 
 	if plan, ok := project.Plan(); ok {
-		output.Plan = plan
+		output.Plan = plan.String()
 	}
 
 	// Add users

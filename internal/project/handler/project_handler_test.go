@@ -14,6 +14,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	"github.com/swm-launchpad/web-console-backend/internal/common/settings"
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
@@ -43,6 +44,8 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
+		// Settings service not needed for Pro plan test (only used for Free plan)
+		var settingsService settings.SettingsService = nil
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -52,6 +55,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			settingsService,
 			mockLogger,
 		)
 
@@ -64,14 +68,17 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		project := createTestProject(uint(1), projectName, *slug, userID)
 
-		// MVP 정책으로 강제 적용되는 리소스 제한
-		cpuLimit := uint32(1000)
-		memoryLimit := uint32(2048)
-		diskLimit := uint32(2048)
-		trafficLimit := uint32(1048576)
+		// 사용자가 요청한 리소스 제한 (Beta tier limits: CPU 2 cores, Memory 4GB, Disk 3GB)
+		cpuLimit := uint32(2000)
+		memoryLimit := uint32(4096)
+		diskLimit := uint32(3072) // Max in beta tier
+		trafficLimit := uint32(524288)
 		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
 
-		mockProjectService.On("CreateProject", ctx, projectName, userID, *expectedLimits, (*string)(nil), (*string)(nil)).Return(project, nil)
+		fqdn := "example.com"
+		plan := value.PlanPro
+
+		mockProjectService.On("CreateProject", ctx, projectName, userID, *expectedLimits, &fqdn, &plan).Return(project, nil)
 
 		router := gin.New()
 		router.POST("/projects", func(c *gin.Context) {
@@ -79,16 +86,15 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			handler.CreateProject(c)
 		})
 
-		// Frontend가 FQDN과 Plan을 보내도 무시되어야 함
-		// 리소스 제한도 보내지만 Handler에서 무시되고 MVP 정책값으로 강제됨
+		// 사용자가 FQDN, Plan, 리소스를 지정하면 그대로 사용됨
 		reqBody := map[string]interface{}{
 			"name":          projectName,
-			"fqdn":          "should-be-ignored.com", // MVP 정책으로 무시됨
-			"plan":          "premium",               // MVP 정책으로 무시됨
-			"cpu_limit":     2000,                    // MVP 정책으로 무시됨 (1000으로 강제)
-			"memory_limit":  4096,                    // MVP 정책으로 무시됨 (2048로 강제)
-			"disk_limit":    4096,                    // MVP 정책으로 무시됨 (2048로 강제)
-			"traffic_limit": 524288,                  // MVP 정책으로 무시됨 (1048576으로 강제)
+			"fqdn":          fqdn,
+			"plan":          "pro",
+			"cpu_limit":     2000,
+			"memory_limit":  4096,
+			"disk_limit":    3072, // Max in beta tier
+			"traffic_limit": 524288,
 		}
 		jsonBody, _ := json.Marshal(reqBody)
 
@@ -112,16 +118,6 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		assert.Equal(t, projectName, data["name"])
 		assert.Equal(t, "p2025011812000012345678", data["slug"])
 
-		// MVP 정책: FQDN과 Plan이 null이어야 함
-		assert.Empty(t, data["fqdn"])
-		assert.Empty(t, data["plan"])
-
-		// MVP 정책: 리소스 제한이 강제 적용되어야 함
-		assert.Equal(t, float64(1000), data["cpu_limit"])
-		assert.Equal(t, float64(2048), data["memory_limit"])
-		assert.Equal(t, float64(2048), data["disk_limit"])
-		assert.Equal(t, float64(1048576), data["traffic_limit"]) // MVP: 1TB traffic limit
-
 		mockProjectService.AssertExpectations(t)
 	})
 
@@ -142,6 +138,8 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
+		// Settings service not needed for Pro plan test (only used for Free plan)
+		var settingsService settings.SettingsService = nil
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -151,6 +149,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			settingsService,
 			mockLogger,
 		)
 
@@ -189,6 +188,8 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
+		// Settings service not needed for Pro plan test (only used for Free plan)
+		var settingsService settings.SettingsService = nil
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -198,6 +199,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			settingsService,
 			mockLogger,
 		)
 
@@ -262,6 +264,8 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
+		// Settings service not needed for Pro plan test (only used for Free plan)
+		var settingsService settings.SettingsService = nil
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -271,6 +275,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			settingsService,
 			mockLogger,
 		)
 
@@ -326,6 +331,8 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
+		// Settings service not needed for Pro plan test (only used for Free plan)
+		var settingsService settings.SettingsService = nil
 		handler := NewProjectHandler(
 			createUseCase,
 			getUseCase,
@@ -335,6 +342,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 			listUseCase,
 			mockPermissionService,
 			mockProjectService,
+			settingsService,
 			mockLogger,
 		)
 

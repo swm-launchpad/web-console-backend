@@ -16,7 +16,7 @@ type ProjectService interface {
 	// CreateProject creates a new project with the given parameters
 	// limits is required, fqdn and plan are optional
 	// slug is automatically generated from name
-	CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *string) (*model.Project, error)
+	CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *value.Plan) (*model.Project, error)
 
 	// GetProject retrieves a project by ID
 	GetProject(ctx context.Context, projectID uint) (*model.Project, error)
@@ -25,10 +25,12 @@ type ProjectService interface {
 	GetProjectBySlug(ctx context.Context, slug string) (*model.Project, error)
 
 	// UpdateProject updates an existing project
-	UpdateProject(ctx context.Context, projectID uint, updateFn func(*model.Project) error) (*model.Project, error)
+	// actingUserID is the user performing the update (for quota validation)
+	UpdateProject(ctx context.Context, projectID uint, actingUserID uint, updateFn func(*model.Project) error) (*model.Project, error)
 
 	// UpdateProjectBySlug updates an existing project by slug
-	UpdateProjectBySlug(ctx context.Context, slug string, updateFn func(*model.Project) error) (*model.Project, error)
+	// actingUserID is the user performing the update (for quota validation)
+	UpdateProjectBySlug(ctx context.Context, slug string, actingUserID uint, updateFn func(*model.Project) error) (*model.Project, error)
 
 	// DeleteProject soft deletes a project
 	DeleteProject(ctx context.Context, projectID uint) error
@@ -48,28 +50,64 @@ type ProjectService interface {
 
 // projectService is the concrete implementation of ProjectService
 type projectService struct {
-	projectRepo repository.ProjectRepository
-	slugService SlugService
-	logger      logger.Logger
+	projectRepo       repository.ProjectRepository
+	slugService       SlugService
+	validationService ValidationService
+	logger            logger.Logger
 }
 
 // NewProjectService creates a new instance of ProjectService
-func NewProjectService(projectRepo repository.ProjectRepository, slugService SlugService, log logger.Logger) ProjectService {
+func NewProjectService(projectRepo repository.ProjectRepository, slugService SlugService, validationService ValidationService, log logger.Logger) ProjectService {
 	return &projectService{
-		projectRepo: projectRepo,
-		slugService: slugService,
-		logger:      log,
+		projectRepo:       projectRepo,
+		slugService:       slugService,
+		validationService: validationService,
+		logger:            log,
 	}
 }
 
 // CreateProject creates a new project with validation
 // slug is automatically generated from name
 // limits is required, fqdn and plan are optional
-func (s *projectService) CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *string) (*model.Project, error) {
+func (s *projectService) CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *value.Plan) (*model.Project, error) {
 	s.logger.Info(ctx, "create project started",
 		zap.String("name", name),
 		zap.Uint("owner_id", ownerID),
 	)
+
+	// Determine the plan (default to Eco if not provided)
+	selectedPlan := value.PlanEco
+	if plan != nil {
+		selectedPlan = *plan
+	}
+
+	// Validate Free plan resources (must match fixed values)
+	if err := s.validationService.ValidateFreeResources(selectedPlan, limits); err != nil {
+		s.logger.Error(ctx, "Free plan resources validation failed",
+			zap.String("plan", selectedPlan.String()),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// Validate free tier limits (beta period restrictions)
+	if err := s.validationService.ValidateFreeTierLimits(selectedPlan, limits); err != nil {
+		s.logger.Error(ctx, "free tier limits validation failed",
+			zap.String("plan", selectedPlan.String()),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// Validate Free plan project limit (1 per user)
+	if err := s.validationService.ValidateFreePlanLimit(ctx, ownerID, selectedPlan); err != nil {
+		s.logger.Error(ctx, "Free plan limit validation failed",
+			zap.Uint("owner_id", ownerID),
+			zap.String("plan", selectedPlan.String()),
+			zap.Error(err),
+		)
+		return nil, err
+	}
 
 	// Check if project name already exists for this user
 	exists, err := s.CheckProjectNameExists(ctx, name, ownerID)
@@ -101,7 +139,8 @@ func (s *projectService) CreateProject(ctx context.Context, name string, ownerID
 
 	// Create the project aggregate with all fields (including optional ones)
 	// This ensures created_at and updated_at are the same at creation time
-	project, err := model.NewProject(name, slug, ownerID, limits, fqdn, plan)
+	// Use selectedPlan (which defaults to Eco if plan was nil)
+	project, err := model.NewProject(name, slug, ownerID, limits, fqdn, &selectedPlan)
 	if err != nil {
 		s.logger.Error(ctx, "failed to create project model",
 			zap.String("name", name),
@@ -193,9 +232,10 @@ func (s *projectService) GetProjectBySlug(ctx context.Context, slug string) (*mo
 }
 
 // UpdateProject updates an existing project
-func (s *projectService) UpdateProject(ctx context.Context, projectID uint, updateFn func(*model.Project) error) (*model.Project, error) {
+func (s *projectService) UpdateProject(ctx context.Context, projectID uint, actingUserID uint, updateFn func(*model.Project) error) (*model.Project, error) {
 	s.logger.Info(ctx, "update project started",
 		zap.Uint("project_id", projectID),
+		zap.Uint("acting_user_id", actingUserID),
 	)
 
 	if projectID == 0 {
@@ -215,6 +255,13 @@ func (s *projectService) UpdateProject(ctx context.Context, projectID uint, upda
 		return nil, err
 	}
 
+	// Store original plan before update
+	originalPlan, hadPlan := project.Plan()
+	if !hadPlan {
+		// Pre-existing projects without a plan default to Eco
+		originalPlan = value.PlanEco
+	}
+
 	// Apply the update function
 	if err := updateFn(project); err != nil {
 		s.logger.Error(ctx, "failed to apply update function",
@@ -222,6 +269,47 @@ func (s *projectService) UpdateProject(ctx context.Context, projectID uint, upda
 			zap.Error(err),
 		)
 		return nil, err
+	}
+
+	// Validate updated project state
+	// Always run validations - treat NULL plan as default (Eco)
+	plan, hasPlan := project.Plan()
+	if !hasPlan {
+		// Pre-existing projects without a plan default to Eco
+		plan = value.PlanEco
+	}
+
+	limits := project.Limits()
+
+	// Free plan must use fixed resources
+	if err := s.validationService.ValidateFreeResources(plan, limits); err != nil {
+		s.logger.Error(ctx, "free plan resource validation failed",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// Check beta tier limits (always enforced)
+	if err := s.validationService.ValidateFreeTierLimits(plan, limits); err != nil {
+		s.logger.Error(ctx, "beta tier limit validation failed",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// If converting to Free plan (not already Free), check project count for the acting user
+	// This prevents blocking updates to existing Free plan projects (e.g., renaming)
+	if plan == value.PlanFree && originalPlan != value.PlanFree {
+		if err := s.validationService.ValidateFreePlanLimit(ctx, actingUserID, plan); err != nil {
+			s.logger.Error(ctx, "free plan limit validation failed",
+				zap.Uint("project_id", projectID),
+				zap.Uint("acting_user_id", actingUserID),
+				zap.Error(err),
+			)
+			return nil, err
+		}
 	}
 
 	// Save the updated project
@@ -241,9 +329,10 @@ func (s *projectService) UpdateProject(ctx context.Context, projectID uint, upda
 }
 
 // UpdateProjectBySlug updates an existing project by slug
-func (s *projectService) UpdateProjectBySlug(ctx context.Context, slug string, updateFn func(*model.Project) error) (*model.Project, error) {
+func (s *projectService) UpdateProjectBySlug(ctx context.Context, slug string, actingUserID uint, updateFn func(*model.Project) error) (*model.Project, error) {
 	s.logger.Info(ctx, "update project by slug started",
 		zap.String("slug", slug),
+		zap.Uint("acting_user_id", actingUserID),
 	)
 
 	if slug == "" {
@@ -263,6 +352,13 @@ func (s *projectService) UpdateProjectBySlug(ctx context.Context, slug string, u
 		return nil, err
 	}
 
+	// Store original plan before update
+	originalPlan, hadPlan := project.Plan()
+	if !hadPlan {
+		// Pre-existing projects without a plan default to Eco
+		originalPlan = value.PlanEco
+	}
+
 	// Apply the update function
 	if err := updateFn(project); err != nil {
 		s.logger.Error(ctx, "failed to apply update function",
@@ -270,6 +366,47 @@ func (s *projectService) UpdateProjectBySlug(ctx context.Context, slug string, u
 			zap.Error(err),
 		)
 		return nil, err
+	}
+
+	// Validate updated project state
+	// Always run validations - treat NULL plan as default (Eco)
+	plan, hasPlan := project.Plan()
+	if !hasPlan {
+		// Pre-existing projects without a plan default to Eco
+		plan = value.PlanEco
+	}
+
+	limits := project.Limits()
+
+	// Free plan must use fixed resources
+	if err := s.validationService.ValidateFreeResources(plan, limits); err != nil {
+		s.logger.Error(ctx, "free plan resource validation failed",
+			zap.String("slug", slug),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// Check beta tier limits (always enforced)
+	if err := s.validationService.ValidateFreeTierLimits(plan, limits); err != nil {
+		s.logger.Error(ctx, "beta tier limit validation failed",
+			zap.String("slug", slug),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// If converting to Free plan (not already Free), check project count for the acting user
+	// This prevents blocking updates to existing Free plan projects (e.g., renaming)
+	if plan == value.PlanFree && originalPlan != value.PlanFree {
+		if err := s.validationService.ValidateFreePlanLimit(ctx, actingUserID, plan); err != nil {
+			s.logger.Error(ctx, "free plan limit validation failed",
+				zap.String("slug", slug),
+				zap.Uint("acting_user_id", actingUserID),
+				zap.Error(err),
+			)
+			return nil, err
+		}
 	}
 
 	// Save the updated project

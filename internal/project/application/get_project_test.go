@@ -16,7 +16,7 @@ import (
 )
 
 func defaultLimits() value.ResourceLimits {
-	limits, _ := value.NewResourceLimits(100, 512, 1024, 1000)
+	limits, _ := value.NewResourceLimits(500, 512, 1024, 1000) // MinCPULimit: 500
 	return *limits
 }
 

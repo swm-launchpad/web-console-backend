@@ -84,7 +84,7 @@ func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsIn
 		}
 
 		if plan, ok := project.Plan(); ok {
-			item.Plan = plan
+			item.Plan = plan.String()
 		}
 
 		output.Projects = append(output.Projects, item)

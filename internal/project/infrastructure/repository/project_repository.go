@@ -44,7 +44,7 @@ func (r *projectRepository) Create(ctx context.Context, project *model.Project) 
 		Slug:                   project.Slug().String(),
 		Fqdn:                   stringBoolToNullString(project.FQDN()),
 		Status:                 sqlc.ProjectsStatus(project.Status()),
-		Plan:                   stringBoolToNullString(project.Plan()),
+		Plan:                   planToNullString(project.Plan()),
 		CpuLimit:               sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
 		MemoryLimit:            sql.NullInt32{Int32: int32(project.Limits().MemoryLimit()), Valid: true},
 		DiskLimit:              sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
@@ -118,7 +118,7 @@ func (r *projectRepository) Save(ctx context.Context, project *model.Project) er
 		Name:                   project.Name(),
 		Fqdn:                   stringBoolToNullString(project.FQDN()),
 		Status:                 sqlc.ProjectsStatus(project.Status()),
-		Plan:                   stringBoolToNullString(project.Plan()),
+		Plan:                   planToNullString(project.Plan()),
 		CpuLimit:               sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
 		MemoryLimit:            sql.NullInt32{Int32: int32(project.Limits().MemoryLimit()), Valid: true},
 		DiskLimit:              sql.NullInt32{Int32: int32(project.Limits().DiskLimit()), Valid: true},
@@ -564,34 +564,39 @@ func (r *projectRepository) rowToDomainProject(
 		domainActiveDeploymentID = &deploymentID
 	}
 
+	// Convert FQDN from DB
+	var domainFQDN *string
+	if fqdn.Valid {
+		fqdnStr := fqdn.String
+		domainFQDN = &fqdnStr
+	}
+
+	// Convert Plan from DB
+	var domainPlan *value.Plan
+	if plan.Valid {
+		p, err := value.NewPlan(plan.String)
+		if err != nil {
+			// DB에 저장된 Plan이 유효하지 않은 경우 - 데이터 무결성 문제
+			return nil, projecterrors.ErrInvalidPlan
+		}
+		domainPlan = &p
+	}
+
 	project := model.ReconstructProject(
 		uint(projectID),
 		name,
 		*slug,
+		domainFQDN,
 		value.ProjectStatus(status),
 		domainOperationStatus,
 		domainActiveDeploymentID,
+		domainPlan,
 		*limits,
 		createdAt,
 		finalUpdatedAt,
 		isDeleted,
 		fromNullTime(deletedAt),
 	)
-
-	// Set fields
-	if fqdn.Valid {
-		if err := project.SetFQDN(fqdn.String); err != nil {
-			// DB에 저장된 FQDN이 유효하지 않은 경우 - 데이터 무결성 문제
-			return nil, projecterrors.ErrDatabaseOperation
-		}
-	}
-
-	if plan.Valid {
-		if err := project.SetPlan(plan.String); err != nil {
-			// DB에 저장된 Plan이 유효하지 않은 경우 - 데이터 무결성 문제
-			return nil, projecterrors.ErrDatabaseOperation
-		}
-	}
 
 	if err := project.SetStatus(value.ProjectStatus(status)); err != nil {
 		// DB에 저장된 Status가 유효하지 않은 경우 - 데이터 무결성 문제
@@ -665,6 +670,13 @@ func stringBoolToNullString(s string, ok bool) sql.NullString {
 		return sql.NullString{Valid: false}
 	}
 	return sql.NullString{String: s, Valid: true}
+}
+
+func planToNullString(plan value.Plan, ok bool) sql.NullString {
+	if !ok {
+		return sql.NullString{Valid: false}
+	}
+	return sql.NullString{String: plan.String(), Valid: true}
 }
 
 func toNullTime(t *time.Time) sql.NullTime {

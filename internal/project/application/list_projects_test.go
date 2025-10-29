@@ -117,7 +117,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 		project := createTestProjectWithVolumes(1, "운영 프로젝트", *slug, userID)
 
 		fqdn := "my-project.example.com"
-		plan := "premium"
+		plan := value.PlanPro
 		_ = project.SetFQDN(fqdn)
 		_ = project.SetPlan(plan)
 
@@ -131,7 +131,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Len(t, output.Projects, 1)
 		assert.Equal(t, "my-project.example.com", output.Projects[0].FQDN)
-		assert.Equal(t, "premium", output.Projects[0].Plan)
+		assert.Equal(t, "pro", output.Projects[0].Plan)
 
 		mockProjectService.AssertExpectations(t)
 	})

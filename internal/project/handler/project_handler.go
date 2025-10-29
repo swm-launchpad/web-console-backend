@@ -7,19 +7,22 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
+	"github.com/swm-launchpad/web-console-backend/internal/common/settings"
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	"go.uber.org/zap"
 )
 
-// MVP 강제 정책 상수 - Handler 계층에서 정책 적용
+// Project policy constants
 const (
-	MVPMaxProjectsPerUser = 3       // 사용자당 최대 3개 프로젝트
-	MVPForcedCPULimit     = 1000    // 1000m = 1 CPU core
-	MVPForcedMemoryLimit  = 2048    // 2Gi = 2048Mi
-	MVPForcedDiskLimit    = 2048    // 2Gi = 2048Mi
-	MVPForcedTrafficLimit = 1048576 // 1TB = 1048576Mi
+	MaxProjectsPerUser         = 3             // Maximum number of projects per user (not Free plan limit)
+	DefaultCPULimit     uint32 = 500           // 0.5 core (500 millicores) - matches API_SPECIFICATION.md:116
+	DefaultMemoryLimit  uint32 = 1024          // 1GB (1024 Mi)
+	DefaultDiskLimit    uint32 = 2048          // 2GB (2048 Mi) - matches API_SPECIFICATION.md:118
+	DefaultTrafficLimit uint32 = 1048576       // 1TB (1048576 Mi) - maintained for compatibility
+	DefaultPlan                = value.PlanEco // Default plan for new projects
 )
 
 type ProjectHandler struct {
@@ -31,6 +34,7 @@ type ProjectHandler struct {
 	listProjectsUseCase     *application.ListProjectsUseCase
 	permissionService       service.PermissionService
 	projectService          service.ProjectService
+	settingsService         settings.SettingsService
 	logger                  logger.Logger
 }
 
@@ -43,6 +47,7 @@ func NewProjectHandler(
 	listProjectsUseCase *application.ListProjectsUseCase,
 	permissionService service.PermissionService,
 	projectService service.ProjectService,
+	settingsService settings.SettingsService,
 	log logger.Logger,
 ) *ProjectHandler {
 	return &ProjectHandler{
@@ -54,21 +59,20 @@ func NewProjectHandler(
 		listProjectsUseCase:     listProjectsUseCase,
 		permissionService:       permissionService,
 		projectService:          projectService,
+		settingsService:         settingsService,
 		logger:                  log,
 	}
 }
 
 // CreateProjectRequest represents the request body for project creation
-// MVP 단계: FQDN, Plan 입력은 무시되고 nil로 강제됨
-// 리소스 제한 입력은 무시되고 MVP 고정값으로 강제됨
 type CreateProjectRequest struct {
 	Name         string  `json:"name" binding:"required,min=1,max=255"`
 	FQDN         *string `json:"fqdn,omitempty"`
-	Plan         *string `json:"plan,omitempty"`
-	CPULimit     uint32  `json:"cpu_limit" binding:"required,min=100,max=4000"`
-	MemoryLimit  uint32  `json:"memory_limit" binding:"required,min=128,max=8192"`
-	DiskLimit    uint32  `json:"disk_limit" binding:"required,min=128,max=10240"`
-	TrafficLimit uint32  `json:"traffic_limit" binding:"required,min=128,max=1048576"`
+	Plan         *string `json:"plan,omitempty" binding:"omitempty,oneof=free eco pro"`
+	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=500,max=8000"`        // 0.5~8 cores, step 500m
+	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=512,max=16384"`    // 0.5~16GB, step 512Mi
+	DiskLimit    *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=1024,max=3072"`      // 1~3GB, step 512Mi
+	TrafficLimit *uint32 `json:"traffic_limit,omitempty" binding:"omitempty,min=128,max=1048576"` // Maintained for compatibility
 }
 
 // CreateProject handles POST /api/v1/projects
@@ -100,7 +104,7 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		return
 	}
 
-	// MVP 정책 1: 사용자당 프로젝트 개수 제한 확인
+	// Check project limit per user
 	projectCount, err := h.projectService.CountProjectsByUserID(c.Request.Context(), userID.(uint))
 	if err != nil {
 		h.logger.Error(ctx, "failed to count user projects",
@@ -111,28 +115,111 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		response.Error(c, err, mapProjectError)
 		return
 	}
-	if projectCount >= MVPMaxProjectsPerUser {
+	if projectCount >= MaxProjectsPerUser {
 		h.logger.Warn(ctx, "project limit exceeded",
 			zap.String("handler", "CreateProject"),
 			zap.Uint("user_id", userID.(uint)),
 			zap.Int("current_count", projectCount),
-			zap.Int("max_allowed", MVPMaxProjectsPerUser),
+			zap.Int("max_allowed", MaxProjectsPerUser),
 		)
 		response.Error(c, projecterrors.ErrProjectLimitExceeded, mapProjectError)
 		return
 	}
 
-	// MVP 정책 2: FQDN, Plan 강제 적용 (null로 강제, Frontend 입력 무시)
-	// MVP 정책 3: 리소스 제한 강제 적용 (Frontend 입력 무시)
+	// Prepare plan
+	var plan *value.Plan
+	if req.Plan != nil {
+		p, err := value.NewPlan(*req.Plan)
+		if err != nil {
+			h.logger.Warn(ctx, "invalid plan provided",
+				zap.Error(err),
+				zap.String("handler", "CreateProject"),
+				zap.String("plan", *req.Plan),
+			)
+			response.Error(c, projecterrors.ErrInvalidPlan, mapProjectError, response.WithDetails(map[string]any{
+				"message": "Invalid plan: must be one of free, eco, or pro",
+			}))
+			return
+		}
+		plan = &p
+	} else {
+		// Default plan if not provided
+		defaultPlan := DefaultPlan
+		plan = &defaultPlan
+	}
+
+	// Prepare resource limits with defaults
+	var cpuLimit, memoryLimit, diskLimit, trafficLimit uint32
+
+	// Free plan has fixed resources - fetch from DB to stay in sync with ValidationService
+	if plan != nil && *plan == value.PlanFree {
+		// Get Free plan limits from settings (fail if not found)
+		freeCPU, err := h.settingsService.GetFreePlanCPULimit()
+		if err != nil {
+			h.logger.Error(ctx, "failed to get free plan CPU limit",
+				zap.Error(err),
+				zap.String("handler", "CreateProject"),
+			)
+			response.Error(c, err, mapProjectError)
+			return
+		}
+
+		freeMem, err := h.settingsService.GetFreePlanMemoryLimit()
+		if err != nil {
+			h.logger.Error(ctx, "failed to get free plan memory limit",
+				zap.Error(err),
+				zap.String("handler", "CreateProject"),
+			)
+			response.Error(c, err, mapProjectError)
+			return
+		}
+
+		freeDisk, err := h.settingsService.GetFreePlanDiskLimit()
+		if err != nil {
+			h.logger.Error(ctx, "failed to get free plan disk limit",
+				zap.Error(err),
+				zap.String("handler", "CreateProject"),
+			)
+			response.Error(c, err, mapProjectError)
+			return
+		}
+
+		cpuLimit = uint32(freeCPU)
+		memoryLimit = uint32(freeMem)
+		diskLimit = uint32(freeDisk)
+		trafficLimit = DefaultTrafficLimit
+	} else {
+		// For non-Free plans, use defaults or client input
+		cpuLimit = DefaultCPULimit
+		if req.CPULimit != nil {
+			cpuLimit = *req.CPULimit
+		}
+
+		memoryLimit = DefaultMemoryLimit
+		if req.MemoryLimit != nil {
+			memoryLimit = *req.MemoryLimit
+		}
+
+		diskLimit = DefaultDiskLimit
+		if req.DiskLimit != nil {
+			diskLimit = *req.DiskLimit
+		}
+
+		trafficLimit = DefaultTrafficLimit
+		if req.TrafficLimit != nil {
+			trafficLimit = *req.TrafficLimit
+		}
+	}
+
 	input := application.CreateProjectInput{
 		Name:         req.Name,
 		OwnerID:      userID.(uint),
-		FQDN:         nil,                   // MVP: FQDN not allowed
-		Plan:         nil,                   // MVP: Plan not allowed
-		CPULimit:     MVPForcedCPULimit,     // MVP: 1000m = 1 CPU core
-		MemoryLimit:  MVPForcedMemoryLimit,  // MVP: 2048Mi = 2Gi
-		DiskLimit:    MVPForcedDiskLimit,    // MVP: 2048Mi = 2Gi
-		TrafficLimit: MVPForcedTrafficLimit, // MVP: 1TB = 1048576Mi
+		FQDN:         req.FQDN,
+		Plan:         plan,
+		CPULimit:     cpuLimit,
+		MemoryLimit:  memoryLimit,
+		DiskLimit:    diskLimit,
+		TrafficLimit: trafficLimit,
 	}
 
 	output, err := h.createProjectUseCase.Execute(c.Request.Context(), input)
@@ -219,16 +306,14 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 }
 
 // UpdateProjectRequest represents the request body for project update
-// MVP 단계: FQDN, Plan 입력은 무시되고 nil로 강제됨
-// 리소스 제한 입력은 무시되고 MVP 고정값으로 강제됨
 type UpdateProjectRequest struct {
 	Name         *string `json:"name,omitempty" binding:"omitempty,min=1,max=255"`
 	FQDN         *string `json:"fqdn,omitempty"`
-	Plan         *string `json:"plan,omitempty"`
-	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=100,max=4000"`
-	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=128,max=8192"`
-	DiskLimit    *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=128,max=10240"`
-	TrafficLimit *uint32 `json:"traffic_limit,omitempty" binding:"omitempty,min=128,max=1048576"`
+	Plan         *string `json:"plan,omitempty" binding:"omitempty,oneof=free eco pro"`
+	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=500,max=8000"`        // 0.5~8 cores, step 500m
+	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=512,max=16384"`    // 0.5~16GB, step 512Mi
+	DiskLimit    *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=1024,max=3072"`      // 1~3GB, step 512Mi
+	TrafficLimit *uint32 `json:"traffic_limit,omitempty" binding:"omitempty,min=128,max=1048576"` // Maintained for compatibility
 }
 
 // UpdateProject handles PUT /api/v1/projects/:id
@@ -290,23 +375,35 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	// MVP 정책: FQDN, Plan, 리소스 제한 강제 적용 (Frontend 입력 무시)
-	// Use UpdateProjectUseCase with transaction wrapper
-	cpuLimit := uint32(MVPForcedCPULimit)
-	memoryLimit := uint32(MVPForcedMemoryLimit)
-	diskLimit := uint32(MVPForcedDiskLimit)
-	trafficLimit := uint32(MVPForcedTrafficLimit)
+	// Prepare plan if provided
+	var plan *value.Plan
+	if req.Plan != nil {
+		p, err := value.NewPlan(*req.Plan)
+		if err != nil {
+			h.logger.Warn(ctx, "invalid plan provided",
+				zap.Error(err),
+				zap.String("handler", "UpdateProject"),
+				zap.String("plan", *req.Plan),
+			)
+			response.Error(c, projecterrors.ErrInvalidPlan, mapProjectError, response.WithDetails(map[string]any{
+				"message": "Invalid plan: must be one of free, eco, or pro",
+			}))
+			return
+		}
+		plan = &p
+	}
 
 	input := application.UpdateProjectInput{
 		ProjectID:    project.ProjectID(),
+		ActingUserID: userID.(uint),
 		Name:         req.Name,
-		FQDN:         nil,           // MVP: FQDN not allowed
-		Plan:         nil,           // MVP: Plan not allowed
-		CPULimit:     &cpuLimit,     // MVP: 1000m = 1 CPU core
-		MemoryLimit:  &memoryLimit,  // MVP: 2048Mi = 2Gi
-		DiskLimit:    &diskLimit,    // MVP: 2048Mi = 2Gi
-		TrafficLimit: &trafficLimit, // MVP: 1TB = 1048576Mi
-		Status:       nil,           // Status update not allowed
+		FQDN:         req.FQDN,
+		Plan:         plan,
+		CPULimit:     req.CPULimit,
+		MemoryLimit:  req.MemoryLimit,
+		DiskLimit:    req.DiskLimit,
+		TrafficLimit: req.TrafficLimit,
+		Status:       nil, // Status update not allowed
 	}
 
 	output, err := h.updateProjectUseCase.Execute(c.Request.Context(), input)

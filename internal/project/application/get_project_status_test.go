@@ -23,15 +23,18 @@ import (
 func createTestProject(projectID uint, operationStatus value.ProjectOperationStatus) *projectmodel.Project {
 	slug, _ := value.NewProjectSlug("p2025011812000012345678")
 	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
+	plan, _ := value.NewPlan("eco")
 	now := time.Now()
 
 	return projectmodel.ReconstructProject(
 		projectID,
 		"Test Project",
 		*slug,
+		nil, // fqdn
 		value.ProjectStatusActive,
 		operationStatus,
 		nil, // activeDeploymentID
+		&plan,
 		*limits,
 		now,
 		now,
@@ -44,15 +47,18 @@ func createTestProject(projectID uint, operationStatus value.ProjectOperationSta
 func createTestProjectWithDeployment(projectID uint, operationStatus value.ProjectOperationStatus, deploymentID uint) *projectmodel.Project {
 	slug, _ := value.NewProjectSlug("p2025011812000012345678")
 	limits, _ := value.NewResourceLimits(1000, 2048, 2048, 1000000)
+	plan, _ := value.NewPlan("eco")
 	now := time.Now()
 
 	return projectmodel.ReconstructProject(
 		projectID,
 		"Test Project",
 		*slug,
+		nil, // fqdn
 		value.ProjectStatusActive,
 		operationStatus,
 		&deploymentID,
+		&plan,
 		*limits,
 		now,
 		now,
