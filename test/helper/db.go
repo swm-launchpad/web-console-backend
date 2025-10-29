@@ -96,6 +96,7 @@ func (tdb *TestDB) Migrate() error {
 		"000015_modify_containers_for_build.up.sql",
 		"000016_refactor_build_history.up.sql",
 		"000017_rename_build_env_vars_to_build_vars.up.sql",
+		"000018_add_system_settings.up.sql",
 	}
 
 	for _, migration := range migrations {

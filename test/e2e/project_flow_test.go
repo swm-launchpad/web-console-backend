@@ -44,7 +44,7 @@ func TestProjectFlow_E2E(t *testing.T) {
 			"name":          "Test Project",
 			"slug":          "test-project",
 			"fqdn":          "test.example.com",
-			"plan":          "starter",
+			"plan":          "eco",
 			"cpu_limit":     1000,
 			"memory_limit":  2048,
 			"disk_limit":    2048,
@@ -71,18 +71,14 @@ func TestProjectFlow_E2E(t *testing.T) {
 		assert.Len(t, projectSlug, 23, "Slug should be 23 characters") // slug 길이 검증
 		assert.Equal(t, "p", string(projectSlug[0]), "Slug should start with 'p'")
 
-		// MVP 정책 검증: FQDN과 Plan은 null이어야 함 (Frontend에서 보내도 무시됨)
-		assert.Empty(t, projectData["fqdn"])
-		assert.Empty(t, projectData["plan"])
-
 		// Status는 active여야 함
 		assert.Equal(t, "active", projectData["status"])
 
-		// MVP 정책 검증: 리소스 제한이 강제 적용되어야 함
+		// 사용자가 요청한 리소스 제한이 적용되어야 함
 		assert.Equal(t, float64(1000), projectData["cpu_limit"])
 		assert.Equal(t, float64(2048), projectData["memory_limit"])
 		assert.Equal(t, float64(2048), projectData["disk_limit"])
-		assert.Equal(t, float64(1048576), projectData["traffic_limit"]) // 1TB = 1048576Mi
+		assert.Equal(t, float64(128), projectData["traffic_limit"])
 
 		// 생성/수정 시간 존재 확인
 		assert.NotEmpty(t, projectData["created_at"])
@@ -111,23 +107,21 @@ func TestProjectFlow_E2E(t *testing.T) {
 		assert.Equal(t, float64(projectID), projectDetail["project_id"])
 		assert.Equal(t, "Test Project", projectDetail["name"])
 
-		// DB에서 조회한 데이터도 MVP 정책이 적용되었는지 확인
-		assert.Empty(t, projectDetail["fqdn"])
-		assert.Empty(t, projectDetail["plan"])
+		// DB에서 조회한 데이터도 사용자 입력값이 적용되어야 함
+		assert.Equal(t, "test.example.com", projectDetail["fqdn"])
+		assert.Equal(t, "eco", projectDetail["plan"])
 		assert.Equal(t, "active", projectDetail["status"])
 		assert.Equal(t, float64(1000), projectDetail["cpu_limit"])
 		assert.Equal(t, float64(2048), projectDetail["memory_limit"])
 		assert.Equal(t, float64(2048), projectDetail["disk_limit"])
-		assert.Equal(t, float64(1048576), projectDetail["traffic_limit"]) // 1TB = 1048576Mi
+		assert.Equal(t, float64(128), projectDetail["traffic_limit"])
 
-		// Step 6: 프로젝트 수정
-		// MVP 정책: Update는 FQDN, Plan, 리소스 제한만 수정 가능 (입력값은 무시되고 MVP 고정값 적용)
-		// Name, Status는 수정 불가
+		// Step 6: 프로젝트 수정 (Beta tier limits: CPU 1 core, Memory 2GB, Disk 3GB)
 		updateProjectReq := map[string]interface{}{
 			"fqdn":          "updated.example.com",
-			"cpu_limit":     2000,
-			"memory_limit":  4096,
-			"disk_limit":    4096,
+			"cpu_limit":     1000, // Max in beta tier
+			"memory_limit":  2048, // Max in beta tier
+			"disk_limit":    3072, // Max in beta tier
 			"traffic_limit": 524288,
 		}
 
@@ -142,15 +136,15 @@ func TestProjectFlow_E2E(t *testing.T) {
 		require.NoError(t, err)
 
 		updatedData := updateResp["data"].(map[string]interface{})
-		// MVP 정책: Name은 업데이트 안 됨
+		// Name은 업데이트 안 됨 (수정하지 않음)
 		assert.Equal(t, "Test Project", updatedData["name"])
-		// MVP 정책: FQDN은 항상 null (Frontend에서 보내도 무시됨)
-		assert.Empty(t, updatedData["fqdn"])
-		// MVP 정책: 리소스 제한은 항상 MVP 고정값 (Frontend 입력 무시됨)
-		assert.Equal(t, float64(1000), updatedData["cpu_limit"])
-		assert.Equal(t, float64(2048), updatedData["memory_limit"])
-		assert.Equal(t, float64(2048), updatedData["disk_limit"])
-		assert.Equal(t, float64(1048576), updatedData["traffic_limit"])
+		// FQDN은 업데이트됨
+		assert.Equal(t, "updated.example.com", updatedData["fqdn"])
+		// 리소스 제한도 업데이트됨
+		assert.Equal(t, float64(1000), updatedData["cpu_limit"])    // Max in beta tier
+		assert.Equal(t, float64(2048), updatedData["memory_limit"]) // Max in beta tier
+		assert.Equal(t, float64(3072), updatedData["disk_limit"])   // Max in beta tier
+		assert.Equal(t, float64(524288), updatedData["traffic_limit"])
 
 		// Step 7: 프로젝트 삭제
 		w = server.MakeAuthRequest("DELETE", fmt.Sprintf("/api/v1/projects/%s", projectSlug), nil, token)
