@@ -23,6 +23,16 @@ type BuildService interface {
 	//   - BuildResult: Contains build status, commit hash, and error information
 	//   - error: Returns error if build cannot be initiated or tracking fails
 	//
+	// Return Value Contract:
+	//   This method MUST follow one of these patterns:
+	//   1. (BuildResult, nil) - Build completed successfully
+	//   2. (BuildResult, error) - Build reached terminal failure state with metadata
+	//   3. (nil, error) - Context cancelled or tracking lost before completion
+	//
+	//   NEVER returns (nil, nil) - this is a contract violation
+	//   Invariant: If error is nil, result MUST be non-nil
+	//              If result is nil, error MUST be non-nil
+	//
 	// The method will:
 	//  1. Trigger Tekton image-build-push pipeline with container config
 	//  2. Poll PipelineRun status every 30 seconds

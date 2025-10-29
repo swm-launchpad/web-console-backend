@@ -194,6 +194,7 @@ func (c *containerClient) GetContainerBuildConfig(ctx context.Context, projectID
 			ContainerID:         container.ContainerID,
 			Name:                container.Name,
 			Slug:                container.Slug,
+			TemplateID:          container.TemplateID,
 			TemplateBody:        container.TemplateBody,
 			TemplateConfig:      container.TemplateConfig,
 			GitRepositoryURL:    container.GitRepositoryURL,
