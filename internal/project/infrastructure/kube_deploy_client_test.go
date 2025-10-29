@@ -9,9 +9,9 @@ import (
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
-// TestNewKubeClient_EnvironmentVariables tests that NewKubeClient properly validates
+// TestNewKubeDeployClient_EnvironmentVariables tests that NewKubeDeployClient properly validates
 // required environment variables.
-func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
+func TestNewKubeDeployClient_EnvironmentVariables(t *testing.T) {
 	// Save original environment
 	originalAPIServer := os.Getenv("KUBE_API_SERVER")
 	originalToken := os.Getenv("KUBE_SERVICE_ACCOUNT_TOKEN")
@@ -101,7 +101,7 @@ func TestNewKubeClient_EnvironmentVariables(t *testing.T) {
 			}
 
 			// Create client
-			client, err := NewKubeClient(logger.NewForTest())
+			client, err := NewKubeDeployClient(logger.NewForTest())
 
 			if tt.shouldSucceed {
 				assert.NoError(t, err)

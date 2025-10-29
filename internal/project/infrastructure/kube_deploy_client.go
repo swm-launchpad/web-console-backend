@@ -36,7 +36,7 @@ type kubeClient struct {
 	logger         logger.Logger
 }
 
-// NewKubeClient creates a new Kubernetes client using configuration from environment variables.
+// NewKubeDeployClient creates a new Kubernetes client using configuration from environment variables.
 //
 // Required environment variables:
 //   - KUBE_API_SERVER: The Kubernetes API server URL (e.g., "https://kube-api.launchpad.kr:6443")
@@ -46,7 +46,7 @@ type kubeClient struct {
 //
 // Returns an error if any required environment variable is missing or if the client
 // cannot be initialized.
-func NewKubeClient(log logger.Logger) (infrastructure.KubeClient, error) {
+func NewKubeDeployClient(log logger.Logger) (infrastructure.KubeClient, error) {
 	// Read configuration from environment variables
 	apiServer := os.Getenv("KUBE_API_SERVER")
 	if apiServer == "" {

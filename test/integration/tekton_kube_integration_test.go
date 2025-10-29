@@ -53,7 +53,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 
 	t.Run("TektonClient - Dry run deployment request", func(t *testing.T) {
 		// Given - Create TektonClient
-		tektonClient, err := infrastructure.NewTektonClient(logger.NewForTest())
+		tektonClient, err := infrastructure.NewTektonDeployClient(logger.NewForTest())
 		require.NoError(t, err, "Failed to create TektonClient")
 
 		// Create a minimal deployment request with dry_run=true and project_id=0
@@ -104,7 +104,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 
 	t.Run("KubeClient - List PipelineRuns for project", func(t *testing.T) {
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
+		kubeClient, err := infrastructure.NewKubeDeployClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Logf("This may be due to network connectivity or certificate issues")
@@ -137,7 +137,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 
 	t.Run("KubeClient - Get PipelineRun status (if exists)", func(t *testing.T) {
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
+		kubeClient, err := infrastructure.NewKubeDeployClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -194,7 +194,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 
 	t.Run("KubeClient - Get PipelineRun logs (if exists)", func(t *testing.T) {
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
+		kubeClient, err := infrastructure.NewKubeDeployClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -239,7 +239,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 
 	t.Run("KubeClient - Get non-existent PipelineRun status (error case)", func(t *testing.T) {
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
+		kubeClient, err := infrastructure.NewKubeDeployClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -258,7 +258,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 
 	t.Run("KubeClient - Get non-existent PipelineRun logs (error case)", func(t *testing.T) {
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
+		kubeClient, err := infrastructure.NewKubeDeployClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -277,7 +277,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 
 	t.Run("KubeClient - Find PipelineRun name by EventID (success case)", func(t *testing.T) {
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
+		kubeClient, err := infrastructure.NewKubeDeployClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -330,7 +330,7 @@ func TestTektonKubeIntegration(t *testing.T) {
 
 	t.Run("KubeClient - Find PipelineRun by non-existent EventID (error case)", func(t *testing.T) {
 		// Given - Create KubeClient
-		kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
+		kubeClient, err := infrastructure.NewKubeDeployClient(logger.NewForTest())
 		if err != nil {
 			t.Logf("KubeClient creation failed: %v", err)
 			t.Skip("Skipping test - Kubernetes API not available")
@@ -363,10 +363,10 @@ func TestTektonClient_FullDeploymentFlow(t *testing.T) {
 	ctx := context.Background()
 
 	// Create clients
-	tektonClient, err := infrastructure.NewTektonClient(logger.NewForTest())
+	tektonClient, err := infrastructure.NewTektonDeployClient(logger.NewForTest())
 	require.NoError(t, err, "Failed to create TektonClient")
 
-	kubeClient, err := infrastructure.NewKubeClient(logger.NewForTest())
+	kubeClient, err := infrastructure.NewKubeDeployClient(logger.NewForTest())
 	require.NoError(t, err, "Failed to create KubeClient")
 
 	// Create a test deployment request with dry_run=false

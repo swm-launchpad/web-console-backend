@@ -118,11 +118,11 @@ func InitializeApp() (*App, error) {
 	getContainersForBuildUseCase := build.NewGetContainersForBuildUseCase(containerService, templateRepository, logger)
 	getContainersForBuildAndDeployUseCase := combined.NewGetContainersForBuildAndDeployUseCase(containerService, templateRepository, logger)
 	containerClient := provideContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, getContainersForBuildAndDeployUseCase, logger)
-	tektonClient, err := provideTektonClient(logger)
+	tektonClient, err := provideTektonDeployClient(logger)
 	if err != nil {
 		return nil, err
 	}
-	kubeClient, err := provideKubeClient(logger)
+	kubeClient, err := provideKubeDeployClient(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -241,14 +241,14 @@ func provideEmailService(cfg *config.Config, log logger.Logger) email.Service {
 	)
 }
 
-// provideTektonClient creates a Tekton client from environment variables
-func provideTektonClient(log logger.Logger) (infrastructure3.TektonClient, error) {
-	return infrastructure4.NewTektonClient(log)
+// provideTektonDeployClient creates a Tekton client from environment variables
+func provideTektonDeployClient(log logger.Logger) (infrastructure3.TektonClient, error) {
+	return infrastructure4.NewTektonDeployClient(log)
 }
 
-// provideKubeClient creates a Kubernetes client from environment variables
-func provideKubeClient(log logger.Logger) (infrastructure3.KubeClient, error) {
-	return infrastructure4.NewKubeClient(log)
+// provideKubeDeployClient creates a Kubernetes client from environment variables
+func provideKubeDeployClient(log logger.Logger) (infrastructure3.KubeClient, error) {
+	return infrastructure4.NewKubeDeployClient(log)
 }
 
 // provideContainerClient creates a container client

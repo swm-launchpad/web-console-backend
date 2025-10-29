@@ -103,14 +103,14 @@ func provideEmailService(cfg *config.Config, log logger.Logger) email.Service {
 	)
 }
 
-// provideTektonClient creates a Tekton client from environment variables
-func provideTektonClient(log logger.Logger) (projectDomainInfra.TektonClient, error) {
-	return projectInfra.NewTektonClient(log)
+// provideTektonDeployClient creates a Tekton client from environment variables
+func provideTektonDeployClient(log logger.Logger) (projectDomainInfra.TektonClient, error) {
+	return projectInfra.NewTektonDeployClient(log)
 }
 
-// provideKubeClient creates a Kubernetes client from environment variables
-func provideKubeClient(log logger.Logger) (projectDomainInfra.KubeClient, error) {
-	return projectInfra.NewKubeClient(log)
+// provideKubeDeployClient creates a Kubernetes client from environment variables
+func provideKubeDeployClient(log logger.Logger) (projectDomainInfra.KubeClient, error) {
+	return projectInfra.NewKubeDeployClient(log)
 }
 
 // provideContainerClient creates a container client
@@ -278,8 +278,8 @@ func InitializeApp() (*App, error) {
 		projectRepo.NewVolumeRepository,
 		projectRepo.NewDeploymentRepository,
 		projectRepo.NewBuildHistoryRepository,
-		provideTektonClient,
-		provideKubeClient,
+		provideTektonDeployClient,
+		provideKubeDeployClient,
 		provideContainerClient,
 		provideTektonBuildClient,
 		provideKubeBuildClient,

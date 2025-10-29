@@ -26,14 +26,14 @@ type tektonClient struct {
 	logger     logger.Logger
 }
 
-// NewTektonClient creates a new Tekton client using configuration from environment variables.
+// NewTektonDeployClient creates a new Tekton client using configuration from environment variables.
 //
 // Required environment variables:
 //   - TEKTON_DEPLOY_URL: The Tekton EventListener endpoint URL (e.g., "https://tekton-api.launchpad.kr/deploy")
 //   - TEKTON_API_AUTH: The Basic authentication header value (e.g., "Basic base64encodedcredentials")
 //
 // Returns an error if any required environment variable is missing.
-func NewTektonClient(log logger.Logger) (infrastructure.TektonClient, error) {
+func NewTektonDeployClient(log logger.Logger) (infrastructure.TektonClient, error) {
 	deployURL := os.Getenv("TEKTON_DEPLOY_URL")
 	if deployURL == "" {
 		return nil, projecterrors.ErrTektonUnavailable
