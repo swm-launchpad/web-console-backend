@@ -26,6 +26,7 @@ func (m *MockBuildOrchestrator) BuildAndWait(
 	for i, container := range containers {
 		results[i] = &BuildResult{
 			BuildHistoryID:   uint(i + 1),
+			ContainerID:      container.ContainerID,
 			Status:           "success",
 			LatestCommitHash: "abc123def456",
 			ImageTag:         "latest",

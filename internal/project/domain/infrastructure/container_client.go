@@ -65,4 +65,70 @@ type ContainerClient interface {
 	//           container.Name, container.GitBranch, container.NeedsBuild)
 	//   }
 	GetContainerBuildConfig(ctx context.Context, projectID uint) (*dto.ContainerBuildConfig, error)
+
+	// GetContainerConfigs retrieves both build and deployment configurations in a single call.
+	// This method executes a single database query and transforms the result into both formats,
+	// ensuring perfect snapshot consistency and eliminating the risk of configuration divergence
+	// between build and deployment phases (P1 Badge fix).
+	//
+	// This method should be preferred over calling GetContainerBuildConfig and GetContainerConfig
+	// separately when you need both configurations, as it:
+	// - Reduces database queries by 50% (1 query instead of 2)
+	// - Guarantees snapshot consistency (no time gap between queries)
+	// - Prevents configuration divergence (e.g., deploying containers that weren't built)
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - *dto.ContainerBuildConfig: Container build configuration if found
+	//   - *dto.ContainerDeploymentConfig: Container deployment configuration if found
+	//   - error: An error if the operation fails or the project is not found
+	//
+	// Example usage:
+	//   buildConfig, deployConfig, err := client.GetContainerConfigs(ctx, 123)
+	//   if err != nil {
+	//       return err
+	//   }
+	//   // Both configs are guaranteed to be from the same database snapshot
+	//   fmt.Printf("Build containers: %d, Deploy containers: %d\n",
+	//       len(buildConfig.Containers), len(deployConfig.Containers))
+	GetContainerConfigs(ctx context.Context, projectID uint) (*dto.ContainerBuildConfig, *dto.ContainerDeploymentConfig, error)
+
+	// GetUnifiedContainerConfig retrieves container configuration as a single unified snapshot.
+	// This method executes a single database query and returns a unified view that contains
+	// all information needed for both build and deployment operations.
+	//
+	// This is the preferred method for build+deploy workflows as it:
+	// - Provides a single source of truth (no possibility of divergence)
+	// - Can be converted to build-only or deploy-only formats using converter functions
+	// - Eliminates the need for complex mapping and validation logic
+	// - Guarantees perfect consistency between build and deployment phases (P1 Badge fix)
+	//
+	// Usage pattern:
+	//   1. Call GetUnifiedContainerConfig() once
+	//   2. Convert to BuildConfig using ConvertToBuildConfig()
+	//   3. Perform builds
+	//   4. Convert to DeployConfig using ConvertToDeployConfig() with build results
+	//   5. Perform deployment
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - *dto.UnifiedContainerConfig: Unified container configuration if found
+	//   - error: An error if the operation fails or the project is not found
+	//
+	// Example usage:
+	//   unified, err := client.GetUnifiedContainerConfig(ctx, 123)
+	//   if err != nil {
+	//       return err
+	//   }
+	//   buildConfig := ConvertToBuildConfig(unified)
+	//   // ... perform builds ...
+	//   deployConfig := ConvertToDeployConfig(unified, buildResults)
+	//   // ... perform deployment ...
+	GetUnifiedContainerConfig(ctx context.Context, projectID uint) (*dto.UnifiedContainerConfig, error)
 }

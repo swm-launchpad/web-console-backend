@@ -6,6 +6,7 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containerbuild "github.com/swm-launchpad/web-console-backend/internal/container/application/build"
+	containercombined "github.com/swm-launchpad/web-console-backend/internal/container/application/combined"
 	containerdeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	projectinfra "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
@@ -16,21 +17,24 @@ import (
 // containerClient is the implementation of ContainerClient interface.
 // It fetches actual container configuration from the container bounded context.
 type containerClient struct {
-	getContainersForDeploymentUseCase *containerdeployment.GetContainersForDeploymentUseCase
-	getContainersForBuildUseCase      *containerbuild.GetContainersForBuildUseCase
-	logger                            logger.Logger
+	getContainersForDeploymentUseCase     *containerdeployment.GetContainersForDeploymentUseCase
+	getContainersForBuildUseCase          *containerbuild.GetContainersForBuildUseCase
+	getContainersForBuildAndDeployUseCase *containercombined.GetContainersForBuildAndDeployUseCase
+	logger                                logger.Logger
 }
 
 // NewContainerClient creates a new containerClient instance.
 func NewContainerClient(
 	getContainersForDeploymentUseCase *containerdeployment.GetContainersForDeploymentUseCase,
 	getContainersForBuildUseCase *containerbuild.GetContainersForBuildUseCase,
+	getContainersForBuildAndDeployUseCase *containercombined.GetContainersForBuildAndDeployUseCase,
 	log logger.Logger,
 ) projectinfra.ContainerClient {
 	return &containerClient{
-		getContainersForDeploymentUseCase: getContainersForDeploymentUseCase,
-		getContainersForBuildUseCase:      getContainersForBuildUseCase,
-		logger:                            log,
+		getContainersForDeploymentUseCase:     getContainersForDeploymentUseCase,
+		getContainersForBuildUseCase:          getContainersForBuildUseCase,
+		getContainersForBuildAndDeployUseCase: getContainersForBuildAndDeployUseCase,
+		logger:                                log,
 	}
 }
 
@@ -67,6 +71,8 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 		imageName := container.Slug
 
 		// Image tag: use first 7 characters of last_built_git_commit_hash
+		// For first-time builds, last_built_git_commit_hash is NULL, so we use a placeholder
+		// that will be updated from BuildResult before deployment
 		var imageTag string
 		if container.LastBuiltGitCommitHash != nil && *container.LastBuiltGitCommitHash != "" {
 			commitHash := *container.LastBuiltGitCommitHash
@@ -76,12 +82,14 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 				imageTag = commitHash
 			}
 		} else {
-			// No last built commit hash - cannot deploy
-			c.logger.Error(ctx, "container client container missing last built commit hash",
+			// First-time build: use placeholder tag
+			// This will be updated from BuildResult.LatestCommitHash before deployment
+			imageTag = "pending"
+			c.logger.Info(ctx, "container client using placeholder image tag for first build",
 				zap.Uint("project_id", projectID),
 				zap.String("container_name", container.Name),
+				zap.String("placeholder_tag", imageTag),
 			)
-			return nil, fmt.Errorf("container %s has no last_built_git_commit_hash", container.Name)
 		}
 
 		// Health check: always "none"
@@ -216,6 +224,339 @@ func (c *containerClient) GetContainerBuildConfig(ctx context.Context, projectID
 
 	return &dto.ContainerBuildConfig{
 		Containers: containerInfos,
+	}, nil
+}
+
+// GetContainerConfigs returns both build and deployment container configurations
+// using a single database query. This ensures perfect snapshot consistency and
+// eliminates the risk of configuration divergence between build and deployment.
+func (c *containerClient) GetContainerConfigs(ctx context.Context, projectID uint) (
+	*dto.ContainerBuildConfig,
+	*dto.ContainerDeploymentConfig,
+	error,
+) {
+	c.logger.Info(ctx, "container client get container configs (unified) started",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Step 1: Get containers from container bounded context using unified use case
+	// This executes a single database query and transforms to both formats
+	combined, err := c.getContainersForBuildAndDeployUseCase.Execute(ctx, containercombined.GetContainersForBuildAndDeployInput{
+		ProjectID: projectID,
+	})
+	if err != nil {
+		c.logger.Error(ctx, "container client failed to get containers (unified)",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return nil, nil, fmt.Errorf("failed to get containers: %w", err)
+	}
+
+	if len(combined.BuildContainers) == 0 {
+		c.logger.Warn(ctx, "container client no containers found (unified)",
+			zap.Uint("project_id", projectID),
+		)
+		return nil, nil, projecterrors.ErrContainerConfigNotFound
+	}
+
+	// Step 2: Convert build containers to project DTO format
+	buildContainerInfos := make([]dto.BuildContainerInfo, 0, len(combined.BuildContainers))
+
+	for _, container := range combined.BuildContainers {
+		containerInfo := dto.BuildContainerInfo{
+			ProjectID:           projectID,
+			ContainerID:         container.ContainerID,
+			Name:                container.Name,
+			Slug:                container.Slug,
+			TemplateID:          container.TemplateID,
+			TemplateBody:        container.TemplateBody,
+			TemplateConfig:      container.TemplateConfig,
+			GitRepositoryURL:    container.GitRepositoryURL,
+			GitBranch:           container.GitBranch,
+			GitDirectoryPath:    container.GitDirectoryPath,
+			LastBuiltCommitHash: container.LastBuiltCommitHash,
+			NeedsBuild:          container.NeedsBuild,
+			BuildVars:           container.BuildVars,
+			InstallationID:      container.InstallationID,
+		}
+
+		buildContainerInfos = append(buildContainerInfos, containerInfo)
+	}
+
+	// Step 3: Convert deployment containers to project DTO format
+	deployContainerInfos := make([]dto.ContainerInfo, 0, len(combined.DeploymentContainers))
+
+	for _, container := range combined.DeploymentContainers {
+		// Image name: use container slug
+		imageName := container.Slug
+
+		// Image tag: use first 7 characters of last_built_git_commit_hash
+		// For first-time builds, last_built_git_commit_hash is NULL, so we use a placeholder
+		// that will be updated from BuildResult before deployment
+		var imageTag string
+		if container.LastBuiltGitCommitHash != nil && *container.LastBuiltGitCommitHash != "" {
+			commitHash := *container.LastBuiltGitCommitHash
+			if len(commitHash) >= 7 {
+				imageTag = commitHash[:7]
+			} else {
+				imageTag = commitHash
+			}
+		} else {
+			// First-time build: use placeholder tag
+			// This will be updated from BuildResult.LatestCommitHash before deployment
+			imageTag = "pending"
+			c.logger.Info(ctx, "container client using placeholder image tag for first build (unified)",
+				zap.Uint("project_id", projectID),
+				zap.String("container_name", container.Name),
+				zap.String("placeholder_tag", imageTag),
+			)
+		}
+
+		// Health check: always "none"
+		healthCheckType := "none"
+
+		// Port and Domain: from first network (assuming only one network per container)
+		var port int
+		var domain *string
+		if len(container.Networks) > 0 {
+			network := container.Networks[0]
+			port = int(network.InternalPort)
+
+			if network.FQDN != "" {
+				domain = &network.FQDN
+			}
+		} else {
+			// No network defined - cannot deploy
+			c.logger.Error(ctx, "container client container missing network configuration (unified)",
+				zap.Uint("project_id", projectID),
+				zap.String("container_name", container.Name),
+			)
+			return nil, nil, fmt.Errorf("container %s has no network configuration", container.Name)
+		}
+
+		// Resource limits
+		cpuLimit := "1000m" // default
+		if container.CPULimit != nil {
+			cpuLimit = fmt.Sprintf("%dm", *container.CPULimit)
+		}
+
+		memoryLimit := "1Gi" // default
+		if container.MemoryLimit != nil {
+			memoryLimit = fmt.Sprintf("%dMi", *container.MemoryLimit)
+		}
+		// MemoryRequest = MemoryLimit (same value)
+		memoryRequest := memoryLimit
+
+		// Volume mounts: pass volume_id as-is
+		// The actual volume_id to volume_slug mapping will be done at the deployment service layer
+		volumeMounts := make([]dto.VolumeMount, 0, len(container.Mounts))
+		for _, mount := range container.Mounts {
+			volumeMounts = append(volumeMounts, dto.VolumeMount{
+				VolumeID:  mount.VolumeID,
+				MountPath: mount.MountPath,
+			})
+		}
+
+		// Build ContainerInfo
+		containerInfo := dto.ContainerInfo{
+			Name:            container.Slug, // Use slug as container name for Kubernetes
+			Domain:          domain,
+			HealthCheckType: healthCheckType,
+			HealthEndpoint:  nil, // No health endpoint for "none" type
+			Port:            port,
+			HealthPort:      nil, // No separate health port
+			ImageName:       imageName,
+			ImageTag:        imageTag,
+			EnvVars:         container.EnvVars,
+			Secrets:         container.Secrets,
+			CPULimit:        cpuLimit,
+			MemoryRequest:   memoryRequest,
+			MemoryLimit:     memoryLimit,
+			VolumeMounts:    volumeMounts,
+		}
+
+		deployContainerInfos = append(deployContainerInfos, containerInfo)
+	}
+
+	c.logger.Info(ctx, "container client get container configs (unified) completed",
+		zap.Uint("project_id", projectID),
+		zap.Int("build_container_count", len(buildContainerInfos)),
+		zap.Int("deploy_container_count", len(deployContainerInfos)),
+	)
+
+	return &dto.ContainerBuildConfig{
+			Containers: buildContainerInfos,
+		}, &dto.ContainerDeploymentConfig{
+			Containers: deployContainerInfos,
+		}, nil
+}
+
+// GetUnifiedContainerConfig returns container configuration as a single unified snapshot.
+// This method provides the foundation for the unified config approach that eliminates
+// snapshot divergence by design (P1 Badge fix improvement).
+func (c *containerClient) GetUnifiedContainerConfig(ctx context.Context, projectID uint) (*dto.UnifiedContainerConfig, error) {
+	c.logger.Info(ctx, "container client get unified container config started",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Step 1: Get containers from container bounded context using unified use case
+	// This executes a single database query and transforms to both build and deploy formats
+	combined, err := c.getContainersForBuildAndDeployUseCase.Execute(ctx, containercombined.GetContainersForBuildAndDeployInput{
+		ProjectID: projectID,
+	})
+	if err != nil {
+		c.logger.Error(ctx, "container client failed to get unified containers",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("failed to get containers: %w", err)
+	}
+
+	if len(combined.BuildContainers) == 0 {
+		c.logger.Warn(ctx, "container client no containers found for unified config",
+			zap.Uint("project_id", projectID),
+		)
+		return nil, projecterrors.ErrContainerConfigNotFound
+	}
+
+	// Step 2: Merge build and deploy containers into unified format
+	// Map by ContainerID for efficient lookup
+	deployByID := make(map[uint]containerdeployment.DeploymentContainerOutput)
+	for _, deploy := range combined.DeploymentContainers {
+		deployByID[deploy.ContainerID] = deploy
+	}
+
+	unifiedContainers := make([]dto.UnifiedContainerInfo, 0, len(combined.BuildContainers))
+
+	for _, build := range combined.BuildContainers {
+		// Get corresponding deployment info
+		deploy, found := deployByID[build.ContainerID]
+		if !found {
+			// This should never happen since both come from the same DB query
+			// but we handle it defensively
+			c.logger.Error(ctx, "deployment info not found for build container",
+				zap.Uint("project_id", projectID),
+				zap.Uint("container_id", build.ContainerID),
+				zap.String("container_name", build.Name),
+			)
+			return nil, fmt.Errorf("deployment info not found for container %d", build.ContainerID)
+		}
+
+		// Calculate image name and tag
+		imageName := build.Slug
+
+		var imageTag string
+		if build.LastBuiltCommitHash != nil && *build.LastBuiltCommitHash != "" {
+			commitHash := *build.LastBuiltCommitHash
+			if len(commitHash) >= 7 {
+				imageTag = commitHash[:7]
+			} else {
+				imageTag = commitHash
+			}
+		} else {
+			// First-time build: use placeholder
+			imageTag = "pending"
+			c.logger.Info(ctx, "using placeholder image tag for first build",
+				zap.Uint("project_id", projectID),
+				zap.String("container_name", build.Name),
+			)
+		}
+
+		// Extract network information
+		var port int
+		var domain *string
+		healthCheckType := "none"
+		var healthEndpoint *string
+		var healthPort *int
+
+		networks := make([]dto.NetworkInfo, len(deploy.Networks))
+		for i, net := range deploy.Networks {
+			networks[i] = dto.NetworkInfo{
+				NetworkID:    net.NetworkID,
+				InternalPort: net.InternalPort,
+				ExternalPort: net.ExternalPort,
+				ExternalIP:   net.ExternalIP,
+				FQDN:         net.FQDN,
+				NetworkType:  net.NetworkType,
+			}
+
+			// Use first network for primary port and domain
+			if i == 0 {
+				port = int(net.InternalPort)
+				if net.FQDN != "" {
+					// Copy FQDN to local variable before taking address
+					// to avoid capturing loop variable pointer
+					fqdn := net.FQDN
+					domain = &fqdn
+				}
+			}
+		}
+
+		if len(networks) == 0 {
+			c.logger.Error(ctx, "container missing network configuration",
+				zap.Uint("project_id", projectID),
+				zap.String("container_name", build.Name),
+			)
+			return nil, fmt.Errorf("container %s has no network configuration", build.Name)
+		}
+
+		// Convert mounts
+		mounts := make([]dto.MountInfo, len(deploy.Mounts))
+		for i, mount := range deploy.Mounts {
+			mounts[i] = dto.MountInfo{
+				VolumeID:  mount.VolumeID,
+				MountPath: mount.MountPath,
+			}
+		}
+
+		// Build unified container info
+		unified := dto.UnifiedContainerInfo{
+			// Identity
+			ContainerID: build.ContainerID,
+			Name:        build.Name,
+			Slug:        build.Slug,
+
+			// Build fields
+			TemplateID:           build.TemplateID,
+			TemplateBody:         build.TemplateBody,
+			TemplateConfig:       build.TemplateConfig,
+			GitRepositoryURL:     build.GitRepositoryURL,
+			GitBranch:            build.GitBranch,
+			GitDirectoryPath:     build.GitDirectoryPath,
+			LastBuiltCommitHash:  build.LastBuiltCommitHash,
+			NeedsBuild:           build.NeedsBuild,
+			BuildVars:            build.BuildVars,
+			GitHubInstallationID: build.InstallationID,
+
+			// Deploy fields
+			ImageName:   imageName,
+			ImageTag:    imageTag,
+			CPULimit:    deploy.CPULimit,
+			MemoryLimit: deploy.MemoryLimit,
+			EnvVars:     deploy.EnvVars,
+			Secrets:     deploy.Secrets,
+			Networks:    networks,
+			Mounts:      mounts,
+
+			// Domain/Health check
+			Domain:          domain,
+			HealthCheckType: healthCheckType,
+			HealthEndpoint:  healthEndpoint,
+			Port:            port,
+			HealthPort:      healthPort,
+		}
+
+		unifiedContainers = append(unifiedContainers, unified)
+	}
+
+	c.logger.Info(ctx, "container client get unified container config completed",
+		zap.Uint("project_id", projectID),
+		zap.Int("container_count", len(unifiedContainers)),
+	)
+
+	return &dto.UnifiedContainerConfig{
+		ProjectID:  projectID,
+		Containers: unifiedContainers,
 	}, nil
 }
 

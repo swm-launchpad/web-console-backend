@@ -308,6 +308,25 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*dep
 		return nil, projecterrors.ErrContainerConfigNotFound
 	}
 
+	// Step 2.5: Validate that all containers have been built at least once
+	// This is a standalone deploy (not BuildAndDeploy), so we must ensure
+	// that all containers have a valid image tag. If any container has never
+	// been built, fail fast with a clear validation error instead of allowing
+	// Tekton to fail later.
+	for _, container := range containerConfig.Containers {
+		if container.ImageTag == "pending" {
+			s.logger.Error(ctx, "cannot deploy unbuilt container in standalone deploy",
+				zap.Uint("project_id", projectID),
+				zap.Uint("deployment_id", d.DeploymentID),
+				zap.String("container_name", container.Name),
+				zap.String("image_tag", container.ImageTag),
+			)
+			msg := fmt.Sprintf("Container '%s' has never been built (imageTag='pending'). Use build+deploy API instead of standalone deploy.", container.Name)
+			s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTriggerFailed, &msg)
+			return nil, fmt.Errorf("container '%s' has never been built", container.Name)
+		}
+	}
+
 	// Step 3: Gather volume information
 	volumes, err := s.volumeRepo.FindByProjectID(ctx, projectID)
 	if err != nil {
@@ -996,6 +1015,245 @@ func (s *deployService) monitorDeployment(ctx context.Context, projectID uint, d
 	}
 }
 
+// deployProjectInternal deploys a project using the provided container configuration.
+// This method performs the deployment and monitors it directly (no background goroutine).
+//
+// The method is used by BuildAndDeployProject to deploy after builds complete.
+// It accepts container configuration as a parameter to ensure consistency with the
+// built artifacts - the configuration represents the state when builds were initiated.
+//
+// Process:
+//  1. Atomically set project status to 'deploying' and create Deployment record
+//  2. Gather deployment configuration (volumes, project metadata)
+//  3. Trigger deployment via Tekton API
+//  4. Monitor deployment directly with 10-second polling (30-minute timeout)
+//  5. Update deployment and project status when terminal state is reached
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control
+//   - projectID: The unique identifier of the project
+//   - containerConfig: Container configuration snapshot captured before builds
+//
+// Returns:
+//   - error: Returns error if deployment cannot be initiated or monitoring fails
+//
+// Note: This method does NOT spawn a goroutine - it performs monitoring synchronously.
+// This allows the caller (buildAndDeployInBackground) to maintain a single goroutine
+// for the entire build+deploy flow.
+func (s *deployService) deployProjectInternal(
+	ctx context.Context,
+	projectID uint,
+	containerConfig *dto.ContainerDeploymentConfig,
+) error {
+	s.logger.Info(ctx, "deployProjectInternal started",
+		zap.Uint("project_id", projectID),
+		zap.Int("container_count", len(containerConfig.Containers)),
+	)
+
+	// Step 1: Atomically change project status to 'deploying' + create deployment in a transaction
+	var d *deployment.Deployment
+	var proj *projectmodel.Project
+	err := s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+		// Load project with FOR UPDATE lock
+		var err error
+		proj, err = s.projectRepo.FindByIDForUpdate(txCtx, projectID)
+		if err != nil {
+			s.logger.Error(ctx, "failed to find project for update",
+				zap.Uint("project_id", projectID),
+				zap.Error(err),
+			)
+			return err
+		}
+
+		// Verify project is in an appropriate state for deployment
+		// Expected: 'building' (from BuildAndDeployProject flow)
+		// Also acceptable: 'nothing' (for future standalone deploy scenarios)
+		// StartDeploy() will validate and reject invalid transitions
+		if proj.OperationStatus() != value.ProjectOperationStatusBuilding &&
+			proj.OperationStatus() != value.ProjectOperationStatusNothing {
+			s.logger.Error(ctx, "project in unexpected status for deployment",
+				zap.Uint("project_id", projectID),
+				zap.String("operation_status", string(proj.OperationStatus())),
+			)
+			return fmt.Errorf("project in unexpected status: %s", proj.OperationStatus())
+		}
+
+		// Create deployment record with status 'untracked' FIRST
+		d = deployment.NewDeployment(projectID)
+
+		if err := s.deploymentRepo.Create(txCtx, d); err != nil {
+			return err
+		}
+
+		// Change project status to deploying and record which deployment owns it
+		if err := proj.StartDeploy(d.DeploymentID); err != nil {
+			return err
+		}
+
+		if err := s.projectRepo.Save(txCtx, proj); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		s.logger.Error(ctx, "failed to create deployment in transaction",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		// Transaction failed before deployment was created - reset project status
+		// The project is still in 'building' status from buildAndDeployInBackground
+		// We must reset it to 'nothing' to avoid leaving it stuck
+		msg := fmt.Sprintf("Failed to create deployment in transaction: %v", err)
+		s.handleBuildError(ctx, projectID, &msg)
+		return err
+	}
+
+	s.logger.Info(ctx, "deployment record created, project status set to deploying",
+		zap.Uint("project_id", projectID),
+		zap.Uint("deployment_id", d.DeploymentID),
+	)
+
+	// From now on, any error should rollback project status and mark deployment as failed
+
+	// Step 2: Gather volume information
+	volumes, err := s.volumeRepo.FindByProjectID(ctx, projectID)
+	if err != nil {
+		s.logger.Error(ctx, "failed to get volumes",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
+		msg := fmt.Sprintf("Failed to get volumes: %v", err)
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTriggerFailed, &msg)
+		return projecterrors.ErrDatabaseOperation
+	}
+
+	// Step 3: Build Tekton deployment request using provided container configuration
+	tektonRequest, err := s.buildTektonRequest(proj, containerConfig, volumes)
+	if err != nil {
+		s.logger.Error(ctx, "failed to build Tekton request",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
+		msg := fmt.Sprintf("Failed to build Tekton request: %v", err)
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTriggerFailed, &msg)
+		return err
+	}
+
+	// Step 4: Trigger deployment via Tekton API
+	tektonResponse, err := s.tektonClient.TriggerDeploy(ctx, tektonRequest)
+	if err != nil {
+		s.logger.Error(ctx, "failed to trigger Tekton deployment",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
+		msg := fmt.Sprintf("Failed to trigger Tekton deployment: %v", err)
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTriggerFailed, &msg)
+		return projecterrors.ErrTektonDeploymentFailed
+	}
+
+	s.logger.Info(ctx, "Tekton deployment triggered successfully",
+		zap.Uint("project_id", projectID),
+		zap.Uint("deployment_id", d.DeploymentID),
+		zap.String("event_id", tektonResponse.EventID),
+	)
+
+	// Step 5: Update deployment with Tekton event ID
+	eventID := tektonResponse.EventID
+	if err := d.InitTektonInfo(&eventID, nil); err != nil {
+		s.logger.Error(ctx, "failed to init Tekton info",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
+		msg := fmt.Sprintf("Failed to init Tekton info: %v", err)
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTrackingFailed, &msg)
+		return err
+	}
+
+	if err := s.deploymentRepo.Save(ctx, d); err != nil {
+		s.logger.Error(ctx, "failed to save deployment",
+			zap.Uint("project_id", projectID),
+			zap.Uint("deployment_id", d.DeploymentID),
+			zap.Error(err),
+		)
+		msg := fmt.Sprintf("Failed to save deployment: %v", err)
+		s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTrackingFailed, &msg)
+		return projecterrors.ErrDatabaseOperation
+	}
+
+	// Step 6: Monitor deployment directly (no goroutine)
+	s.logger.Info(ctx, "starting direct deployment monitoring",
+		zap.Uint("project_id", projectID),
+		zap.Uint("deployment_id", d.DeploymentID),
+	)
+
+	// Use ticker for 10-second polling intervals
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	// Set 30-minute timeout for deployment monitoring
+	timeout := time.After(30 * time.Minute)
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled - mark deployment as tracking lost
+			s.logger.Error(ctx, "deployment monitoring cancelled",
+				zap.Uint("project_id", projectID),
+				zap.Uint("deployment_id", d.DeploymentID),
+				zap.Error(ctx.Err()),
+			)
+			msg := fmt.Sprintf("Deployment monitoring cancelled: %v", ctx.Err())
+			s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTrackingLost, &msg)
+			return ctx.Err()
+
+		case <-timeout:
+			// Timeout reached - mark deployment as tracking failed
+			s.logger.Error(ctx, "deployment monitoring timeout",
+				zap.Uint("project_id", projectID),
+				zap.Uint("deployment_id", d.DeploymentID),
+			)
+			msg := "Deployment monitoring timeout after 30 minutes"
+			s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTrackingFailed, &msg)
+			return fmt.Errorf("deployment monitoring timeout")
+
+		case <-ticker.C:
+			// Poll deployment status
+			refreshedDeployment, err := s.refreshDeploymentStatus(ctx, uint64(d.DeploymentID))
+			if err != nil {
+				// Log error but continue monitoring (transient errors are retriable)
+				s.logger.Warn(ctx, "failed to refresh deployment status, will retry",
+					zap.Uint("project_id", projectID),
+					zap.Uint("deployment_id", d.DeploymentID),
+					zap.Error(err),
+				)
+				continue
+			}
+
+			// Check if deployment reached terminal state
+			if refreshedDeployment != nil && refreshedDeployment.IsCompleted() {
+				s.logger.Info(ctx, "deployment reached terminal state",
+					zap.Uint("project_id", projectID),
+					zap.Uint("deployment_id", d.DeploymentID),
+					zap.String("status", string(refreshedDeployment.Status())),
+				)
+				// Deployment completed - check if it succeeded or failed
+				// Note: refreshDeploymentStatus already handled project status reset
+				if refreshedDeployment.Status() == deployment.DeploymentStatusSuccess {
+					return nil
+				}
+				// Deployment failed, cancelled, or tracking failed
+				return fmt.Errorf("deployment completed with status: %s", refreshedDeployment.Status())
+			}
+		}
+	}
+}
+
 // BuildAndDeployProject builds all containers for a project, then deploys them
 func (s *deployService) BuildAndDeployProject(ctx context.Context, projectID uint) error {
 	s.logger.Info(ctx, "build and deploy project started",
@@ -1107,25 +1365,41 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 		zap.Uint("project_id", projectID),
 	)
 
-	// Step 1: Get container build configuration
-	containerConfig, err := s.containerClient.GetContainerBuildConfig(ctx, projectID)
+	// Step 1: Get unified container configuration (single source of truth)
+	// This executes a SINGLE database query and returns a unified snapshot containing
+	// all information needed for both build and deployment operations.
+	// By using a unified config, we eliminate the possibility of snapshot divergence by design
+	// (P1 Badge fix improvement: divergence cannot happen, not just detected and handled).
+	unifiedConfig, err := s.containerClient.GetUnifiedContainerConfig(ctx, projectID)
 	if err != nil {
-		s.logger.Error(ctx, "failed to get container build config in background",
+		s.logger.Error(ctx, "failed to get unified container config in background",
 			zap.Uint("project_id", projectID),
 			zap.Error(err),
 		)
-		msg := fmt.Sprintf("Failed to get container build config: %v", err)
+		msg := fmt.Sprintf("Failed to get container configuration: %v", err)
 		s.handleBuildError(ctx, projectID, &msg)
 		return
 	}
 
-	s.logger.Info(ctx, "retrieved container build config",
+	s.logger.Info(ctx, "retrieved unified container configuration",
 		zap.Uint("project_id", projectID),
-		zap.Int("container_count", len(containerConfig.Containers)),
+		zap.Int("container_count", len(unifiedConfig.Containers)),
 	)
 
+	// Step 1.5: Convert unified config to build format
+	// This conversion extracts build-specific fields while maintaining the unified snapshot
+	buildConfig := ConvertToBuildConfig(unifiedConfig)
+	if buildConfig == nil || len(buildConfig.Containers) == 0 {
+		s.logger.Error(ctx, "no containers in build config after conversion",
+			zap.Uint("project_id", projectID),
+		)
+		msg := "No containers found for build"
+		s.handleBuildError(ctx, projectID, &msg)
+		return
+	}
+
 	// Guard: Verify containers still exist (race condition: container deleted between validation and here)
-	if len(containerConfig.Containers) == 0 {
+	if len(buildConfig.Containers) == 0 {
 		s.logger.Error(ctx, "no containers found for build after status flip",
 			zap.Uint("project_id", projectID),
 			zap.String("reason", "containers were deleted between initial validation and background execution"),
@@ -1136,9 +1410,9 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 	}
 
 	// Convert []BuildContainerInfo to []*BuildContainerInfo
-	containerPointers := make([]*dto.BuildContainerInfo, len(containerConfig.Containers))
-	for i := range containerConfig.Containers {
-		containerPointers[i] = &containerConfig.Containers[i]
+	containerPointers := make([]*dto.BuildContainerInfo, len(buildConfig.Containers))
+	for i := range buildConfig.Containers {
+		containerPointers[i] = &buildConfig.Containers[i]
 	}
 
 	// Step 2: Execute builds in parallel using BuildOrchestrator
@@ -1216,41 +1490,47 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 		zap.Uint("project_id", projectID),
 	)
 
-	// Step 5: Proceed to deployment
-	// Note: deployProjectInternal will be implemented in PR#10
-	// For now, we just log and reset the project status
-	s.logger.Info(ctx, "deployment would be triggered here (not yet implemented)",
-		zap.Uint("project_id", projectID),
-	)
-
-	// TODO: Call deployProjectInternal once PR#10 is implemented
-	// For now, reset project status to 'nothing'
-	err = s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
-		proj, err := s.projectRepo.FindByIDForUpdate(txCtx, projectID)
-		if err != nil {
-			return err
-		}
-
-		if err := proj.CompleteBuild(); err != nil {
-			return err
-		}
-
-		return s.projectRepo.Save(txCtx, proj)
-	})
-
-	if err != nil {
-		s.logger.Error(ctx, "failed to reset project status after build",
+	// Step 4.5: Convert unified config to deployment format with build results
+	// This conversion extracts deployment-specific fields from the unified snapshot
+	// and updates image tags based on build results.
+	// By using the unified config as the source of truth, we eliminate the possibility
+	// of divergence by design - no mapping, no validation loops, just pure conversion.
+	// (P1 Badge fix improvement: ~70 lines of complex mapping logic replaced with 1 line)
+	deploymentConfig := ConvertToDeployConfig(unifiedConfig, buildResults)
+	if deploymentConfig == nil || len(deploymentConfig.Containers) == 0 {
+		s.logger.Error(ctx, "no containers in deployment config after conversion",
 			zap.Uint("project_id", projectID),
-			zap.Error(err),
 		)
-		// Critical: If we can't reset the status, the project will be stuck in 'building' state
-		// Call handleBuildError to attempt recovery with a fresh context and timeout
-		msg := fmt.Sprintf("Failed to reset project status after successful build: %v", err)
+		msg := "No containers found for deployment"
 		s.handleBuildError(ctx, projectID, &msg)
 		return
 	}
 
-	s.logger.Info(ctx, "build and deploy background operation completed",
+	s.logger.Info(ctx, "converted unified config to deployment format",
+		zap.Uint("project_id", projectID),
+		zap.Int("deploy_container_count", len(deploymentConfig.Containers)),
+	)
+
+	// Step 5: Proceed to deployment using the converted snapshot
+	// The snapshot maintains consistent configuration (captured before builds)
+	// with updated image tags from build results
+	s.logger.Info(ctx, "proceeding to deployment",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Call deployProjectInternal with the captured deployment configuration
+	// This method will handle the deployment, monitoring, and project status updates
+	if err := s.deployProjectInternal(ctx, projectID, deploymentConfig); err != nil {
+		s.logger.Error(ctx, "build and deploy background operation completed with deployment failure",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		// deployProjectInternal handles its own cleanup via handleDeployFailure
+		// Builds were successful, but deployment failed
+		return
+	}
+
+	s.logger.Info(ctx, "build and deploy background operation completed successfully",
 		zap.Uint("project_id", projectID),
 	)
 }
