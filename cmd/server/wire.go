@@ -29,7 +29,6 @@ import (
 	projectDomainRepo "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	projectBuildService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build"
-	projectBuildAdapter "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build/adapter"
 	projectDeployService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/deploy"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
@@ -283,8 +282,8 @@ func InitializeApp() (*App, error) {
 		provideContainerClient,
 		provideTektonBuildClient,
 		provideKubeBuildClient,
-		projectBuildAdapter.NewContainerUpdateAdapter,
-		wire.Bind(new(projectBuildAdapter.ContainerUpdater), new(*projectBuildAdapter.ContainerUpdateAdapter)),
+		projectInfra.NewContainerUpdateAdapter,
+		wire.Bind(new(projectDomainInfra.ContainerUpdater), new(*projectInfra.ContainerUpdateAdapter)),
 
 		// Project domain services
 		projectService.NewSlugService,

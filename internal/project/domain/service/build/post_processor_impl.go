@@ -8,19 +8,19 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build/adapter"
 )
 
 // postProcessorImpl implements PostProcessor
 type postProcessorImpl struct {
-	containerUpdater adapter.ContainerUpdater
+	containerUpdater infrastructure.ContainerUpdater
 	logger           logger.Logger
 }
 
 // NewPostProcessor creates a new PostProcessor instance
 func NewPostProcessor(
-	containerUpdater adapter.ContainerUpdater,
+	containerUpdater infrastructure.ContainerUpdater,
 	log logger.Logger,
 ) PostProcessor {
 	return &postProcessorImpl{
