@@ -560,5 +560,47 @@ func (c *containerClient) GetUnifiedContainerConfig(ctx context.Context, project
 	}, nil
 }
 
+// GetContainerIDsByProjectID returns basic container information (IDs and names) for a project
+func (c *containerClient) GetContainerIDsByProjectID(ctx context.Context, projectID uint) ([]dto.ContainerBasicInfo, error) {
+	c.logger.Info(ctx, "container client get container IDs started",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Use the lightweight deployment use case to get container information
+	containersOutput, err := c.getContainersForDeploymentUseCase.Execute(ctx, containerdeployment.GetContainersForDeploymentInput{
+		ProjectID: projectID,
+	})
+	if err != nil {
+		c.logger.Error(ctx, "container client failed to get containers",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("failed to get containers: %w", err)
+	}
+
+	if len(containersOutput.Containers) == 0 {
+		c.logger.Warn(ctx, "container client no containers found",
+			zap.Uint("project_id", projectID),
+		)
+		return []dto.ContainerBasicInfo{}, nil
+	}
+
+	// Convert to basic info format
+	basicInfos := make([]dto.ContainerBasicInfo, 0, len(containersOutput.Containers))
+	for _, container := range containersOutput.Containers {
+		basicInfos = append(basicInfos, dto.ContainerBasicInfo{
+			ContainerID: container.ContainerID,
+			Name:        container.Name,
+		})
+	}
+
+	c.logger.Info(ctx, "container client get container IDs completed",
+		zap.Uint("project_id", projectID),
+		zap.Int("container_count", len(basicInfos)),
+	)
+
+	return basicInfos, nil
+}
+
 // Compile-time assertion that containerClient implements ContainerClient interface
 var _ projectinfra.ContainerClient = (*containerClient)(nil)

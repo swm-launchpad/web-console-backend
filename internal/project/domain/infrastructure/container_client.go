@@ -131,4 +131,26 @@ type ContainerClient interface {
 	//   deployConfig := ConvertToDeployConfig(unified, buildResults)
 	//   // ... perform deployment ...
 	GetUnifiedContainerConfig(ctx context.Context, projectID uint) (*dto.UnifiedContainerConfig, error)
+
+	// GetContainerIDsByProjectID retrieves basic container information (IDs and names) for a project.
+	// This is a lightweight method useful for status queries that don't need full container configuration.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - []dto.ContainerBasicInfo: List of container IDs and names
+	//   - error: An error if the operation fails or the project is not found
+	//
+	// Example usage:
+	//   containers, err := client.GetContainerIDsByProjectID(ctx, 123)
+	//   if err != nil {
+	//       return err
+	//   }
+	//   for _, container := range containers {
+	//       fmt.Printf("Container ID: %d, Name: %s\n",
+	//           container.ContainerID, container.Name)
+	//   }
+	GetContainerIDsByProjectID(ctx context.Context, projectID uint) ([]dto.ContainerBasicInfo, error)
 }

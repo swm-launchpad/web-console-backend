@@ -50,3 +50,11 @@ func (m *MockContainerClient) GetUnifiedContainerConfig(ctx context.Context, pro
 	}
 	return args.Get(0).(*dto.UnifiedContainerConfig), args.Error(1)
 }
+
+func (m *MockContainerClient) GetContainerIDsByProjectID(ctx context.Context, projectID uint) ([]dto.ContainerBasicInfo, error) {
+	args := m.Called(ctx, projectID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]dto.ContainerBasicInfo), args.Error(1)
+}
