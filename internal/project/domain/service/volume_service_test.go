@@ -17,7 +17,7 @@ import (
 )
 
 func defaultProjectLimits() value.ResourceLimits {
-	limits, _ := value.NewResourceLimits(100, 512, 1024, 1000)
+	limits, _ := value.NewResourceLimits(500, 512, 1024, 1000) // MinCPULimit: 500
 	return *limits
 }
 
@@ -38,7 +38,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 		diskLimit := uint32(2048)
-		limits, _ := value.NewResourceLimits(100, 128, diskLimit, 128)
+		limits, _ := value.NewResourceLimits(500, 512, diskLimit, 128) // Min values: CPU 500, Memory 512
 		_ = project.SetResourceLimits(*limits)
 
 		mockProjectRepo.On("FindByIDForUpdate", ctx, projectID).Return(project, nil)
@@ -74,7 +74,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 		diskLimit := uint32(2048)
-		limits, _ := value.NewResourceLimits(100, 128, diskLimit, 128)
+		limits, _ := value.NewResourceLimits(500, 512, diskLimit, 128) // Min values: CPU 500, Memory 512
 		_ = project.SetResourceLimits(*limits)
 
 		mockProjectRepo.On("FindByIDForUpdate", ctx, projectID).Return(project, nil)
@@ -168,7 +168,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 		diskLimit := uint32(2048)
-		limits, _ := value.NewResourceLimits(100, 128, diskLimit, 128)
+		limits, _ := value.NewResourceLimits(500, 512, diskLimit, 128) // Min values: CPU 500, Memory 512
 		_ = project.SetResourceLimits(*limits)
 
 		mockProjectRepo.On("FindByIDForUpdate", ctx, projectID).Return(project, nil)
@@ -200,7 +200,7 @@ func TestVolumeService_CreateVolume(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000087654321")
 		project := createTestProject(projectID, "테스트 프로젝트", *slug, 1)
 		diskLimit := uint32(2048)
-		limits, _ := value.NewResourceLimits(100, 128, diskLimit, 128)
+		limits, _ := value.NewResourceLimits(500, 512, diskLimit, 128) // Min values: CPU 500, Memory 512
 		_ = project.SetResourceLimits(*limits)
 
 		mockProjectRepo.On("FindByIDForUpdate", ctx, projectID).Return(project, nil)
