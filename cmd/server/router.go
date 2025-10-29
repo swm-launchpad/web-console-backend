@@ -151,8 +151,6 @@ func (r *Router) Setup() {
 
 			// Deployment routes
 			projects.POST("/:slug/deploy", r.deploymentHandler.DeployProject)
-			projects.GET("/:slug/deployments/latest", r.deploymentHandler.GetDeployment)
-			projects.POST("/:slug/deployments/refresh", r.deploymentHandler.RefreshDeployment)
 
 			// Status routes (integrated build and deployment status)
 			projects.GET("/:slug/status", r.projectStatusHandler.GetProjectStatus)

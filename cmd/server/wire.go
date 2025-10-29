@@ -306,8 +306,6 @@ func InitializeApp() (*App, error) {
 		projectApp.NewGetVolumesUseCase,
 		projectApp.NewRemoveVolumeUseCase,
 		projectApp.NewDeployProjectUseCase,
-		projectApp.NewGetDeploymentUseCase,
-		projectApp.NewRefreshDeploymentUseCase,
 		projectApp.NewGetProjectStatusUseCase,
 		projectApp.NewRefreshProjectStatusUseCase,
 
