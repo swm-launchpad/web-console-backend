@@ -38,16 +38,19 @@ func TestManualMountManagement_E2E(t *testing.T) {
 
 		token := registerResp["data"].(map[string]interface{})["token"].(string)
 
-		// Step 2: 프로젝트 생성
+		// Step 2: 프로젝트 생성 (베타 티어 제한 내로: CPU 1 core, Memory 2GB, Disk 3GB)
 		createProjectReq := map[string]interface{}{
 			"name":          "Mount Test Project",
-			"cpu_limit":     4000,
-			"memory_limit":  8192,
-			"disk_limit":    10240,
+			"cpu_limit":     1000, // 1 core (beta limit)
+			"memory_limit":  2048, // 2GB (beta limit)
+			"disk_limit":    3072, // 3GB (beta limit)
 			"traffic_limit": 256,
 		}
 
 		w = server.MakeAuthRequest("POST", "/api/v1/projects", createProjectReq, token)
+		if w.Code != http.StatusCreated {
+			t.Logf("Project creation failed with code %d: %s", w.Code, w.Body.String())
+		}
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var projectResp map[string]interface{}
@@ -218,16 +221,19 @@ func TestManualMountManagement_E2E(t *testing.T) {
 
 		token := registerResp["data"].(map[string]interface{})["token"].(string)
 
-		// Step 2: 프로젝트 생성
+		// Step 2: 프로젝트 생성 (베타 티어 제한 내로)
 		createProjectReq := map[string]interface{}{
 			"name":          "Dupe Mount Project",
-			"cpu_limit":     2000,
-			"memory_limit":  4096,
-			"disk_limit":    5120,
+			"cpu_limit":     1000, // 1 core (beta limit)
+			"memory_limit":  2048, // 2GB (beta limit)
+			"disk_limit":    3072, // 3GB (beta limit)
 			"traffic_limit": 128,
 		}
 
 		w = server.MakeAuthRequest("POST", "/api/v1/projects", createProjectReq, token)
+		if w.Code != http.StatusCreated {
+			t.Logf("Project creation failed with code %d: %s", w.Code, w.Body.String())
+		}
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var projectResp map[string]interface{}
