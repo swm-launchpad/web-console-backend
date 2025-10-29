@@ -143,6 +143,9 @@ func InitializeApp() (*App, error) {
 	getDeploymentUseCase := application2.NewGetDeploymentUseCase(deployService, logger)
 	refreshDeploymentUseCase := application2.NewRefreshDeploymentUseCase(deployService, logger)
 	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, getDeploymentUseCase, refreshDeploymentUseCase, permissionService, projectService, logger)
+	getProjectStatusUseCase := application2.NewGetProjectStatusUseCase(projectRepository, deploymentRepository, buildHistoryRepository, containerClient, logger)
+	refreshProjectStatusUseCase := application2.NewRefreshProjectStatusUseCase(projectRepository, deploymentRepository, buildHistoryRepository, containerClient, kubeClient, kubeBuildClient, logger)
+	projectStatusHandler := handler2.NewProjectStatusHandler(getProjectStatusUseCase, refreshProjectStatusUseCase, permissionService, projectService, logger)
 	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository, logger)
 	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository, logger)
 	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, servicePermissionService, resourceValidationService, volumeService, gitHubInstallationRepository, txManager, logger)
@@ -170,7 +173,7 @@ func InitializeApp() (*App, error) {
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase, logger)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	loggingMiddleware := provideLoggingMiddleware(logger)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, containerHandler, templateHandler, authMiddleware, loggingMiddleware)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, authMiddleware, loggingMiddleware)
 	app := NewApp(configConfig, db, router, oAuthStateRepository, logger)
 	return app, nil
 }
