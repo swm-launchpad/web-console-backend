@@ -13,9 +13,10 @@ import (
 
 type UpdateProjectInput struct {
 	ProjectID    uint
+	ActingUserID uint // The user performing the update (for quota validation)
 	Name         *string
 	FQDN         *string
-	Plan         *string
+	Plan         *value.Plan
 	Status       *string
 	CPULimit     *uint32
 	MemoryLimit  *uint32
@@ -67,7 +68,7 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Update project through service
-		project, err := uc.projectService.UpdateProject(txCtx, input.ProjectID, func(p *model.Project) error {
+		project, err := uc.projectService.UpdateProject(txCtx, input.ProjectID, input.ActingUserID, func(p *model.Project) error {
 			// Update fields if provided
 			if input.Name != nil {
 				if err := p.SetName(*input.Name); err != nil {
@@ -161,7 +162,7 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 		}
 
 		if p, ok := project.Plan(); ok {
-			plan = p
+			plan = p.String()
 			hasPlan = true
 		}
 

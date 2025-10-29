@@ -24,6 +24,10 @@ func uint32Ptr(u uint32) *uint32 {
 	return &u
 }
 
+func planPtr(p value.Plan) *value.Plan {
+	return &p
+}
+
 func TestUpdateProjectUseCase_Execute(t *testing.T) {
 	ctx := context.Background()
 	txManager := db.NewStubTxManager()
@@ -34,15 +38,16 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
-			ProjectID: 1,
-			Name:      stringPtr("새로운 프로젝트 이름"),
+			ProjectID:    1,
+			ActingUserID: 1,
+			Name:         stringPtr("새로운 프로젝트 이름"),
 		}
 
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		updatedProject := createTestProjectWithVolumes(1, "새로운 프로젝트 이름", *slug, 1)
 		// Note: SetUpdatedAt doesn't exist in the model, updatedAt is managed internally
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -62,9 +67,10 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
-			ProjectID: 1,
-			FQDN:      stringPtr("my-project.example.com"),
-			Plan:      stringPtr("premium"),
+			ProjectID:    1,
+			ActingUserID: 1,
+			FQDN:         stringPtr("my-project.example.com"),
+			Plan:         planPtr(value.PlanPro),
 		}
 
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -73,14 +79,14 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		_ = updatedProject.SetPlan(*input.Plan)
 		// Note: SetUpdatedAt doesn't exist in the model, updatedAt is managed internally
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
 
 		output, err := uc.Execute(ctx, input)
 
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, "my-project.example.com", output.FQDN)
-		assert.Equal(t, "premium", output.Plan)
+		assert.Equal(t, "pro", output.Plan)
 
 		mockProjectService.AssertExpectations(t)
 	})
@@ -91,8 +97,9 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
-			ProjectID: 1,
-			Status:    stringPtr("running"),
+			ProjectID:    1,
+			ActingUserID: 1,
+			Status:       stringPtr("running"),
 		}
 
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
@@ -100,7 +107,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		_ = updatedProject.SetStatus(value.ProjectStatusActive)
 		// Note: SetUpdatedAt doesn't exist in the model, updatedAt is managed internally
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -118,6 +125,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 		input := UpdateProjectInput{
 			ProjectID:    1,
+			ActingUserID: 1,
 			CPULimit:     uint32Ptr(2000),
 			MemoryLimit:  uint32Ptr(4096),
 			DiskLimit:    uint32Ptr(4096),
@@ -137,7 +145,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		_ = updatedProject.SetResourceLimits(*limits)
 		// Note: SetUpdatedAt doesn't exist in the model, updatedAt is managed internally
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -154,9 +162,10 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 		input := UpdateProjectInput{
 			ProjectID:    1,
+			ActingUserID: 1,
 			Name:         stringPtr("완전히 새로운 프로젝트"),
 			FQDN:         stringPtr("new.example.com"),
-			Plan:         stringPtr("enterprise"),
+			Plan:         planPtr(value.PlanPro),
 			Status:       stringPtr("running"),
 			CPULimit:     uint32Ptr(4000),
 			MemoryLimit:  uint32Ptr(8192),
@@ -179,7 +188,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		_ = updatedProject.SetResourceLimits(*limits)
 		// Note: SetUpdatedAt doesn't exist in the model, updatedAt is managed internally
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return(updatedProject, nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -187,7 +196,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, "완전히 새로운 프로젝트", output.Name)
 		assert.Equal(t, "new.example.com", output.FQDN)
-		assert.Equal(t, "enterprise", output.Plan)
+		assert.Equal(t, "pro", output.Plan)
 		assert.Equal(t, "active", output.Status)
 
 		mockProjectService.AssertExpectations(t)
@@ -199,11 +208,12 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
-			ProjectID: 0,
-			Name:      stringPtr("새 이름"),
+			ProjectID:    0,
+			ActingUserID: 1,
+			Name:         stringPtr("새 이름"),
 		}
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), projecterrors.ErrInvalidProjectID)
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), projecterrors.ErrInvalidProjectID)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -220,11 +230,12 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
-			ProjectID: 999,
-			Name:      stringPtr("새 이름"),
+			ProjectID:    999,
+			ActingUserID: 1,
+			Name:         stringPtr("새 이름"),
 		}
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), projecterrors.ErrProjectNotFound)
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), projecterrors.ErrProjectNotFound)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -241,11 +252,12 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
-			ProjectID: 1,
-			Name:      stringPtr("새 이름"),
+			ProjectID:    1,
+			ActingUserID: 1,
+			Name:         stringPtr("새 이름"),
 		}
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), projecterrors.ErrCannotModifyDeletedProject)
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), projecterrors.ErrCannotModifyDeletedProject)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -262,11 +274,12 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
-			ProjectID: 1,
-			Status:    stringPtr("invalid-status"),
+			ProjectID:    1,
+			ActingUserID: 1,
+			Status:       stringPtr("invalid-status"),
 		}
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), projecterrors.ErrInvalidStatusTransition)
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), projecterrors.ErrInvalidStatusTransition)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -283,11 +296,12 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 
 		input := UpdateProjectInput{
-			ProjectID: 1,
-			Name:      stringPtr("새 이름"),
+			ProjectID:    1,
+			ActingUserID: 1,
+			Name:         stringPtr("새 이름"),
 		}
 
-		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), errors.New("database error"))
+		mockProjectService.On("UpdateProject", mock.Anything, input.ProjectID, input.ActingUserID, mock.AnythingOfType("func(*model.Project) error")).Return((*model.Project)(nil), errors.New("database error"))
 
 		output, err := uc.Execute(ctx, input)
 
