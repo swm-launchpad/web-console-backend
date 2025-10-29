@@ -139,6 +139,48 @@ type DeployService interface {
 	//   }
 	//   log.Printf("Refreshed status: %s", deployment.Status)
 	RefreshActiveDeployment(ctx context.Context, projectID uint) (*deployment.Deployment, error)
+
+	// BuildAndDeployProject builds all containers for a project, then deploys them.
+	// This method orchestrates the complete CI/CD pipeline: build → deploy.
+	//
+	// The method performs validation and immediately returns with a 202 response,
+	// then executes builds and deployment in a background goroutine.
+	//
+	// Process:
+	//  1. Validate project state (check operation_status is 'nothing')
+	//  2. Validate containers exist
+	//  3. Atomically set project operation_status to 'building'
+	//  4. Return immediately (for 202 response)
+	//  5. Background goroutine executes:
+	//     - Build all containers in parallel (via BuildOrchestrator)
+	//     - Update container metadata after successful builds
+	//     - Deploy project if all builds succeed
+	//     - Reset project status to 'nothing' on any error
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - error: Returns error only if validation fails or status cannot be set
+	//
+	// Error cases:
+	//   - ErrProjectNotFound: Project does not exist
+	//   - ErrProjectAlreadyDeploying: Project is already being deployed/built (operation_status != 'nothing')
+	//   - ErrContainerConfigNotFound: No containers configured for the project
+	//
+	// Example usage:
+	//   err := deployService.BuildAndDeployProject(ctx, 123)
+	//   if err != nil {
+	//       return err  // Validation failed
+	//   }
+	//   // Return 202 Accepted - builds are running in background
+	//
+	// Post-conditions:
+	//   - Project.operation_status is set to 'building' (on success)
+	//   - Background goroutine is started for build+deploy orchestration
+	//   - On error during build/deploy, project status is reverted to 'nothing'
+	BuildAndDeployProject(ctx context.Context, projectID uint) error
 }
 
 // deployService implements the DeployService interface
@@ -150,6 +192,8 @@ type deployService struct {
 	containerClient    infrastructure.ContainerClient
 	tektonClient       infrastructure.TektonClient
 	kubeClient         infrastructure.KubeClient
+	buildOrchestrator  BuildOrchestrator
+	buildPostProcessor BuildPostProcessor
 	deployNamespace    string
 	projectServiceName string
 	logger             logger.Logger
@@ -164,6 +208,8 @@ func NewDeployService(
 	containerClient infrastructure.ContainerClient,
 	tektonClient infrastructure.TektonClient,
 	kubeClient infrastructure.KubeClient,
+	buildOrchestrator BuildOrchestrator,
+	buildPostProcessor BuildPostProcessor,
 	deployNamespace string,
 	projectServiceName string,
 	log logger.Logger,
@@ -176,6 +222,8 @@ func NewDeployService(
 		containerClient:    containerClient,
 		tektonClient:       tektonClient,
 		kubeClient:         kubeClient,
+		buildOrchestrator:  buildOrchestrator,
+		buildPostProcessor: buildPostProcessor,
 		deployNamespace:    deployNamespace,
 		projectServiceName: projectServiceName,
 		logger:             log,
@@ -946,4 +994,322 @@ func (s *deployService) monitorDeployment(ctx context.Context, projectID uint, d
 			}
 		}
 	}
+}
+
+// BuildAndDeployProject builds all containers for a project, then deploys them
+func (s *deployService) BuildAndDeployProject(ctx context.Context, projectID uint) error {
+	s.logger.Info(ctx, "build and deploy project started",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Phase 1: Validate project exists first (authorization/ownership check must come before resource checks)
+	// This ensures we return ErrProjectNotFound for non-existent/unauthorized projects,
+	// not ErrContainerConfigNotFound which would leak information about other users' projects
+	_, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		s.logger.Error(ctx, "failed to find project",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return err // Returns ErrProjectNotFound if project doesn't exist
+	}
+
+	// Phase 2: Check container configuration (only after confirming project exists)
+	containerConfig, err := s.containerClient.GetContainerBuildConfig(ctx, projectID)
+	if err != nil {
+		s.logger.Error(ctx, "failed to get container build config",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return projecterrors.ErrContainerConfigNotFound
+	}
+
+	if len(containerConfig.Containers) == 0 {
+		s.logger.Error(ctx, "no containers found for project",
+			zap.Uint("project_id", projectID),
+		)
+		return projecterrors.ErrContainerConfigNotFound
+	}
+
+	// Phase 3: Atomically change project status to 'building'
+	err = s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+		// Reload project with FOR UPDATE lock (need to lock for status update)
+		proj, err := s.projectRepo.FindByIDForUpdate(txCtx, projectID)
+		if err != nil {
+			s.logger.Error(ctx, "failed to find project for update",
+				zap.Uint("project_id", projectID),
+				zap.Error(err),
+			)
+			return err
+		}
+
+		// Check if project is already deploying or building
+		if proj.OperationStatus() != value.ProjectOperationStatusNothing {
+			s.logger.Error(ctx, "project already in operation",
+				zap.Uint("project_id", projectID),
+				zap.String("operation_status", string(proj.OperationStatus())),
+			)
+			return projecterrors.ErrProjectAlreadyDeploying
+		}
+
+		// Change project status to building
+		if err := proj.StartBuild(); err != nil {
+			return err
+		}
+
+		if err := s.projectRepo.Save(txCtx, proj); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		s.logger.Error(ctx, "failed to set project status to building",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info(ctx, "project status set to building",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Phase 3: Start background goroutine for build and deploy
+	// Create a detached context that preserves request_id and user_id for logging correlation
+	// but doesn't inherit cancellation from the original request
+	backgroundCtx := logger.DetachContext(ctx)
+	go s.buildAndDeployInBackground(backgroundCtx, projectID)
+
+	s.logger.Info(ctx, "build and deploy project initiated",
+		zap.Uint("project_id", projectID),
+	)
+
+	return nil
+}
+
+// buildAndDeployInBackground executes build and deploy operations in the background
+func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectID uint) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error(ctx, "PANIC in buildAndDeployInBackground",
+				zap.Uint("project_id", projectID),
+				zap.Any("panic", r),
+			)
+			// Attempt to reset project status on panic
+			msg := fmt.Sprintf("Panic during build and deploy: %v", r)
+			s.handleBuildError(ctx, projectID, &msg)
+		}
+	}()
+
+	s.logger.Info(ctx, "background build and deploy started",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Step 1: Get container build configuration
+	containerConfig, err := s.containerClient.GetContainerBuildConfig(ctx, projectID)
+	if err != nil {
+		s.logger.Error(ctx, "failed to get container build config in background",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		msg := fmt.Sprintf("Failed to get container build config: %v", err)
+		s.handleBuildError(ctx, projectID, &msg)
+		return
+	}
+
+	s.logger.Info(ctx, "retrieved container build config",
+		zap.Uint("project_id", projectID),
+		zap.Int("container_count", len(containerConfig.Containers)),
+	)
+
+	// Guard: Verify containers still exist (race condition: container deleted between validation and here)
+	if len(containerConfig.Containers) == 0 {
+		s.logger.Error(ctx, "no containers found for build after status flip",
+			zap.Uint("project_id", projectID),
+			zap.String("reason", "containers were deleted between initial validation and background execution"),
+		)
+		msg := "No containers found for build (deleted after status flip)"
+		s.handleBuildError(ctx, projectID, &msg)
+		return
+	}
+
+	// Convert []BuildContainerInfo to []*BuildContainerInfo
+	containerPointers := make([]*dto.BuildContainerInfo, len(containerConfig.Containers))
+	for i := range containerConfig.Containers {
+		containerPointers[i] = &containerConfig.Containers[i]
+	}
+
+	// Step 2: Execute builds in parallel using BuildOrchestrator
+	buildResults, err := s.buildOrchestrator.BuildAndWait(ctx, projectID, containerPointers)
+	if err != nil {
+		s.logger.Error(ctx, "build orchestration failed",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		msg := fmt.Sprintf("Build orchestration failed: %v", err)
+		s.handleBuildError(ctx, projectID, &msg)
+		return
+	}
+
+	// Step 3: Check if all builds succeeded
+	if hasFailedBuilds(buildResults) {
+		s.logger.Error(ctx, "one or more builds failed",
+			zap.Uint("project_id", projectID),
+		)
+		msg := "One or more container builds failed"
+		s.handleBuildError(ctx, projectID, &msg)
+		return
+	}
+
+	s.logger.Info(ctx, "all builds completed successfully",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Step 4: Update container information after successful builds
+	// If any update fails, we must abort to avoid deploying with stale metadata
+	for i, result := range buildResults {
+		if result == nil {
+			s.logger.Error(ctx, "build result is nil, aborting post-build updates",
+				zap.Uint("project_id", projectID),
+				zap.Int("index", i),
+			)
+			msg := fmt.Sprintf("Build result is nil for container at index %d", i)
+			s.handleBuildError(ctx, projectID, &msg)
+			return
+		}
+
+		err := s.buildPostProcessor.UpdateContainerAfterBuild(
+			ctx,
+			containerPointers[i].ContainerID,
+			result,
+			containerPointers[i],
+		)
+		if err != nil {
+			// Check if container changed during build (parameters drift)
+			if errors.Is(err, projecterrors.ErrContainerChangedDuringBuild) {
+				s.logger.Error(ctx, "container changed during build, cannot proceed with deployment",
+					zap.Uint("project_id", projectID),
+					zap.Uint("container_id", containerPointers[i].ContainerID),
+					zap.String("reason", "parameters changed mid-build, built image is stale"),
+					zap.String("mitigation", "needs_build flag remains true, rebuild required"),
+				)
+				msg := fmt.Sprintf("Container %d changed during build, deployment aborted. Rebuild required.", containerPointers[i].ContainerID)
+				s.handleBuildError(ctx, projectID, &msg)
+				return
+			}
+
+			// Other update errors
+			s.logger.Error(ctx, "failed to update container after build, aborting",
+				zap.Uint("project_id", projectID),
+				zap.Uint("container_id", containerPointers[i].ContainerID),
+				zap.Error(err),
+			)
+			msg := fmt.Sprintf("Failed to update container %d after build: %v", containerPointers[i].ContainerID, err)
+			s.handleBuildError(ctx, projectID, &msg)
+			return
+		}
+	}
+
+	s.logger.Info(ctx, "container updates completed, proceeding to deployment",
+		zap.Uint("project_id", projectID),
+	)
+
+	// Step 5: Proceed to deployment
+	// Note: deployProjectInternal will be implemented in PR#10
+	// For now, we just log and reset the project status
+	s.logger.Info(ctx, "deployment would be triggered here (not yet implemented)",
+		zap.Uint("project_id", projectID),
+	)
+
+	// TODO: Call deployProjectInternal once PR#10 is implemented
+	// For now, reset project status to 'nothing'
+	err = s.txManager.RunInTx(ctx, func(txCtx context.Context) error {
+		proj, err := s.projectRepo.FindByIDForUpdate(txCtx, projectID)
+		if err != nil {
+			return err
+		}
+
+		if err := proj.CompleteBuild(); err != nil {
+			return err
+		}
+
+		return s.projectRepo.Save(txCtx, proj)
+	})
+
+	if err != nil {
+		s.logger.Error(ctx, "failed to reset project status after build",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		// Critical: If we can't reset the status, the project will be stuck in 'building' state
+		// Call handleBuildError to attempt recovery with a fresh context and timeout
+		msg := fmt.Sprintf("Failed to reset project status after successful build: %v", err)
+		s.handleBuildError(ctx, projectID, &msg)
+		return
+	}
+
+	s.logger.Info(ctx, "build and deploy background operation completed",
+		zap.Uint("project_id", projectID),
+	)
+}
+
+// handleBuildError handles build failure by resetting project status to 'nothing'
+func (s *deployService) handleBuildError(ctx context.Context, projectID uint, summary *string) {
+	s.logger.Error(ctx, "handling build error",
+		zap.Uint("project_id", projectID),
+		zap.Stringp("summary", summary),
+	)
+
+	// Create a fresh context with timeout for cleanup operations
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Reset project operation status to 'nothing'
+	err := s.txManager.RunInTx(cleanupCtx, func(txCtx context.Context) error {
+		proj, err := s.projectRepo.FindByIDForUpdate(txCtx, projectID)
+		if err != nil {
+			return fmt.Errorf("failed to find project: %w", err)
+		}
+
+		// Only reset if project is in 'building' status
+		if proj.OperationStatus() == value.ProjectOperationStatusBuilding {
+			if err := proj.CompleteBuild(); err != nil {
+				return fmt.Errorf("failed to complete build operation: %w", err)
+			}
+
+			if err := s.projectRepo.Save(txCtx, proj); err != nil {
+				return fmt.Errorf("failed to save project: %w", err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		s.logger.Error(ctx, "handleBuildError failed",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+	} else {
+		s.logger.Info(ctx, "project status reset to nothing",
+			zap.Uint("project_id", projectID),
+		)
+	}
+}
+
+// hasFailedBuilds checks if any build result indicates failure
+func hasFailedBuilds(results []*BuildResult) bool {
+	for _, result := range results {
+		if result == nil {
+			// Nil result is treated as failure
+			return true
+		}
+		// Check for non-success terminal states
+		if result.Status != "success" && result.Status != "skipped" {
+			return true
+		}
+	}
+	return false
 }

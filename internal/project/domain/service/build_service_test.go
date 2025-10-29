@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -320,6 +321,8 @@ func TestBuildService_BuildContainer_ContextCancellation(t *testing.T) {
 		logger:                       testLogger,
 		pollingInterval:              100 * time.Millisecond,
 		findPipelineRunRetryInterval: 100 * time.Millisecond,
+		findPipelineRunTotalTimeout:  5 * time.Minute,
+		findPipelineRunMaxRetries:    300,
 	}
 
 	testTemplate := "FROM alpine:latest"
@@ -664,6 +667,8 @@ func TestBuildService_FastBuildStartedAt(t *testing.T) {
 			logger:                       logger.NewForTest(),
 			pollingInterval:              100 * time.Millisecond,
 			findPipelineRunRetryInterval: 100 * time.Millisecond,
+			findPipelineRunTotalTimeout:  5 * time.Minute,
+			findPipelineRunMaxRetries:    300,
 		}
 
 		// Execute
@@ -753,6 +758,8 @@ func TestBuildService_FastBuildStartedAt(t *testing.T) {
 			logger:                       logger.NewForTest(),
 			pollingInterval:              100 * time.Millisecond,
 			findPipelineRunRetryInterval: 100 * time.Millisecond,
+			findPipelineRunTotalTimeout:  5 * time.Minute,
+			findPipelineRunMaxRetries:    300,
 		}
 
 		// Execute
@@ -842,4 +849,249 @@ func parseTime(t *testing.T, timeStr string) time.Time {
 	parsedTime, err := time.Parse(time.RFC3339, timeStr)
 	require.NoError(t, err, "Failed to parse time: %s", timeStr)
 	return parsedTime
+}
+
+// TestBuildService_FindPipelineRunWithRetry_Timeout tests the scenario where
+// timeout occurs before PipelineRun is found, ensuring BUILD_HISTORY is updated to terminal state
+func TestBuildService_FindPipelineRunWithRetry_Timeout(t *testing.T) {
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+
+	var savedBuildHistory *build_history.BuildHistory
+	mockBuildHistoryRepo := &mockBuildHistoryRepository{
+		saveFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+			savedBuildHistory = b
+			return nil
+		},
+	}
+
+	// Mock: Always return "not found" to trigger timeout
+	mockKubeBuildClient := &mockKubeBuildClient{
+		findPipelineRunNameByEventIDFunc: func(ctx context.Context, eventID string) (string, error) {
+			return "", projecterrors.ErrKubePipelineRunNotFound
+		},
+	}
+
+	// Create service with short timeout to test the actual time.After timeout path
+	// timeout=47ms, interval=10ms → calculatedRetries=4 (47/10 integer division)
+	// maxRetries=100 → min(4, 100)=4, so loop runs 4 times (40ms) then timeout fires at 47ms
+	service := &buildServiceImpl{
+		buildHistoryRepo:             mockBuildHistoryRepo,
+		kubeBuildClient:              mockKubeBuildClient,
+		logger:                       testLogger,
+		findPipelineRunRetryInterval: 10 * time.Millisecond,  // Fast retries for testing
+		findPipelineRunTotalTimeout:  47 * time.Millisecond,  // Timeout fires 7ms after 4th attempt
+		findPipelineRunMaxRetries:    100,                    // High enough that calculatedRetries takes precedence
+		pollingInterval:              100 * time.Millisecond, // Not used in this test
+	}
+
+	buildHistory := build_history.NewBuildHistory(1)
+	eventID := "test-event-timeout"
+
+	// Act: Call without context timeout - let the internal time.After fire
+	pipelineRunName, err := service.findPipelineRunWithRetry(ctx, buildHistory, eventID)
+
+	// Assert: Should return error (either timeout or retry exhaustion depending on timing)
+	require.Error(t, err)
+	assert.Empty(t, pipelineRunName)
+	// Due to timing, either timeout or retry exhaustion can occur - both are valid terminal states
+	assert.True(t,
+		strings.Contains(err.Error(), "timeout waiting for PipelineRun") ||
+			strings.Contains(err.Error(), "PipelineRun not found after"),
+		"error should indicate PipelineRun lookup failure: %v", err)
+
+	// Assert: BUILD_HISTORY should be updated to backend_tracking_failed and saved
+	require.NotNil(t, savedBuildHistory, "BUILD_HISTORY should be saved after PipelineRun lookup failure")
+	assert.Equal(t, build_history.BuildHistoryStatusBackendTrackingFailed, savedBuildHistory.Status())
+}
+
+// TestBuildService_FindPipelineRunWithRetry_RetryExhaustion tests the scenario where
+// all retry attempts are exhausted without finding PipelineRun, ensuring BUILD_HISTORY is updated to terminal state
+func TestBuildService_FindPipelineRunWithRetry_RetryExhaustion(t *testing.T) {
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+
+	var savedBuildHistory *build_history.BuildHistory
+	mockBuildHistoryRepo := &mockBuildHistoryRepository{
+		saveFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+			savedBuildHistory = b
+			return nil
+		},
+	}
+
+	// Mock: Always return "not found" to exhaust retries
+	attemptCount := 0
+	mockKubeBuildClient := &mockKubeBuildClient{
+		findPipelineRunNameByEventIDFunc: func(ctx context.Context, eventID string) (string, error) {
+			attemptCount++
+			return "", projecterrors.ErrKubePipelineRunNotFound
+		},
+	}
+
+	// Create service with settings that exhaust retries before timeout
+	// timeout=5s, interval=10ms, maxRetries=10 → retry exhaustion fires first
+	// 10 attempts × 10ms = 100ms << 5s
+	service := &buildServiceImpl{
+		buildHistoryRepo:             mockBuildHistoryRepo,
+		kubeBuildClient:              mockKubeBuildClient,
+		logger:                       testLogger,
+		findPipelineRunRetryInterval: 10 * time.Millisecond, // Fast retries for testing
+		findPipelineRunTotalTimeout:  5 * time.Second,       // Long timeout, won't fire
+		findPipelineRunMaxRetries:    10,                    // Low limit, exhausts first
+		pollingInterval:              100 * time.Millisecond,
+	}
+
+	buildHistory := build_history.NewBuildHistory(1)
+	eventID := "test-event-exhaustion"
+
+	// Act: Call without context timeout - let retry exhaustion fire
+	pipelineRunName, err := service.findPipelineRunWithRetry(ctx, buildHistory, eventID)
+
+	// Assert: Should return retry exhaustion error
+	require.Error(t, err)
+	assert.Empty(t, pipelineRunName)
+	assert.Contains(t, err.Error(), "PipelineRun not found after")
+	assert.Equal(t, 10, attemptCount, "Should have attempted exactly maxRetries times")
+
+	// Assert: BUILD_HISTORY should be updated to backend_tracking_failed and saved
+	require.NotNil(t, savedBuildHistory, "BUILD_HISTORY should be saved after retry exhaustion")
+	assert.Equal(t, build_history.BuildHistoryStatusBackendTrackingFailed, savedBuildHistory.Status())
+}
+
+// TestBuildService_FindPipelineRunWithRetry_UpdateFailure tests that
+// the method continues to return error even if BUILD_HISTORY update fails
+func TestBuildService_FindPipelineRunWithRetry_UpdateFailure(t *testing.T) {
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+
+	// Mock: Save always fails
+	mockBuildHistoryRepo := &mockBuildHistoryRepository{
+		saveFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+			return errors.New("database error")
+		},
+	}
+
+	// Mock: Always return "not found"
+	mockKubeBuildClient := &mockKubeBuildClient{
+		findPipelineRunNameByEventIDFunc: func(ctx context.Context, eventID string) (string, error) {
+			return "", projecterrors.ErrKubePipelineRunNotFound
+		},
+	}
+
+	service := &buildServiceImpl{
+		buildHistoryRepo:             mockBuildHistoryRepo,
+		kubeBuildClient:              mockKubeBuildClient,
+		logger:                       testLogger,
+		findPipelineRunRetryInterval: 50 * time.Millisecond,
+		pollingInterval:              100 * time.Millisecond,
+	}
+
+	buildHistory := build_history.NewBuildHistory(1)
+	eventID := "test-event-update-failure"
+
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+
+	// Act
+	pipelineRunName, err := service.findPipelineRunWithRetry(ctxWithTimeout, buildHistory, eventID)
+
+	// Assert: Should still return the original error even if update fails
+	assert.Error(t, err)
+	assert.Empty(t, pipelineRunName)
+	// The update/save failure should be logged but not prevent error return
+}
+
+// TestBuildService_BuildContainer_SaveRetryAfterFindPipelineRunFailure tests that
+// BuildContainer retries Save when findPipelineRunWithRetry fails to persist
+func TestBuildService_BuildContainer_SaveRetryAfterFindPipelineRunFailure(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	testLogger := logger.NewForTest()
+
+	saveCallCount := 0
+	var savedBuildHistory *build_history.BuildHistory
+
+	// Mock: First Save of backend_tracking_failed fails (in findPipelineRunWithRetry),
+	// second Save of backend_tracking_failed succeeds (in BuildContainer)
+	buildHistoryRepo := &mockBuildHistoryRepository{
+		findByIDFunc: func(ctx context.Context, id uint) (*build_history.BuildHistory, error) {
+			bh := build_history.NewBuildHistory(1)
+			bh.SetBuildHistoryID(id)
+			return bh, nil
+		},
+		saveFunc: func(ctx context.Context, b *build_history.BuildHistory) error {
+			// Only track/fail saves when BuildHistory is in backend_tracking_failed state
+			if b.Status() == build_history.BuildHistoryStatusBackendTrackingFailed {
+				saveCallCount++
+				if saveCallCount == 1 {
+					// First save attempt of backend_tracking_failed (from findPipelineRunWithRetry) fails
+					return errors.New("database connection error")
+				}
+				// Second save attempt of backend_tracking_failed (from BuildContainer) succeeds
+				savedBuildHistory = b
+			}
+			// All other saves succeed
+			return nil
+		},
+	}
+
+	tektonBuildClient := &mockTektonBuildClient{
+		triggerBuildFunc: func(ctx context.Context, request *dto.TektonBuildRequest) (*dto.TektonBuildResponse, error) {
+			return &dto.TektonBuildResponse{EventID: "test-event-123"}, nil
+		},
+	}
+
+	kubeBuildClient := &mockKubeBuildClient{
+		findPipelineRunNameByEventIDFunc: func(ctx context.Context, eventID string) (string, error) {
+			return "", projecterrors.ErrKubePipelineRunNotFound
+		},
+	}
+
+	service := &buildServiceImpl{
+		buildHistoryRepo:             buildHistoryRepo,
+		tektonBuildClient:            tektonBuildClient,
+		kubeBuildClient:              kubeBuildClient,
+		logger:                       testLogger,
+		pollingInterval:              100 * time.Millisecond,
+		findPipelineRunRetryInterval: 10 * time.Millisecond, // Fast retries for testing
+		findPipelineRunTotalTimeout:  5 * time.Second,       // Long timeout, won't fire
+		findPipelineRunMaxRetries:    10,                    // Low limit, exhausts quickly
+	}
+
+	testTemplate := "FROM alpine:latest"
+	container := &dto.BuildContainerInfo{
+		ProjectID:        10,
+		ContainerID:      1,
+		Name:             "test-container",
+		Slug:             "test-slug",
+		TemplateBody:     &testTemplate,
+		GitRepositoryURL: "https://github.com/test/repo",
+		GitBranch:        "main",
+		NeedsBuild:       true,
+	}
+
+	result, err := service.BuildContainer(ctx, 1, container)
+
+	// Assert: BuildContainer returns error (from findPipelineRunWithRetry failure)
+	// but the critical point is that BUILD_HISTORY was saved to DB (via retry in BuildContainer)
+	require.Error(t, err)
+	// Error can be either timeout or retry exhaustion depending on timing
+	assert.True(t,
+		strings.Contains(err.Error(), "timeout waiting for PipelineRun") ||
+			strings.Contains(err.Error(), "PipelineRun not found after"),
+		"error should indicate PipelineRun lookup failure")
+	assert.NotNil(t, result)
+	assert.Equal(t, "failed", result.Status)
+	assert.Contains(t, result.ErrorMessage, "Failed to find PipelineRun")
+
+	// Verify Save was called twice for backend_tracking_failed state:
+	// - First call from findPipelineRunWithRetry: FAILED (database error)
+	// - Second call from BuildContainer: SUCCEEDED (retry)
+	assert.Equal(t, 2, saveCallCount, "Save should be called twice for backend_tracking_failed state")
+
+	// Verify BUILD_HISTORY was eventually saved to DB in terminal state (this is the fix!)
+	// Without the fix, savedBuildHistory would be nil (DB would remain in 'untracked' state)
+	require.NotNil(t, savedBuildHistory, "BuildHistory should be saved to DB via retry in BuildContainer")
+	assert.Equal(t, build_history.BuildHistoryStatusBackendTrackingFailed, savedBuildHistory.Status())
+	assert.True(t, savedBuildHistory.IsCompleted(), "BuildHistory should be in terminal state")
 }

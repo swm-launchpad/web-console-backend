@@ -29,6 +29,7 @@ import (
 	handler2 "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	infrastructure4 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
+	service4 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -121,7 +122,21 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	deployService := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient, logger)
+	buildHistoryRepository := repository.NewBuildHistoryRepository(db, logger)
+	tektonBuildClient, err := provideTektonBuildClient(logger)
+	if err != nil {
+		return nil, err
+	}
+	kubeBuildClient, err := provideKubeBuildClient(logger)
+	if err != nil {
+		return nil, err
+	}
+	buildService := service2.NewBuildService(buildHistoryRepository, tektonBuildClient, kubeBuildClient, logger)
+	buildOrchestrator := service2.NewBuildOrchestrator(buildHistoryRepository, buildService, logger)
+	updateContainerAfterBuildUseCase := build.NewUpdateContainerAfterBuildUseCase(containerRepository, txManager, logger)
+	containerUpdateAdapter := service4.NewContainerUpdateAdapter(updateContainerAfterBuildUseCase, logger)
+	buildPostProcessor := service2.NewBuildPostProcessor(containerUpdateAdapter, logger)
+	deployService := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient, buildOrchestrator, buildPostProcessor, logger)
 	deployProjectUseCase := application2.NewDeployProjectUseCase(deployService, logger)
 	getDeploymentUseCase := application2.NewGetDeploymentUseCase(deployService, logger)
 	refreshDeploymentUseCase := application2.NewRefreshDeploymentUseCase(deployService, logger)
@@ -269,6 +284,8 @@ func provideDeployService(
 	containerClient infrastructure3.ContainerClient,
 	tektonClient infrastructure3.TektonClient,
 	kubeClient infrastructure3.KubeClient,
+	buildOrchestrator service2.BuildOrchestrator,
+	buildPostProcessor service2.BuildPostProcessor,
 	log logger.Logger,
 ) service2.DeployService {
 	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
@@ -286,6 +303,8 @@ func provideDeployService(
 		containerClient,
 		tektonClient,
 		kubeClient,
+		buildOrchestrator,
+		buildPostProcessor,
 		deployNamespace,
 		projectServiceName,
 		log,

@@ -147,9 +147,10 @@ var (
 
 // Build history errors - errors related to build history management
 var (
-	ErrBuildHistoryNotFound       = errors.New("build history not found")
-	ErrInvalidBuildStatus         = errors.New("invalid build status")
-	ErrInvalidBuildTransition     = errors.New("invalid build state transition")
-	ErrBuildNotCompleted          = errors.New("build has not completed yet")
-	ErrCannotUpdateCompletedBuild = errors.New("cannot update completed build")
+	ErrBuildHistoryNotFound        = errors.New("build history not found")
+	ErrInvalidBuildStatus          = errors.New("invalid build status")
+	ErrInvalidBuildTransition      = errors.New("invalid build state transition")
+	ErrBuildNotCompleted           = errors.New("build has not completed yet")
+	ErrCannotUpdateCompletedBuild  = errors.New("cannot update completed build")
+	ErrContainerChangedDuringBuild = errors.New("container parameters changed during build")
 )
