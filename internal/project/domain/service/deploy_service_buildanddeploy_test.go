@@ -319,21 +319,24 @@ func TestBuildAndDeployInBackground_Success(t *testing.T) {
 		logger:             testLogger,
 	}
 
-	buildContainerConfig := &dto.ContainerBuildConfig{
-		Containers: []dto.BuildContainerInfo{
+	unifiedConfig := &dto.UnifiedContainerConfig{
+		ProjectID: projectID,
+		Containers: []dto.UnifiedContainerInfo{
 			{
-				ProjectID:   projectID,
 				ContainerID: 1,
 				Name:        "test-container",
 				Slug:        "test-slug",
+				ImageName:   "test-image",
+				ImageTag:    "latest",
+				Port:        8080,
 			},
 		},
 	}
 
-	// Mock: GetContainerConfigs returns build config but deployment config error
+	// Mock: GetUnifiedContainerConfig returns unified config
 	// This allows us to test the build phase without having to mock the entire deployment flow
-	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
-		Return(buildContainerConfig, nil, errors.New("deployment config not found"))
+	mockContainerClient.On("GetUnifiedContainerConfig", mock.Anything, projectID).
+		Return(unifiedConfig, nil)
 
 	// Mock: BuildOrchestrator returns success
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
@@ -389,14 +392,20 @@ func TestBuildAndDeployInBackground_BuildOrchestrationFailure(t *testing.T) {
 		logger:            testLogger,
 	}
 
-	containerConfig := &dto.ContainerBuildConfig{
-		Containers: []dto.BuildContainerInfo{
-			{ProjectID: projectID, ContainerID: 1},
+	unifiedConfig := &dto.UnifiedContainerConfig{
+		ProjectID: projectID,
+		Containers: []dto.UnifiedContainerInfo{
+			{
+				ContainerID: 1,
+				ImageName:   "test-image",
+				ImageTag:    "latest",
+				Port:        8080,
+			},
 		},
 	}
-	// Mock: GetContainerConfigs returns configs (orchestration will fail, so deployment config not used)
-	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
-		Return(containerConfig, nil, errors.New("deployment config not needed for this test"))
+	// Mock: GetUnifiedContainerConfig returns unified config
+	mockContainerClient.On("GetUnifiedContainerConfig", mock.Anything, projectID).
+		Return(unifiedConfig, nil)
 
 	// Mock: BuildOrchestrator returns error
 	orchError := errors.New("orchestration failed")
@@ -439,15 +448,26 @@ func TestBuildAndDeployInBackground_BuildFailures(t *testing.T) {
 		logger:            testLogger,
 	}
 
-	containerConfig := &dto.ContainerBuildConfig{
-		Containers: []dto.BuildContainerInfo{
-			{ProjectID: projectID, ContainerID: 1},
-			{ProjectID: projectID, ContainerID: 2},
+	unifiedConfig := &dto.UnifiedContainerConfig{
+		ProjectID: projectID,
+		Containers: []dto.UnifiedContainerInfo{
+			{
+				ContainerID: 1,
+				ImageName:   "test-image-1",
+				ImageTag:    "latest",
+				Port:        8080,
+			},
+			{
+				ContainerID: 2,
+				ImageName:   "test-image-2",
+				ImageTag:    "latest",
+				Port:        8081,
+			},
 		},
 	}
-	// Mock: GetContainerConfigs returns configs (build will fail, so deployment config not used)
-	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
-		Return(containerConfig, nil, errors.New("deployment config not needed for this test"))
+	// Mock: GetUnifiedContainerConfig returns unified config
+	mockContainerClient.On("GetUnifiedContainerConfig", mock.Anything, projectID).
+		Return(unifiedConfig, nil)
 
 	// Mock: BuildOrchestrator returns with one failure
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
@@ -494,14 +514,20 @@ func TestBuildAndDeployInBackground_ContainerChangedDuringBuild(t *testing.T) {
 		logger:             testLogger,
 	}
 
-	containerConfig := &dto.ContainerBuildConfig{
-		Containers: []dto.BuildContainerInfo{
-			{ProjectID: projectID, ContainerID: 1},
+	unifiedConfig := &dto.UnifiedContainerConfig{
+		ProjectID: projectID,
+		Containers: []dto.UnifiedContainerInfo{
+			{
+				ContainerID: 1,
+				ImageName:   "test-image",
+				ImageTag:    "latest",
+				Port:        8080,
+			},
 		},
 	}
-	// Mock: GetContainerConfigs returns configs (post-processor will fail, so deployment config not used)
-	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
-		Return(containerConfig, nil, errors.New("deployment config not needed for this test"))
+	// Mock: GetUnifiedContainerConfig returns unified config
+	mockContainerClient.On("GetUnifiedContainerConfig", mock.Anything, projectID).
+		Return(unifiedConfig, nil)
 
 	// Mock: BuildOrchestrator succeeds
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
@@ -552,14 +578,20 @@ func TestBuildAndDeployInBackground_PostProcessorError(t *testing.T) {
 		logger:             testLogger,
 	}
 
-	containerConfig := &dto.ContainerBuildConfig{
-		Containers: []dto.BuildContainerInfo{
-			{ProjectID: projectID, ContainerID: 1},
+	unifiedConfig := &dto.UnifiedContainerConfig{
+		ProjectID: projectID,
+		Containers: []dto.UnifiedContainerInfo{
+			{
+				ContainerID: 1,
+				ImageName:   "test-image",
+				ImageTag:    "latest",
+				Port:        8080,
+			},
 		},
 	}
-	// Mock: GetContainerConfigs returns configs (post-processor will fail, so deployment config not used)
-	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
-		Return(containerConfig, nil, errors.New("deployment config not needed for this test"))
+	// Mock: GetUnifiedContainerConfig returns unified config
+	mockContainerClient.On("GetUnifiedContainerConfig", mock.Anything, projectID).
+		Return(unifiedConfig, nil)
 
 	// Mock: BuildOrchestrator succeeds
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
@@ -611,13 +643,14 @@ func TestBuildAndDeployInBackground_ContainersDeletedAfterStatusFlip(t *testing.
 		logger:             testLogger,
 	}
 
-	// Mock: GetContainerConfigs returns empty list (containers deleted after status flip)
-	mockContainerClient.On("GetContainerConfigs", mock.Anything, projectID).
-		Return(&dto.ContainerBuildConfig{
-			Containers: []dto.BuildContainerInfo{}, // Empty list
-		}, nil, errors.New("deployment config not needed for this test"))
+	// Mock: GetUnifiedContainerConfig returns empty list (containers deleted after status flip)
+	mockContainerClient.On("GetUnifiedContainerConfig", mock.Anything, projectID).
+		Return(&dto.UnifiedContainerConfig{
+			ProjectID:  projectID,
+			Containers: []dto.UnifiedContainerInfo{}, // Empty list
+		}, nil)
 
-	// Note: We fail early on empty containers before even checking deployment config
+	// Note: We fail early on empty containers
 
 	// Mock: BuildOrchestrator should NOT be called - fail the test if it is
 	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {

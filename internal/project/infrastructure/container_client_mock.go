@@ -224,5 +224,133 @@ func (m *MockContainerClient) GetContainerConfigs(ctx context.Context, projectID
 	}
 }
 
+// GetUnifiedContainerConfig returns unified container configuration based on project ID.
+// Different project IDs return different scenarios:
+//   - projectID 1: Single container unified config
+//   - projectID 2: Multi-container unified config
+//   - Other IDs: Returns projecterrors.ErrProjectNotFound
+func (m *MockContainerClient) GetUnifiedContainerConfig(ctx context.Context, projectID uint) (*dto.UnifiedContainerConfig, error) {
+	switch projectID {
+	case 1:
+		return m.getSingleContainerUnifiedConfig(), nil
+	case 2:
+		return m.getMultiContainerUnifiedConfig(), nil
+	default:
+		return nil, projecterrors.ErrProjectNotFound
+	}
+}
+
+// getSingleContainerUnifiedConfig returns a unified config for single container scenario
+func (m *MockContainerClient) getSingleContainerUnifiedConfig() *dto.UnifiedContainerConfig {
+	domain := "spring-helloworld.launchpad.kr"
+	healthEndpoint := "/"
+	commitHash := "abc1234567890"
+	dirPath := "/backend"
+	installationID := int64(12345678)
+
+	return &dto.UnifiedContainerConfig{
+		ProjectID: 1,
+		Containers: []dto.UnifiedContainerInfo{
+			{
+				ContainerID:          1,
+				Name:                 "backend",
+				Slug:                 "c2025011812000011111111",
+				TemplateID:           nil,
+				TemplateBody:         nil,
+				TemplateConfig:       map[string]interface{}{"go_version": "1.21"},
+				GitRepositoryURL:     "https://github.com/test/repo",
+				GitBranch:            "main",
+				GitDirectoryPath:     &dirPath,
+				LastBuiltCommitHash:  &commitHash,
+				NeedsBuild:           true,
+				BuildVars:            map[string]string{"BUILD_ENV": "production"},
+				GitHubInstallationID: &installationID,
+				ImageName:            "c2025011812000011111111",
+				ImageTag:             "abc1234",
+				CPULimit:             nil,
+				MemoryLimit:          nil,
+				EnvVars:              map[string]string{"SPRING_PROFILES_ACTIVE": "production"},
+				Secrets:              map[string]string{},
+				Networks:             []dto.NetworkInfo{},
+				Mounts:               []dto.MountInfo{},
+				Domain:               &domain,
+				HealthCheckType:      "http",
+				HealthEndpoint:       &healthEndpoint,
+				Port:                 8080,
+				HealthPort:           nil,
+			},
+		},
+	}
+}
+
+// getMultiContainerUnifiedConfig returns a unified config for multi-container scenario
+func (m *MockContainerClient) getMultiContainerUnifiedConfig() *dto.UnifiedContainerConfig {
+	domain := "spring-helloworld-stack.launchpad.kr"
+	healthEndpoint := "/"
+	commitHash := "abc1234567890"
+
+	return &dto.UnifiedContainerConfig{
+		ProjectID: 2,
+		Containers: []dto.UnifiedContainerInfo{
+			{
+				ContainerID:          1,
+				Name:                 "backend",
+				Slug:                 "c2025011812000011111111",
+				TemplateID:           nil,
+				TemplateBody:         nil,
+				TemplateConfig:       map[string]interface{}{"go_version": "1.21"},
+				GitRepositoryURL:     "https://github.com/test/repo",
+				GitBranch:            "main",
+				GitDirectoryPath:     nil,
+				LastBuiltCommitHash:  &commitHash,
+				NeedsBuild:           true,
+				BuildVars:            map[string]string{},
+				GitHubInstallationID: nil,
+				ImageName:            "c2025011812000011111111",
+				ImageTag:             "abc1234",
+				CPULimit:             nil,
+				MemoryLimit:          nil,
+				EnvVars:              map[string]string{},
+				Secrets:              map[string]string{},
+				Networks:             []dto.NetworkInfo{},
+				Mounts:               []dto.MountInfo{},
+				Domain:               &domain,
+				HealthCheckType:      "http",
+				HealthEndpoint:       &healthEndpoint,
+				Port:                 8080,
+				HealthPort:           nil,
+			},
+			{
+				ContainerID:          2,
+				Name:                 "mysql",
+				Slug:                 "c2025011812000022222222",
+				TemplateID:           nil,
+				TemplateBody:         nil,
+				TemplateConfig:       map[string]interface{}{},
+				GitRepositoryURL:     "https://github.com/test/repo",
+				GitBranch:            "main",
+				GitDirectoryPath:     nil,
+				LastBuiltCommitHash:  nil,
+				NeedsBuild:           false,
+				BuildVars:            map[string]string{},
+				GitHubInstallationID: nil,
+				ImageName:            "c2025011812000022222222",
+				ImageTag:             "pending",
+				CPULimit:             nil,
+				MemoryLimit:          nil,
+				EnvVars:              map[string]string{"MYSQL_DATABASE": "mydb", "MYSQL_ROOT_PASSWORD": "rootpass"},
+				Secrets:              map[string]string{},
+				Networks:             []dto.NetworkInfo{},
+				Mounts:               []dto.MountInfo{{VolumeID: 1, MountPath: "/var/lib/mysql"}},
+				Domain:               nil,
+				HealthCheckType:      "tcp",
+				HealthEndpoint:       nil,
+				Port:                 3306,
+				HealthPort:           nil,
+			},
+		},
+	}
+}
+
 // Compile-time assertion that MockContainerClient implements ContainerClient interface
 var _ infrastructure.ContainerClient = (*MockContainerClient)(nil)
