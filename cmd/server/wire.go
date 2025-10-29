@@ -28,11 +28,13 @@ import (
 	projectDomainInfra "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	projectDomainRepo "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	projectBuildService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build"
+	projectBuildAdapter "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build/adapter"
+	projectDeployService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/deploy"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	projectSqlc "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
-	projectInfraService "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -156,10 +158,10 @@ func provideDeployService(
 	containerClient projectDomainInfra.ContainerClient,
 	tektonClient projectDomainInfra.TektonClient,
 	kubeClient projectDomainInfra.KubeClient,
-	buildOrchestrator projectService.BuildOrchestrator,
-	buildPostProcessor projectService.BuildPostProcessor,
+	buildOrchestrator projectBuildService.Orchestrator,
+	buildPostProcessor projectBuildService.PostProcessor,
 	log logger.Logger,
-) projectService.DeployService {
+) projectDeployService.Deployer {
 	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
 	if deployNamespace == "" {
 		deployNamespace = "default"
@@ -167,7 +169,7 @@ func provideDeployService(
 	// projectServiceName is not used in the actual implementation
 	projectServiceName := ""
 
-	return projectService.NewDeployService(
+	return projectDeployService.NewDeployer(
 		txManager,
 		projectRepository,
 		deploymentRepo,
@@ -281,8 +283,8 @@ func InitializeApp() (*App, error) {
 		provideContainerClient,
 		provideTektonBuildClient,
 		provideKubeBuildClient,
-		projectInfraService.NewContainerUpdateAdapter,
-		wire.Bind(new(projectService.ContainerUpdater), new(*projectInfraService.ContainerUpdateAdapter)),
+		projectBuildAdapter.NewContainerUpdateAdapter,
+		wire.Bind(new(projectBuildAdapter.ContainerUpdater), new(*projectBuildAdapter.ContainerUpdateAdapter)),
 
 		// Project domain services
 		projectService.NewSlugService,
@@ -290,9 +292,9 @@ func InitializeApp() (*App, error) {
 		projectService.NewProjectService,
 		projectService.NewVolumeService,
 		projectService.NewPermissionService,
-		projectService.NewBuildService,
-		projectService.NewBuildOrchestrator,
-		projectService.NewBuildPostProcessor,
+		projectBuildService.NewBuilder,
+		projectBuildService.NewOrchestrator,
+		projectBuildService.NewPostProcessor,
 		provideDeployService,
 
 		// Project use cases

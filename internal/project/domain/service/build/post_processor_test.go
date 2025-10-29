@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -52,7 +52,7 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_Success(t *testing.T) {
 		},
 	}
 
-	processor := NewBuildPostProcessor(mockUpdater, testLogger)
+	processor := NewPostProcessor(mockUpdater, testLogger)
 
 	buildResult := &BuildResult{
 		BuildHistoryID:   1,
@@ -88,7 +88,7 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_NonSuccessStatus(t *testin
 		},
 	}
 
-	processor := NewBuildPostProcessor(mockUpdater, testLogger)
+	processor := NewPostProcessor(mockUpdater, testLogger)
 
 	buildResult := &BuildResult{
 		BuildHistoryID:   1,
@@ -122,7 +122,7 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_UpdaterError(t *testing.T)
 		},
 	}
 
-	processor := NewBuildPostProcessor(mockUpdater, testLogger)
+	processor := NewPostProcessor(mockUpdater, testLogger)
 
 	buildResult := &BuildResult{
 		BuildHistoryID:   1,
@@ -155,7 +155,7 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_SkippedBuild(t *testing.T)
 		},
 	}
 
-	processor := NewBuildPostProcessor(mockUpdater, testLogger)
+	processor := NewPostProcessor(mockUpdater, testLogger)
 
 	buildResult := &BuildResult{
 		BuildHistoryID:   1,
@@ -188,7 +188,7 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_BackendTrackingLost(t *tes
 		},
 	}
 
-	processor := NewBuildPostProcessor(mockUpdater, testLogger)
+	processor := NewPostProcessor(mockUpdater, testLogger)
 
 	buildResult := &BuildResult{
 		BuildHistoryID:   1,
@@ -225,7 +225,7 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_ParametersChangedDuringBui
 		},
 	}
 
-	processor := NewBuildPostProcessor(mockUpdater, testLogger)
+	processor := NewPostProcessor(mockUpdater, testLogger)
 
 	buildResult := &BuildResult{
 		BuildHistoryID:   1,
@@ -261,7 +261,7 @@ func TestBuildPostProcessor_UpdateContainerAfterBuild_SkippedBuildWithParameters
 		},
 	}
 
-	processor := NewBuildPostProcessor(mockUpdater, testLogger)
+	processor := NewPostProcessor(mockUpdater, testLogger)
 
 	buildResult := &BuildResult{
 		BuildHistoryID:   1,

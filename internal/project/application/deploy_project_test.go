@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
-	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/deploy"
 )
 
 func TestDeployProjectUseCase_Execute_Success(t *testing.T) {
 	// Arrange
-	mockDeployService := new(service.MockDeployService)
+	mockDeployService := new(deploy.MockDeployService)
 	testLogger := logger.NewForTest()
 	useCase := NewDeployProjectUseCase(mockDeployService, testLogger)
 
@@ -41,7 +41,7 @@ func TestDeployProjectUseCase_Execute_Success(t *testing.T) {
 
 func TestDeployProjectUseCase_Execute_ProjectAlreadyDeploying(t *testing.T) {
 	// Arrange
-	mockDeployService := new(service.MockDeployService)
+	mockDeployService := new(deploy.MockDeployService)
 	testLogger := logger.NewForTest()
 	useCase := NewDeployProjectUseCase(mockDeployService, testLogger)
 
@@ -65,7 +65,7 @@ func TestDeployProjectUseCase_Execute_ProjectAlreadyDeploying(t *testing.T) {
 
 func TestDeployProjectUseCase_Execute_ContainerConfigNotFound(t *testing.T) {
 	// Arrange
-	mockDeployService := new(service.MockDeployService)
+	mockDeployService := new(deploy.MockDeployService)
 	testLogger := logger.NewForTest()
 	useCase := NewDeployProjectUseCase(mockDeployService, testLogger)
 

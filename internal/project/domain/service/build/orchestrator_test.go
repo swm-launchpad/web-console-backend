@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -107,7 +107,7 @@ func TestBuildOrchestrator_BuildAndWait_Success(t *testing.T) {
 		},
 	}
 
-	orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+	orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 	// Test data
 	containers := []*dto.BuildContainerInfo{
@@ -186,7 +186,7 @@ func TestBuildOrchestrator_BuildAndWait_PartialFailure(t *testing.T) {
 		},
 	}
 
-	orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+	orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 	// Test data
 	containers := []*dto.BuildContainerInfo{
@@ -257,7 +257,7 @@ func TestBuildOrchestrator_BuildAndWait_BuildServiceError(t *testing.T) {
 		},
 	}
 
-	orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+	orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 	// Test data
 	containers := []*dto.BuildContainerInfo{
@@ -304,7 +304,7 @@ func TestBuildOrchestrator_BuildAndWait_EmptyContainers(t *testing.T) {
 	mockRepo := &mockOrchestratorBuildHistoryRepo{}
 	mockBuildService := &mockOrchestratorBuildService{}
 
-	orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+	orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 	// Execute with empty containers
 	results, err := orchestrator.BuildAndWait(ctx, 1, []*dto.BuildContainerInfo{})
@@ -328,7 +328,7 @@ func TestBuildOrchestrator_BuildAndWait_BuildHistoryCreationFails(t *testing.T) 
 
 	mockBuildService := &mockOrchestratorBuildService{}
 
-	orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+	orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 	// Test data
 	containers := []*dto.BuildContainerInfo{
@@ -381,7 +381,7 @@ func TestBuildOrchestrator_BuildAndWait_PartialBuildHistoryCreationFails(t *test
 	}
 
 	mockBuildService := &mockOrchestratorBuildService{}
-	orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+	orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 	containers := []*dto.BuildContainerInfo{
 		{ContainerID: 1, Name: "web", Slug: "web"},
@@ -424,7 +424,7 @@ func TestBuildOrchestrator_BuildAndWait_MultipleContainers(t *testing.T) {
 
 	mockBuildService := &mockOrchestratorBuildService{}
 
-	orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+	orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 	// Test data - 5 containers
 	containers := make([]*dto.BuildContainerInfo, 5)
@@ -481,7 +481,7 @@ func TestBuildOrchestrator_BuildAndWait_OrderPreserved(t *testing.T) {
 		},
 	}
 
-	orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+	orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 	// Test data
 	containers := []*dto.BuildContainerInfo{
@@ -533,7 +533,7 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 			},
 		}
 
-		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+		orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 		containers := []*dto.BuildContainerInfo{
 			{ContainerID: 1, Name: "test", Slug: "test"},
@@ -569,7 +569,7 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 			},
 		}
 
-		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+		orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 		containers := []*dto.BuildContainerInfo{
 			{ContainerID: 1, Name: "test", Slug: "test"},
@@ -605,7 +605,7 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 			},
 		}
 
-		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+		orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 		containers := []*dto.BuildContainerInfo{
 			{ContainerID: 1, Name: "test", Slug: "test"},
@@ -639,7 +639,7 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 			},
 		}
 
-		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+		orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 		containers := []*dto.BuildContainerInfo{
 			{ContainerID: 1, Name: "test", Slug: "test"},
@@ -675,7 +675,7 @@ func TestBuildOrchestrator_ErrorHandling(t *testing.T) {
 			},
 		}
 
-		orchestrator := NewBuildOrchestrator(mockRepo, mockBuildService, testLogger)
+		orchestrator := NewOrchestrator(mockRepo, mockBuildService, testLogger)
 
 		containers := []*dto.BuildContainerInfo{
 			{ContainerID: 1, Name: "test", Slug: "test"},

@@ -1,6 +1,5 @@
-// Package service contains domain services that implement business logic
-// spanning multiple aggregates or requiring external infrastructure.
-package service
+// Package deploy contains domain services for deployment orchestration.
+package deploy
 
 import (
 	"context"
@@ -19,10 +18,11 @@ import (
 	projectmodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	volumemodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build"
 	"go.uber.org/zap"
 )
 
-// DeployService defines the interface for deploying projects.
+// Deployer defines the interface for deploying projects.
 // This service orchestrates the deployment process by coordinating between
 // the Project, Deployment, Container, and external infrastructure (Tekton/Kubernetes).
 //
@@ -39,7 +39,7 @@ import (
 //   - Deployment state is tracked accurately (7 possible states)
 //   - Failed deployments are properly cleaned up (project status reset to 'nothing')
 //   - Monitoring handles both fatal and retriable errors appropriately
-type DeployService interface {
+type Deployer interface {
 	// DeployProject initiates a deployment for the specified project.
 	// This method performs validation, state management, and triggers the deployment asynchronously.
 	//
@@ -152,7 +152,7 @@ type DeployService interface {
 	//  3. Atomically set project operation_status to 'building'
 	//  4. Return immediately (for 202 response)
 	//  5. Background goroutine executes:
-	//     - Build all containers in parallel (via BuildOrchestrator)
+	//     - Build all containers in parallel (via build.Orchestrator)
 	//     - Update container metadata after successful builds
 	//     - Deploy project if all builds succeed
 	//     - Reset project status to 'nothing' on any error
@@ -183,7 +183,7 @@ type DeployService interface {
 	BuildAndDeployProject(ctx context.Context, projectID uint) error
 }
 
-// deployService implements the DeployService interface
+// deployService implements the Deployer interface
 type deployService struct {
 	txManager          db.TxManager
 	projectRepo        repository.ProjectRepository
@@ -192,15 +192,15 @@ type deployService struct {
 	containerClient    infrastructure.ContainerClient
 	tektonClient       infrastructure.TektonClient
 	kubeClient         infrastructure.KubeClient
-	buildOrchestrator  BuildOrchestrator
-	buildPostProcessor BuildPostProcessor
+	buildOrchestrator  build.Orchestrator
+	buildPostProcessor build.PostProcessor
 	deployNamespace    string
 	projectServiceName string
 	logger             logger.Logger
 }
 
-// NewDeployService creates a new instance of deployService
-func NewDeployService(
+// NewDeployer creates a new instance of deployService
+func NewDeployer(
 	txManager db.TxManager,
 	projectRepo repository.ProjectRepository,
 	deploymentRepo repository.DeploymentRepository,
@@ -208,12 +208,12 @@ func NewDeployService(
 	containerClient infrastructure.ContainerClient,
 	tektonClient infrastructure.TektonClient,
 	kubeClient infrastructure.KubeClient,
-	buildOrchestrator BuildOrchestrator,
-	buildPostProcessor BuildPostProcessor,
+	buildOrchestrator build.Orchestrator,
+	buildPostProcessor build.PostProcessor,
 	deployNamespace string,
 	projectServiceName string,
 	log logger.Logger,
-) DeployService {
+) Deployer {
 	return &deployService{
 		txManager:          txManager,
 		projectRepo:        projectRepo,
@@ -1388,7 +1388,7 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 
 	// Step 1.5: Convert unified config to build format
 	// This conversion extracts build-specific fields while maintaining the unified snapshot
-	buildConfig := ConvertToBuildConfig(unifiedConfig)
+	buildConfig := build.ConvertToBuildConfig(unifiedConfig)
 	if buildConfig == nil || len(buildConfig.Containers) == 0 {
 		s.logger.Error(ctx, "no containers in build config after conversion",
 			zap.Uint("project_id", projectID),
@@ -1415,7 +1415,7 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 		containerPointers[i] = &buildConfig.Containers[i]
 	}
 
-	// Step 2: Execute builds in parallel using BuildOrchestrator
+	// Step 2: Execute builds in parallel using build.Orchestrator
 	buildResults, err := s.buildOrchestrator.BuildAndWait(ctx, projectID, containerPointers)
 	if err != nil {
 		s.logger.Error(ctx, "build orchestration failed",
@@ -1496,7 +1496,7 @@ func (s *deployService) buildAndDeployInBackground(ctx context.Context, projectI
 	// By using the unified config as the source of truth, we eliminate the possibility
 	// of divergence by design - no mapping, no validation loops, just pure conversion.
 	// (P1 Badge fix improvement: ~70 lines of complex mapping logic replaced with 1 line)
-	deploymentConfig := ConvertToDeployConfig(unifiedConfig, buildResults)
+	deploymentConfig := build.ConvertToDeployConfig(unifiedConfig, buildResults)
 	if deploymentConfig == nil || len(deploymentConfig.Containers) == 0 {
 		s.logger.Error(ctx, "no containers in deployment config after conversion",
 			zap.Uint("project_id", projectID),
@@ -1580,7 +1580,7 @@ func (s *deployService) handleBuildError(ctx context.Context, projectID uint, su
 }
 
 // hasFailedBuilds checks if any build result indicates failure
-func hasFailedBuilds(results []*BuildResult) bool {
+func hasFailedBuilds(results []*build.BuildResult) bool {
 	for _, result := range results {
 		if result == nil {
 			// Nil result is treated as failure

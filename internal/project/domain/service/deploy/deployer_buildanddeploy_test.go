@@ -1,4 +1,4 @@
-package service
+package deploy
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	projectmodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build"
 )
 
 // TestBuildAndDeployProject_ContainerConfigNotFound tests validation failure when no containers are found
@@ -152,8 +153,8 @@ func TestBuildAndDeployProject_Success(t *testing.T) {
 	mockTxManager := db.NewStubTxManager()
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockContainerClient := new(infrastructure.MockContainerClient)
-	mockBuildOrchestrator := &MockBuildOrchestrator{}
-	mockBuildPostProcessor := &MockBuildPostProcessor{}
+	mockBuildOrchestrator := &build.MockBuildOrchestrator{}
+	mockBuildPostProcessor := &build.MockBuildPostProcessor{}
 	testLogger := logger.NewForTest()
 
 	service := &deployService{
@@ -306,8 +307,8 @@ func TestBuildAndDeployInBackground_Success(t *testing.T) {
 	mockTxManager := db.NewStubTxManager()
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockContainerClient := new(infrastructure.MockContainerClient)
-	mockBuildOrchestrator := &MockBuildOrchestrator{}
-	mockBuildPostProcessor := &MockBuildPostProcessor{}
+	mockBuildOrchestrator := &build.MockBuildOrchestrator{}
+	mockBuildPostProcessor := &build.MockBuildPostProcessor{}
 	testLogger := logger.NewForTest()
 
 	service := &deployService{
@@ -339,8 +340,8 @@ func TestBuildAndDeployInBackground_Success(t *testing.T) {
 		Return(unifiedConfig, nil)
 
 	// Mock: BuildOrchestrator returns success
-	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
-		return []*BuildResult{
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*build.BuildResult, error) {
+		return []*build.BuildResult{
 			{
 				BuildHistoryID:   1,
 				Status:           "success",
@@ -351,7 +352,7 @@ func TestBuildAndDeployInBackground_Success(t *testing.T) {
 	}
 
 	// Mock: BuildPostProcessor succeeds
-	mockBuildPostProcessor.UpdateContainerAfterBuildFunc = func(ctx context.Context, containerID uint, result *BuildResult, snapshot *dto.BuildContainerInfo) error {
+	mockBuildPostProcessor.UpdateContainerAfterBuildFunc = func(ctx context.Context, containerID uint, result *build.BuildResult, snapshot *dto.BuildContainerInfo) error {
 		return nil
 	}
 
@@ -381,7 +382,7 @@ func TestBuildAndDeployInBackground_BuildOrchestrationFailure(t *testing.T) {
 	mockTxManager := db.NewStubTxManager()
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockContainerClient := new(infrastructure.MockContainerClient)
-	mockBuildOrchestrator := &MockBuildOrchestrator{}
+	mockBuildOrchestrator := &build.MockBuildOrchestrator{}
 	testLogger := logger.NewForTest()
 
 	service := &deployService{
@@ -409,7 +410,7 @@ func TestBuildAndDeployInBackground_BuildOrchestrationFailure(t *testing.T) {
 
 	// Mock: BuildOrchestrator returns error
 	orchError := errors.New("orchestration failed")
-	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*build.BuildResult, error) {
 		return nil, orchError
 	}
 
@@ -437,7 +438,7 @@ func TestBuildAndDeployInBackground_BuildFailures(t *testing.T) {
 	mockTxManager := db.NewStubTxManager()
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockContainerClient := new(infrastructure.MockContainerClient)
-	mockBuildOrchestrator := &MockBuildOrchestrator{}
+	mockBuildOrchestrator := &build.MockBuildOrchestrator{}
 	testLogger := logger.NewForTest()
 
 	service := &deployService{
@@ -470,8 +471,8 @@ func TestBuildAndDeployInBackground_BuildFailures(t *testing.T) {
 		Return(unifiedConfig, nil)
 
 	// Mock: BuildOrchestrator returns with one failure
-	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
-		return []*BuildResult{
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*build.BuildResult, error) {
+		return []*build.BuildResult{
 			{BuildHistoryID: 1, Status: "success"},
 			{BuildHistoryID: 2, Status: "failed"}, // One failed
 		}, nil
@@ -501,8 +502,8 @@ func TestBuildAndDeployInBackground_ContainerChangedDuringBuild(t *testing.T) {
 	mockTxManager := db.NewStubTxManager()
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockContainerClient := new(infrastructure.MockContainerClient)
-	mockBuildOrchestrator := &MockBuildOrchestrator{}
-	mockBuildPostProcessor := &MockBuildPostProcessor{}
+	mockBuildOrchestrator := &build.MockBuildOrchestrator{}
+	mockBuildPostProcessor := &build.MockBuildPostProcessor{}
 	testLogger := logger.NewForTest()
 
 	service := &deployService{
@@ -530,14 +531,14 @@ func TestBuildAndDeployInBackground_ContainerChangedDuringBuild(t *testing.T) {
 		Return(unifiedConfig, nil)
 
 	// Mock: BuildOrchestrator succeeds
-	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
-		return []*BuildResult{
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*build.BuildResult, error) {
+		return []*build.BuildResult{
 			{BuildHistoryID: 1, Status: "success", LatestCommitHash: "abc123"},
 		}, nil
 	}
 
 	// Mock: BuildPostProcessor returns ErrContainerChangedDuringBuild
-	mockBuildPostProcessor.UpdateContainerAfterBuildFunc = func(ctx context.Context, containerID uint, result *BuildResult, snapshot *dto.BuildContainerInfo) error {
+	mockBuildPostProcessor.UpdateContainerAfterBuildFunc = func(ctx context.Context, containerID uint, result *build.BuildResult, snapshot *dto.BuildContainerInfo) error {
 		return projecterrors.ErrContainerChangedDuringBuild
 	}
 
@@ -565,8 +566,8 @@ func TestBuildAndDeployInBackground_PostProcessorError(t *testing.T) {
 	mockTxManager := db.NewStubTxManager()
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockContainerClient := new(infrastructure.MockContainerClient)
-	mockBuildOrchestrator := &MockBuildOrchestrator{}
-	mockBuildPostProcessor := &MockBuildPostProcessor{}
+	mockBuildOrchestrator := &build.MockBuildOrchestrator{}
+	mockBuildPostProcessor := &build.MockBuildPostProcessor{}
 	testLogger := logger.NewForTest()
 
 	service := &deployService{
@@ -594,14 +595,14 @@ func TestBuildAndDeployInBackground_PostProcessorError(t *testing.T) {
 		Return(unifiedConfig, nil)
 
 	// Mock: BuildOrchestrator succeeds
-	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
-		return []*BuildResult{
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*build.BuildResult, error) {
+		return []*build.BuildResult{
 			{BuildHistoryID: 1, Status: "success"},
 		}, nil
 	}
 
 	// Mock: BuildPostProcessor returns generic error
-	mockBuildPostProcessor.UpdateContainerAfterBuildFunc = func(ctx context.Context, containerID uint, result *BuildResult, snapshot *dto.BuildContainerInfo) error {
+	mockBuildPostProcessor.UpdateContainerAfterBuildFunc = func(ctx context.Context, containerID uint, result *build.BuildResult, snapshot *dto.BuildContainerInfo) error {
 		return errors.New("database error")
 	}
 
@@ -631,8 +632,8 @@ func TestBuildAndDeployInBackground_ContainersDeletedAfterStatusFlip(t *testing.
 	mockTxManager := db.NewStubTxManager()
 	mockProjectRepo := new(repository.MockProjectRepository)
 	mockContainerClient := new(infrastructure.MockContainerClient)
-	mockBuildOrchestrator := &MockBuildOrchestrator{}
-	mockBuildPostProcessor := &MockBuildPostProcessor{}
+	mockBuildOrchestrator := &build.MockBuildOrchestrator{}
+	mockBuildPostProcessor := &build.MockBuildPostProcessor{}
 
 	service := &deployService{
 		txManager:          mockTxManager,
@@ -653,7 +654,7 @@ func TestBuildAndDeployInBackground_ContainersDeletedAfterStatusFlip(t *testing.
 	// Note: We fail early on empty containers
 
 	// Mock: BuildOrchestrator should NOT be called - fail the test if it is
-	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*BuildResult, error) {
+	mockBuildOrchestrator.BuildAndWaitFunc = func(ctx context.Context, pid uint, containers []*dto.BuildContainerInfo) ([]*build.BuildResult, error) {
 		t.Fatalf("BuildAndWait should not be called when containers are deleted after status flip")
 		return nil, nil
 	}

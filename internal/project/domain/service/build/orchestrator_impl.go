@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -14,20 +14,20 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/build_history"
 )
 
-// buildOrchestratorImpl implements BuildOrchestrator
-type buildOrchestratorImpl struct {
+// orchestratorImpl implements Orchestrator
+type orchestratorImpl struct {
 	buildHistoryRepo repository.BuildHistoryRepository
-	buildService     BuildService
+	buildService     Builder
 	logger           logger.Logger
 }
 
-// NewBuildOrchestrator creates a new BuildOrchestrator instance
-func NewBuildOrchestrator(
+// NewOrchestrator creates a new Orchestrator instance
+func NewOrchestrator(
 	buildHistoryRepo repository.BuildHistoryRepository,
-	buildService BuildService,
+	buildService Builder,
 	log logger.Logger,
-) BuildOrchestrator {
-	return &buildOrchestratorImpl{
+) Orchestrator {
+	return &orchestratorImpl{
 		buildHistoryRepo: buildHistoryRepo,
 		buildService:     buildService,
 		logger:           log,
@@ -44,7 +44,7 @@ type buildTask struct {
 }
 
 // BuildAndWait executes builds for all containers in parallel and waits for completion
-func (o *buildOrchestratorImpl) BuildAndWait(
+func (o *orchestratorImpl) BuildAndWait(
 	ctx context.Context,
 	projectID uint,
 	containers []*dto.BuildContainerInfo,
@@ -81,7 +81,7 @@ func (o *buildOrchestratorImpl) BuildAndWait(
 }
 
 // createBuildHistories creates BUILD_HISTORY records for all containers
-func (o *buildOrchestratorImpl) createBuildHistories(
+func (o *orchestratorImpl) createBuildHistories(
 	ctx context.Context,
 	containers []*dto.BuildContainerInfo,
 ) ([]*build_history.BuildHistory, error) {
@@ -121,7 +121,7 @@ func (o *buildOrchestratorImpl) createBuildHistories(
 }
 
 // executeBuildsConcurrently spawns goroutines for each build and collects results
-func (o *buildOrchestratorImpl) executeBuildsConcurrently(
+func (o *orchestratorImpl) executeBuildsConcurrently(
 	ctx context.Context,
 	_ uint, // projectID - unused but kept for consistency
 	containers []*dto.BuildContainerInfo,
@@ -154,7 +154,7 @@ func (o *buildOrchestratorImpl) executeBuildsConcurrently(
 }
 
 // buildContainerWorker executes a single container build in a goroutine
-func (o *buildOrchestratorImpl) buildContainerWorker(
+func (o *orchestratorImpl) buildContainerWorker(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	resultChan chan<- buildTask,
@@ -246,7 +246,7 @@ func (o *buildOrchestratorImpl) buildContainerWorker(
 }
 
 // collectBuildResults collects results from channel and orders them by index
-func (o *buildOrchestratorImpl) collectBuildResults(
+func (o *orchestratorImpl) collectBuildResults(
 	ctx context.Context,
 	resultChan <-chan buildTask,
 	expectedCount int,
@@ -308,7 +308,7 @@ func (o *buildOrchestratorImpl) collectBuildResults(
 }
 
 // logBuildSummary logs a summary of all build results
-func (o *buildOrchestratorImpl) logBuildSummary(
+func (o *orchestratorImpl) logBuildSummary(
 	projectID uint,
 	results []*BuildResult,
 ) {
@@ -356,7 +356,7 @@ func (o *buildOrchestratorImpl) logBuildSummary(
 
 // cleanupBuildHistories performs best-effort cleanup of created BUILD_HISTORY records
 // This is called when BUILD_HISTORY creation fails partway through to avoid orphaned records
-func (o *buildOrchestratorImpl) cleanupBuildHistories(
+func (o *orchestratorImpl) cleanupBuildHistories(
 	ctx context.Context,
 	buildHistories []*build_history.BuildHistory,
 ) {

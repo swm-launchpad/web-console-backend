@@ -27,10 +27,12 @@ import (
 	infrastructure3 "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	repository2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	service2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	build2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build/adapter"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/deploy"
 	handler2 "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	infrastructure4 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
-	service4 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -133,13 +135,13 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	buildService := service2.NewBuildService(buildHistoryRepository, tektonBuildClient, kubeBuildClient, logger)
-	buildOrchestrator := service2.NewBuildOrchestrator(buildHistoryRepository, buildService, logger)
+	builder := build2.NewBuilder(buildHistoryRepository, tektonBuildClient, kubeBuildClient, logger)
+	orchestrator := build2.NewOrchestrator(buildHistoryRepository, builder, logger)
 	updateContainerAfterBuildUseCase := build.NewUpdateContainerAfterBuildUseCase(containerRepository, txManager, logger)
-	containerUpdateAdapter := service4.NewContainerUpdateAdapter(updateContainerAfterBuildUseCase, logger)
-	buildPostProcessor := service2.NewBuildPostProcessor(containerUpdateAdapter, logger)
-	deployService := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient, buildOrchestrator, buildPostProcessor, logger)
-	deployProjectUseCase := application2.NewDeployProjectUseCase(deployService, logger)
+	containerUpdateAdapter := adapter.NewContainerUpdateAdapter(updateContainerAfterBuildUseCase, logger)
+	postProcessor := build2.NewPostProcessor(containerUpdateAdapter, logger)
+	deployer := provideDeployService(txManager, projectRepository, deploymentRepository, volumeRepository, containerClient, tektonClient, kubeClient, orchestrator, postProcessor, logger)
+	deployProjectUseCase := application2.NewDeployProjectUseCase(deployer, logger)
 	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, permissionService, projectService, logger)
 	getProjectStatusUseCase := application2.NewGetProjectStatusUseCase(projectRepository, deploymentRepository, buildHistoryRepository, containerClient, logger)
 	refreshProjectStatusUseCase := application2.NewRefreshProjectStatusUseCase(projectRepository, deploymentRepository, buildHistoryRepository, containerClient, kubeClient, kubeBuildClient, logger)
@@ -293,10 +295,10 @@ func provideDeployService(
 	containerClient infrastructure3.ContainerClient,
 	tektonClient infrastructure3.TektonClient,
 	kubeClient infrastructure3.KubeClient,
-	buildOrchestrator service2.BuildOrchestrator,
-	buildPostProcessor service2.BuildPostProcessor,
+	buildOrchestrator build2.Orchestrator,
+	buildPostProcessor build2.PostProcessor,
 	log logger.Logger,
-) service2.DeployService {
+) deploy.Deployer {
 	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
 	if deployNamespace == "" {
 		deployNamespace = "default"
@@ -304,7 +306,7 @@ func provideDeployService(
 
 	projectServiceName := ""
 
-	return service2.NewDeployService(
+	return deploy.NewDeployer(
 		txManager,
 		projectRepository,
 		deploymentRepo,

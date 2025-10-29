@@ -1,4 +1,4 @@
-package service
+package build
 
 import (
 	"context"
@@ -16,8 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// buildServiceImpl implements the BuildService interface
-type buildServiceImpl struct {
+// builderImpl implements the Builder interface
+type builderImpl struct {
 	buildHistoryRepo             repository.BuildHistoryRepository
 	tektonBuildClient            infrastructure.TektonBuildClient
 	kubeBuildClient              infrastructure.KubeBuildClient
@@ -28,14 +28,14 @@ type buildServiceImpl struct {
 	findPipelineRunMaxRetries    int           // Maximum retry attempts for finding PipelineRun
 }
 
-// NewBuildService creates a new BuildService instance
-func NewBuildService(
+// NewBuilder creates a new Builder instance
+func NewBuilder(
 	buildHistoryRepo repository.BuildHistoryRepository,
 	tektonBuildClient infrastructure.TektonBuildClient,
 	kubeBuildClient infrastructure.KubeBuildClient,
 	logger logger.Logger,
-) BuildService {
-	return &buildServiceImpl{
+) Builder {
+	return &builderImpl{
 		buildHistoryRepo:             buildHistoryRepo,
 		tektonBuildClient:            tektonBuildClient,
 		kubeBuildClient:              kubeBuildClient,
@@ -49,7 +49,7 @@ func NewBuildService(
 
 // BuildContainer executes a build for a single container
 // This method is designed to be called in a goroutine and will block until the build completes or times out
-func (s *buildServiceImpl) BuildContainer(
+func (s *builderImpl) BuildContainer(
 	ctx context.Context,
 	buildHistoryID uint,
 	container *dto.BuildContainerInfo,
@@ -315,7 +315,7 @@ func (s *buildServiceImpl) BuildContainer(
 }
 
 // prepareBuildRequest converts BuildContainerInfo to TektonBuildRequest
-func (s *buildServiceImpl) prepareBuildRequest(container *dto.BuildContainerInfo) (*dto.TektonBuildRequest, error) {
+func (s *builderImpl) prepareBuildRequest(container *dto.BuildContainerInfo) (*dto.TektonBuildRequest, error) {
 	// Validate template requirement
 	// Template is required for build pipeline (apply-dockerfile-config task)
 	if container.TemplateBody == nil || *container.TemplateBody == "" {
@@ -370,7 +370,7 @@ func (s *buildServiceImpl) prepareBuildRequest(container *dto.BuildContainerInfo
 
 // findPipelineRunWithRetry attempts to find PipelineRun by EventID with retries
 // Retries periodically for up to totalTimeout or maxRetries attempts, whichever comes first
-func (s *buildServiceImpl) findPipelineRunWithRetry(
+func (s *builderImpl) findPipelineRunWithRetry(
 	ctx context.Context,
 	buildHistory *build_history.BuildHistory,
 	eventID string,
@@ -477,7 +477,7 @@ func (s *buildServiceImpl) findPipelineRunWithRetry(
 
 // monitorBuildStatus monitors the PipelineRun status periodically
 // Returns when the build reaches a terminal state or times out
-func (s *buildServiceImpl) monitorBuildStatus(
+func (s *builderImpl) monitorBuildStatus(
 	ctx context.Context,
 	buildHistory *build_history.BuildHistory,
 	pipelineRunName string,
@@ -574,7 +574,7 @@ func (s *buildServiceImpl) monitorBuildStatus(
 
 // checkBuildStatus checks the current status of the PipelineRun and updates BUILD_HISTORY
 // Returns BuildResult if terminal state is reached, nil if still running
-func (s *buildServiceImpl) checkBuildStatus(
+func (s *builderImpl) checkBuildStatus(
 	ctx context.Context,
 	buildHistory *build_history.BuildHistory,
 	pipelineRunName string,
@@ -686,7 +686,7 @@ func (s *buildServiceImpl) checkBuildStatus(
 }
 
 // handleBuildSuccess handles successful build completion
-func (s *buildServiceImpl) handleBuildSuccess(
+func (s *builderImpl) handleBuildSuccess(
 	ctx context.Context,
 	buildHistory *build_history.BuildHistory,
 	pipelineRun *dto.PipelineRun,
@@ -775,7 +775,7 @@ func (s *buildServiceImpl) handleBuildSuccess(
 }
 
 // handleBuildFailure handles build failure or cancellation
-func (s *buildServiceImpl) handleBuildFailure(
+func (s *builderImpl) handleBuildFailure(
 	ctx context.Context,
 	buildHistory *build_history.BuildHistory,
 	pipelineRun *dto.PipelineRun,
