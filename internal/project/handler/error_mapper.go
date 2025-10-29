@@ -39,10 +39,22 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrInvalidProjectID:  {StatusCode: http.StatusBadRequest, Code: "INVALID_PROJECT_ID", Message: "Invalid project ID"},
 	projecterrors.ErrValidationFailed:  {StatusCode: http.StatusBadRequest, Code: "VALIDATION_FAILED", Message: "Validation failed"},
 
+	// Plan validation errors
+	projecterrors.ErrInvalidPlan: {StatusCode: http.StatusBadRequest, Code: "INVALID_PLAN", Message: "Invalid plan type. Must be one of: free, eco, pro"},
+
+	// Resource limit validation errors
+	projecterrors.ErrCPULimitExceeded:     {StatusCode: http.StatusBadRequest, Code: "CPU_LIMIT_EXCEEDED", Message: "CPU limit must be between 500-8000 millicores (0.5-8 cores)"},
+	projecterrors.ErrMemoryLimitExceeded:  {StatusCode: http.StatusBadRequest, Code: "MEMORY_LIMIT_EXCEEDED", Message: "Memory limit must be between 512Mi-16384Mi (0.5GB-16GB)"},
+	projecterrors.ErrDiskLimitExceeded:    {StatusCode: http.StatusBadRequest, Code: "DISK_LIMIT_EXCEEDED", Message: "Disk limit must be between 1024Mi-3072Mi (1GB-3GB)"},
+	projecterrors.ErrTrafficLimitExceeded: {StatusCode: http.StatusBadRequest, Code: "TRAFFIC_LIMIT_EXCEEDED", Message: "Traffic limit must be between 128Mi-1TB"},
+
 	// Resource limit errors
-	projecterrors.ErrResourceLimitExceeded: {StatusCode: http.StatusForbidden, Code: "RESOURCE_LIMIT_EXCEEDED", Message: "Resource limit exceeded"},
-	projecterrors.ErrPlanLimitExceeded:     {StatusCode: http.StatusForbidden, Code: "PLAN_LIMIT_EXCEEDED", Message: "Plan limit exceeded"},
-	projecterrors.ErrProjectLimitExceeded:  {StatusCode: http.StatusBadRequest, Code: "PROJECT_LIMIT_EXCEEDED", Message: "Maximum number of projects exceeded"},
+	projecterrors.ErrResourceLimitExceeded:    {StatusCode: http.StatusForbidden, Code: "RESOURCE_LIMIT_EXCEEDED", Message: "Resource limit exceeded"},
+	projecterrors.ErrPlanLimitExceeded:        {StatusCode: http.StatusForbidden, Code: "PLAN_LIMIT_EXCEEDED", Message: "Plan limit exceeded"},
+	projecterrors.ErrProjectLimitExceeded:     {StatusCode: http.StatusBadRequest, Code: "PROJECT_LIMIT_EXCEEDED", Message: "Maximum number of projects exceeded"},
+	projecterrors.ErrFreeResourcesFixed:       {StatusCode: http.StatusBadRequest, Code: "FREE_RESOURCES_FIXED", Message: "Free plan resources are fixed and cannot be modified (0.5 core, 1GB memory, 1GB disk)"},
+	projecterrors.ErrFreeTierResourceExceeded: {StatusCode: http.StatusBadRequest, Code: "FREE_TIER_RESOURCE_EXCEEDED", Message: "Free tier resource limit exceeded: beta period allows up to 1 core CPU, 2GB memory, 3GB disk"},
+	projecterrors.ErrFreePlanLimitExceeded:    {StatusCode: http.StatusBadRequest, Code: "FREE_PLAN_LIMIT_EXCEEDED", Message: "Free plan is limited to 1 project per user"},
 
 	// Volume errors
 	projecterrors.ErrVolumeNotFound:          {StatusCode: http.StatusNotFound, Code: "VOLUME_NOT_FOUND", Message: "Volume not found"},
