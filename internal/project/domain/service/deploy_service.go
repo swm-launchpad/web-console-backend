@@ -308,6 +308,25 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*dep
 		return nil, projecterrors.ErrContainerConfigNotFound
 	}
 
+	// Step 2.5: Validate that all containers have been built at least once
+	// This is a standalone deploy (not BuildAndDeploy), so we must ensure
+	// that all containers have a valid image tag. If any container has never
+	// been built, fail fast with a clear validation error instead of allowing
+	// Tekton to fail later.
+	for _, container := range containerConfig.Containers {
+		if container.ImageTag == "pending" {
+			s.logger.Error(ctx, "cannot deploy unbuilt container in standalone deploy",
+				zap.Uint("project_id", projectID),
+				zap.Uint("deployment_id", d.DeploymentID),
+				zap.String("container_name", container.Name),
+				zap.String("image_tag", container.ImageTag),
+			)
+			msg := fmt.Sprintf("Container '%s' has never been built (imageTag='pending'). Use build+deploy API instead of standalone deploy.", container.Name)
+			s.handleDeployFailure(ctx, projectID, d.DeploymentID, deployment.DeploymentStatusBackendTriggerFailed, &msg)
+			return nil, fmt.Errorf("container '%s' has never been built", container.Name)
+		}
+	}
+
 	// Step 3: Gather volume information
 	volumes, err := s.volumeRepo.FindByProjectID(ctx, projectID)
 	if err != nil {
