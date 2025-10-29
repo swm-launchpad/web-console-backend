@@ -12,7 +12,7 @@ type MockProjectService struct {
 	mock.Mock
 }
 
-func (m *MockProjectService) CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *string) (*model.Project, error) {
+func (m *MockProjectService) CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *value.Plan) (*model.Project, error) {
 	args := m.Called(ctx, name, ownerID, limits, fqdn, plan)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -36,16 +36,16 @@ func (m *MockProjectService) GetProjectBySlug(ctx context.Context, slug string) 
 	return args.Get(0).(*model.Project), args.Error(1)
 }
 
-func (m *MockProjectService) UpdateProject(ctx context.Context, projectID uint, updateFn func(*model.Project) error) (*model.Project, error) {
-	args := m.Called(ctx, projectID, updateFn)
+func (m *MockProjectService) UpdateProject(ctx context.Context, projectID uint, actingUserID uint, updateFn func(*model.Project) error) (*model.Project, error) {
+	args := m.Called(ctx, projectID, actingUserID, updateFn)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*model.Project), args.Error(1)
 }
 
-func (m *MockProjectService) UpdateProjectBySlug(ctx context.Context, slug string, updateFn func(*model.Project) error) (*model.Project, error) {
-	args := m.Called(ctx, slug, updateFn)
+func (m *MockProjectService) UpdateProjectBySlug(ctx context.Context, slug string, actingUserID uint, updateFn func(*model.Project) error) (*model.Project, error) {
+	args := m.Called(ctx, slug, actingUserID, updateFn)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
