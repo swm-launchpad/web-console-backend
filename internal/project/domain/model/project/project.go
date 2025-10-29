@@ -17,7 +17,7 @@ type Project struct {
 	status             value.ProjectStatus
 	operationStatus    value.ProjectOperationStatus
 	activeDeploymentID *uint // ID of the deployment that currently owns the deploying status
-	plan               *string
+	plan               *value.Plan
 	limits             value.ResourceLimits
 	users              []ProjectUser // Aggregate's internal entities
 	isDeleted          bool
@@ -28,12 +28,17 @@ type Project struct {
 
 // NewProject creates a new project with an initial owner
 // fqdn and plan are optional parameters (pass nil if not needed)
-func NewProject(name string, slug value.ProjectSlug, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *string) (*Project, error) {
+func NewProject(name string, slug value.ProjectSlug, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *value.Plan) (*Project, error) {
 	if name == "" {
 		return nil, projecterrors.ErrNameRequired
 	}
 	if ownerID == 0 {
 		return nil, projecterrors.ErrOwnerIDRequired
+	}
+
+	// Validate plan if provided
+	if plan != nil && !plan.IsValid() {
+		return nil, projecterrors.ErrInvalidPlan
 	}
 
 	now := time.Now()
@@ -82,9 +87,11 @@ func ReconstructProject(
 	projectID uint,
 	name string,
 	slug value.ProjectSlug,
+	fqdn *string,
 	status value.ProjectStatus,
 	operationStatus value.ProjectOperationStatus,
 	activeDeploymentID *uint,
+	plan *value.Plan,
 	limits value.ResourceLimits,
 	createdAt time.Time,
 	updatedAt time.Time,
@@ -95,9 +102,11 @@ func ReconstructProject(
 		projectID:          projectID,
 		name:               name,
 		slug:               slug,
+		fqdn:               fqdn,
 		status:             status,
 		operationStatus:    operationStatus,
 		activeDeploymentID: activeDeploymentID,
+		plan:               plan,
 		limits:             limits,
 		users:              make([]ProjectUser, 0), // Will be loaded separately
 		isDeleted:          isDeleted,
@@ -150,7 +159,7 @@ func (p *Project) ActiveDeploymentID() (uint, bool) {
 }
 
 // Plan returns the project plan and whether it is set
-func (p *Project) Plan() (string, bool) {
+func (p *Project) Plan() (value.Plan, bool) {
 	if p.plan == nil {
 		return "", false
 	}
@@ -248,17 +257,29 @@ func (p *Project) SetFQDN(fqdn string) error {
 }
 
 // SetPlan updates the project plan
-// If plan is empty, it clears the plan
-func (p *Project) SetPlan(plan string) error {
+// Validates the plan before setting
+func (p *Project) SetPlan(plan value.Plan) error {
 	if p.isDeleted {
 		return projecterrors.ErrCannotModifyDeletedProject
 	}
 
-	if plan == "" {
-		p.plan = nil
-	} else {
-		p.plan = &plan
+	// Validate plan
+	if !plan.IsValid() {
+		return projecterrors.ErrInvalidPlan
 	}
+
+	p.plan = &plan
+	p.updateTimestamp()
+	return nil
+}
+
+// ClearPlan clears the project plan (sets to nil)
+func (p *Project) ClearPlan() error {
+	if p.isDeleted {
+		return projecterrors.ErrCannotModifyDeletedProject
+	}
+
+	p.plan = nil
 	p.updateTimestamp()
 	return nil
 }
