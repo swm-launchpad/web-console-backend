@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"html/template"
-	"os"
 	"path/filepath"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
@@ -134,12 +133,12 @@ func (s *service) SendPasswordResetEmail(ctx context.Context, email, username, t
 }
 
 // sendEmail sends an email using SMTP
-func (s *service) sendEmail(to, subject, body string) error {
+func (s *service) sendEmail(to, subject, htmlBody string) error {
 	m := gomail.NewMessage()
 	m.SetHeader("From", s.from)
 	m.SetHeader("To", to)
 	m.SetHeader("Subject", subject)
-	m.SetBody("text/html", body)
+	m.SetBody("text/html", htmlBody)
 
 	d := gomail.NewDialer(s.host, s.port, s.username, s.password)
 
@@ -152,93 +151,14 @@ func (s *service) sendEmail(to, subject, body string) error {
 
 // renderTemplate renders an email template with the given data
 func (s *service) renderTemplate(templateName string, data map[string]string) (string, error) {
-	// Try to render from loaded templates first
-	if s.templates != nil {
-		var buf bytes.Buffer
-		if err := s.templates.ExecuteTemplate(&buf, templateName, data); err == nil {
-			return buf.String(), nil
-		}
-	}
-
-	// Fallback to embedded templates if file-based templates are not available
-	var tmplStr string
-	switch templateName {
-	case "verification.html":
-		tmplStr = getVerificationTemplateEmbedded()
-	case "password_reset.html":
-		tmplStr = getPasswordResetTemplateEmbedded()
-	default:
-		return "", fmt.Errorf("unknown template: %s", templateName)
-	}
-
-	tmpl, err := template.New(templateName).Parse(tmplStr)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse embedded template: %w", err)
+	if s.templates == nil {
+		return "", fmt.Errorf("email templates not loaded: template files must be present in templates/email directory")
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("failed to execute embedded template: %w", err)
+	if err := s.templates.ExecuteTemplate(&buf, templateName, data); err != nil {
+		return "", fmt.Errorf("failed to render template %s: %w", templateName, err)
 	}
 
 	return buf.String(), nil
-}
-
-// getVerificationTemplateEmbedded returns the embedded verification email template
-func getVerificationTemplateEmbedded() string {
-	// Read from file if available
-	content, err := os.ReadFile(filepath.Join("templates", "email", "verification.html"))
-	if err == nil {
-		return string(content)
-	}
-
-	// Simple fallback template
-	return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-	<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-		<h2>이메일 인증 - Launchpad Web Console</h2>
-		<p>안녕하세요, {{.Username}}님!</p>
-		<p>Launchpad Web Console에 가입해 주셔서 감사합니다.</p>
-		<p>아래 링크를 클릭하여 이메일 주소를 인증해주세요:</p>
-		<p><a href="{{.FrontendURL}}/verify-email?token={{.Token}}" style="display: inline-block; padding: 10px 20px; background-color: #667eea; color: white; text-decoration: none; border-radius: 5px;">이메일 인증하기</a></p>
-		<p>이 링크는 24시간 동안 유효합니다.</p>
-		<hr>
-		<p style="font-size: 12px; color: #666;">© 2025 Launchpad Web Console</p>
-	</div>
-</body>
-</html>
-`
-}
-
-// getPasswordResetTemplateEmbedded returns the embedded password reset email template
-func getPasswordResetTemplateEmbedded() string {
-	// Read from file if available
-	content, err := os.ReadFile(filepath.Join("templates", "email", "password_reset.html"))
-	if err == nil {
-		return string(content)
-	}
-
-	// Simple fallback template
-	return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-	<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-		<h2>비밀번호 재설정 - Launchpad Web Console</h2>
-		<p>안녕하세요, {{.Username}}님!</p>
-		<p>비밀번호 재설정 요청을 받았습니다.</p>
-		<p>아래 링크를 클릭하여 새로운 비밀번호를 설정해주세요:</p>
-		<p><a href="{{.FrontendURL}}/reset-password?token={{.Token}}" style="display: inline-block; padding: 10px 20px; background-color: #f5576c; color: white; text-decoration: none; border-radius: 5px;">비밀번호 재설정하기</a></p>
-		<p>이 링크는 1시간 동안 유효합니다.</p>
-		<p><strong>본인이 요청하지 않은 경우</strong>, 이 이메일을 무시하셔도 됩니다.</p>
-		<hr>
-		<p style="font-size: 12px; color: #666;">© 2025 Launchpad Web Console</p>
-	</div>
-</body>
-</html>
-`
 }
