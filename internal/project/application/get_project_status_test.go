@@ -92,6 +92,25 @@ func TestGetProjectStatusUseCase_Execute_NothingStatus(t *testing.T) {
 
 	mockProjectRepo.On("FindByID", mock.Anything, uint(1)).Return(proj, nil)
 
+	// Mock container client response
+	containers := []dto.ContainerBasicInfo{
+		{ContainerID: 1, Name: "backend"},
+	}
+	mockContainerClient.On("GetContainerIDsByProjectID", mock.Anything, uint(1)).Return(containers, nil)
+
+	// Mock build history for the container
+	bh1 := build_history.NewBuildHistory(1)
+	bh1.SetBuildHistoryID(10)
+	summary1 := "Build completed"
+	startedAt1 := time.Now()
+	_ = bh1.UpdateRunningStatus(&summary1, &startedAt1)
+	finishedAt1 := time.Now().Add(time.Minute)
+	_ = bh1.UpdateCompleteStatus(build_history.BuildHistoryStatusSuccess, &summary1, nil, finishedAt1)
+	mockBuildHistoryRepo.On("FindLatestByContainerID", mock.Anything, uint(1)).Return(bh1, nil)
+
+	// Mock deployment (return not found - no deployment yet)
+	mockDeploymentRepo.On("FindLatestByProjectID", mock.Anything, uint(1)).Return(nil, projecterrors.ErrDeploymentNotFound)
+
 	// Act
 	output, err := useCase.Execute(context.Background(), input)
 
@@ -100,10 +119,17 @@ func TestGetProjectStatusUseCase_Execute_NothingStatus(t *testing.T) {
 	assert.NotNil(t, output)
 	assert.Equal(t, uint(1), output.ProjectID)
 	assert.Equal(t, "nothing", output.OperationStatus)
-	assert.Nil(t, output.BuildStatuses)
+	assert.NotNil(t, output.BuildStatuses)
+	assert.Len(t, output.BuildStatuses, 1)
+	assert.Equal(t, uint(1), output.BuildStatuses[0].ContainerID)
+	assert.Equal(t, "backend", output.BuildStatuses[0].ContainerName)
+	assert.Equal(t, "success", output.BuildStatuses[0].Status)
 	assert.Nil(t, output.DeploymentStatus)
 
 	mockProjectRepo.AssertExpectations(t)
+	mockContainerClient.AssertExpectations(t)
+	mockBuildHistoryRepo.AssertExpectations(t)
+	mockDeploymentRepo.AssertExpectations(t)
 }
 
 func TestGetProjectStatusUseCase_Execute_BuildingStatus(t *testing.T) {
@@ -160,6 +186,19 @@ func TestGetProjectStatusUseCase_Execute_BuildingStatus(t *testing.T) {
 	mockBuildHistoryRepo.On("FindLatestByContainerID", mock.Anything, uint(1)).Return(bh1, nil)
 	mockBuildHistoryRepo.On("FindLatestByContainerID", mock.Anything, uint(2)).Return(bh2, nil)
 
+	// Mock deployment (previous completed deployment exists)
+	d := deployment.NewDeployment(1)
+	d.SetDeploymentID(50)
+	deployEventID := "deploy-event-50"
+	deployRunName := "deploy-run-50"
+	_ = d.InitTektonInfo(&deployEventID, &deployRunName)
+	deploySummary := "Deployment completed"
+	deployStartedAt := time.Now().Add(-2 * time.Hour)
+	_ = d.UpdateRunningStatus(&deploySummary, &deployStartedAt)
+	deployFinishedAt := time.Now().Add(-90 * time.Minute)
+	_ = d.UpdateCompleteStatus(deployment.DeploymentStatusSuccess, &deploySummary, deployFinishedAt)
+	mockDeploymentRepo.On("FindLatestByProjectID", mock.Anything, uint(1)).Return(d, nil)
+
 	// Act
 	output, err := useCase.Execute(context.Background(), input)
 
@@ -175,7 +214,6 @@ func TestGetProjectStatusUseCase_Execute_BuildingStatus(t *testing.T) {
 	assert.Equal(t, uint(1), output.BuildStatuses[0].ContainerID)
 	assert.Equal(t, "backend", output.BuildStatuses[0].ContainerName)
 	assert.Equal(t, "running", output.BuildStatuses[0].Status)
-	assert.Equal(t, "build-run-1", output.BuildStatuses[0].TektonPipelineRun)
 	assert.NotEmpty(t, output.BuildStatuses[0].StartedAt)
 	assert.Empty(t, output.BuildStatuses[0].FinishedAt)
 
@@ -184,15 +222,22 @@ func TestGetProjectStatusUseCase_Execute_BuildingStatus(t *testing.T) {
 	assert.Equal(t, uint(2), output.BuildStatuses[1].ContainerID)
 	assert.Equal(t, "mysql", output.BuildStatuses[1].ContainerName)
 	assert.Equal(t, "success", output.BuildStatuses[1].Status)
-	assert.Equal(t, "build-run-2", output.BuildStatuses[1].TektonPipelineRun)
 	assert.Equal(t, "abc123def456", output.BuildStatuses[1].GitCommitHash)
 	assert.NotEmpty(t, output.BuildStatuses[1].FinishedAt)
 
-	assert.Nil(t, output.DeploymentStatus)
+	// Deployment status should now be returned in building case
+	assert.NotNil(t, output.DeploymentStatus)
+	assert.Equal(t, uint64(50), output.DeploymentStatus.DeploymentID)
+	assert.Equal(t, uint(1), output.DeploymentStatus.ProjectID)
+	assert.Equal(t, "success", output.DeploymentStatus.Status)
+	assert.Equal(t, "Deployment completed", output.DeploymentStatus.Summary)
+	assert.NotEmpty(t, output.DeploymentStatus.StartedAt)
+	assert.NotEmpty(t, output.DeploymentStatus.FinishedAt)
 
 	mockProjectRepo.AssertExpectations(t)
 	mockContainerClient.AssertExpectations(t)
 	mockBuildHistoryRepo.AssertExpectations(t)
+	mockDeploymentRepo.AssertExpectations(t)
 }
 
 func TestGetProjectStatusUseCase_Execute_DeployingStatus(t *testing.T) {
@@ -232,6 +277,22 @@ func TestGetProjectStatusUseCase_Execute_DeployingStatus(t *testing.T) {
 
 	mockDeploymentRepo.On("FindByID", mock.Anything, uint(100)).Return(d, nil)
 
+	// Mock container client response for build statuses
+	containers := []dto.ContainerBasicInfo{
+		{ContainerID: 1, Name: "backend"},
+	}
+	mockContainerClient.On("GetContainerIDsByProjectID", mock.Anything, uint(1)).Return(containers, nil)
+
+	// Mock build history for the container
+	bh1 := build_history.NewBuildHistory(1)
+	bh1.SetBuildHistoryID(10)
+	buildSummary := "Build completed"
+	buildStartedAt := time.Now().Add(-time.Hour)
+	_ = bh1.UpdateRunningStatus(&buildSummary, &buildStartedAt)
+	buildFinishedAt := time.Now().Add(-30 * time.Minute)
+	_ = bh1.UpdateCompleteStatus(build_history.BuildHistoryStatusSuccess, &buildSummary, nil, buildFinishedAt)
+	mockBuildHistoryRepo.On("FindLatestByContainerID", mock.Anything, uint(1)).Return(bh1, nil)
+
 	// Act
 	output, err := useCase.Execute(context.Background(), input)
 
@@ -240,20 +301,26 @@ func TestGetProjectStatusUseCase_Execute_DeployingStatus(t *testing.T) {
 	assert.NotNil(t, output)
 	assert.Equal(t, uint(1), output.ProjectID)
 	assert.Equal(t, "deploying", output.OperationStatus)
-	assert.Nil(t, output.BuildStatuses)
+
+	// Build statuses should now be returned in deploying case
+	assert.NotNil(t, output.BuildStatuses)
+	assert.Len(t, output.BuildStatuses, 1)
+	assert.Equal(t, uint(1), output.BuildStatuses[0].ContainerID)
+	assert.Equal(t, "backend", output.BuildStatuses[0].ContainerName)
+	assert.Equal(t, "success", output.BuildStatuses[0].Status)
 
 	assert.NotNil(t, output.DeploymentStatus)
 	assert.Equal(t, uint64(100), output.DeploymentStatus.DeploymentID)
 	assert.Equal(t, uint(1), output.DeploymentStatus.ProjectID)
 	assert.Equal(t, "running", output.DeploymentStatus.Status)
-	assert.Equal(t, "deploy-event-123", output.DeploymentStatus.TektonEventID)
-	assert.Equal(t, "deploy-run-123", output.DeploymentStatus.TektonPipelineRunName)
 	assert.Equal(t, "Deploying...", output.DeploymentStatus.Summary)
 	assert.NotEmpty(t, output.DeploymentStatus.StartedAt)
 	assert.Empty(t, output.DeploymentStatus.FinishedAt)
 
 	mockProjectRepo.AssertExpectations(t)
 	mockDeploymentRepo.AssertExpectations(t)
+	mockContainerClient.AssertExpectations(t)
+	mockBuildHistoryRepo.AssertExpectations(t)
 }
 
 func TestGetProjectStatusUseCase_Execute_ProjectNotFound(t *testing.T) {
@@ -319,6 +386,10 @@ func TestGetProjectStatusUseCase_Execute_BuildingWithNoContainers(t *testing.T) 
 	mockContainerClient.On("GetContainerIDsByProjectID", mock.Anything, uint(1)).
 		Return(nil, projecterrors.ErrContainerConfigNotFound)
 
+	// Mock deployment (no previous deployment)
+	mockDeploymentRepo.On("FindLatestByProjectID", mock.Anything, uint(1)).
+		Return(nil, projecterrors.ErrDeploymentNotFound)
+
 	// Act
 	output, err := useCase.Execute(context.Background(), input)
 
@@ -328,9 +399,11 @@ func TestGetProjectStatusUseCase_Execute_BuildingWithNoContainers(t *testing.T) 
 	assert.Equal(t, uint(1), output.ProjectID)
 	assert.Equal(t, "building", output.OperationStatus)
 	assert.Empty(t, output.BuildStatuses)
+	assert.Nil(t, output.DeploymentStatus)
 
 	mockProjectRepo.AssertExpectations(t)
 	mockContainerClient.AssertExpectations(t)
+	mockDeploymentRepo.AssertExpectations(t)
 }
 
 func TestGetProjectStatusUseCase_Execute_BuildingWithNoBuildHistory(t *testing.T) {
@@ -368,19 +441,29 @@ func TestGetProjectStatusUseCase_Execute_BuildingWithNoBuildHistory(t *testing.T
 	mockBuildHistoryRepo.On("FindLatestByContainerID", mock.Anything, uint(1)).
 		Return(nil, projecterrors.ErrBuildHistoryNotFound)
 
+	// Mock deployment (no previous deployment)
+	mockDeploymentRepo.On("FindLatestByProjectID", mock.Anything, uint(1)).
+		Return(nil, projecterrors.ErrDeploymentNotFound)
+
 	// Act
 	output, err := useCase.Execute(context.Background(), input)
 
-	// Assert - Should not fail, just skip containers without build history
+	// Assert - Should return 'running' status for containers without build history in 'building' state
 	assert.NoError(t, err)
 	assert.NotNil(t, output)
 	assert.Equal(t, uint(1), output.ProjectID)
 	assert.Equal(t, "building", output.OperationStatus)
-	assert.Empty(t, output.BuildStatuses) // No build history means no statuses
+	assert.NotNil(t, output.BuildStatuses)
+	assert.Len(t, output.BuildStatuses, 1)
+	assert.Equal(t, uint(1), output.BuildStatuses[0].ContainerID)
+	assert.Equal(t, "backend", output.BuildStatuses[0].ContainerName)
+	assert.Equal(t, "running", output.BuildStatuses[0].Status) // 'building' with no history shows 'running'
+	assert.Nil(t, output.DeploymentStatus)
 
 	mockProjectRepo.AssertExpectations(t)
 	mockContainerClient.AssertExpectations(t)
 	mockBuildHistoryRepo.AssertExpectations(t)
+	mockDeploymentRepo.AssertExpectations(t)
 }
 
 func TestGetProjectStatusUseCase_Execute_DeployingWithoutActiveDeployment(t *testing.T) {
@@ -408,15 +491,36 @@ func TestGetProjectStatusUseCase_Execute_DeployingWithoutActiveDeployment(t *tes
 
 	mockProjectRepo.On("FindByID", mock.Anything, uint(1)).Return(proj, nil)
 
+	// Mock container client response for build statuses
+	containers := []dto.ContainerBasicInfo{
+		{ContainerID: 1, Name: "backend"},
+	}
+	mockContainerClient.On("GetContainerIDsByProjectID", mock.Anything, uint(1)).Return(containers, nil)
+
+	// Mock build history for the container
+	bh1 := build_history.NewBuildHistory(1)
+	bh1.SetBuildHistoryID(10)
+	buildSummary := "Build completed"
+	buildStartedAt := time.Now().Add(-time.Hour)
+	_ = bh1.UpdateRunningStatus(&buildSummary, &buildStartedAt)
+	buildFinishedAt := time.Now().Add(-30 * time.Minute)
+	_ = bh1.UpdateCompleteStatus(build_history.BuildHistoryStatusSuccess, &buildSummary, nil, buildFinishedAt)
+	mockBuildHistoryRepo.On("FindLatestByContainerID", mock.Anything, uint(1)).Return(bh1, nil)
+
 	// Act
 	output, err := useCase.Execute(context.Background(), input)
 
-	// Assert - Should not fail, just return nil deployment status
+	// Assert - Should return build statuses even without active deployment
 	assert.NoError(t, err)
 	assert.NotNil(t, output)
 	assert.Equal(t, uint(1), output.ProjectID)
 	assert.Equal(t, "deploying", output.OperationStatus)
-	assert.Nil(t, output.DeploymentStatus)
+	assert.Nil(t, output.DeploymentStatus) // No active deployment
+	assert.NotNil(t, output.BuildStatuses) // But build statuses should be present
+	assert.Len(t, output.BuildStatuses, 1)
+	assert.Equal(t, "success", output.BuildStatuses[0].Status)
 
 	mockProjectRepo.AssertExpectations(t)
+	mockContainerClient.AssertExpectations(t)
+	mockBuildHistoryRepo.AssertExpectations(t)
 }

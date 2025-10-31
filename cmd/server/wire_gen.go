@@ -147,7 +147,7 @@ func InitializeApp() (*App, error) {
 	deployProjectUseCase := application2.NewDeployProjectUseCase(deployer, logger)
 	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, permissionService, projectService, logger)
 	getProjectStatusUseCase := application2.NewGetProjectStatusUseCase(projectRepository, deploymentRepository, buildHistoryRepository, containerClient, logger)
-	refreshProjectStatusUseCase := application2.NewRefreshProjectStatusUseCase(projectRepository, deployer, logger)
+	refreshProjectStatusUseCase := application2.NewRefreshProjectStatusUseCase(projectRepository, deploymentRepository, buildHistoryRepository, containerClient, deployer, logger)
 	projectStatusHandler := handler2.NewProjectStatusHandler(getProjectStatusUseCase, refreshProjectStatusUseCase, permissionService, projectService, logger)
 	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository, logger)
 	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository, logger)
