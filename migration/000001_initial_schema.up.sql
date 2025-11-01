@@ -1,7 +1,7 @@
--- Web Console Database Schema - Consolidated
--- Version: 2.0.0
--- Description: Consolidated database schema for container management platform
--- This file consolidates migrations 1-20 without template data
+-- Web Console Database Schema - Initial Schema
+-- Version: 1.0.0
+-- Description: Initial database schema for container management platform
+-- Note: Template data is managed in a separate repository
 
 -- Drop tables in reverse dependency order (respecting FK constraints)
 -- Note: PROJECTS has circular FK with DEPLOYMENTS, so we drop the FK first

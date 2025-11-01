@@ -1,5 +1,5 @@
--- Web Console Database Schema - Consolidated Rollback
--- Version: 2.0.0
+-- Web Console Database Schema - Initial Schema Rollback
+-- Version: 1.0.0
 -- Description: Drop all tables in reverse dependency order (respecting FK constraints)
 -- Note: PROJECTS has circular FK with DEPLOYMENTS, so we disable FK checks temporarily
 
