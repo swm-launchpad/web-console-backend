@@ -21,6 +21,7 @@ import (
 	containerBuild "github.com/swm-launchpad/web-console-backend/internal/container/application/build"
 	containerCombined "github.com/swm-launchpad/web-console-backend/internal/container/application/combined"
 	containerDeployment "github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
+	containerDomainInfra "github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure"
 	containerService "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	containerInfra "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
@@ -224,6 +225,28 @@ func provideGitHubHandler(
 	)
 }
 
+// provideLokiClient creates a Loki client from config
+func provideLokiClient(cfg *config.Config, log logger.Logger) containerDomainInfra.LokiClient {
+	return containerInfra.NewLokiClient(cfg, log)
+}
+
+// provideBuildLogHandler creates a build log handler with all dependencies
+func provideBuildLogHandler(
+	createBuildLogTokenUC *containerApp.CreateBuildLogTokenUseCase,
+	streamBuildLogsUC *containerApp.StreamBuildLogsUseCase,
+	containerService containerService.ContainerService,
+	jwtUtil *jwt.JWTUtil,
+	log logger.Logger,
+) *containerHTTP.BuildLogHandler {
+	return containerHTTP.NewBuildLogHandler(
+		createBuildLogTokenUC,
+		streamBuildLogsUC,
+		containerService,
+		jwtUtil,
+		log,
+	)
+}
+
 func InitializeApp() (*App, error) {
 	wire.Build(
 		// Config
@@ -324,6 +347,7 @@ func InitializeApp() (*App, error) {
 		// Container infrastructure
 		containerInfra.NewContainerRepository,
 		containerInfra.NewTemplateRepository,
+		provideLokiClient,
 
 		// Container domain services
 		containerService.NewSlugService,
@@ -357,6 +381,8 @@ func InitializeApp() (*App, error) {
 		containerBuild.NewGetContainersForBuildUseCase,
 		containerCombined.NewGetContainersForBuildAndDeployUseCase,
 		containerBuild.NewUpdateContainerAfterBuildUseCase,
+		containerApp.NewCreateBuildLogTokenUseCase,
+		containerApp.NewStreamBuildLogsUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,
@@ -370,6 +396,7 @@ func InitializeApp() (*App, error) {
 		projectHTTP.NewProjectStatusHandler,
 		containerHTTP.NewContainerHandler,
 		containerHTTP.NewTemplateHandler,
+		provideBuildLogHandler,
 
 		// Middleware
 		middleware.NewAuthMiddleware,

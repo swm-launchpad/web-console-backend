@@ -21,6 +21,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/build"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/combined"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
+	infrastructure5 "github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure"
 	service3 "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	handler3 "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	infrastructure2 "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
@@ -174,10 +175,14 @@ func InitializeApp() (*App, error) {
 	getTemplatesUseCase := application3.NewGetTemplatesUseCase(templateRepository, logger)
 	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository, logger)
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase, logger)
+	createBuildLogTokenUseCase := application3.NewCreateBuildLogTokenUseCase(servicePermissionService, jwtUtil, logger)
+	lokiClient := provideLokiClient(configConfig, logger)
+	streamBuildLogsUseCase := application3.NewStreamBuildLogsUseCase(buildHistoryRepository, lokiClient, logger)
+	buildLogHandler := provideBuildLogHandler(createBuildLogTokenUseCase, streamBuildLogsUseCase, containerService, jwtUtil, logger)
 	settingsHandler := settings.NewSettingsHandler(settingsService, logger)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	loggingMiddleware := provideLoggingMiddleware(logger)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, settingsHandler, authMiddleware, loggingMiddleware)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, buildLogHandler, settingsHandler, authMiddleware, loggingMiddleware)
 	app := NewApp(configConfig, db, router, oAuthStateRepository, logger)
 	return app, nil
 }
@@ -361,6 +366,28 @@ func provideGitHubHandler(
 		startInstallationUseCase,
 		installationCallbackUseCase,
 		cfg.Frontend.URL,
+		log,
+	)
+}
+
+// provideLokiClient creates a Loki client from config
+func provideLokiClient(cfg *config.Config, log logger.Logger) infrastructure5.LokiClient {
+	return infrastructure2.NewLokiClient(cfg, log)
+}
+
+// provideBuildLogHandler creates a build log handler with all dependencies
+func provideBuildLogHandler(
+	createBuildLogTokenUC *application3.CreateBuildLogTokenUseCase,
+	streamBuildLogsUC *application3.StreamBuildLogsUseCase,
+	containerService service3.ContainerService,
+	jwtUtil *jwt.JWTUtil,
+	log logger.Logger,
+) *handler3.BuildLogHandler {
+	return handler3.NewBuildLogHandler(
+		createBuildLogTokenUC,
+		streamBuildLogsUC,
+		containerService,
+		jwtUtil,
 		log,
 	)
 }

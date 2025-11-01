@@ -28,6 +28,7 @@ type Router struct {
 	projectStatusHandler *projectHTTP.ProjectStatusHandler
 	containerHandler     *containerHTTP.ContainerHandler
 	templateHandler      *containerHTTP.TemplateHandler
+	buildLogHandler      *containerHTTP.BuildLogHandler
 	settingsHandler      *settings.SettingsHandler
 	authMiddleware       *middleware.AuthMiddleware
 	loggingMiddleware    *logger.LoggingMiddleware
@@ -47,6 +48,7 @@ func NewRouter(
 	projectStatusHandler *projectHTTP.ProjectStatusHandler,
 	containerHandler *containerHTTP.ContainerHandler,
 	templateHandler *containerHTTP.TemplateHandler,
+	buildLogHandler *containerHTTP.BuildLogHandler,
 	settingsHandler *settings.SettingsHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	loggingMiddleware *logger.LoggingMiddleware,
@@ -80,6 +82,7 @@ func NewRouter(
 		projectStatusHandler: projectStatusHandler,
 		containerHandler:     containerHandler,
 		templateHandler:      templateHandler,
+		buildLogHandler:      buildLogHandler,
 		settingsHandler:      settingsHandler,
 		authMiddleware:       authMiddleware,
 		loggingMiddleware:    loggingMiddleware,
@@ -221,7 +224,15 @@ func (r *Router) Setup() {
 			// Mounts
 			containers.POST("/:slug/mounts", r.containerHandler.AddMount)
 			containers.DELETE("/:slug/mounts/:volume_id", r.containerHandler.DeleteMount)
+
+			// Build logs
+			containers.POST("/:slug/build-log-token", r.buildLogHandler.CreateBuildLogToken)
+			// WebSocket endpoint for streaming build logs (no auth middleware - uses token in query param)
 		}
+
+		// Build log streaming WebSocket endpoint (public with token validation)
+		// Placed outside auth middleware to allow token-based authentication via query param
+		v1.GET("/containers/:slug/build-logs/stream", r.buildLogHandler.StreamBuildLogs)
 
 		// Template routes (public - no auth required)
 		templates := v1.Group("/templates")
