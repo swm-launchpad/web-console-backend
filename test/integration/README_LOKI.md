@@ -15,25 +15,31 @@ The Loki integration test validates the WebSocket-based log streaming from Grafa
 ### Prerequisites
 
 1. Access to a Grafana Loki instance
-2. Valid Loki credentials (username, password, org ID)
+2. Valid Loki credentials configured in `.env` file
 3. A test PipelineRun name (optional, for full testing)
 
-### Environment Variables
+### Configuration
 
-Set the following environment variables:
+The integration tests automatically load Loki configuration from the `.env` file in the project root.
+
+Ensure the following variables are set in your `.env` file:
 
 ```bash
-export LOKI_URL="https://loki.launchpad.kr"
-export LOKI_USERNAME="your-loki-username"
-export LOKI_PASSWORD="your-loki-password"
-export LOKI_ORG_ID="fake"  # or your org ID
-export TEST_PIPELINE_RUN_NAME="image-build-push-run-xyz123"  # Optional: actual PipelineRun name
+# Loki Configuration (Log Aggregation)
+LOKI_URL=https://loki.launchpad.kr
+LOKI_USERNAME=your-loki-username
+LOKI_PASSWORD=your-loki-password
+LOKI_ORG_ID=fake
+
+# Optional: for testing with a specific PipelineRun
+TEST_PIPELINE_RUN_NAME=image-build-push-run-xyz123
 ```
 
 ### Run Integration Tests
 
 ```bash
 # Run all integration tests (including Loki)
+# The tests will automatically load .env file
 go test -v ./test/integration/...
 
 # Run only Loki integration tests
@@ -41,21 +47,25 @@ go test -v ./test/integration/ -run TestLoki
 
 # Skip integration tests (short mode)
 go test -short ./test/integration/...
+
+# Or simply use make check (runs all tests including integration tests)
+make check
 ```
 
 ## Test Behavior
 
-### With Environment Variables Set
+### With `.env` File Configured
 
-If `LOKI_URL` and credentials are configured, the tests will:
-1. Connect to the real Loki instance
-2. Attempt to stream logs for the specified PipelineRun
-3. Validate that the stream can be opened and read from
+If `LOKI_URL` and credentials are configured in `.env`, the tests will:
+1. Automatically load configuration from `.env` file
+2. Connect to the real Loki instance
+3. Attempt to stream logs for the specified PipelineRun
+4. Validate that the stream can be opened and read from
 
-### Without Environment Variables
+### Without `.env` File or Missing Loki Configuration
 
-If Loki credentials are not set, the tests will:
-- Automatically skip with a message: `"LOKI_URL not set, skipping Loki integration test"`
+If `.env` file is missing or Loki credentials are not set, the tests will:
+- Automatically skip with a message: `"LOKI_URL not set in .env file, skipping Loki integration test"`
 - This allows the test suite to run in CI/CD without requiring Loki access
 
 ## Notes

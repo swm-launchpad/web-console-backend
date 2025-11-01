@@ -4,9 +4,11 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,17 +18,24 @@ import (
 )
 
 // TestLokiClient_StreamPipelineRunLogs_Integration tests the actual Loki connection
-// This test requires real Loki credentials in environment variables
+// This test requires real Loki credentials in .env file
 // Skip this test in short mode: go test -short
 func TestLokiClient_StreamPipelineRunLogs_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
 
+	// Load .env file for Loki configuration
+	envPath := filepath.Join("..", "..", ".env")
+	err := godotenv.Load(envPath)
+	if err != nil {
+		t.Logf("Warning: Could not load .env file: %v", err)
+	}
+
 	// Check if Loki environment variables are set
 	lokiURL := os.Getenv("LOKI_URL")
 	if lokiURL == "" {
-		t.Skip("LOKI_URL not set, skipping Loki integration test")
+		t.Skip("LOKI_URL not set in .env file, skipping Loki integration test")
 	}
 
 	ctx := context.Background()
@@ -130,9 +139,16 @@ func TestLokiClient_Connection_Integration(t *testing.T) {
 		t.Skip("Skipping integration test in short mode")
 	}
 
+	// Load .env file for Loki configuration
+	envPath := filepath.Join("..", "..", ".env")
+	err := godotenv.Load(envPath)
+	if err != nil {
+		t.Logf("Warning: Could not load .env file: %v", err)
+	}
+
 	lokiURL := os.Getenv("LOKI_URL")
 	if lokiURL == "" {
-		t.Skip("LOKI_URL not set, skipping Loki integration test")
+		t.Skip("LOKI_URL not set in .env file, skipping Loki integration test")
 	}
 
 	log := logger.NewForTest()
