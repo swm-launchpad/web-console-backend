@@ -19,6 +19,7 @@ type Config struct {
 	Frontend  FrontendConfig
 	GitHubApp GitHubAppConfig
 	Log       LogConfig
+	Loki      LokiConfig
 }
 
 type DatabaseConfig struct {
@@ -71,6 +72,13 @@ type LogConfig struct {
 	Level    string // Log level (debug, info, warn, error, fatal)
 	Format   string // Log format (console, json)
 	FilePath string // Optional log file path
+}
+
+type LokiConfig struct {
+	URL      string // Loki base URL (e.g., https://loki.launchpad.kr)
+	Username string // Basic auth username
+	Password string // Basic auth password
+	OrgID    string // X-Scope-OrgID header value
 }
 
 func Load() (*Config, error) {
@@ -181,6 +189,12 @@ func Load() (*Config, error) {
 			Level:    logLevel,
 			Format:   logFormat,
 			FilePath: getEnv("LOG_FILE_PATH", ""),
+		},
+		Loki: LokiConfig{
+			URL:      getEnv("LOKI_URL", ""),
+			Username: getEnv("LOKI_USERNAME", ""),
+			Password: getEnv("LOKI_PASSWORD", ""),
+			OrgID:    getEnv("LOKI_ORG_ID", "fake"),
 		},
 	}
 
