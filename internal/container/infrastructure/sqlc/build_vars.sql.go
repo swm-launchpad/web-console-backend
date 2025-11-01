@@ -85,9 +85,18 @@ type GetBuildVarByKeyParams struct {
 	Key         string `json:"key"`
 }
 
-func (q *Queries) GetBuildVarByKey(ctx context.Context, arg GetBuildVarByKeyParams) (BuildVar, error) {
+type GetBuildVarByKeyRow struct {
+	ContainerID uint32         `json:"container_id"`
+	Key         string         `json:"key"`
+	Value       sql.NullString `json:"value"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   sql.NullTime   `json:"updated_at"`
+	BuildVarID  uint32         `json:"build_var_id"`
+}
+
+func (q *Queries) GetBuildVarByKey(ctx context.Context, arg GetBuildVarByKeyParams) (GetBuildVarByKeyRow, error) {
 	row := q.db.QueryRowContext(ctx, getBuildVarByKey, arg.ContainerID, arg.Key)
-	var i BuildVar
+	var i GetBuildVarByKeyRow
 	err := row.Scan(
 		&i.ContainerID,
 		&i.Key,
@@ -108,15 +117,24 @@ WHERE container_id = ?
 ORDER BY ` + "`" + `key` + "`" + ` ASC
 `
 
-func (q *Queries) GetBuildVarsByContainerID(ctx context.Context, containerID uint32) ([]BuildVar, error) {
+type GetBuildVarsByContainerIDRow struct {
+	ContainerID uint32         `json:"container_id"`
+	Key         string         `json:"key"`
+	Value       sql.NullString `json:"value"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   sql.NullTime   `json:"updated_at"`
+	BuildVarID  uint32         `json:"build_var_id"`
+}
+
+func (q *Queries) GetBuildVarsByContainerID(ctx context.Context, containerID uint32) ([]GetBuildVarsByContainerIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, getBuildVarsByContainerID, containerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []BuildVar{}
+	items := []GetBuildVarsByContainerIDRow{}
 	for rows.Next() {
-		var i BuildVar
+		var i GetBuildVarsByContainerIDRow
 		if err := rows.Scan(
 			&i.ContainerID,
 			&i.Key,

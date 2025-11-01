@@ -71,31 +71,18 @@ AND ` + "`" + `status` + "`" + ` IN ('untracked', 'running', 'backend_tracking_l
 ORDER BY ` + "`" + `created_at` + "`" + ` DESC, ` + "`" + `build_history_id` + "`" + ` DESC
 `
 
-type FindActiveBuildHistoriesByContainerIDRow struct {
-	BuildHistoryID        uint32             `json:"build_history_id"`
-	ContainerID           uint32             `json:"container_id"`
-	Status                BuildHistoryStatus `json:"status"`
-	Summary               sql.NullString     `json:"summary"`
-	TektonEventID         sql.NullString     `json:"tekton_event_id"`
-	TektonPipelineRunName sql.NullString     `json:"tekton_pipeline_run_name"`
-	GitCommitHash         sql.NullString     `json:"git_commit_hash"`
-	CreatedAt             time.Time          `json:"created_at"`
-	StartedAt             sql.NullTime       `json:"started_at"`
-	FinishedAt            sql.NullTime       `json:"finished_at"`
-}
-
 // Returns all non-completed build histories for a container.
 // Includes: untracked, running, backend_tracking_lost (recoverable states)
 // Excludes: success, failed, cancelled, skipped, backend_trigger_failed, backend_tracking_failed (terminal states)
-func (q *Queries) FindActiveBuildHistoriesByContainerID(ctx context.Context, containerID uint32) ([]FindActiveBuildHistoriesByContainerIDRow, error) {
+func (q *Queries) FindActiveBuildHistoriesByContainerID(ctx context.Context, containerID uint32) ([]BuildHistory, error) {
 	rows, err := q.db.QueryContext(ctx, findActiveBuildHistoriesByContainerID, containerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []FindActiveBuildHistoriesByContainerIDRow{}
+	items := []BuildHistory{}
 	for rows.Next() {
-		var i FindActiveBuildHistoriesByContainerIDRow
+		var i BuildHistory
 		if err := rows.Scan(
 			&i.BuildHistoryID,
 			&i.ContainerID,
@@ -145,28 +132,15 @@ type FindBuildHistoriesByContainerIDParams struct {
 	Offset      int32  `json:"offset"`
 }
 
-type FindBuildHistoriesByContainerIDRow struct {
-	BuildHistoryID        uint32             `json:"build_history_id"`
-	ContainerID           uint32             `json:"container_id"`
-	Status                BuildHistoryStatus `json:"status"`
-	Summary               sql.NullString     `json:"summary"`
-	TektonEventID         sql.NullString     `json:"tekton_event_id"`
-	TektonPipelineRunName sql.NullString     `json:"tekton_pipeline_run_name"`
-	GitCommitHash         sql.NullString     `json:"git_commit_hash"`
-	CreatedAt             time.Time          `json:"created_at"`
-	StartedAt             sql.NullTime       `json:"started_at"`
-	FinishedAt            sql.NullTime       `json:"finished_at"`
-}
-
-func (q *Queries) FindBuildHistoriesByContainerID(ctx context.Context, arg FindBuildHistoriesByContainerIDParams) ([]FindBuildHistoriesByContainerIDRow, error) {
+func (q *Queries) FindBuildHistoriesByContainerID(ctx context.Context, arg FindBuildHistoriesByContainerIDParams) ([]BuildHistory, error) {
 	rows, err := q.db.QueryContext(ctx, findBuildHistoriesByContainerID, arg.ContainerID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []FindBuildHistoriesByContainerIDRow{}
+	items := []BuildHistory{}
 	for rows.Next() {
-		var i FindBuildHistoriesByContainerIDRow
+		var i BuildHistory
 		if err := rows.Scan(
 			&i.BuildHistoryID,
 			&i.ContainerID,
@@ -209,22 +183,9 @@ WHERE ` + "`" + `build_history_id` + "`" + ` = ?
 LIMIT 1
 `
 
-type FindBuildHistoryByIDRow struct {
-	BuildHistoryID        uint32             `json:"build_history_id"`
-	ContainerID           uint32             `json:"container_id"`
-	Status                BuildHistoryStatus `json:"status"`
-	Summary               sql.NullString     `json:"summary"`
-	TektonEventID         sql.NullString     `json:"tekton_event_id"`
-	TektonPipelineRunName sql.NullString     `json:"tekton_pipeline_run_name"`
-	GitCommitHash         sql.NullString     `json:"git_commit_hash"`
-	CreatedAt             time.Time          `json:"created_at"`
-	StartedAt             sql.NullTime       `json:"started_at"`
-	FinishedAt            sql.NullTime       `json:"finished_at"`
-}
-
-func (q *Queries) FindBuildHistoryByID(ctx context.Context, buildHistoryID uint32) (FindBuildHistoryByIDRow, error) {
+func (q *Queries) FindBuildHistoryByID(ctx context.Context, buildHistoryID uint32) (BuildHistory, error) {
 	row := q.db.QueryRowContext(ctx, findBuildHistoryByID, buildHistoryID)
-	var i FindBuildHistoryByIDRow
+	var i BuildHistory
 	err := row.Scan(
 		&i.BuildHistoryID,
 		&i.ContainerID,
@@ -257,22 +218,9 @@ WHERE ` + "`" + `tekton_pipeline_run_name` + "`" + ` = ?
 LIMIT 1
 `
 
-type FindBuildHistoryByTektonPipelineRunNameRow struct {
-	BuildHistoryID        uint32             `json:"build_history_id"`
-	ContainerID           uint32             `json:"container_id"`
-	Status                BuildHistoryStatus `json:"status"`
-	Summary               sql.NullString     `json:"summary"`
-	TektonEventID         sql.NullString     `json:"tekton_event_id"`
-	TektonPipelineRunName sql.NullString     `json:"tekton_pipeline_run_name"`
-	GitCommitHash         sql.NullString     `json:"git_commit_hash"`
-	CreatedAt             time.Time          `json:"created_at"`
-	StartedAt             sql.NullTime       `json:"started_at"`
-	FinishedAt            sql.NullTime       `json:"finished_at"`
-}
-
-func (q *Queries) FindBuildHistoryByTektonPipelineRunName(ctx context.Context, tektonPipelineRunName sql.NullString) (FindBuildHistoryByTektonPipelineRunNameRow, error) {
+func (q *Queries) FindBuildHistoryByTektonPipelineRunName(ctx context.Context, tektonPipelineRunName sql.NullString) (BuildHistory, error) {
 	row := q.db.QueryRowContext(ctx, findBuildHistoryByTektonPipelineRunName, tektonPipelineRunName)
-	var i FindBuildHistoryByTektonPipelineRunNameRow
+	var i BuildHistory
 	err := row.Scan(
 		&i.BuildHistoryID,
 		&i.ContainerID,
@@ -306,22 +254,9 @@ ORDER BY ` + "`" + `created_at` + "`" + ` DESC, ` + "`" + `build_history_id` + "
 LIMIT 1
 `
 
-type FindLatestBuildHistoryByContainerIDRow struct {
-	BuildHistoryID        uint32             `json:"build_history_id"`
-	ContainerID           uint32             `json:"container_id"`
-	Status                BuildHistoryStatus `json:"status"`
-	Summary               sql.NullString     `json:"summary"`
-	TektonEventID         sql.NullString     `json:"tekton_event_id"`
-	TektonPipelineRunName sql.NullString     `json:"tekton_pipeline_run_name"`
-	GitCommitHash         sql.NullString     `json:"git_commit_hash"`
-	CreatedAt             time.Time          `json:"created_at"`
-	StartedAt             sql.NullTime       `json:"started_at"`
-	FinishedAt            sql.NullTime       `json:"finished_at"`
-}
-
-func (q *Queries) FindLatestBuildHistoryByContainerID(ctx context.Context, containerID uint32) (FindLatestBuildHistoryByContainerIDRow, error) {
+func (q *Queries) FindLatestBuildHistoryByContainerID(ctx context.Context, containerID uint32) (BuildHistory, error) {
 	row := q.db.QueryRowContext(ctx, findLatestBuildHistoryByContainerID, containerID)
-	var i FindLatestBuildHistoryByContainerIDRow
+	var i BuildHistory
 	err := row.Scan(
 		&i.BuildHistoryID,
 		&i.ContainerID,

@@ -85,18 +85,9 @@ type GetSecretByKeyParams struct {
 	Key         string `json:"key"`
 }
 
-type GetSecretByKeyRow struct {
-	SecretID    uint32         `json:"secret_id"`
-	ContainerID uint32         `json:"container_id"`
-	Key         string         `json:"key"`
-	Value       sql.NullString `json:"value"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   sql.NullTime   `json:"updated_at"`
-}
-
-func (q *Queries) GetSecretByKey(ctx context.Context, arg GetSecretByKeyParams) (GetSecretByKeyRow, error) {
+func (q *Queries) GetSecretByKey(ctx context.Context, arg GetSecretByKeyParams) (Secret, error) {
 	row := q.db.QueryRowContext(ctx, getSecretByKey, arg.ContainerID, arg.Key)
-	var i GetSecretByKeyRow
+	var i Secret
 	err := row.Scan(
 		&i.SecretID,
 		&i.ContainerID,
@@ -117,24 +108,15 @@ WHERE container_id = ?
 ORDER BY ` + "`" + `key` + "`" + ` ASC
 `
 
-type GetSecretsByContainerIDRow struct {
-	SecretID    uint32         `json:"secret_id"`
-	ContainerID uint32         `json:"container_id"`
-	Key         string         `json:"key"`
-	Value       sql.NullString `json:"value"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   sql.NullTime   `json:"updated_at"`
-}
-
-func (q *Queries) GetSecretsByContainerID(ctx context.Context, containerID uint32) ([]GetSecretsByContainerIDRow, error) {
+func (q *Queries) GetSecretsByContainerID(ctx context.Context, containerID uint32) ([]Secret, error) {
 	rows, err := q.db.QueryContext(ctx, getSecretsByContainerID, containerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetSecretsByContainerIDRow{}
+	items := []Secret{}
 	for rows.Next() {
-		var i GetSecretsByContainerIDRow
+		var i Secret
 		if err := rows.Scan(
 			&i.SecretID,
 			&i.ContainerID,

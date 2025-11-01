@@ -4,22 +4,6 @@ sql:
     queries: "query"
     schema:
       - "../../../migration/000001_initial_schema.up.sql"
-      - "../../../migration/000002_add_deployment_locks.up.sql"
-      - "../../../migration/000003_add_verification_tokens.up.sql"
-      - "../../../migration/000004_move_fqdn_to_networks.up.sql"
-      - "../../../migration/000005_add_initial_templates.up.sql"
-      - "../../../migration/000006_refactor_deployment_mechanism.up.sql"
-      - "../../../migration/000007_add_active_deployment_tracking.up.sql"
-      - "../../../migration/000008_add_volume_slug.up.sql"
-      - "../../../migration/000009_add_github_installations.up.sql"
-      - "../../../migration/000010_add_installation_status.up.sql"
-      - "../../../migration/000011_create_oauth_states.up.sql"
-      - "../../../migration/000012_update_slug_columns.up.sql"
-      - "../../../migration/000013_fix_container_slug_index.up.sql"
-      - "../../../migration/000014_add_build_env_vars.up.sql"
-      - "../../../migration/000015_modify_containers_for_build.up.sql"
-      - "../../../migration/000016_refactor_build_history.up.sql"
-      - "../../../migration/000017_rename_build_env_vars_to_build_vars.up.sql"
     gen:
       go:
         package: "sqlc"

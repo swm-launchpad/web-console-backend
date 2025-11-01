@@ -74,7 +74,7 @@ func (q *Queries) DeleteNetworksByContainerID(ctx context.Context, containerID u
 }
 
 const getNetworkByID = `-- name: GetNetworkByID :one
-SELECT network_id, container_id, external_ip, external_port, internal_port, type, created_at, updated_at, fqdn
+SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at
 FROM NETWORKS
 WHERE network_id = ?
 `
@@ -86,18 +86,18 @@ func (q *Queries) GetNetworkByID(ctx context.Context, networkID uint32) (Network
 		&i.NetworkID,
 		&i.ContainerID,
 		&i.ExternalIp,
+		&i.Fqdn,
 		&i.ExternalPort,
 		&i.InternalPort,
 		&i.Type,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Fqdn,
 	)
 	return i, err
 }
 
 const getNetworksByContainerID = `-- name: GetNetworksByContainerID :many
-SELECT network_id, container_id, external_ip, external_port, internal_port, type, created_at, updated_at, fqdn
+SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at
 FROM NETWORKS
 WHERE container_id = ?
 ORDER BY internal_port ASC
@@ -116,12 +116,12 @@ func (q *Queries) GetNetworksByContainerID(ctx context.Context, containerID uint
 			&i.NetworkID,
 			&i.ContainerID,
 			&i.ExternalIp,
+			&i.Fqdn,
 			&i.ExternalPort,
 			&i.InternalPort,
 			&i.Type,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.Fqdn,
 		); err != nil {
 			return nil, err
 		}
