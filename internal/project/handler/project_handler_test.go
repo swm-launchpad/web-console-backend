@@ -75,10 +75,9 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		trafficLimit := uint32(524288)
 		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
 
-		fqdn := "example.com"
 		plan := value.PlanPro
 
-		mockProjectService.On("CreateProject", ctx, projectName, userID, *expectedLimits, &fqdn, &plan).Return(project, nil)
+		mockProjectService.On("CreateProject", ctx, projectName, userID, *expectedLimits, &plan).Return(project, nil)
 
 		router := gin.New()
 		router.POST("/projects", func(c *gin.Context) {
@@ -86,10 +85,9 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			handler.CreateProject(c)
 		})
 
-		// 사용자가 FQDN, Plan, 리소스를 지정하면 그대로 사용됨
+		// 사용자가 Plan, 리소스를 지정하면 그대로 사용됨
 		reqBody := map[string]interface{}{
 			"name":          projectName,
-			"fqdn":          fqdn,
 			"plan":          "pro",
 			"cpu_limit":     2000,
 			"memory_limit":  4096,
@@ -386,7 +384,7 @@ func createTestProject(projectID uint, name string, slug value.ProjectSlug, owne
 		panic(err)
 	}
 
-	project, err := model.NewProject(name, slug, ownerID, *limits, nil, nil)
+	project, err := model.NewProject(name, slug, ownerID, *limits, nil)
 	if err != nil {
 		// Handle error - shouldn't happen with valid test data
 		panic(err)
