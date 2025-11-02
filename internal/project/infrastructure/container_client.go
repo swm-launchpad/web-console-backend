@@ -446,7 +446,7 @@ func (c *containerClient) GetUnifiedContainerConfig(ctx context.Context, project
 		}
 
 		// Calculate image name and tag
-		imageName := build.Slug
+		imageName := fmt.Sprintf("%s/%s", c.registryURL, build.Slug)
 
 		var imageTag string
 		if build.LastBuiltCommitHash != nil && *build.LastBuiltCommitHash != "" {
