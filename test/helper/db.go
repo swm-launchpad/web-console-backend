@@ -77,26 +77,9 @@ func SetupTestDB(t *testing.T) *TestDB {
 
 // Migrate applies schema to test database
 func (tdb *TestDB) Migrate() error {
-	// Apply all migrations in order
+	// Apply consolidated schema migration
 	migrations := []string{
 		"000001_initial_schema.up.sql",
-		"000002_add_deployment_locks.up.sql",
-		"000003_add_verification_tokens.up.sql",
-		"000004_move_fqdn_to_networks.up.sql",
-		"000005_add_initial_templates.up.sql",
-		"000006_refactor_deployment_mechanism.up.sql",
-		"000007_add_active_deployment_tracking.up.sql",
-		"000008_add_volume_slug.up.sql",
-		"000009_add_github_installations.up.sql",
-		"000010_add_installation_status.up.sql",
-		"000011_create_oauth_states.up.sql",
-		"000012_update_slug_columns.up.sql",
-		"000013_fix_container_slug_index.up.sql",
-		"000014_add_build_env_vars.up.sql",
-		"000015_modify_containers_for_build.up.sql",
-		"000016_refactor_build_history.up.sql",
-		"000017_rename_build_env_vars_to_build_vars.up.sql",
-		"000018_add_system_settings.up.sql",
 	}
 
 	for _, migration := range migrations {

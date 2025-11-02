@@ -130,19 +130,9 @@ FROM VOLUMES
 WHERE volume_id = ?
 `
 
-type GetVolumeByIDRow struct {
-	VolumeID  uint32         `json:"volume_id"`
-	ProjectID uint32         `json:"project_id"`
-	Name      string         `json:"name"`
-	Slug      sql.NullString `json:"slug"`
-	Capacity  uint32         `json:"capacity"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt sql.NullTime   `json:"updated_at"`
-}
-
-func (q *Queries) GetVolumeByID(ctx context.Context, volumeID uint32) (GetVolumeByIDRow, error) {
+func (q *Queries) GetVolumeByID(ctx context.Context, volumeID uint32) (Volume, error) {
 	row := q.db.QueryRowContext(ctx, getVolumeByID, volumeID)
-	var i GetVolumeByIDRow
+	var i Volume
 	err := row.Scan(
 		&i.VolumeID,
 		&i.ProjectID,
@@ -168,19 +158,9 @@ type GetVolumeByNameParams struct {
 	Name      string `json:"name"`
 }
 
-type GetVolumeByNameRow struct {
-	VolumeID  uint32         `json:"volume_id"`
-	ProjectID uint32         `json:"project_id"`
-	Name      string         `json:"name"`
-	Slug      sql.NullString `json:"slug"`
-	Capacity  uint32         `json:"capacity"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt sql.NullTime   `json:"updated_at"`
-}
-
-func (q *Queries) GetVolumeByName(ctx context.Context, arg GetVolumeByNameParams) (GetVolumeByNameRow, error) {
+func (q *Queries) GetVolumeByName(ctx context.Context, arg GetVolumeByNameParams) (Volume, error) {
 	row := q.db.QueryRowContext(ctx, getVolumeByName, arg.ProjectID, arg.Name)
-	var i GetVolumeByNameRow
+	var i Volume
 	err := row.Scan(
 		&i.VolumeID,
 		&i.ProjectID,
@@ -201,19 +181,9 @@ FROM VOLUMES
 WHERE slug = ?
 `
 
-type GetVolumeBySlugRow struct {
-	VolumeID  uint32         `json:"volume_id"`
-	ProjectID uint32         `json:"project_id"`
-	Name      string         `json:"name"`
-	Slug      sql.NullString `json:"slug"`
-	Capacity  uint32         `json:"capacity"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt sql.NullTime   `json:"updated_at"`
-}
-
-func (q *Queries) GetVolumeBySlug(ctx context.Context, slug sql.NullString) (GetVolumeBySlugRow, error) {
+func (q *Queries) GetVolumeBySlug(ctx context.Context, slug sql.NullString) (Volume, error) {
 	row := q.db.QueryRowContext(ctx, getVolumeBySlug, slug)
-	var i GetVolumeBySlugRow
+	var i Volume
 	err := row.Scan(
 		&i.VolumeID,
 		&i.ProjectID,
@@ -235,25 +205,15 @@ WHERE project_id = ?
 ORDER BY created_at ASC
 `
 
-type GetVolumesByProjectIDRow struct {
-	VolumeID  uint32         `json:"volume_id"`
-	ProjectID uint32         `json:"project_id"`
-	Name      string         `json:"name"`
-	Slug      sql.NullString `json:"slug"`
-	Capacity  uint32         `json:"capacity"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt sql.NullTime   `json:"updated_at"`
-}
-
-func (q *Queries) GetVolumesByProjectID(ctx context.Context, projectID uint32) ([]GetVolumesByProjectIDRow, error) {
+func (q *Queries) GetVolumesByProjectID(ctx context.Context, projectID uint32) ([]Volume, error) {
 	rows, err := q.db.QueryContext(ctx, getVolumesByProjectID, projectID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetVolumesByProjectIDRow{}
+	items := []Volume{}
 	for rows.Next() {
-		var i GetVolumesByProjectIDRow
+		var i Volume
 		if err := rows.Scan(
 			&i.VolumeID,
 			&i.ProjectID,
@@ -290,25 +250,15 @@ type ListVolumesParams struct {
 	Offset int32 `json:"offset"`
 }
 
-type ListVolumesRow struct {
-	VolumeID  uint32         `json:"volume_id"`
-	ProjectID uint32         `json:"project_id"`
-	Name      string         `json:"name"`
-	Slug      sql.NullString `json:"slug"`
-	Capacity  uint32         `json:"capacity"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt sql.NullTime   `json:"updated_at"`
-}
-
-func (q *Queries) ListVolumes(ctx context.Context, arg ListVolumesParams) ([]ListVolumesRow, error) {
+func (q *Queries) ListVolumes(ctx context.Context, arg ListVolumesParams) ([]Volume, error) {
 	rows, err := q.db.QueryContext(ctx, listVolumes, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListVolumesRow{}
+	items := []Volume{}
 	for rows.Next() {
-		var i ListVolumesRow
+		var i Volume
 		if err := rows.Scan(
 			&i.VolumeID,
 			&i.ProjectID,

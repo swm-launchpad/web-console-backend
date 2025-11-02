@@ -797,7 +797,7 @@ func (r *containerRepository) loadNetworks(container *model.Container, sqlcNetwo
 	return nil
 }
 
-func (r *containerRepository) loadSecrets(container *model.Container, sqlcSecrets []sqlc.GetSecretsByContainerIDRow) error {
+func (r *containerRepository) loadSecrets(container *model.Container, sqlcSecrets []sqlc.Secret) error {
 	for _, sqlcSecret := range sqlcSecrets {
 		secret, err := r.toDomainSecret(sqlcSecret)
 		if err != nil {
@@ -810,7 +810,7 @@ func (r *containerRepository) loadSecrets(container *model.Container, sqlcSecret
 	return nil
 }
 
-func (r *containerRepository) loadBuildVars(container *model.Container, sqlcBuildVars []sqlc.BuildVar) error {
+func (r *containerRepository) loadBuildVars(container *model.Container, sqlcBuildVars []sqlc.GetBuildVarsByContainerIDRow) error {
 	for _, sqlcBuildVar := range sqlcBuildVars {
 		buildVar, err := r.toDomainBuildVarFromRow(sqlcBuildVar)
 		if err != nil {
@@ -1002,7 +1002,7 @@ func (r *containerRepository) toDomainNetwork(sqlcNetwork sqlc.Network) (*model.
 	return network, nil
 }
 
-func (r *containerRepository) toDomainSecret(sqlcSecret sqlc.GetSecretsByContainerIDRow) (*model.Secret, error) {
+func (r *containerRepository) toDomainSecret(sqlcSecret sqlc.Secret) (*model.Secret, error) {
 	secret := model.ReconstructSecret(
 		uint(sqlcSecret.SecretID),
 		uint(sqlcSecret.ContainerID),
@@ -1014,7 +1014,7 @@ func (r *containerRepository) toDomainSecret(sqlcSecret sqlc.GetSecretsByContain
 	return secret, nil
 }
 
-func (r *containerRepository) toDomainBuildVarFromRow(sqlcBuildVar sqlc.BuildVar) (*model.BuildVar, error) {
+func (r *containerRepository) toDomainBuildVarFromRow(sqlcBuildVar sqlc.GetBuildVarsByContainerIDRow) (*model.BuildVar, error) {
 	buildVar := model.ReconstructBuildVar(
 		uint(sqlcBuildVar.BuildVarID),
 		uint(sqlcBuildVar.ContainerID),

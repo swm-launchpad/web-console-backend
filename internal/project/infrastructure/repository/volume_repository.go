@@ -323,7 +323,7 @@ func (r *volumeRepository) queriesWithContext(ctx context.Context) *sqlc.Queries
 
 // Converter methods for different Row types
 
-func (r *volumeRepository) toDomainVolumeFromGetRow(row sqlc.GetVolumeByIDRow) *model.Volume {
+func (r *volumeRepository) toDomainVolumeFromGetRow(row sqlc.Volume) *model.Volume {
 	var updatedAt time.Time
 	if row.UpdatedAt.Valid {
 		updatedAt = row.UpdatedAt.Time
@@ -346,7 +346,7 @@ func (r *volumeRepository) toDomainVolumeFromGetRow(row sqlc.GetVolumeByIDRow) *
 	)
 }
 
-func (r *volumeRepository) toDomainVolumeFromGetByProjectRow(row sqlc.GetVolumesByProjectIDRow) *model.Volume {
+func (r *volumeRepository) toDomainVolumeFromGetByProjectRow(row sqlc.Volume) *model.Volume {
 	var updatedAt time.Time
 	if row.UpdatedAt.Valid {
 		updatedAt = row.UpdatedAt.Time
@@ -369,7 +369,7 @@ func (r *volumeRepository) toDomainVolumeFromGetByProjectRow(row sqlc.GetVolumes
 	)
 }
 
-func (r *volumeRepository) toDomainVolumeFromGetByNameRow(row sqlc.GetVolumeByNameRow) *model.Volume {
+func (r *volumeRepository) toDomainVolumeFromGetByNameRow(row sqlc.Volume) *model.Volume {
 	var updatedAt time.Time
 	if row.UpdatedAt.Valid {
 		updatedAt = row.UpdatedAt.Time
@@ -392,7 +392,7 @@ func (r *volumeRepository) toDomainVolumeFromGetByNameRow(row sqlc.GetVolumeByNa
 	)
 }
 
-func (r *volumeRepository) toDomainVolumeFromGetBySlugRow(row sqlc.GetVolumeBySlugRow) *model.Volume {
+func (r *volumeRepository) toDomainVolumeFromGetBySlugRow(row sqlc.Volume) *model.Volume {
 	var updatedAt time.Time
 	if row.UpdatedAt.Valid {
 		updatedAt = row.UpdatedAt.Time
@@ -415,7 +415,7 @@ func (r *volumeRepository) toDomainVolumeFromGetBySlugRow(row sqlc.GetVolumeBySl
 	)
 }
 
-func (r *volumeRepository) toDomainVolumeFromListRow(row sqlc.ListVolumesRow) *model.Volume {
+func (r *volumeRepository) toDomainVolumeFromListRow(row sqlc.Volume) *model.Volume {
 	var updatedAt time.Time
 	if row.UpdatedAt.Valid {
 		updatedAt = row.UpdatedAt.Time

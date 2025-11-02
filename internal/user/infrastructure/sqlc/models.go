@@ -366,6 +366,51 @@ func (ns NullProjectsStatus) Value() (driver.Value, error) {
 	return string(ns.ProjectsStatus), nil
 }
 
+type SystemSettingsValueType string
+
+const (
+	SystemSettingsValueTypeString  SystemSettingsValueType = "string"
+	SystemSettingsValueTypeInt     SystemSettingsValueType = "int"
+	SystemSettingsValueTypeFloat   SystemSettingsValueType = "float"
+	SystemSettingsValueTypeBoolean SystemSettingsValueType = "boolean"
+	SystemSettingsValueTypeJson    SystemSettingsValueType = "json"
+)
+
+func (e *SystemSettingsValueType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SystemSettingsValueType(s)
+	case string:
+		*e = SystemSettingsValueType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SystemSettingsValueType: %T", src)
+	}
+	return nil
+}
+
+type NullSystemSettingsValueType struct {
+	SystemSettingsValueType SystemSettingsValueType `json:"system_settings_value_type"`
+	Valid                   bool                    `json:"valid"` // Valid is true if SystemSettingsValueType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSystemSettingsValueType) Scan(value interface{}) error {
+	if value == nil {
+		ns.SystemSettingsValueType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SystemSettingsValueType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSystemSettingsValueType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SystemSettingsValueType), nil
+}
+
 type TemplatesStatus string
 
 const (
@@ -496,28 +541,28 @@ func (ns NullVerificationTokensTokenType) Value() (driver.Value, error) {
 }
 
 type BuildHistory struct {
-	BuildHistoryID uint32         `json:"build_history_id"`
-	ContainerID    uint32         `json:"container_id"`
-	Summary        sql.NullString `json:"summary"`
-	CreatedAt      time.Time      `json:"created_at"`
-	StartedAt      sql.NullTime   `json:"started_at"`
-	FinishedAt     sql.NullTime   `json:"finished_at"`
+	BuildHistoryID uint32             `json:"build_history_id"`
+	ContainerID    uint32             `json:"container_id"`
+	Status         BuildHistoryStatus `json:"status"`
+	Summary        sql.NullString     `json:"summary"`
 	// Tekton event ID from API response
 	TektonEventID sql.NullString `json:"tekton_event_id"`
 	// Tekton PipelineRun name
-	TektonPipelineRunName sql.NullString     `json:"tekton_pipeline_run_name"`
-	Status                BuildHistoryStatus `json:"status"`
+	TektonPipelineRunName sql.NullString `json:"tekton_pipeline_run_name"`
 	// Latest commit hash from Tekton build result
 	GitCommitHash sql.NullString `json:"git_commit_hash"`
+	CreatedAt     time.Time      `json:"created_at"`
+	StartedAt     sql.NullTime   `json:"started_at"`
+	FinishedAt    sql.NullTime   `json:"finished_at"`
 }
 
 type BuildVar struct {
+	BuildVarID  uint32         `json:"build_var_id"`
 	ContainerID uint32         `json:"container_id"`
 	Key         string         `json:"key"`
 	Value       sql.NullString `json:"value"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   sql.NullTime   `json:"updated_at"`
-	BuildVarID  uint32         `json:"build_var_id"`
 }
 
 type Container struct {
@@ -525,40 +570,40 @@ type Container struct {
 	ProjectID              uint32          `json:"project_id"`
 	TemplateID             sql.NullInt32   `json:"template_id"`
 	Name                   string          `json:"name"`
+	Slug                   string          `json:"slug"`
 	StableWindow           sql.NullInt32   `json:"stable_window"`
 	TemplateConfig         json.RawMessage `json:"template_config"`
+	GithubInstallationID   sql.NullInt64   `json:"github_installation_id"`
 	GitRepositoryUrl       sql.NullString  `json:"git_repository_url"`
 	GitBranch              sql.NullString  `json:"git_branch"`
 	GitCommitHash          sql.NullString  `json:"git_commit_hash"`
 	GitDirectoryPath       sql.NullString  `json:"git_directory_path"`
 	LastBuiltGitCommitHash sql.NullString  `json:"last_built_git_commit_hash"`
-	CpuLimit               sql.NullInt32   `json:"cpu_limit"`
-	MemoryLimit            sql.NullInt32   `json:"memory_limit"`
-	MonthlyBuildTime       sql.NullInt32   `json:"monthly_build_time"`
-	MonthlyBuildCount      sql.NullInt32   `json:"monthly_build_count"`
-	MonthlyUptime          sql.NullString  `json:"monthly_uptime"`
-	CreatedAt              time.Time       `json:"created_at"`
-	UpdatedAt              sql.NullTime    `json:"updated_at"`
-	DeletedAt              sql.NullTime    `json:"deleted_at"`
-	IsDeleted              bool            `json:"is_deleted"`
-	GithubInstallationID   sql.NullInt64   `json:"github_installation_id"`
-	Slug                   string          `json:"slug"`
 	// Indicates whether build is required (set to true when build parameters change)
-	NeedsBuild bool `json:"needs_build"`
+	NeedsBuild        bool           `json:"needs_build"`
+	CpuLimit          sql.NullInt32  `json:"cpu_limit"`
+	MemoryLimit       sql.NullInt32  `json:"memory_limit"`
+	MonthlyBuildTime  sql.NullInt32  `json:"monthly_build_time"`
+	MonthlyBuildCount sql.NullInt32  `json:"monthly_build_count"`
+	MonthlyUptime     sql.NullString `json:"monthly_uptime"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         sql.NullTime   `json:"updated_at"`
+	DeletedAt         sql.NullTime   `json:"deleted_at"`
+	IsDeleted         bool           `json:"is_deleted"`
 }
 
 type Deployment struct {
-	DeploymentID uint32         `json:"deployment_id"`
-	ProjectID    uint32         `json:"project_id"`
-	Summary      sql.NullString `json:"summary"`
-	CreatedAt    time.Time      `json:"created_at"`
-	StartedAt    sql.NullTime   `json:"started_at"`
-	FinishedAt   sql.NullTime   `json:"finished_at"`
+	DeploymentID uint32            `json:"deployment_id"`
+	ProjectID    uint32            `json:"project_id"`
+	Status       DeploymentsStatus `json:"status"`
+	Summary      sql.NullString    `json:"summary"`
 	// Tekton event ID from API response
 	TektonEventID sql.NullString `json:"tekton_event_id"`
 	// Tekton PipelineRun name
-	TektonPipelineRunName sql.NullString    `json:"tekton_pipeline_run_name"`
-	Status                DeploymentsStatus `json:"status"`
+	TektonPipelineRunName sql.NullString `json:"tekton_pipeline_run_name"`
+	CreatedAt             time.Time      `json:"created_at"`
+	StartedAt             sql.NullTime   `json:"started_at"`
+	FinishedAt            sql.NullTime   `json:"finished_at"`
 }
 
 type EnvVar struct {
@@ -575,13 +620,13 @@ type GithubInstallation struct {
 	UserID         uint32                         `json:"user_id"`
 	AccountLogin   string                         `json:"account_login"`
 	AccountType    GithubInstallationsAccountType `json:"account_type"`
+	Status         GithubInstallationsStatus      `json:"status"`
 	CachedToken    sql.NullString                 `json:"cached_token"`
 	TokenExpiresAt sql.NullTime                   `json:"token_expires_at"`
 	CreatedAt      time.Time                      `json:"created_at"`
 	UpdatedAt      sql.NullTime                   `json:"updated_at"`
 	DeletedAt      sql.NullTime                   `json:"deleted_at"`
 	IsDeleted      bool                           `json:"is_deleted"`
-	Status         GithubInstallationsStatus      `json:"status"`
 }
 
 type Mount struct {
@@ -596,12 +641,12 @@ type Network struct {
 	NetworkID    uint32         `json:"network_id"`
 	ContainerID  uint32         `json:"container_id"`
 	ExternalIp   sql.NullString `json:"external_ip"`
+	Fqdn         sql.NullString `json:"fqdn"`
 	ExternalPort sql.NullInt16  `json:"external_port"`
 	InternalPort sql.NullInt16  `json:"internal_port"`
 	Type         NetworksType   `json:"type"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    sql.NullTime   `json:"updated_at"`
-	Fqdn         sql.NullString `json:"fqdn"`
 }
 
 type OauthState struct {
@@ -614,24 +659,24 @@ type OauthState struct {
 }
 
 type Project struct {
-	ProjectID    uint32         `json:"project_id"`
-	Name         string         `json:"name"`
-	Fqdn         sql.NullString `json:"fqdn"`
-	Status       ProjectsStatus `json:"status"`
-	Plan         sql.NullString `json:"plan"`
-	CpuLimit     sql.NullInt32  `json:"cpu_limit"`
-	MemoryLimit  sql.NullInt32  `json:"memory_limit"`
-	DiskLimit    sql.NullInt32  `json:"disk_limit"`
-	TrafficLimit sql.NullInt64  `json:"traffic_limit"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    sql.NullTime   `json:"updated_at"`
-	DeletedAt    sql.NullTime   `json:"deleted_at"`
-	IsDeleted    bool           `json:"is_deleted"`
+	ProjectID uint32         `json:"project_id"`
+	Name      string         `json:"name"`
+	Slug      string         `json:"slug"`
+	Fqdn      sql.NullString `json:"fqdn"`
+	Status    ProjectsStatus `json:"status"`
 	// Current operation status of the project
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
 	// ID of the deployment that currently owns the deploying status
-	ActiveDeploymentID sql.NullInt32 `json:"active_deployment_id"`
-	Slug               string        `json:"slug"`
+	ActiveDeploymentID sql.NullInt32  `json:"active_deployment_id"`
+	Plan               sql.NullString `json:"plan"`
+	CpuLimit           sql.NullInt32  `json:"cpu_limit"`
+	MemoryLimit        sql.NullInt32  `json:"memory_limit"`
+	DiskLimit          sql.NullInt32  `json:"disk_limit"`
+	TrafficLimit       sql.NullInt64  `json:"traffic_limit"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          sql.NullTime   `json:"updated_at"`
+	DeletedAt          sql.NullTime   `json:"deleted_at"`
+	IsDeleted          bool           `json:"is_deleted"`
 }
 
 type ProjectUser struct {
@@ -649,9 +694,21 @@ type Secret struct {
 	SecretID    uint32         `json:"secret_id"`
 	ContainerID uint32         `json:"container_id"`
 	Key         string         `json:"key"`
+	Value       sql.NullString `json:"value"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   sql.NullTime   `json:"updated_at"`
-	Value       sql.NullString `json:"value"`
+}
+
+type SystemSetting struct {
+	SettingKey   string                  `json:"setting_key"`
+	SettingValue string                  `json:"setting_value"`
+	ValueType    SystemSettingsValueType `json:"value_type"`
+	Category     string                  `json:"category"`
+	Description  sql.NullString          `json:"description"`
+	IsEditable   sql.NullBool            `json:"is_editable"`
+	UpdatedBy    sql.NullInt32           `json:"updated_by"`
+	CreatedAt    sql.NullTime            `json:"created_at"`
+	UpdatedAt    sql.NullTime            `json:"updated_at"`
 }
 
 type Template struct {
@@ -694,8 +751,8 @@ type Volume struct {
 	VolumeID  uint32         `json:"volume_id"`
 	ProjectID uint32         `json:"project_id"`
 	Name      string         `json:"name"`
+	Slug      sql.NullString `json:"slug"`
 	Capacity  uint32         `json:"capacity"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt sql.NullTime   `json:"updated_at"`
-	Slug      sql.NullString `json:"slug"`
 }

@@ -169,7 +169,7 @@ func (q *Queries) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
 }
 
 const getContainerByID = `-- name: GetContainerByID :one
-SELECT container_id, project_id, template_id, name, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id, slug, needs_build
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
 FROM CONTAINERS
 WHERE container_id = ? AND is_deleted = FALSE
 `
@@ -182,13 +182,16 @@ func (q *Queries) GetContainerByID(ctx context.Context, containerID uint32) (Con
 		&i.ProjectID,
 		&i.TemplateID,
 		&i.Name,
+		&i.Slug,
 		&i.StableWindow,
 		&i.TemplateConfig,
+		&i.GithubInstallationID,
 		&i.GitRepositoryUrl,
 		&i.GitBranch,
 		&i.GitCommitHash,
 		&i.GitDirectoryPath,
 		&i.LastBuiltGitCommitHash,
+		&i.NeedsBuild,
 		&i.CpuLimit,
 		&i.MemoryLimit,
 		&i.MonthlyBuildTime,
@@ -198,15 +201,12 @@ func (q *Queries) GetContainerByID(ctx context.Context, containerID uint32) (Con
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.IsDeleted,
-		&i.GithubInstallationID,
-		&i.Slug,
-		&i.NeedsBuild,
 	)
 	return i, err
 }
 
 const getContainerByIDForUpdate = `-- name: GetContainerByIDForUpdate :one
-SELECT container_id, project_id, template_id, name, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id, slug, needs_build
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
 FROM CONTAINERS
 WHERE container_id = ? AND is_deleted = FALSE
 FOR UPDATE
@@ -220,13 +220,16 @@ func (q *Queries) GetContainerByIDForUpdate(ctx context.Context, containerID uin
 		&i.ProjectID,
 		&i.TemplateID,
 		&i.Name,
+		&i.Slug,
 		&i.StableWindow,
 		&i.TemplateConfig,
+		&i.GithubInstallationID,
 		&i.GitRepositoryUrl,
 		&i.GitBranch,
 		&i.GitCommitHash,
 		&i.GitDirectoryPath,
 		&i.LastBuiltGitCommitHash,
+		&i.NeedsBuild,
 		&i.CpuLimit,
 		&i.MemoryLimit,
 		&i.MonthlyBuildTime,
@@ -236,15 +239,12 @@ func (q *Queries) GetContainerByIDForUpdate(ctx context.Context, containerID uin
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.IsDeleted,
-		&i.GithubInstallationID,
-		&i.Slug,
-		&i.NeedsBuild,
 	)
 	return i, err
 }
 
 const getContainerBySlug = `-- name: GetContainerBySlug :one
-SELECT container_id, project_id, template_id, name, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id, slug, needs_build
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
 FROM CONTAINERS
 WHERE slug = ? AND is_deleted = FALSE
 `
@@ -257,13 +257,16 @@ func (q *Queries) GetContainerBySlug(ctx context.Context, slug string) (Containe
 		&i.ProjectID,
 		&i.TemplateID,
 		&i.Name,
+		&i.Slug,
 		&i.StableWindow,
 		&i.TemplateConfig,
+		&i.GithubInstallationID,
 		&i.GitRepositoryUrl,
 		&i.GitBranch,
 		&i.GitCommitHash,
 		&i.GitDirectoryPath,
 		&i.LastBuiltGitCommitHash,
+		&i.NeedsBuild,
 		&i.CpuLimit,
 		&i.MemoryLimit,
 		&i.MonthlyBuildTime,
@@ -273,9 +276,6 @@ func (q *Queries) GetContainerBySlug(ctx context.Context, slug string) (Containe
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.IsDeleted,
-		&i.GithubInstallationID,
-		&i.Slug,
-		&i.NeedsBuild,
 	)
 	return i, err
 }
@@ -301,7 +301,7 @@ func (q *Queries) GetTotalResourceUsageByProject(ctx context.Context, projectID 
 }
 
 const listContainers = `-- name: ListContainers :many
-SELECT container_id, project_id, template_id, name, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id, slug, needs_build
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
 FROM CONTAINERS
 WHERE is_deleted = FALSE
 ORDER BY created_at DESC
@@ -327,13 +327,16 @@ func (q *Queries) ListContainers(ctx context.Context, arg ListContainersParams) 
 			&i.ProjectID,
 			&i.TemplateID,
 			&i.Name,
+			&i.Slug,
 			&i.StableWindow,
 			&i.TemplateConfig,
+			&i.GithubInstallationID,
 			&i.GitRepositoryUrl,
 			&i.GitBranch,
 			&i.GitCommitHash,
 			&i.GitDirectoryPath,
 			&i.LastBuiltGitCommitHash,
+			&i.NeedsBuild,
 			&i.CpuLimit,
 			&i.MemoryLimit,
 			&i.MonthlyBuildTime,
@@ -343,9 +346,6 @@ func (q *Queries) ListContainers(ctx context.Context, arg ListContainersParams) 
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.IsDeleted,
-			&i.GithubInstallationID,
-			&i.Slug,
-			&i.NeedsBuild,
 		); err != nil {
 			return nil, err
 		}
@@ -361,7 +361,7 @@ func (q *Queries) ListContainers(ctx context.Context, arg ListContainersParams) 
 }
 
 const listContainersByProjectID = `-- name: ListContainersByProjectID :many
-SELECT container_id, project_id, template_id, name, stable_window, template_config, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, github_installation_id, slug, needs_build
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
 FROM CONTAINERS
 WHERE project_id = ? AND is_deleted = FALSE
 ORDER BY created_at DESC
@@ -381,13 +381,16 @@ func (q *Queries) ListContainersByProjectID(ctx context.Context, projectID uint3
 			&i.ProjectID,
 			&i.TemplateID,
 			&i.Name,
+			&i.Slug,
 			&i.StableWindow,
 			&i.TemplateConfig,
+			&i.GithubInstallationID,
 			&i.GitRepositoryUrl,
 			&i.GitBranch,
 			&i.GitCommitHash,
 			&i.GitDirectoryPath,
 			&i.LastBuiltGitCommitHash,
+			&i.NeedsBuild,
 			&i.CpuLimit,
 			&i.MemoryLimit,
 			&i.MonthlyBuildTime,
@@ -397,9 +400,6 @@ func (q *Queries) ListContainersByProjectID(ctx context.Context, projectID uint3
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.IsDeleted,
-			&i.GithubInstallationID,
-			&i.Slug,
-			&i.NeedsBuild,
 		); err != nil {
 			return nil, err
 		}
