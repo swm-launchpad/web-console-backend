@@ -13,7 +13,6 @@ type Project struct {
 	projectID          uint
 	name               string
 	slug               value.ProjectSlug
-	fqdn               *string
 	status             value.ProjectStatus
 	operationStatus    value.ProjectOperationStatus
 	activeDeploymentID *uint // ID of the deployment that currently owns the deploying status
@@ -27,8 +26,8 @@ type Project struct {
 }
 
 // NewProject creates a new project with an initial owner
-// fqdn and plan are optional parameters (pass nil if not needed)
-func NewProject(name string, slug value.ProjectSlug, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *value.Plan) (*Project, error) {
+// plan is an optional parameter (pass nil if not needed)
+func NewProject(name string, slug value.ProjectSlug, ownerID uint, limits value.ResourceLimits, plan *value.Plan) (*Project, error) {
 	if name == "" {
 		return nil, projecterrors.ErrNameRequired
 	}
@@ -54,13 +53,7 @@ func NewProject(name string, slug value.ProjectSlug, ownerID uint, limits value.
 		updatedAt:       now,
 	}
 
-	// Set optional fields by copying the pointer values
-	// This ensures created_at and updated_at remain the same
-	if fqdn != nil {
-		fqdnCopy := *fqdn
-		project.fqdn = &fqdnCopy
-	}
-
+	// Set optional plan field by copying the pointer value
 	if plan != nil {
 		planCopy := *plan
 		project.plan = &planCopy
@@ -87,7 +80,6 @@ func ReconstructProject(
 	projectID uint,
 	name string,
 	slug value.ProjectSlug,
-	fqdn *string,
 	status value.ProjectStatus,
 	operationStatus value.ProjectOperationStatus,
 	activeDeploymentID *uint,
@@ -102,7 +94,6 @@ func ReconstructProject(
 		projectID:          projectID,
 		name:               name,
 		slug:               slug,
-		fqdn:               fqdn,
 		status:             status,
 		operationStatus:    operationStatus,
 		activeDeploymentID: activeDeploymentID,
@@ -129,14 +120,6 @@ func (p *Project) Name() string {
 // Slug returns the project slug
 func (p *Project) Slug() value.ProjectSlug {
 	return p.slug
-}
-
-// FQDN returns the fully qualified domain name and whether it is set
-func (p *Project) FQDN() (string, bool) {
-	if p.fqdn == nil {
-		return "", false
-	}
-	return *p.fqdn, true
 }
 
 // Status returns the project status
@@ -236,22 +219,6 @@ func (p *Project) SetSlug(slug value.ProjectSlug) error {
 	}
 
 	p.slug = slug
-	p.updateTimestamp()
-	return nil
-}
-
-// SetFQDN sets the fully qualified domain name
-// If fqdn is empty, it clears the FQDN
-func (p *Project) SetFQDN(fqdn string) error {
-	if p.isDeleted {
-		return projecterrors.ErrCannotModifyDeletedProject
-	}
-
-	if fqdn == "" {
-		p.fqdn = nil
-	} else {
-		p.fqdn = &fqdn
-	}
 	p.updateTimestamp()
 	return nil
 }

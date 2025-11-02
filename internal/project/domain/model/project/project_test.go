@@ -20,7 +20,7 @@ func TestNewProject(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
 		ownerID := uint(100)
 
-		project, err := NewProject(name, *slug, ownerID, defaultLimits(), nil, nil)
+		project, err := NewProject(name, *slug, ownerID, defaultLimits(), nil)
 
 		require.NoError(t, err)
 		assert.NotNil(t, project)
@@ -41,7 +41,7 @@ func TestNewProject(t *testing.T) {
 
 	t.Run("실패: 빈 이름", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, err := NewProject("", *slug, 100, defaultLimits(), nil, nil)
+		project, err := NewProject("", *slug, 100, defaultLimits(), nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, project)
@@ -49,7 +49,7 @@ func TestNewProject(t *testing.T) {
 
 	t.Run("실패: 잘못된 owner ID", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, err := NewProject("My Project", *slug, 0, defaultLimits(), nil, nil)
+		project, err := NewProject("My Project", *slug, 0, defaultLimits(), nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, project)
@@ -58,7 +58,7 @@ func TestNewProject(t *testing.T) {
 
 func TestProject_SetProjectID(t *testing.T) {
 	slug, _ := value.NewProjectSlug("p2025011812000088888888")
-	project, err := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+	project, err := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 	require.NoError(t, err)
 	require.NotNil(t, project)
 
@@ -75,7 +75,7 @@ func TestProject_SetProjectID(t *testing.T) {
 
 func TestProject_AddUser(t *testing.T) {
 	slug, _ := value.NewProjectSlug("p2025011812000088888888")
-	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 	project.SetProjectID(1) // Important: Set project ID so users have correct projectID
 
 	t.Run("성공: Owner 추가", func(t *testing.T) {
@@ -137,7 +137,7 @@ func TestProject_AddUser(t *testing.T) {
 func TestProject_RemoveUser(t *testing.T) {
 	t.Run("성공: Member 제거", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.AddUser(101, value.ProjectUserRoleOwner)
 
@@ -149,7 +149,7 @@ func TestProject_RemoveUser(t *testing.T) {
 
 	t.Run("실패: 마지막 Owner 제거", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 
 		err := project.RemoveUser(100)
@@ -160,7 +160,7 @@ func TestProject_RemoveUser(t *testing.T) {
 
 	t.Run("성공: 여러 Owner 중 하나 제거", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.AddUser(101, value.ProjectUserRoleOwner)
 
@@ -173,7 +173,7 @@ func TestProject_RemoveUser(t *testing.T) {
 
 	t.Run("실패: 존재하지 않는 사용자", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 
 		err := project.RemoveUser(999)
@@ -183,7 +183,7 @@ func TestProject_RemoveUser(t *testing.T) {
 
 	t.Run("실패: 삭제된 프로젝트에서 사용자 제거", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.AddUser(101, value.ProjectUserRoleOwner)
 		_ = project.SoftDelete()
@@ -197,7 +197,7 @@ func TestProject_RemoveUser(t *testing.T) {
 func TestProject_ChangeUserRole(t *testing.T) {
 	t.Run("성공: Member를 Owner로 변경", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.AddUser(101, value.ProjectUserRoleOwner)
 
@@ -210,7 +210,7 @@ func TestProject_ChangeUserRole(t *testing.T) {
 
 	t.Run("성공: Owner를 Member로 변경 (다른 Owner 있음)", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.AddUser(101, value.ProjectUserRoleOwner)
 
@@ -223,7 +223,7 @@ func TestProject_ChangeUserRole(t *testing.T) {
 
 	t.Run("실패: 존재하지 않는 사용자", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 
 		err := project.ChangeUserRole(999, value.ProjectUserRoleOwner)
@@ -233,7 +233,7 @@ func TestProject_ChangeUserRole(t *testing.T) {
 
 	t.Run("실패: 삭제된 프로젝트", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		_ = project.SoftDelete()
 
 		err := project.ChangeUserRole(100, value.ProjectUserRoleOwner)
@@ -244,7 +244,7 @@ func TestProject_ChangeUserRole(t *testing.T) {
 
 func TestProject_GetOwners(t *testing.T) {
 	slug, _ := value.NewProjectSlug("p2025011812000088888888")
-	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 	project.SetProjectID(1)
 	_ = project.AddUser(101, value.ProjectUserRoleOwner)
 	// All users are owners since we only have Owner role
@@ -259,31 +259,9 @@ func TestProject_GetOwners(t *testing.T) {
 	}
 }
 
-func TestProject_SetFQDN(t *testing.T) {
-	slug, _ := value.NewProjectSlug("p2025011812000088888888")
-	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
-
-	t.Run("성공: FQDN 설정", func(t *testing.T) {
-		err := project.SetFQDN("my-project.example.com")
-
-		require.NoError(t, err)
-		fqdn, ok := project.FQDN()
-		assert.True(t, ok)
-		assert.Equal(t, "my-project.example.com", fqdn)
-	})
-
-	t.Run("성공: FQDN 제거", func(t *testing.T) {
-		err := project.SetFQDN("")
-
-		require.NoError(t, err)
-		_, ok := project.FQDN()
-		assert.False(t, ok)
-	})
-}
-
 func TestProject_UpdateName(t *testing.T) {
 	slug, _ := value.NewProjectSlug("p2025011812000088888888")
-	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 
 	t.Run("성공: 이름 업데이트", func(t *testing.T) {
 		err := project.SetName("New Project Name")
@@ -303,7 +281,7 @@ func TestProject_UpdateName(t *testing.T) {
 func TestProject_DeleteAndRestore(t *testing.T) {
 	t.Run("프로젝트 삭제", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		_ = project.AddUser(101, value.ProjectUserRoleOwner)
 
 		err := project.SoftDelete()
@@ -330,7 +308,7 @@ func TestProject_DeleteAndRestore(t *testing.T) {
 func TestProject_AddVolume(t *testing.T) {
 	t.Run("성공: 볼륨 추가", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 
 		err := project.AddVolume("data-volume", 100)
@@ -344,7 +322,7 @@ func TestProject_AddVolume(t *testing.T) {
 
 	t.Run("실패: 중복된 볼륨 이름", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.AddVolume("data-volume", 100)
 
@@ -357,7 +335,7 @@ func TestProject_AddVolume(t *testing.T) {
 
 	t.Run("실패: 삭제된 프로젝트", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.SoftDelete()
 
@@ -370,7 +348,7 @@ func TestProject_AddVolume(t *testing.T) {
 func TestProject_RemoveVolume(t *testing.T) {
 	t.Run("성공: 볼륨 제거", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.AddVolume("data-volume", 100)
 		_ = project.SetVolumeID("data-volume", 999)
@@ -383,7 +361,7 @@ func TestProject_RemoveVolume(t *testing.T) {
 
 	t.Run("실패: 존재하지 않는 볼륨", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 
 		err := project.RemoveVolume(999)
@@ -393,7 +371,7 @@ func TestProject_RemoveVolume(t *testing.T) {
 
 	t.Run("실패: 삭제된 프로젝트", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		_ = project.SoftDelete()
 
 		err := project.RemoveVolume(999)
@@ -405,7 +383,7 @@ func TestProject_RemoveVolume(t *testing.T) {
 func TestProject_UpdateVolume(t *testing.T) {
 	t.Run("성공: 볼륨 업데이트", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.AddVolume("old-name", 100)
 		_ = project.SetVolumeID("old-name", 999)
@@ -420,7 +398,7 @@ func TestProject_UpdateVolume(t *testing.T) {
 
 	t.Run("실패: 중복된 이름", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 		_ = project.AddVolume("volume1", 100)
 		_ = project.AddVolume("volume2", 100)
@@ -434,7 +412,7 @@ func TestProject_UpdateVolume(t *testing.T) {
 
 	t.Run("실패: 존재하지 않는 볼륨", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		project.SetProjectID(1)
 
 		err := project.UpdateVolume(999, "new-name", 200)
@@ -445,7 +423,7 @@ func TestProject_UpdateVolume(t *testing.T) {
 
 func TestProject_GetVolumeByName(t *testing.T) {
 	slug, _ := value.NewProjectSlug("p2025011812000088888888")
-	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 	project.SetProjectID(1)
 	_ = project.AddVolume("data-volume", 100)
 
@@ -467,7 +445,7 @@ func TestProject_GetVolumeByName(t *testing.T) {
 
 func TestProject_GetActiveUsers(t *testing.T) {
 	slug, _ := value.NewProjectSlug("p2025011812000088888888")
-	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+	project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 	project.SetProjectID(1)
 	// All users are owners since we only have Owner role
 	_ = project.AddUser(101, value.ProjectUserRoleOwner)
@@ -485,14 +463,14 @@ func TestProject_GetActiveUsers(t *testing.T) {
 func TestProject_OperationStatus(t *testing.T) {
 	t.Run("성공: 새 프로젝트의 초기 operation status는 nothing", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 
 		assert.Equal(t, value.ProjectOperationStatusNothing, project.OperationStatus())
 	})
 
 	t.Run("실패: StartDeploy - nothing에서 deploying으로 전환 차단 (standalone deploy 불가)", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 
 		err := project.StartDeploy(1)
 
@@ -526,7 +504,7 @@ func TestProject_OperationStatus(t *testing.T) {
 
 	t.Run("성공: CompleteDeploy - deploying에서 nothing으로 전환", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		deploymentID := uint(1)
 		_ = project.StartBuild()
 		_ = project.StartDeploy(deploymentID)
@@ -539,7 +517,7 @@ func TestProject_OperationStatus(t *testing.T) {
 
 	t.Run("실패: CompleteDeploy - 다른 deployment가 lock을 소유할 때", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		deploymentID := uint(1)
 		_ = project.StartBuild()
 		_ = project.StartDeploy(deploymentID)
@@ -552,7 +530,7 @@ func TestProject_OperationStatus(t *testing.T) {
 
 	t.Run("실패: 삭제된 프로젝트의 operation status 변경", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		_ = project.SoftDelete()
 
 		err := project.StartDeploy(1)
