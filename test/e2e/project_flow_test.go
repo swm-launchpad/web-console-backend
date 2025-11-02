@@ -43,7 +43,6 @@ func TestProjectFlow_E2E(t *testing.T) {
 		createProjectReq := map[string]interface{}{
 			"name":          "Test Project",
 			"slug":          "test-project",
-			"fqdn":          "test.example.com",
 			"plan":          "eco",
 			"cpu_limit":     1000,
 			"memory_limit":  2048,
@@ -108,7 +107,6 @@ func TestProjectFlow_E2E(t *testing.T) {
 		assert.Equal(t, "Test Project", projectDetail["name"])
 
 		// DB에서 조회한 데이터도 사용자 입력값이 적용되어야 함
-		assert.Equal(t, "test.example.com", projectDetail["fqdn"])
 		assert.Equal(t, "eco", projectDetail["plan"])
 		assert.Equal(t, "active", projectDetail["status"])
 		assert.Equal(t, float64(1000), projectDetail["cpu_limit"])
@@ -118,7 +116,6 @@ func TestProjectFlow_E2E(t *testing.T) {
 
 		// Step 6: 프로젝트 수정 (Beta tier limits: CPU 1 core, Memory 2GB, Disk 3GB)
 		updateProjectReq := map[string]interface{}{
-			"fqdn":          "updated.example.com",
 			"cpu_limit":     1000, // Max in beta tier
 			"memory_limit":  2048, // Max in beta tier
 			"disk_limit":    3072, // Max in beta tier
@@ -138,9 +135,7 @@ func TestProjectFlow_E2E(t *testing.T) {
 		updatedData := updateResp["data"].(map[string]interface{})
 		// Name은 업데이트 안 됨 (수정하지 않음)
 		assert.Equal(t, "Test Project", updatedData["name"])
-		// FQDN은 업데이트됨
-		assert.Equal(t, "updated.example.com", updatedData["fqdn"])
-		// 리소스 제한도 업데이트됨
+		// 리소스 제한은 업데이트됨
 		assert.Equal(t, float64(1000), updatedData["cpu_limit"])    // Max in beta tier
 		assert.Equal(t, float64(2048), updatedData["memory_limit"]) // Max in beta tier
 		assert.Equal(t, float64(3072), updatedData["disk_limit"])   // Max in beta tier
