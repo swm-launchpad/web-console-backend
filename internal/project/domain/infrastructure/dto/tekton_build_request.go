@@ -69,7 +69,8 @@ type TektonBuildRequest struct {
 	// Template is the full Dockerfile template content
 	// This template may contain gomplate syntax for variable substitution
 	// Example: "FROM {{ .base_image }}\nCOPY . /app"
-	// Required field
+	// Can be an empty string if the container doesn't use a template (uses repository Dockerfile)
+	// Optional field
 	Template string `json:"template"`
 
 	// DockerfileConfigJSON contains template variable values in JSON format.

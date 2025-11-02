@@ -170,6 +170,49 @@ func TestBuildService_PrepareBuildRequest(t *testing.T) {
 		assert.Equal(t, "FROM alpine:latest", request.Template)
 		assert.Equal(t, "", request.InstallationID)
 	})
+
+	t.Run("success with nil template (no template configured)", func(t *testing.T) {
+		// Test that nil template is accepted and converted to empty string
+		container := &dto.BuildContainerInfo{
+			ProjectID:        10,
+			ContainerID:      1,
+			Name:             "test-container",
+			Slug:             "test-slug",
+			TemplateBody:     nil, // Explicitly nil - no template configured
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			NeedsBuild:       false,
+		}
+
+		request, err := service.(*builderImpl).prepareBuildRequest(container)
+
+		require.NoError(t, err)
+		assert.Equal(t, "test-slug", request.ImageName)
+		assert.Equal(t, "", request.Template) // nil should convert to empty string
+		assert.Equal(t, "false", request.ForceBuild)
+	})
+
+	t.Run("success with empty string template", func(t *testing.T) {
+		// Test that empty string template is also accepted
+		emptyTemplate := ""
+		container := &dto.BuildContainerInfo{
+			ProjectID:        10,
+			ContainerID:      1,
+			Name:             "test-container",
+			Slug:             "test-slug",
+			TemplateBody:     &emptyTemplate, // Explicitly empty string
+			GitRepositoryURL: "https://github.com/test/repo",
+			GitBranch:        "main",
+			NeedsBuild:       false,
+		}
+
+		request, err := service.(*builderImpl).prepareBuildRequest(container)
+
+		require.NoError(t, err)
+		assert.Equal(t, "test-slug", request.ImageName)
+		assert.Equal(t, "", request.Template)
+		assert.Equal(t, "false", request.ForceBuild)
+	})
 }
 
 func TestBuildService_BuildContainer_TriggerFailure(t *testing.T) {
