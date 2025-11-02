@@ -42,7 +42,6 @@ func (r *projectRepository) Create(ctx context.Context, project *model.Project) 
 	params := sqlc.CreateProjectParams{
 		Name:                   project.Name(),
 		Slug:                   project.Slug().String(),
-		Fqdn:                   stringBoolToNullString(project.FQDN()),
 		Status:                 sqlc.ProjectsStatus(project.Status()),
 		Plan:                   planToNullString(project.Plan()),
 		CpuLimit:               sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
@@ -116,7 +115,6 @@ func (r *projectRepository) Save(ctx context.Context, project *model.Project) er
 	// Update project
 	params := sqlc.UpdateProjectParams{
 		Name:                   project.Name(),
-		Fqdn:                   stringBoolToNullString(project.FQDN()),
 		Status:                 sqlc.ProjectsStatus(project.Status()),
 		Plan:                   planToNullString(project.Plan()),
 		CpuLimit:               sql.NullInt32{Int32: int32(project.Limits().CPULimit()), Valid: true},
@@ -252,7 +250,7 @@ func (r *projectRepository) FindByID(ctx context.Context, projectID uint) (*mode
 
 	// Convert to domain model
 	project, err := r.rowToDomainProject(
-		row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+		row.ProjectID, row.Name, row.Slug, row.Status, row.Plan,
 		row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
 		row.ProjectOperationStatus, row.ActiveDeploymentID,
 		row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
@@ -290,7 +288,7 @@ func (r *projectRepository) FindByIDForUpdate(ctx context.Context, projectID uin
 
 	// Convert to domain model
 	project, err := r.rowToDomainProject(
-		row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+		row.ProjectID, row.Name, row.Slug, row.Status, row.Plan,
 		row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
 		row.ProjectOperationStatus, row.ActiveDeploymentID,
 		row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
@@ -336,7 +334,7 @@ func (r *projectRepository) FindBySlug(ctx context.Context, slug string) (*model
 
 	// Convert to domain model
 	project, err := r.rowToDomainProject(
-		row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+		row.ProjectID, row.Name, row.Slug, row.Status, row.Plan,
 		row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
 		row.ProjectOperationStatus, row.ActiveDeploymentID,
 		row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
@@ -400,7 +398,7 @@ func (r *projectRepository) FindByUserID(ctx context.Context, userID uint) ([]*m
 	projects := make([]*model.Project, 0, len(sqlcProjects))
 	for _, row := range sqlcProjects {
 		project, err := r.rowToDomainProject(
-			row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+			row.ProjectID, row.Name, row.Slug, row.Status, row.Plan,
 			row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
 			row.ProjectOperationStatus, row.ActiveDeploymentID,
 			row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
@@ -470,7 +468,7 @@ func (r *projectRepository) FindProjectsWithActiveOperations(ctx context.Context
 	projects := make([]*model.Project, 0, len(rows))
 	for _, row := range rows {
 		project, err := r.rowToDomainProject(
-			row.ProjectID, row.Name, row.Slug, row.Fqdn, row.Status, row.Plan,
+			row.ProjectID, row.Name, row.Slug, row.Status, row.Plan,
 			row.CpuLimit, row.MemoryLimit, row.DiskLimit, row.TrafficLimit,
 			row.ProjectOperationStatus, row.ActiveDeploymentID,
 			row.CreatedAt, row.UpdatedAt, row.DeletedAt, row.IsDeleted,
@@ -515,7 +513,6 @@ func (r *projectRepository) rowToDomainProject(
 	projectID uint32,
 	name string,
 	slugStr string,
-	fqdn sql.NullString,
 	status sqlc.ProjectsStatus,
 	plan sql.NullString,
 	cpuLimit sql.NullInt32,
@@ -564,13 +561,6 @@ func (r *projectRepository) rowToDomainProject(
 		domainActiveDeploymentID = &deploymentID
 	}
 
-	// Convert FQDN from DB
-	var domainFQDN *string
-	if fqdn.Valid {
-		fqdnStr := fqdn.String
-		domainFQDN = &fqdnStr
-	}
-
 	// Convert Plan from DB
 	var domainPlan *value.Plan
 	if plan.Valid {
@@ -586,7 +576,6 @@ func (r *projectRepository) rowToDomainProject(
 		uint(projectID),
 		name,
 		*slug,
-		domainFQDN,
 		value.ProjectStatus(status),
 		domainOperationStatus,
 		domainActiveDeploymentID,
