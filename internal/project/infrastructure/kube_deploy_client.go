@@ -41,7 +41,7 @@ type kubeClient struct {
 // Required environment variables:
 //   - KUBE_API_SERVER: The Kubernetes API server URL (e.g., "https://kube-api.launchpad.kr:6443")
 //   - KUBE_SERVICE_ACCOUNT_TOKEN: The ServiceAccount token for authentication
-//   - KUBE_DEPLOY_NAMESPACE: The namespace where PipelineRuns are deployed (e.g., "deploy-pipeline")
+//   - KUBE_DEPLOY_NAMESPACE: The namespace where deploy PipelineRuns are deployed (e.g., "deploy-pipeline")
 //   - KUBE_CA_CERT_PATH: Path to the CA certificate file for TLS verification (required)
 //
 // Returns an error if any required environment variable is missing or if the client

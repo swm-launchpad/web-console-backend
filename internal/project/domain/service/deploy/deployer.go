@@ -214,20 +214,21 @@ type Deployer interface {
 
 // deployService implements the Deployer interface
 type deployService struct {
-	txManager          db.TxManager
-	projectRepo        repository.ProjectRepository
-	deploymentRepo     repository.DeploymentRepository
-	buildHistoryRepo   repository.BuildHistoryRepository
-	volumeRepo         repository.VolumeRepository
-	containerClient    infrastructure.ContainerClient
-	tektonClient       infrastructure.TektonClient
-	kubeClient         infrastructure.KubeClient
-	kubeBuildClient    infrastructure.KubeBuildClient
-	buildOrchestrator  build.Orchestrator
-	buildPostProcessor build.PostProcessor
-	deployNamespace    string
-	projectServiceName string
-	logger             logger.Logger
+	txManager            db.TxManager
+	projectRepo          repository.ProjectRepository
+	deploymentRepo       repository.DeploymentRepository
+	buildHistoryRepo     repository.BuildHistoryRepository
+	volumeRepo           repository.VolumeRepository
+	containerClient      infrastructure.ContainerClient
+	tektonClient         infrastructure.TektonClient
+	kubeClient           infrastructure.KubeClient
+	kubeBuildClient      infrastructure.KubeBuildClient
+	buildOrchestrator    build.Orchestrator
+	buildPostProcessor   build.PostProcessor
+	deployNamespace      string // Namespace where deploy PipelineRuns are deployed (e.g., "deploy-pipeline")
+	applicationNamespace string // Namespace where application resources are deployed (e.g., "application")
+	projectServiceName   string
+	logger               logger.Logger
 }
 
 // NewDeployer creates a new instance of deployService
@@ -244,24 +245,26 @@ func NewDeployer(
 	buildOrchestrator build.Orchestrator,
 	buildPostProcessor build.PostProcessor,
 	deployNamespace string,
+	applicationNamespace string,
 	projectServiceName string,
 	log logger.Logger,
 ) Deployer {
 	return &deployService{
-		txManager:          txManager,
-		projectRepo:        projectRepo,
-		deploymentRepo:     deploymentRepo,
-		buildHistoryRepo:   buildHistoryRepo,
-		volumeRepo:         volumeRepo,
-		containerClient:    containerClient,
-		tektonClient:       tektonClient,
-		kubeClient:         kubeClient,
-		kubeBuildClient:    kubeBuildClient,
-		buildOrchestrator:  buildOrchestrator,
-		buildPostProcessor: buildPostProcessor,
-		deployNamespace:    deployNamespace,
-		projectServiceName: projectServiceName,
-		logger:             log,
+		txManager:            txManager,
+		projectRepo:          projectRepo,
+		deploymentRepo:       deploymentRepo,
+		buildHistoryRepo:     buildHistoryRepo,
+		volumeRepo:           volumeRepo,
+		containerClient:      containerClient,
+		tektonClient:         tektonClient,
+		kubeClient:           kubeClient,
+		kubeBuildClient:      kubeBuildClient,
+		buildOrchestrator:    buildOrchestrator,
+		buildPostProcessor:   buildPostProcessor,
+		deployNamespace:      deployNamespace,
+		applicationNamespace: applicationNamespace,
+		projectServiceName:   projectServiceName,
+		logger:               log,
 	}
 }
 

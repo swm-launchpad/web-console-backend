@@ -139,17 +139,6 @@ func provideTektonBuildClient(log logger.Logger) (projectDomainInfra.TektonBuild
 	return projectInfra.NewTektonBuildClient(log)
 }
 
-// provideDeployNamespace provides the deployment namespace from environment
-func provideDeployNamespace() string {
-	// This is used by DeployService to know which namespace to deploy to
-	// Read from same env var as KubeClient
-	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
-	if deployNamespace == "" {
-		return "default"
-	}
-	return deployNamespace
-}
-
 // provideDeployService creates a DeployService with all dependencies
 func provideDeployService(
 	txManager db.TxManager,
@@ -167,8 +156,14 @@ func provideDeployService(
 ) projectDeployService.Deployer {
 	deployNamespace := os.Getenv("KUBE_DEPLOY_NAMESPACE")
 	if deployNamespace == "" {
-		deployNamespace = "default"
+		deployNamespace = "deploy-pipeline"
 	}
+
+	applicationNamespace := os.Getenv("KUBE_APPLICATION_NAMESPACE")
+	if applicationNamespace == "" {
+		applicationNamespace = "application"
+	}
+
 	// projectServiceName is not used in the actual implementation
 	projectServiceName := ""
 
@@ -185,6 +180,7 @@ func provideDeployService(
 		buildOrchestrator,
 		buildPostProcessor,
 		deployNamespace,
+		applicationNamespace,
 		projectServiceName,
 		log,
 	)
