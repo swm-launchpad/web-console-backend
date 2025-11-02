@@ -5,8 +5,10 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
+	templatevalue "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/template/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	projectservice "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
@@ -52,6 +54,7 @@ type CreateContainerOutput struct {
 type CreateContainerUseCase struct {
 	containerService      service.ContainerService
 	containerRepo         repository.ContainerRepository
+	templateRepo          repository.TemplateRepository
 	permissionSvc         service.PermissionService
 	resourceValidationSvc service.ResourceValidationService
 	volumeService         projectservice.VolumeService
@@ -63,6 +66,7 @@ type CreateContainerUseCase struct {
 func NewCreateContainerUseCase(
 	containerService service.ContainerService,
 	containerRepo repository.ContainerRepository,
+	templateRepo repository.TemplateRepository,
 	permissionSvc service.PermissionService,
 	resourceValidationSvc service.ResourceValidationService,
 	volumeService projectservice.VolumeService,
@@ -73,6 +77,7 @@ func NewCreateContainerUseCase(
 	return &CreateContainerUseCase{
 		containerService:      containerService,
 		containerRepo:         containerRepo,
+		templateRepo:          templateRepo,
 		permissionSvc:         permissionSvc,
 		resourceValidationSvc: resourceValidationSvc,
 		volumeService:         volumeService,
@@ -199,6 +204,81 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 			// Save container with mounts using repository
 			if err := uc.containerRepo.Save(txCtx, container); err != nil {
 				return err
+			}
+		}
+
+		// Auto-create networks from template default_ports if template is used
+		if input.TemplateID != nil {
+			template, err := uc.templateRepo.FindByID(txCtx, *input.TemplateID)
+			if err != nil {
+				uc.logger.Error(ctx, "failed to fetch template for network creation",
+					zap.Error(err),
+					zap.Uint("template_id", *input.TemplateID),
+				)
+				return err
+			}
+
+			// Get template config
+			templateConfig := template.TemplateConfig()
+			if templateConfig == nil {
+				uc.logger.Warn(ctx, "template has no config",
+					zap.Uint("template_id", *input.TemplateID),
+				)
+				templateConfig = &templatevalue.TemplateConfig{}
+			}
+
+			// Validate Git URL if template requires git
+			if templateConfig.GetRequiresGit() && input.GitURL == "" {
+				uc.logger.Warn(ctx, "template requires git but no git url provided",
+					zap.Uint("template_id", *input.TemplateID),
+					zap.String("template_name", template.Name()),
+				)
+				return containererrors.ErrGitURLRequired
+			}
+
+			// Create networks from default_ports
+			defaultPorts := templateConfig.DefaultPorts
+			if defaultPorts != nil && len(defaultPorts) > 0 {
+				for _, defaultPort := range defaultPorts {
+					// Parse network type
+					networkType, err := value.NewNetworkType(defaultPort.NetworkType)
+					if err != nil {
+						uc.logger.Error(ctx, "invalid network type in default_ports",
+							zap.Error(err),
+							zap.Uint16("internal_port", defaultPort.InternalPort),
+							zap.String("network_type", defaultPort.NetworkType),
+						)
+						return err
+					}
+
+					// Add network to container
+					internalPort := defaultPort.InternalPort
+					_, err = container.AddNetwork(
+						&internalPort,
+						defaultPort.ExternalPort,
+						networkType,
+						defaultPort.ExternalIP,
+						nil, // fqdn is not set in default_ports
+					)
+					if err != nil {
+						uc.logger.Error(ctx, "failed to add network from default_ports",
+							zap.Error(err),
+							zap.Uint16("internal_port", defaultPort.InternalPort),
+							zap.String("network_type", defaultPort.NetworkType),
+						)
+						return err
+					}
+				}
+
+				// Save container with networks using repository
+				if err := uc.containerRepo.Save(txCtx, container); err != nil {
+					return err
+				}
+
+				uc.logger.Info(ctx, "auto-created networks from template default_ports",
+					zap.Uint("template_id", *input.TemplateID),
+					zap.Int("network_count", len(defaultPorts)),
+				)
 			}
 		}
 
