@@ -316,11 +316,8 @@ func (s *builderImpl) BuildContainer(
 
 // prepareBuildRequest converts BuildContainerInfo to TektonBuildRequest
 func (s *builderImpl) prepareBuildRequest(container *dto.BuildContainerInfo) (*dto.TektonBuildRequest, error) {
-	// Validate template requirement
-	// Template is required for build pipeline (apply-dockerfile-config task)
-	if container.TemplateBody == nil || *container.TemplateBody == "" {
-		return nil, fmt.Errorf("template is required for build but not configured for container %s (ID: %d)", container.Slug, container.ContainerID)
-	}
+	// Note: TemplateBody is optional. If nil, an empty string will be passed to Tekton.
+	// This allows containers without templates to proceed with builds using repository Dockerfiles.
 
 	// Convert template_config map to JSON
 	var templateConfigJSON json.RawMessage
