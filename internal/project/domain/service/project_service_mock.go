@@ -12,8 +12,8 @@ type MockProjectService struct {
 	mock.Mock
 }
 
-func (m *MockProjectService) CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *value.Plan) (*model.Project, error) {
-	args := m.Called(ctx, name, ownerID, limits, fqdn, plan)
+func (m *MockProjectService) CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, plan *value.Plan) (*model.Project, error) {
+	args := m.Called(ctx, name, ownerID, limits, plan)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

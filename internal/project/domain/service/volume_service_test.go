@@ -292,7 +292,7 @@ func TestVolumeService_ListVolumesByProjectID(t *testing.T) {
 
 		// Project exists check
 		slug, _ := value.NewProjectSlug("p2025011812000087654321")
-		project, _ := projectmodel.NewProject("Test Project", *slug, 1, defaultProjectLimits(), nil, nil)
+		project, _ := projectmodel.NewProject("Test Project", *slug, 1, defaultProjectLimits(), nil)
 		project.SetProjectID(projectID)
 		mockProjectRepo.On("FindByID", ctx, projectID).Return(project, nil)
 		mockVolumeRepo.On("FindByProjectID", ctx, projectID).Return(expectedVolumes, nil)

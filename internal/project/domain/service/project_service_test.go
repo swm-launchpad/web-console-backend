@@ -40,7 +40,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 			return project.Name() == name && project.Slug().String() == slug.String()
 		})).Return(nil)
 
-		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil, nil)
+		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil)
 
 		require.NoError(t, err)
 		assert.NotNil(t, project)
@@ -58,7 +58,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 		testLogger := logger.NewForTest()
 		service := NewProjectService(mockProjectRepo, mockSlugService, mockValidationService, testLogger)
 
-		project, err := service.CreateProject(ctx, "", 1, defaultLimits(), nil, nil)
+		project, err := service.CreateProject(ctx, "", 1, defaultLimits(), nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, project)
@@ -77,7 +77,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 
 		name := "테스트 프로젝트"
 
-		project, err := service.CreateProject(ctx, name, 0, defaultLimits(), nil, nil)
+		project, err := service.CreateProject(ctx, name, 0, defaultLimits(), nil)
 
 		assert.Error(t, err)
 		assert.Nil(t, project)
@@ -99,7 +99,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 
 		mockProjectRepo.On("ExistsByNameAndUserID", ctx, name, ownerID).Return(true, nil)
 
-		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil, nil)
+		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil)
 
 		assert.Error(t, err)
 		assert.Equal(t, projecterrors.ErrProjectNameExists, err)
@@ -123,7 +123,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 		mockProjectRepo.On("ExistsByNameAndUserID", ctx, name, ownerID).Return(false, nil)
 		mockSlugService.On("GenerateSlug", ctx).Return(value.ProjectSlug{}, projecterrors.ErrSlugGenerationFailed)
 
-		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil, nil)
+		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil)
 
 		assert.Error(t, err)
 		assert.Equal(t, projecterrors.ErrSlugGenerationFailed, err)
@@ -149,7 +149,7 @@ func TestProjectService_CreateProject(t *testing.T) {
 		mockSlugService.On("GenerateSlug", ctx).Return(*slug, nil)
 		mockProjectRepo.On("Create", ctx, mock.Anything).Return(errors.New("database error"))
 
-		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil, nil)
+		project, err := service.CreateProject(ctx, name, ownerID, defaultLimits(), nil)
 
 		assert.Error(t, err)
 		assert.Equal(t, projecterrors.ErrProjectCreationFailed, err)
@@ -904,7 +904,7 @@ func TestProjectService_UpdateProjectBySlug_FreePlanQuota(t *testing.T) {
 }
 
 func createTestProject(id uint, name string, slug value.ProjectSlug, ownerID uint) *model.Project {
-	project, _ := model.NewProject(name, slug, ownerID, defaultLimits(), nil, nil)
+	project, _ := model.NewProject(name, slug, ownerID, defaultLimits(), nil)
 	project.SetProjectID(id)
 	return project
 }
