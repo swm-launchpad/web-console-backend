@@ -120,14 +120,29 @@ func TestLokiClient_StreamPipelineRunLogs_Integration(t *testing.T) {
 				_ = stream.Close()
 			}()
 
-			// Try to read - should get EOF or timeout
-			buf := make([]byte, 1024)
-			n, readErr := stream.Read(buf)
+			// Try to read with timeout - should get EOF or timeout
+			readCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
 
-			if readErr == io.EOF {
-				assert.Equal(t, 0, n, "Should not read any data from non-existent PipelineRun")
-			} else {
-				t.Logf("Read result: n=%d, err=%v", n, readErr)
+			buf := make([]byte, 1024)
+			done := make(chan struct{})
+			var readErr error
+			var n int
+
+			go func() {
+				n, readErr = stream.Read(buf)
+				close(done)
+			}()
+
+			select {
+			case <-readCtx.Done():
+				t.Log("Timeout reading from Loki stream (expected for non-existent PipelineRun)")
+			case <-done:
+				if readErr == io.EOF {
+					assert.Equal(t, 0, n, "Should not read any data from non-existent PipelineRun")
+				} else {
+					t.Logf("Read result: n=%d, err=%v", n, readErr)
+				}
 			}
 		}
 	})
