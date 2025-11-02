@@ -8,32 +8,37 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure"
+	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	projectrepo "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 )
 
 // GetBuildLogHistoryInput represents the input for retrieving historical build logs
 type GetBuildLogHistoryInput struct {
+	UserID      uint
 	ContainerID uint
 }
 
 // GetBuildLogHistoryUseCase handles retrieving historical build logs from Loki
 type GetBuildLogHistoryUseCase struct {
-	buildHistoryRepo projectrepo.BuildHistoryRepository
-	lokiClient       infrastructure.LokiClient
-	logger           logger.Logger
+	buildHistoryRepo  projectrepo.BuildHistoryRepository
+	lokiClient        infrastructure.LokiClient
+	permissionService service.PermissionService
+	logger            logger.Logger
 }
 
 // NewGetBuildLogHistoryUseCase creates a new instance of GetBuildLogHistoryUseCase
 func NewGetBuildLogHistoryUseCase(
 	buildHistoryRepo projectrepo.BuildHistoryRepository,
 	lokiClient infrastructure.LokiClient,
+	permissionService service.PermissionService,
 	log logger.Logger,
 ) *GetBuildLogHistoryUseCase {
 	return &GetBuildLogHistoryUseCase{
-		buildHistoryRepo: buildHistoryRepo,
-		lokiClient:       lokiClient,
-		logger:           log,
+		buildHistoryRepo:  buildHistoryRepo,
+		lokiClient:        lokiClient,
+		permissionService: permissionService,
+		logger:            log,
 	}
 }
 
@@ -41,7 +46,18 @@ func NewGetBuildLogHistoryUseCase(
 // Returns an io.ReadCloser containing the Loki query_range response
 // The caller is responsible for closing the returned ReadCloser
 func (uc *GetBuildLogHistoryUseCase) Execute(ctx context.Context, input GetBuildLogHistoryInput) (io.ReadCloser, error) {
+	// Check if user has access to the container (same pattern as CreateBuildLogToken)
+	if err := uc.permissionService.CanUserAccessContainer(ctx, input.UserID, input.ContainerID); err != nil {
+		uc.logger.Warn(ctx, "User permission denied for build log history",
+			zap.Uint("user_id", input.UserID),
+			zap.Uint("container_id", input.ContainerID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
 	uc.logger.Info(ctx, "Retrieving historical build logs",
+		zap.Uint("user_id", input.UserID),
 		zap.Uint("container_id", input.ContainerID),
 	)
 

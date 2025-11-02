@@ -178,7 +178,7 @@ func InitializeApp() (*App, error) {
 	createBuildLogTokenUseCase := application3.NewCreateBuildLogTokenUseCase(servicePermissionService, jwtUtil, logger)
 	lokiClient := provideLokiClient(configConfig, logger)
 	streamBuildLogsUseCase := application3.NewStreamBuildLogsUseCase(buildHistoryRepository, lokiClient, logger)
-	getBuildLogHistoryUseCase := application3.NewGetBuildLogHistoryUseCase(buildHistoryRepository, lokiClient, logger)
+	getBuildLogHistoryUseCase := application3.NewGetBuildLogHistoryUseCase(buildHistoryRepository, lokiClient, servicePermissionService, logger)
 	buildLogHandler := provideBuildLogHandler(createBuildLogTokenUseCase, streamBuildLogsUseCase, getBuildLogHistoryUseCase, containerService, jwtUtil, logger)
 	settingsHandler := settings.NewSettingsHandler(settingsService, logger)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)

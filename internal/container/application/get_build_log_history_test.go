@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
@@ -22,17 +23,23 @@ func TestGetBuildLogHistoryUseCase_Execute_Success(t *testing.T) {
 	ctx := context.Background()
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	log := logger.NewForTest()
 
 	useCase := NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		log,
 	)
 
 	input := GetBuildLogHistoryInput{
+		UserID:      1,
 		ContainerID: 10,
 	}
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
 	// Create completed build with all required fields
 	pipelineRunName := "image-build-push-run-abc123"
@@ -74,6 +81,7 @@ func TestGetBuildLogHistoryUseCase_Execute_Success(t *testing.T) {
 
 	mockBuildHistoryRepo.AssertExpectations(t)
 	mockLokiClient.AssertExpectations(t)
+	mockPermissionService.AssertExpectations(t)
 }
 
 func TestGetBuildLogHistoryUseCase_Execute_NoBuildHistory(t *testing.T) {
@@ -81,17 +89,23 @@ func TestGetBuildLogHistoryUseCase_Execute_NoBuildHistory(t *testing.T) {
 	ctx := context.Background()
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	log := logger.NewForTest()
 
 	useCase := NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		log,
 	)
 
 	input := GetBuildLogHistoryInput{
+		UserID:      1,
 		ContainerID: 999, // Non-existent container
 	}
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(999)).Return(nil)
 
 	// Mock FindLatestByContainerID - no build history
 	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(999)).
@@ -106,6 +120,7 @@ func TestGetBuildLogHistoryUseCase_Execute_NoBuildHistory(t *testing.T) {
 	assert.Nil(t, logData)
 
 	mockBuildHistoryRepo.AssertExpectations(t)
+	mockPermissionService.AssertExpectations(t)
 	// Loki client should not be called
 	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
 }
@@ -115,17 +130,23 @@ func TestGetBuildLogHistoryUseCase_Execute_BuildNotCompleted(t *testing.T) {
 	ctx := context.Background()
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	log := logger.NewForTest()
 
 	useCase := NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		log,
 	)
 
 	input := GetBuildLogHistoryInput{
+		UserID:      1,
 		ContainerID: 10,
 	}
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
 	// Create running build (not completed)
 	pipelineRunName := "image-build-push-run-running"
@@ -157,6 +178,7 @@ func TestGetBuildLogHistoryUseCase_Execute_BuildNotCompleted(t *testing.T) {
 	assert.Nil(t, logData)
 
 	mockBuildHistoryRepo.AssertExpectations(t)
+	mockPermissionService.AssertExpectations(t)
 	// Loki client should not be called
 	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
 }
@@ -166,17 +188,23 @@ func TestGetBuildLogHistoryUseCase_Execute_NoPipelineRunName(t *testing.T) {
 	ctx := context.Background()
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	log := logger.NewForTest()
 
 	useCase := NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		log,
 	)
 
 	input := GetBuildLogHistoryInput{
+		UserID:      1,
 		ContainerID: 10,
 	}
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
 	// Create completed build WITHOUT PipelineRunName
 	startedAt := time.Now().Add(-1 * time.Hour)
@@ -208,6 +236,7 @@ func TestGetBuildLogHistoryUseCase_Execute_NoPipelineRunName(t *testing.T) {
 	assert.Nil(t, logData)
 
 	mockBuildHistoryRepo.AssertExpectations(t)
+	mockPermissionService.AssertExpectations(t)
 	// Loki client should not be called
 	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
 }
@@ -217,17 +246,23 @@ func TestGetBuildLogHistoryUseCase_Execute_NoStartedAt(t *testing.T) {
 	ctx := context.Background()
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	log := logger.NewForTest()
 
 	useCase := NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		log,
 	)
 
 	input := GetBuildLogHistoryInput{
+		UserID:      1,
 		ContainerID: 10,
 	}
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
 	// Create completed build WITHOUT StartedAt
 	pipelineRunName := "image-build-push-run-no-start"
@@ -259,6 +294,7 @@ func TestGetBuildLogHistoryUseCase_Execute_NoStartedAt(t *testing.T) {
 	assert.Nil(t, logData)
 
 	mockBuildHistoryRepo.AssertExpectations(t)
+	mockPermissionService.AssertExpectations(t)
 	// Loki client should not be called
 	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
 }
@@ -268,17 +304,23 @@ func TestGetBuildLogHistoryUseCase_Execute_NoFinishedAt(t *testing.T) {
 	ctx := context.Background()
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	log := logger.NewForTest()
 
 	useCase := NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		log,
 	)
 
 	input := GetBuildLogHistoryInput{
+		UserID:      1,
 		ContainerID: 10,
 	}
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
 	// Create completed build WITHOUT FinishedAt (shouldn't happen in reality)
 	pipelineRunName := "image-build-push-run-no-finish"
@@ -310,6 +352,7 @@ func TestGetBuildLogHistoryUseCase_Execute_NoFinishedAt(t *testing.T) {
 	assert.Nil(t, logData)
 
 	mockBuildHistoryRepo.AssertExpectations(t)
+	mockPermissionService.AssertExpectations(t)
 	// Loki client should not be called
 	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
 }
@@ -319,17 +362,23 @@ func TestGetBuildLogHistoryUseCase_Execute_LokiQueryFails(t *testing.T) {
 	ctx := context.Background()
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	log := logger.NewForTest()
 
 	useCase := NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		log,
 	)
 
 	input := GetBuildLogHistoryInput{
+		UserID:      1,
 		ContainerID: 10,
 	}
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
 	// Create valid completed build
 	pipelineRunName := "image-build-push-run-loki-fail"
@@ -368,4 +417,43 @@ func TestGetBuildLogHistoryUseCase_Execute_LokiQueryFails(t *testing.T) {
 
 	mockBuildHistoryRepo.AssertExpectations(t)
 	mockLokiClient.AssertExpectations(t)
+	mockPermissionService.AssertExpectations(t)
+}
+
+func TestGetBuildLogHistoryUseCase_Execute_PermissionDenied(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
+	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
+	log := logger.NewForTest()
+
+	useCase := NewGetBuildLogHistoryUseCase(
+		mockBuildHistoryRepo,
+		mockLokiClient,
+		mockPermissionService,
+		log,
+	)
+
+	input := GetBuildLogHistoryInput{
+		UserID:      1,
+		ContainerID: 10,
+	}
+
+	// Mock permission check - user does NOT have access
+	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).
+		Return(containererrors.ErrPermissionDenied)
+
+	// Execute
+	logData, err := useCase.Execute(ctx, input)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Equal(t, containererrors.ErrPermissionDenied, err)
+	assert.Nil(t, logData)
+
+	mockPermissionService.AssertExpectations(t)
+	// BuildHistoryRepo and LokiClient should not be called when permission denied
+	mockBuildHistoryRepo.AssertNotCalled(t, "FindLatestByContainerID")
+	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
 }

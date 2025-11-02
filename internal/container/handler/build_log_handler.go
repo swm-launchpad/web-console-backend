@@ -429,11 +429,9 @@ func (h *BuildLogHandler) GetBuildLogHistory(c *gin.Context) {
 		return
 	}
 
-	// Note: Container ownership verification is handled by GetContainerBySlug
-	// which checks if the user has access to the container's project
-
-	// Get historical build logs
+	// Get historical build logs with permission check
 	input := application.GetBuildLogHistoryInput{
+		UserID:      userID.(uint),
 		ContainerID: container.ContainerID(),
 	}
 

@@ -33,6 +33,7 @@ func TestBuildLogHandler_GetBuildLogHistory_Success(t *testing.T) {
 	// Setup mocks
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	mockContainerService := new(containerservice.MockContainerService)
 	testLogger := logger.NewForTest()
 
@@ -40,8 +41,15 @@ func TestBuildLogHandler_GetBuildLogHistory_Success(t *testing.T) {
 	getBuildLogHistoryUC := application.NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		testLogger,
 	)
+
+	userID := uint(1)
+	containerID := uint(10)
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, userID, containerID).Return(nil)
 
 	handler := NewBuildLogHandler(
 		nil, // createBuildLogTokenUC not needed
@@ -52,9 +60,7 @@ func TestBuildLogHandler_GetBuildLogHistory_Success(t *testing.T) {
 		testLogger,
 	)
 
-	userID := uint(1)
 	containerSlug := "test-container-slug"
-	containerID := uint(10)
 
 	// Create test container
 	slug, _ := value.NewContainerSlug(containerSlug)
@@ -128,12 +134,14 @@ func TestBuildLogHandler_GetBuildLogHistory_Unauthenticated(t *testing.T) {
 	// Setup mocks
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	mockContainerService := new(containerservice.MockContainerService)
 	testLogger := logger.NewForTest()
 
 	getBuildLogHistoryUC := application.NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		testLogger,
 	)
 
@@ -172,12 +180,14 @@ func TestBuildLogHandler_GetBuildLogHistory_MissingSlug(t *testing.T) {
 	// Setup mocks
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	mockContainerService := new(containerservice.MockContainerService)
 	testLogger := logger.NewForTest()
 
 	getBuildLogHistoryUC := application.NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		testLogger,
 	)
 
@@ -222,12 +232,14 @@ func TestBuildLogHandler_GetBuildLogHistory_ContainerNotFound(t *testing.T) {
 	// Setup mocks
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	mockContainerService := new(containerservice.MockContainerService)
 	testLogger := logger.NewForTest()
 
 	getBuildLogHistoryUC := application.NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		testLogger,
 	)
 
@@ -275,12 +287,14 @@ func TestBuildLogHandler_GetBuildLogHistory_NoBuildHistory(t *testing.T) {
 	// Setup mocks
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	mockContainerService := new(containerservice.MockContainerService)
 	testLogger := logger.NewForTest()
 
 	getBuildLogHistoryUC := application.NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		testLogger,
 	)
 
@@ -296,6 +310,9 @@ func TestBuildLogHandler_GetBuildLogHistory_NoBuildHistory(t *testing.T) {
 	userID := uint(1)
 	containerSlug := "test-container-slug"
 	containerID := uint(10)
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, userID, containerID).Return(nil)
 
 	// Create test container
 	slug, _ := value.NewContainerSlug(containerSlug)
@@ -348,12 +365,14 @@ func TestBuildLogHandler_GetBuildLogHistory_LokiFailure(t *testing.T) {
 	// Setup mocks
 	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
 	mockLokiClient := new(infrastructure.MockLokiClient)
+	mockPermissionService := new(infrastructure.MockPermissionService)
 	mockContainerService := new(containerservice.MockContainerService)
 	testLogger := logger.NewForTest()
 
 	getBuildLogHistoryUC := application.NewGetBuildLogHistoryUseCase(
 		mockBuildHistoryRepo,
 		mockLokiClient,
+		mockPermissionService,
 		testLogger,
 	)
 
@@ -369,6 +388,9 @@ func TestBuildLogHandler_GetBuildLogHistory_LokiFailure(t *testing.T) {
 	userID := uint(1)
 	containerSlug := "test-container-slug"
 	containerID := uint(10)
+
+	// Mock permission check - user has access
+	mockPermissionService.On("CanUserAccessContainer", ctx, userID, containerID).Return(nil)
 
 	// Create test container
 	slug, _ := value.NewContainerSlug(containerSlug)
