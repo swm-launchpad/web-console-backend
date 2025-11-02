@@ -84,3 +84,55 @@ func (u *JWTUtil) ValidateToken(ctx context.Context, tokenString string) (uint, 
 func (u *JWTUtil) SetTokenDuration(duration time.Duration) {
 	u.tokenDuration = duration
 }
+
+// GenerateBuildLogToken generates a short-lived token (30 minutes) for build log access
+// This token is scoped to a specific container and has minimal permissions
+func (u *JWTUtil) GenerateBuildLogToken(ctx context.Context, userID uint, containerID uint) (string, error) {
+	now := time.Now()
+	buildLogTokenDuration := 30 * time.Minute // 30 minutes for build log access
+
+	claims := BuildLogTokenClaims{
+		UserID:      userID,
+		ContainerID: containerID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    u.issuer,
+			Subject:   strconv.FormatUint(uint64(userID), 10),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(buildLogTokenDuration)),
+			NotBefore: jwt.NewNumericDate(now),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(u.secret))
+	if err != nil {
+		return "", auth.ErrTokenGenerationFailed
+	}
+
+	return tokenString, nil
+}
+
+// ValidateBuildLogToken validates a build log token and returns the claims
+func (u *JWTUtil) ValidateBuildLogToken(ctx context.Context, tokenString string) (*BuildLogTokenClaims, error) {
+	claims := &BuildLogTokenClaims{}
+
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, auth.ErrInvalidToken
+		}
+		return []byte(u.secret), nil
+	})
+
+	if err != nil {
+		if err == jwt.ErrTokenExpired {
+			return nil, auth.ErrTokenExpired
+		}
+		return nil, auth.ErrInvalidToken
+	}
+
+	if !token.Valid {
+		return nil, auth.ErrInvalidToken
+	}
+
+	return claims, nil
+}

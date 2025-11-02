@@ -6,6 +6,7 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 )
 
 // containerErrorMap provides mapping from container domain errors to response information
@@ -16,6 +17,7 @@ var containerErrorMap = map[error]response.ErrorMapping{
 	containererrors.ErrEnvVarNotFound:         {StatusCode: http.StatusNotFound, Code: "ENV_VAR_NOT_FOUND", Message: "Environment variable not found"},
 	containererrors.ErrNetworkNotFound:        {StatusCode: http.StatusNotFound, Code: "NETWORK_NOT_FOUND", Message: "Network not found"},
 	containererrors.ErrBuildHistoryNotFound:   {StatusCode: http.StatusNotFound, Code: "BUILD_HISTORY_NOT_FOUND", Message: "Build history not found"},
+	projecterrors.ErrBuildHistoryNotFound:     {StatusCode: http.StatusNotFound, Code: "BUILD_HISTORY_NOT_FOUND", Message: "Build history not found"},
 	containererrors.ErrMountNotFound:          {StatusCode: http.StatusNotFound, Code: "MOUNT_NOT_FOUND", Message: "Mount not found"},
 
 	// Domain errors

@@ -72,6 +72,12 @@ func SetupTestDB(t *testing.T) *TestDB {
 		t.Fatalf("Failed to migrate test database: %v", err)
 	}
 
+	// Seed test data
+	if err := SeedTemplates(testDB.DB); err != nil {
+		testDB.Cleanup()
+		t.Fatalf("Failed to seed test data: %v", err)
+	}
+
 	return testDB
 }
 

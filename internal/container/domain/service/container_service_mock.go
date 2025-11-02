@@ -12,8 +12,8 @@ type MockContainerService struct {
 	mock.Mock
 }
 
-func (m *MockContainerService) CreateContainer(ctx context.Context, projectID uint, name string, gitConfig value.GitConfig, resourceLimits value.ResourceLimits, templateID *uint, templateConfig map[string]interface{}) (*model.Container, error) {
-	args := m.Called(ctx, projectID, name, gitConfig, resourceLimits, templateID, templateConfig)
+func (m *MockContainerService) CreateContainer(ctx context.Context, projectID uint, name string, gitConfig value.GitConfig, resourceLimits value.ResourceLimits, templateID *uint, templateConfig map[string]interface{}, githubInstallationID *int64) (*model.Container, error) {
+	args := m.Called(ctx, projectID, name, gitConfig, resourceLimits, templateID, templateConfig, githubInstallationID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
