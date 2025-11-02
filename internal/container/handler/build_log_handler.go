@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -276,46 +276,103 @@ func (h *BuildLogHandler) StreamBuildLogs(c *gin.Context) {
 		zap.Uint("container_id", container.ContainerID()),
 	)
 
-	// Use WaitGroup to wait for all goroutines to finish
-	var wg sync.WaitGroup
+	// Defer cleanup sequence (LIFO order):
+	// This pattern follows loki_client.go (lines 96-205) to prevent goroutine leaks
+	// 1. Force any blocked ReadMessage() to timeout immediately
+	// 2. Close Loki stream (interrupts any blocked Read())
+	// 3. Send proper WebSocket close frame
+	// 4. Close WebSocket connection
+	defer func() {
+		// Step 1: Force WebSocket reads to timeout
+		_ = wsConn.SetReadDeadline(time.Now())
 
-	// Goroutine 1: Read from Loki and write to WebSocket
-	wg.Add(1)
+		// Step 2: Close Loki stream
+		_ = lokiStream.Close()
+
+		// Step 3: Send proper close frame (best effort)
+		closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+		writeDeadline := time.Now().Add(time.Second)
+		_ = wsConn.WriteControl(websocket.CloseMessage, closeMsg, writeDeadline)
+
+		// Step 4: Close WebSocket connection
+		_ = wsConn.Close()
+
+		h.logger.Info(streamCtx, "Build log streaming completed",
+			zap.Uint("container_id", container.ContainerID()),
+		)
+	}()
+
+	// Message types for channel communication
+	type lokiMessage struct {
+		data []byte
+		err  error
+	}
+	type wsMessage struct {
+		err error
+	}
+
+	// Buffered channels prevent goroutine blocking on send
+	lokiChan := make(chan lokiMessage, 1)
+	wsChan := make(chan wsMessage, 1)
+
+	// Inner goroutine 1: Read from Loki stream
 	go func() {
-		defer wg.Done()
-		defer cancel() // Cancel context when this goroutine exits
-
-		// Read from Loki stream and write to WebSocket
 		buf := make([]byte, 32*1024) // 32KB buffer
 		for {
-			select {
-			case <-streamCtx.Done():
-				h.logger.Info(streamCtx, "Loki to WebSocket stream cancelled")
-				return
-			default:
-			}
-
 			n, err := lokiStream.Read(buf)
-			if n > 0 {
-				// Write to WebSocket
-				if err := wsConn.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
-					h.logger.Warn(streamCtx, "Failed to write to WebSocket",
-						zap.Uint("container_id", container.ContainerID()),
-						zap.Error(err),
-					)
-					return
-				}
-			}
 
-			if err != nil {
-				if err == io.EOF {
+			// Copy data to avoid buffer reuse issues
+			data := make([]byte, n)
+			copy(data, buf[:n])
+
+			// Send result to channel (non-blocking with context check)
+			select {
+			case lokiChan <- lokiMessage{data, err}:
+				if err != nil {
+					return // Exit on error (including EOF)
+				}
+			case <-streamCtx.Done():
+				return // Exit on context cancellation
+			}
+		}
+	}()
+
+	// Inner goroutine 2: Monitor WebSocket for client disconnection
+	go func() {
+		for {
+			// ReadMessage blocks until message received or connection closed
+			_, _, err := wsConn.ReadMessage()
+
+			// Send result to channel (non-blocking with context check)
+			select {
+			case wsChan <- wsMessage{err}:
+				return // Always exit after first message/error
+			case <-streamCtx.Done():
+				return // Exit on context cancellation
+			}
+		}
+	}()
+
+	// Main coordination loop (blocking select - no default case)
+	// This blocks the handler until streaming completes, preventing premature return
+	for {
+		select {
+		case <-streamCtx.Done():
+			// Context cancelled - cleanup via defers
+			h.logger.Info(streamCtx, "Stream context cancelled")
+			return
+
+		case lokiMsg := <-lokiChan:
+			// Message from Loki stream
+			if lokiMsg.err != nil {
+				if lokiMsg.err == io.EOF {
 					h.logger.Info(streamCtx, "Loki stream ended",
 						zap.Uint("container_id", container.ContainerID()),
 					)
 				} else {
 					h.logger.Error(streamCtx, "Error reading from Loki stream",
 						zap.Uint("container_id", container.ContainerID()),
-						zap.Error(err),
+						zap.Error(lokiMsg.err),
 					)
 
 					// Send error message to Frontend
@@ -327,41 +384,36 @@ func (h *BuildLogHandler) StreamBuildLogs(c *gin.Context) {
 					}
 
 					// Special handling for Loki concurrent limit error
-					if strings.Contains(err.Error(), "max concurrent tail requests") {
+					if strings.Contains(lokiMsg.err.Error(), "max concurrent tail requests") {
 						errorMsg.Code = "LOKI_CONCURRENT_LIMIT_EXCEEDED"
 						errorMsg.Message = "서버가 혼잡합니다. 잠시 후 다시 시도해주세요."
 					}
 
-					// Send error as JSON to frontend
+					// Send error as JSON to frontend (best effort)
 					if errorJSON, marshalErr := json.Marshal(errorMsg); marshalErr == nil {
 						_ = wsConn.WriteMessage(websocket.TextMessage, errorJSON)
 					}
 				}
-				return
-			}
-		}
-	}()
-
-	// Goroutine 2: Monitor WebSocket connection for client disconnection
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer cancel() // Cancel context when this goroutine exits
-
-		for {
-			select {
-			case <-streamCtx.Done():
-				return
-			default:
+				return // Cleanup via defers
 			}
 
-			// Read from WebSocket to detect disconnection
-			// We don't expect any messages from client (read-only stream)
-			_, _, err := wsConn.ReadMessage()
-			if err != nil {
+			// Write data to WebSocket
+			if len(lokiMsg.data) > 0 {
+				if err := wsConn.WriteMessage(websocket.TextMessage, lokiMsg.data); err != nil {
+					h.logger.Warn(streamCtx, "Failed to write to WebSocket",
+						zap.Uint("container_id", container.ContainerID()),
+						zap.Error(err),
+					)
+					return // Cleanup via defers
+				}
+			}
+
+		case wsMsg := <-wsChan:
+			// Message from WebSocket (client disconnection)
+			if wsMsg.err != nil {
 				// Close code 1005 (No Status Received)도 정상 종료로 간주
 				// React 컴포넌트 빠른 언마운트 시 close handshake 미완료는 예상된 동작
-				if websocket.IsCloseError(err,
+				if websocket.IsCloseError(wsMsg.err,
 					websocket.CloseNormalClosure,    // 1000
 					websocket.CloseGoingAway,        // 1001
 					websocket.CloseNoStatusReceived, // 1005
@@ -373,20 +425,13 @@ func (h *BuildLogHandler) StreamBuildLogs(c *gin.Context) {
 					// 진짜 비정상 종료만 경고
 					h.logger.Warn(streamCtx, "WebSocket connection closed unexpectedly",
 						zap.Uint("container_id", container.ContainerID()),
-						zap.Error(err),
+						zap.Error(wsMsg.err),
 					)
 				}
-				return
 			}
+			return // Cleanup via defers
 		}
-	}()
-
-	// Wait for all goroutines to finish
-	wg.Wait()
-
-	h.logger.Info(ctx, "Build log streaming completed",
-		zap.Uint("container_id", container.ContainerID()),
-	)
+	}
 }
 
 // GetBuildLogHistory handles GET /api/v1/containers/:slug/build-logs/history
