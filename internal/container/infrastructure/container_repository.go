@@ -1059,3 +1059,46 @@ func (r *containerRepository) GetTotalResourceUsageByProject(ctx context.Context
 
 	return uint32(totalCPUInt64.Int64), uint32(totalMemoryInt64.Int64), nil
 }
+
+// CheckInternalPortExistsInProject checks if an internal port is already used by another container in the same project
+func (r *containerRepository) CheckInternalPortExistsInProject(ctx context.Context, projectID uint, internalPort uint16) (bool, error) {
+	r.logger.Debug(ctx, "checking internal port existence in project",
+		zap.Uint("project_id", projectID),
+		zap.Uint16("internal_port", internalPort),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckInternalPortExistsInProject(ctx, sqlc.CheckInternalPortExistsInProjectParams{
+		ProjectID:    uint32(projectID),
+		InternalPort: sql.NullInt16{Int16: int16(internalPort), Valid: true},
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check internal port existence",
+			zap.Uint("project_id", projectID),
+			zap.Uint16("internal_port", internalPort),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
+// CheckFQDNExists checks if an FQDN is already used by any network in the system
+func (r *containerRepository) CheckFQDNExists(ctx context.Context, fqdn string) (bool, error) {
+	r.logger.Debug(ctx, "checking FQDN existence",
+		zap.String("fqdn", fqdn),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckFQDNExists(ctx, sql.NullString{String: fqdn, Valid: true})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check FQDN existence",
+			zap.String("fqdn", fqdn),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}

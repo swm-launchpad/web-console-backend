@@ -240,6 +240,29 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 			defaultPorts := templateConfig.DefaultPorts
 			if defaultPorts != nil && len(defaultPorts) > 0 {
 				for _, defaultPort := range defaultPorts {
+					// Validate internal port uniqueness in project
+					// Containers in same project share K8s pod network interface
+					portExists, err := uc.containerRepo.CheckInternalPortExistsInProject(
+						txCtx,
+						input.ProjectID,
+						defaultPort.InternalPort,
+					)
+					if err != nil {
+						uc.logger.Error(ctx, "failed to check internal port existence",
+							zap.Error(err),
+							zap.Uint("project_id", input.ProjectID),
+							zap.Uint16("internal_port", defaultPort.InternalPort),
+						)
+						return err
+					}
+					if portExists {
+						uc.logger.Warn(ctx, "internal port already exists in project",
+							zap.Uint("project_id", input.ProjectID),
+							zap.Uint16("internal_port", defaultPort.InternalPort),
+						)
+						return containererrors.ErrDuplicateInternalPort
+					}
+
 					// Parse network type
 					networkType, err := value.NewNetworkType(defaultPort.NetworkType)
 					if err != nil {

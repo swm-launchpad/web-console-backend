@@ -65,4 +65,12 @@ type ContainerRepository interface {
 	// Returns total CPU (millicores) and memory (Mi) used by all active containers in the project
 	// Used for validating against project resource limits
 	GetTotalResourceUsageByProject(ctx context.Context, projectID uint) (totalCPU uint32, totalMemory uint32, err error)
+
+	// CheckInternalPortExistsInProject checks if an internal port is already used by another container in the same project
+	// Used for validating network port uniqueness within a project (K8s pod shares network interface)
+	CheckInternalPortExistsInProject(ctx context.Context, projectID uint, internalPort uint16) (bool, error)
+
+	// CheckFQDNExists checks if an FQDN is already used by any network in the system
+	// Used for validating FQDN global uniqueness
+	CheckFQDNExists(ctx context.Context, fqdn string) (bool, error)
 }
