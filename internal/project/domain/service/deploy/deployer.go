@@ -227,7 +227,6 @@ type deployService struct {
 	buildPostProcessor   build.PostProcessor
 	deployNamespace      string // Namespace where deploy PipelineRuns are deployed (e.g., "deploy-pipeline")
 	applicationNamespace string // Namespace where application resources are deployed (e.g., "application")
-	registryURL          string // Container registry URL for image references (e.g., "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com")
 	projectServiceName   string
 	logger               logger.Logger
 }
@@ -247,7 +246,6 @@ func NewDeployer(
 	buildPostProcessor build.PostProcessor,
 	deployNamespace string,
 	applicationNamespace string,
-	registryURL string,
 	projectServiceName string,
 	log logger.Logger,
 ) Deployer {
@@ -265,7 +263,6 @@ func NewDeployer(
 		buildPostProcessor:   buildPostProcessor,
 		deployNamespace:      deployNamespace,
 		applicationNamespace: applicationNamespace,
-		registryURL:          registryURL,
 		projectServiceName:   projectServiceName,
 		logger:               log,
 	}

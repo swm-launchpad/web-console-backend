@@ -321,11 +321,6 @@ func provideDeployService(
 		applicationNamespace = "application"
 	}
 
-	registryURL := os.Getenv("REGISTRY_URL")
-	if registryURL == "" {
-		log.Fatal(nil, "REGISTRY_URL environment variable is required")
-	}
-
 	projectServiceName := ""
 
 	return deploy.NewDeployer(
@@ -342,7 +337,6 @@ func provideDeployService(
 		buildPostProcessor,
 		deployNamespace,
 		applicationNamespace,
-		registryURL,
 		projectServiceName,
 		log,
 	)
