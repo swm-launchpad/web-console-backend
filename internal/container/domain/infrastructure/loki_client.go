@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"io"
+	"time"
 )
 
 // LokiClient defines the interface for streaming logs from Loki
@@ -12,4 +13,11 @@ type LokiClient interface {
 	// Returns an io.ReadCloser that streams logs from Loki via WebSocket
 	// The caller is responsible for closing the returned ReadCloser
 	StreamPipelineRunLogs(ctx context.Context, pipelineRunName string, excludeTasks []string) (io.ReadCloser, error)
+
+	// QueryPipelineRunLogsHTTP queries historical logs for a completed PipelineRun
+	// Uses Loki's query_range HTTP API to retrieve logs within the specified time range
+	// startTime and endTime define the time range to query
+	// Returns an io.ReadCloser containing the log data
+	// The caller is responsible for closing the returned ReadCloser
+	QueryPipelineRunLogsHTTP(ctx context.Context, pipelineRunName string, excludeTasks []string, startTime, endTime time.Time) (io.ReadCloser, error)
 }

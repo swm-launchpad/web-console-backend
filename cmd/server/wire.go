@@ -234,6 +234,7 @@ func provideLokiClient(cfg *config.Config, log logger.Logger) containerDomainInf
 func provideBuildLogHandler(
 	createBuildLogTokenUC *containerApp.CreateBuildLogTokenUseCase,
 	streamBuildLogsUC *containerApp.StreamBuildLogsUseCase,
+	getBuildLogHistoryUC *containerApp.GetBuildLogHistoryUseCase,
 	containerService containerService.ContainerService,
 	jwtUtil *jwt.JWTUtil,
 	log logger.Logger,
@@ -241,6 +242,7 @@ func provideBuildLogHandler(
 	return containerHTTP.NewBuildLogHandler(
 		createBuildLogTokenUC,
 		streamBuildLogsUC,
+		getBuildLogHistoryUC,
 		containerService,
 		jwtUtil,
 		log,
@@ -383,6 +385,7 @@ func InitializeApp() (*App, error) {
 		containerBuild.NewUpdateContainerAfterBuildUseCase,
 		containerApp.NewCreateBuildLogTokenUseCase,
 		containerApp.NewStreamBuildLogsUseCase,
+		containerApp.NewGetBuildLogHistoryUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,

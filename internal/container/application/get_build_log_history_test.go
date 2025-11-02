@@ -1,0 +1,371 @@
+package application
+
+import (
+	"context"
+	"errors"
+	"io"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/build_history"
+)
+
+func TestGetBuildLogHistoryUseCase_Execute_Success(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
+	mockLokiClient := new(infrastructure.MockLokiClient)
+	log := logger.NewForTest()
+
+	useCase := NewGetBuildLogHistoryUseCase(
+		mockBuildHistoryRepo,
+		mockLokiClient,
+		log,
+	)
+
+	input := GetBuildLogHistoryInput{
+		ContainerID: 10,
+	}
+
+	// Create completed build with all required fields
+	pipelineRunName := "image-build-push-run-abc123"
+	startedAt := time.Now().Add(-1 * time.Hour)
+	finishedAt := time.Now().Add(-30 * time.Minute)
+
+	completedBuild, _ := build_history.ReconstructBuildHistory(
+		1,
+		10,
+		build_history.BuildHistoryStatusSuccess,
+		nil,
+		stringPtr("event-123"),
+		&pipelineRunName,
+		nil,
+		time.Now().Add(-2*time.Hour),
+		&startedAt,
+		&finishedAt,
+	)
+
+	// Mock FindLatestByContainerID - returns completed build
+	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(10)).
+		Return(completedBuild, nil)
+
+	// Mock QueryPipelineRunLogsHTTP
+	mockLogData := io.NopCloser(strings.NewReader(`{"status":"success","data":{"resultType":"streams","result":[]}}`))
+	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, finishedAt).
+		Return(mockLogData, nil)
+
+	// Execute
+	logData, err := useCase.Execute(ctx, input)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, logData)
+
+	// Verify we can read from the response
+	data, _ := io.ReadAll(logData)
+	assert.Contains(t, string(data), "success")
+
+	mockBuildHistoryRepo.AssertExpectations(t)
+	mockLokiClient.AssertExpectations(t)
+}
+
+func TestGetBuildLogHistoryUseCase_Execute_NoBuildHistory(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
+	mockLokiClient := new(infrastructure.MockLokiClient)
+	log := logger.NewForTest()
+
+	useCase := NewGetBuildLogHistoryUseCase(
+		mockBuildHistoryRepo,
+		mockLokiClient,
+		log,
+	)
+
+	input := GetBuildLogHistoryInput{
+		ContainerID: 999, // Non-existent container
+	}
+
+	// Mock FindLatestByContainerID - no build history
+	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(999)).
+		Return(nil, projecterrors.ErrBuildHistoryNotFound)
+
+	// Execute
+	logData, err := useCase.Execute(ctx, input)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Equal(t, projecterrors.ErrBuildHistoryNotFound, err)
+	assert.Nil(t, logData)
+
+	mockBuildHistoryRepo.AssertExpectations(t)
+	// Loki client should not be called
+	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
+}
+
+func TestGetBuildLogHistoryUseCase_Execute_BuildNotCompleted(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
+	mockLokiClient := new(infrastructure.MockLokiClient)
+	log := logger.NewForTest()
+
+	useCase := NewGetBuildLogHistoryUseCase(
+		mockBuildHistoryRepo,
+		mockLokiClient,
+		log,
+	)
+
+	input := GetBuildLogHistoryInput{
+		ContainerID: 10,
+	}
+
+	// Create running build (not completed)
+	pipelineRunName := "image-build-push-run-running"
+	startedAt := time.Now().Add(-10 * time.Minute)
+
+	runningBuild, _ := build_history.ReconstructBuildHistory(
+		2,
+		10,
+		build_history.BuildHistoryStatusRunning, // Not completed
+		nil,
+		stringPtr("event-456"),
+		&pipelineRunName,
+		nil,
+		time.Now().Add(-20*time.Minute),
+		&startedAt,
+		nil, // No finishedAt - still running
+	)
+
+	// Mock FindLatestByContainerID - returns running build
+	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(10)).
+		Return(runningBuild, nil)
+
+	// Execute
+	logData, err := useCase.Execute(ctx, input)
+
+	// Assert - should fail because build is not completed
+	assert.Error(t, err)
+	assert.Equal(t, projecterrors.ErrBuildHistoryNotFound, err)
+	assert.Nil(t, logData)
+
+	mockBuildHistoryRepo.AssertExpectations(t)
+	// Loki client should not be called
+	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
+}
+
+func TestGetBuildLogHistoryUseCase_Execute_NoPipelineRunName(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
+	mockLokiClient := new(infrastructure.MockLokiClient)
+	log := logger.NewForTest()
+
+	useCase := NewGetBuildLogHistoryUseCase(
+		mockBuildHistoryRepo,
+		mockLokiClient,
+		log,
+	)
+
+	input := GetBuildLogHistoryInput{
+		ContainerID: 10,
+	}
+
+	// Create completed build WITHOUT PipelineRunName
+	startedAt := time.Now().Add(-1 * time.Hour)
+	finishedAt := time.Now().Add(-30 * time.Minute)
+
+	completedBuild, _ := build_history.ReconstructBuildHistory(
+		3,
+		10,
+		build_history.BuildHistoryStatusSuccess,
+		nil,
+		stringPtr("event-789"),
+		nil, // No PipelineRunName
+		nil,
+		time.Now().Add(-2*time.Hour),
+		&startedAt,
+		&finishedAt,
+	)
+
+	// Mock FindLatestByContainerID - returns build without PipelineRunName
+	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(10)).
+		Return(completedBuild, nil)
+
+	// Execute
+	logData, err := useCase.Execute(ctx, input)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Equal(t, projecterrors.ErrBuildHistoryNotFound, err)
+	assert.Nil(t, logData)
+
+	mockBuildHistoryRepo.AssertExpectations(t)
+	// Loki client should not be called
+	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
+}
+
+func TestGetBuildLogHistoryUseCase_Execute_NoStartedAt(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
+	mockLokiClient := new(infrastructure.MockLokiClient)
+	log := logger.NewForTest()
+
+	useCase := NewGetBuildLogHistoryUseCase(
+		mockBuildHistoryRepo,
+		mockLokiClient,
+		log,
+	)
+
+	input := GetBuildLogHistoryInput{
+		ContainerID: 10,
+	}
+
+	// Create completed build WITHOUT StartedAt
+	pipelineRunName := "image-build-push-run-no-start"
+	finishedAt := time.Now().Add(-30 * time.Minute)
+
+	completedBuild, _ := build_history.ReconstructBuildHistory(
+		4,
+		10,
+		build_history.BuildHistoryStatusSuccess,
+		nil,
+		stringPtr("event-abc"),
+		&pipelineRunName,
+		nil,
+		time.Now().Add(-2*time.Hour),
+		nil, // No StartedAt
+		&finishedAt,
+	)
+
+	// Mock FindLatestByContainerID
+	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(10)).
+		Return(completedBuild, nil)
+
+	// Execute
+	logData, err := useCase.Execute(ctx, input)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Equal(t, projecterrors.ErrBuildHistoryNotFound, err)
+	assert.Nil(t, logData)
+
+	mockBuildHistoryRepo.AssertExpectations(t)
+	// Loki client should not be called
+	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
+}
+
+func TestGetBuildLogHistoryUseCase_Execute_NoFinishedAt(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
+	mockLokiClient := new(infrastructure.MockLokiClient)
+	log := logger.NewForTest()
+
+	useCase := NewGetBuildLogHistoryUseCase(
+		mockBuildHistoryRepo,
+		mockLokiClient,
+		log,
+	)
+
+	input := GetBuildLogHistoryInput{
+		ContainerID: 10,
+	}
+
+	// Create completed build WITHOUT FinishedAt (shouldn't happen in reality)
+	pipelineRunName := "image-build-push-run-no-finish"
+	startedAt := time.Now().Add(-1 * time.Hour)
+
+	completedBuild, _ := build_history.ReconstructBuildHistory(
+		5,
+		10,
+		build_history.BuildHistoryStatusSuccess,
+		nil,
+		stringPtr("event-def"),
+		&pipelineRunName,
+		nil,
+		time.Now().Add(-2*time.Hour),
+		&startedAt,
+		nil, // No FinishedAt
+	)
+
+	// Mock FindLatestByContainerID
+	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(10)).
+		Return(completedBuild, nil)
+
+	// Execute
+	logData, err := useCase.Execute(ctx, input)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Equal(t, projecterrors.ErrBuildHistoryNotFound, err)
+	assert.Nil(t, logData)
+
+	mockBuildHistoryRepo.AssertExpectations(t)
+	// Loki client should not be called
+	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
+}
+
+func TestGetBuildLogHistoryUseCase_Execute_LokiQueryFails(t *testing.T) {
+	// Setup
+	ctx := context.Background()
+	mockBuildHistoryRepo := new(repository.MockBuildHistoryRepository)
+	mockLokiClient := new(infrastructure.MockLokiClient)
+	log := logger.NewForTest()
+
+	useCase := NewGetBuildLogHistoryUseCase(
+		mockBuildHistoryRepo,
+		mockLokiClient,
+		log,
+	)
+
+	input := GetBuildLogHistoryInput{
+		ContainerID: 10,
+	}
+
+	// Create valid completed build
+	pipelineRunName := "image-build-push-run-loki-fail"
+	startedAt := time.Now().Add(-1 * time.Hour)
+	finishedAt := time.Now().Add(-30 * time.Minute)
+
+	completedBuild, _ := build_history.ReconstructBuildHistory(
+		6,
+		10,
+		build_history.BuildHistoryStatusSuccess,
+		nil,
+		stringPtr("event-ghi"),
+		&pipelineRunName,
+		nil,
+		time.Now().Add(-2*time.Hour),
+		&startedAt,
+		&finishedAt,
+	)
+
+	// Mock FindLatestByContainerID
+	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(10)).
+		Return(completedBuild, nil)
+
+	// Mock QueryPipelineRunLogsHTTP - fails
+	lokiError := errors.New("loki connection failed")
+	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, finishedAt).
+		Return(nil, lokiError)
+
+	// Execute
+	logData, err := useCase.Execute(ctx, input)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Equal(t, lokiError, err)
+	assert.Nil(t, logData)
+
+	mockBuildHistoryRepo.AssertExpectations(t)
+	mockLokiClient.AssertExpectations(t)
+}

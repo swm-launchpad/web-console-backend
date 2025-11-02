@@ -227,7 +227,7 @@ func (r *Router) Setup() {
 
 			// Build logs
 			containers.POST("/:slug/build-log-token", r.buildLogHandler.CreateBuildLogToken)
-			// WebSocket endpoint for streaming build logs (no auth middleware - uses token in query param)
+			containers.GET("/:slug/build-logs/history", r.buildLogHandler.GetBuildLogHistory)
 		}
 
 		// Build log streaming WebSocket endpoint (public with token validation)

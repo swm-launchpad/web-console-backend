@@ -111,7 +111,7 @@ func (uc *StreamBuildLogsUseCase) Execute(ctx context.Context, input StreamBuild
 		)
 	}
 
-	// Stream logs from Loki, excluding ecr-repository-check task
+	// Stream logs from Loki via WebSocket (tail API), excluding ecr-repository-check task
 	excludeTasks := []string{"ecr-repository-check"}
 	logStream, err := uc.lokiClient.StreamPipelineRunLogs(ctx, pipelineRunName, excludeTasks)
 	if err != nil {

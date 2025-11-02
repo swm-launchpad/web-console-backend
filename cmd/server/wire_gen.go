@@ -178,7 +178,8 @@ func InitializeApp() (*App, error) {
 	createBuildLogTokenUseCase := application3.NewCreateBuildLogTokenUseCase(servicePermissionService, jwtUtil, logger)
 	lokiClient := provideLokiClient(configConfig, logger)
 	streamBuildLogsUseCase := application3.NewStreamBuildLogsUseCase(buildHistoryRepository, lokiClient, logger)
-	buildLogHandler := provideBuildLogHandler(createBuildLogTokenUseCase, streamBuildLogsUseCase, containerService, jwtUtil, logger)
+	getBuildLogHistoryUseCase := application3.NewGetBuildLogHistoryUseCase(buildHistoryRepository, lokiClient, logger)
+	buildLogHandler := provideBuildLogHandler(createBuildLogTokenUseCase, streamBuildLogsUseCase, getBuildLogHistoryUseCase, containerService, jwtUtil, logger)
 	settingsHandler := settings.NewSettingsHandler(settingsService, logger)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	loggingMiddleware := provideLoggingMiddleware(logger)
@@ -379,6 +380,7 @@ func provideLokiClient(cfg *config.Config, log logger.Logger) infrastructure5.Lo
 func provideBuildLogHandler(
 	createBuildLogTokenUC *application3.CreateBuildLogTokenUseCase,
 	streamBuildLogsUC *application3.StreamBuildLogsUseCase,
+	getBuildLogHistoryUC *application3.GetBuildLogHistoryUseCase,
 	containerService service3.ContainerService,
 	jwtUtil *jwt.JWTUtil,
 	log logger.Logger,
@@ -386,6 +388,7 @@ func provideBuildLogHandler(
 	return handler3.NewBuildLogHandler(
 		createBuildLogTokenUC,
 		streamBuildLogsUC,
+		getBuildLogHistoryUC,
 		containerService,
 		jwtUtil,
 		log,

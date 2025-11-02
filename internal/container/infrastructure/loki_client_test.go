@@ -15,7 +15,7 @@ func TestBuildLogQLQuery(t *testing.T) {
 			URL:      "https://loki.test",
 			Username: "test",
 			Password: "pass",
-			OrgID:    "fake",
+			OrgID:    "1",
 		},
 	}
 	log := logger.NewForTest()
@@ -31,19 +31,19 @@ func TestBuildLogQLQuery(t *testing.T) {
 			name:            "no exclusions",
 			pipelineRunName: "image-build-push-run-abc123",
 			excludeTasks:    []string{},
-			expected:        `{namespace="build-pipeline",pod=~"image-build-push-run-abc123-.*"}`,
+			expected:        `{namespace="build-pipeline",pod=~"image-build-push-run-abc123-.*-pod"}`,
 		},
 		{
 			name:            "single exclusion",
 			pipelineRunName: "image-build-push-run-xyz789",
 			excludeTasks:    []string{"ecr-repository-check"},
-			expected:        `{namespace="build-pipeline",pod=~"image-build-push-run-xyz789-.*"} !~ "ecr-repository-check"`,
+			expected:        `{namespace="build-pipeline",pod=~"image-build-push-run-xyz789-.*-pod",pod!~".*-(ecr-repository-check)-pod"}`,
 		},
 		{
 			name:            "multiple exclusions",
 			pipelineRunName: "test-run-123",
 			excludeTasks:    []string{"task1", "task2", "task3"},
-			expected:        `{namespace="build-pipeline",pod=~"test-run-123-.*"} !~ "task1" !~ "task2" !~ "task3"`,
+			expected:        `{namespace="build-pipeline",pod=~"test-run-123-.*-pod",pod!~".*-(task1|task2|task3)-pod"}`,
 		},
 	}
 

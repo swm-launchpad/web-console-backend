@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -18,10 +20,19 @@ import (
 	containerservice "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 )
 
+// WebSocketError represents a structured error message for WebSocket
+type WebSocketError struct {
+	Type      string `json:"type"`      // "error"
+	Code      string `json:"code"`      // Error code (e.g., "BUILD_HISTORY_NOT_FOUND")
+	Message   string `json:"message"`   // Human-readable error message
+	Retryable bool   `json:"retryable"` // Whether the client should retry
+}
+
 // BuildLogHandler handles build log related HTTP requests
 type BuildLogHandler struct {
 	createBuildLogTokenUC *application.CreateBuildLogTokenUseCase
 	streamBuildLogsUC     *application.StreamBuildLogsUseCase
+	getBuildLogHistoryUC  *application.GetBuildLogHistoryUseCase
 	containerService      containerservice.ContainerService
 	jwtUtil               *jwt.JWTUtil
 	logger                logger.Logger
@@ -32,6 +43,7 @@ type BuildLogHandler struct {
 func NewBuildLogHandler(
 	createBuildLogTokenUC *application.CreateBuildLogTokenUseCase,
 	streamBuildLogsUC *application.StreamBuildLogsUseCase,
+	getBuildLogHistoryUC *application.GetBuildLogHistoryUseCase,
 	containerService containerservice.ContainerService,
 	jwtUtil *jwt.JWTUtil,
 	log logger.Logger,
@@ -39,6 +51,7 @@ func NewBuildLogHandler(
 	return &BuildLogHandler{
 		createBuildLogTokenUC: createBuildLogTokenUC,
 		streamBuildLogsUC:     streamBuildLogsUC,
+		getBuildLogHistoryUC:  getBuildLogHistoryUC,
 		containerService:      containerService,
 		jwtUtil:               jwtUtil,
 		logger:                log,
@@ -212,19 +225,47 @@ func (h *BuildLogHandler) StreamBuildLogs(c *gin.Context) {
 		zap.Uint("container_id", container.ContainerID()),
 	)
 
+	// Create context for managing goroutines
+	streamCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// Stream build logs from Loki
 	input := application.StreamBuildLogsInput{
 		ContainerID: container.ContainerID(),
 	}
 
-	lokiStream, err := h.streamBuildLogsUC.Execute(ctx, input)
+	lokiStream, err := h.streamBuildLogsUC.Execute(streamCtx, input)
 	if err != nil {
 		h.logger.Error(ctx, "Failed to stream build logs",
 			zap.Uint("container_id", container.ContainerID()),
 			zap.Error(err),
 		)
-		// Send error message via WebSocket
-		_ = wsConn.WriteMessage(websocket.TextMessage, []byte("Error: "+err.Error()))
+
+		// Send structured error message via WebSocket
+		errorMsg := WebSocketError{
+			Type: "error",
+		}
+
+		// Determine error code and message based on error type
+		if err.Error() == "build history not found" {
+			errorMsg.Code = "BUILD_HISTORY_NOT_FOUND"
+			errorMsg.Message = "빌드 파이프라인이 생성되는 중입니다"
+			errorMsg.Retryable = true
+		} else {
+			errorMsg.Code = "STREAM_ERROR"
+			errorMsg.Message = err.Error()
+			errorMsg.Retryable = false
+		}
+
+		// Marshal error to JSON
+		errorJSON, marshalErr := json.Marshal(errorMsg)
+		if marshalErr != nil {
+			h.logger.Error(ctx, "Failed to marshal error message", zap.Error(marshalErr))
+			_ = wsConn.WriteMessage(websocket.TextMessage, []byte("Error: "+err.Error()))
+			return
+		}
+
+		_ = wsConn.WriteMessage(websocket.TextMessage, errorJSON)
 		return
 	}
 	defer func() {
@@ -234,10 +275,6 @@ func (h *BuildLogHandler) StreamBuildLogs(c *gin.Context) {
 	h.logger.Info(ctx, "Started streaming build logs from Loki",
 		zap.Uint("container_id", container.ContainerID()),
 	)
-
-	// Create context for managing goroutines
-	streamCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	// Use WaitGroup to wait for all goroutines to finish
 	var wg sync.WaitGroup
@@ -280,6 +317,25 @@ func (h *BuildLogHandler) StreamBuildLogs(c *gin.Context) {
 						zap.Uint("container_id", container.ContainerID()),
 						zap.Error(err),
 					)
+
+					// Send error message to Frontend
+					errorMsg := WebSocketError{
+						Type:      "error",
+						Code:      "LOKI_STREAM_ERROR",
+						Message:   "로그 스트림 중 오류가 발생했습니다",
+						Retryable: true,
+					}
+
+					// Special handling for Loki concurrent limit error
+					if strings.Contains(err.Error(), "max concurrent tail requests") {
+						errorMsg.Code = "LOKI_CONCURRENT_LIMIT_EXCEEDED"
+						errorMsg.Message = "서버가 혼잡합니다. 잠시 후 다시 시도해주세요."
+					}
+
+					// Send error as JSON to frontend
+					if errorJSON, marshalErr := json.Marshal(errorMsg); marshalErr == nil {
+						_ = wsConn.WriteMessage(websocket.TextMessage, errorJSON)
+					}
 				}
 				return
 			}
@@ -303,14 +359,21 @@ func (h *BuildLogHandler) StreamBuildLogs(c *gin.Context) {
 			// We don't expect any messages from client (read-only stream)
 			_, _, err := wsConn.ReadMessage()
 			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+				// Close code 1005 (No Status Received)도 정상 종료로 간주
+				// React 컴포넌트 빠른 언마운트 시 close handshake 미완료는 예상된 동작
+				if websocket.IsCloseError(err,
+					websocket.CloseNormalClosure,    // 1000
+					websocket.CloseGoingAway,        // 1001
+					websocket.CloseNoStatusReceived, // 1005
+				) {
+					h.logger.Info(streamCtx, "WebSocket connection closed by client",
+						zap.Uint("container_id", container.ContainerID()),
+					)
+				} else {
+					// 진짜 비정상 종료만 경고
 					h.logger.Warn(streamCtx, "WebSocket connection closed unexpectedly",
 						zap.Uint("container_id", container.ContainerID()),
 						zap.Error(err),
-					)
-				} else {
-					h.logger.Info(streamCtx, "WebSocket connection closed by client",
-						zap.Uint("container_id", container.ContainerID()),
 					)
 				}
 				return
@@ -322,6 +385,91 @@ func (h *BuildLogHandler) StreamBuildLogs(c *gin.Context) {
 	wg.Wait()
 
 	h.logger.Info(ctx, "Build log streaming completed",
+		zap.Uint("container_id", container.ContainerID()),
+	)
+}
+
+// GetBuildLogHistory handles GET /api/v1/containers/:slug/build-logs/history
+// @Summary Get historical build logs via HTTP
+// @Description Retrieves historical build logs for the latest completed build from Loki via HTTP. Requires standard authentication.
+// @Tags containers
+// @Param slug path string true "Container slug"
+// @Success 200 {object} object "Loki query_range response (JSON)"
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/v1/containers/{slug}/build-logs/history [get]
+func (h *BuildLogHandler) GetBuildLogHistory(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Get authenticated user ID from context (set by RequireAuth middleware)
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Warn(ctx, "User ID not found in context")
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	// Get container by slug
+	slug := c.Param("slug")
+	if slug == "" {
+		h.logger.Warn(ctx, "Container slug is missing")
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	container, err := h.containerService.GetContainerBySlug(ctx, slug)
+	if err != nil {
+		h.logger.Warn(ctx, "Failed to get container by slug",
+			zap.String("slug", slug),
+			zap.Error(err),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Note: Container ownership verification is handled by GetContainerBySlug
+	// which checks if the user has access to the container's project
+
+	// Get historical build logs
+	input := application.GetBuildLogHistoryInput{
+		ContainerID: container.ContainerID(),
+	}
+
+	lokiResponse, err := h.getBuildLogHistoryUC.Execute(ctx, input)
+	if err != nil {
+		h.logger.Error(ctx, "Failed to get build log history",
+			zap.Uint("container_id", container.ContainerID()),
+			zap.Error(err),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+	defer func() {
+		_ = lokiResponse.Close()
+	}()
+
+	h.logger.Info(ctx, "Streaming historical build logs to client",
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("container_id", container.ContainerID()),
+	)
+
+	// Set response headers for JSON streaming
+	c.Header("Content-Type", "application/json")
+	c.Header("Transfer-Encoding", "chunked")
+
+	// Stream Loki response to client
+	_, err = io.Copy(c.Writer, lokiResponse)
+	if err != nil {
+		h.logger.Error(ctx, "Failed to stream historical logs to client",
+			zap.Uint("container_id", container.ContainerID()),
+			zap.Error(err),
+		)
+		return
+	}
+
+	h.logger.Info(ctx, "Historical build logs sent successfully",
 		zap.Uint("container_id", container.ContainerID()),
 	)
 }
