@@ -103,7 +103,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 		mockProjectService.AssertExpectations(t)
 	})
 
-	t.Run("성공: FQDN과 Plan이 있는 프로젝트", func(t *testing.T) {
+	t.Run("성공: Plan이 있는 프로젝트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		uc := NewListProjectsUseCase(mockProjectService, testLogger)
@@ -116,9 +116,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000077777777")
 		project := createTestProjectWithVolumes(1, "운영 프로젝트", *slug, userID)
 
-		fqdn := "my-project.example.com"
 		plan := value.PlanPro
-		_ = project.SetFQDN(fqdn)
 		_ = project.SetPlan(plan)
 
 		projects := []*model.Project{project}
@@ -130,7 +128,6 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Len(t, output.Projects, 1)
-		assert.Equal(t, "my-project.example.com", output.Projects[0].FQDN)
 		assert.Equal(t, "pro", output.Projects[0].Plan)
 
 		mockProjectService.AssertExpectations(t)

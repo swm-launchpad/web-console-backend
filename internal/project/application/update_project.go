@@ -15,7 +15,6 @@ type UpdateProjectInput struct {
 	ProjectID    uint
 	ActingUserID uint // The user performing the update (for quota validation)
 	Name         *string
-	FQDN         *string
 	Plan         *value.Plan
 	Status       *string
 	CPULimit     *uint32
@@ -28,7 +27,6 @@ type UpdateProjectOutput struct {
 	ProjectID    uint   `json:"project_id"`
 	Name         string `json:"name"`
 	Slug         string `json:"slug"`
-	FQDN         string `json:"fqdn,omitempty"`
 	Plan         string `json:"plan,omitempty"`
 	Status       string `json:"status"`
 	CPULimit     uint32 `json:"cpu_limit"`
@@ -61,8 +59,8 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 	var name string
 	var slug string
 	var status string
-	var fqdn, plan string
-	var hasFQDN, hasPlan bool
+	var plan string
+	var hasPlan bool
 	var cpuLimit, memoryLimit, diskLimit, trafficLimit uint32
 	var updatedAt string
 
@@ -72,12 +70,6 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 			// Update fields if provided
 			if input.Name != nil {
 				if err := p.SetName(*input.Name); err != nil {
-					return err
-				}
-			}
-
-			if input.FQDN != nil {
-				if err := p.SetFQDN(*input.FQDN); err != nil {
 					return err
 				}
 			}
@@ -156,11 +148,6 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 		diskLimit = limits.DiskLimit()
 		trafficLimit = limits.TrafficLimit()
 
-		if f, ok := project.FQDN(); ok {
-			fqdn = f
-			hasFQDN = true
-		}
-
 		if p, ok := project.Plan(); ok {
 			plan = p.String()
 			hasPlan = true
@@ -189,10 +176,6 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 		DiskLimit:    diskLimit,
 		TrafficLimit: trafficLimit,
 		UpdatedAt:    updatedAt,
-	}
-
-	if hasFQDN {
-		output.FQDN = fqdn
 	}
 
 	if hasPlan {

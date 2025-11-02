@@ -30,7 +30,6 @@ func createTestProject(projectID uint, operationStatus value.ProjectOperationSta
 		projectID,
 		"Test Project",
 		*slug,
-		nil, // fqdn
 		value.ProjectStatusActive,
 		operationStatus,
 		nil, // activeDeploymentID
@@ -54,7 +53,6 @@ func createTestProjectWithDeployment(projectID uint, operationStatus value.Proje
 		projectID,
 		"Test Project",
 		*slug,
-		nil, // fqdn
 		value.ProjectStatusActive,
 		operationStatus,
 		&deploymentID,

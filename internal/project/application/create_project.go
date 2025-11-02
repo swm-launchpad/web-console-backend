@@ -13,7 +13,6 @@ import (
 type CreateProjectInput struct {
 	Name         string
 	OwnerID      uint
-	FQDN         *string
 	Plan         *value.Plan
 	CPULimit     uint32
 	MemoryLimit  uint32
@@ -25,7 +24,6 @@ type CreateProjectOutput struct {
 	ProjectID    uint   `json:"project_id"`
 	Name         string `json:"name"`
 	Slug         string `json:"slug"`
-	FQDN         string `json:"fqdn,omitempty"`
 	Plan         string `json:"plan,omitempty"`
 	Status       string `json:"status"`
 	CPULimit     uint32 `json:"cpu_limit"`
@@ -63,8 +61,8 @@ func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProject
 	var slug string
 	var status string
 	var cpuLimit, memoryLimit, diskLimit, trafficLimit uint32
-	var fqdn, plan string
-	var hasFQDN, hasPlan bool
+	var plan string
+	var hasPlan bool
 	var createdAt, updatedAt string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
@@ -90,7 +88,6 @@ func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProject
 			input.Name,
 			input.OwnerID,
 			*limits,
-			input.FQDN,
 			input.Plan,
 		)
 		if err != nil {
@@ -113,11 +110,6 @@ func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProject
 		trafficLimit = project.Limits().TrafficLimit()
 		createdAt = project.CreatedAt().Format("2006-01-02T15:04:05Z")
 		updatedAt = project.UpdatedAt().Format("2006-01-02T15:04:05Z")
-
-		if f, ok := project.FQDN(); ok {
-			fqdn = f
-			hasFQDN = true
-		}
 
 		if p, ok := project.Plan(); ok {
 			plan = p.String()
@@ -149,10 +141,6 @@ func (uc *CreateProjectUseCase) Execute(ctx context.Context, input CreateProject
 		TrafficLimit: trafficLimit,
 		CreatedAt:    createdAt,
 		UpdatedAt:    updatedAt,
-	}
-
-	if hasFQDN {
-		output.FQDN = fqdn
 	}
 
 	if hasPlan {

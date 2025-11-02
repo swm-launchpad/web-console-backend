@@ -61,7 +61,7 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		mockProjectService.AssertExpectations(t)
 	})
 
-	t.Run("성공: FQDN과 Plan 업데이트", func(t *testing.T) {
+	t.Run("성공: Plan 업데이트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		uc := NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
@@ -69,13 +69,11 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		input := UpdateProjectInput{
 			ProjectID:    1,
 			ActingUserID: 1,
-			FQDN:         stringPtr("my-project.example.com"),
 			Plan:         planPtr(value.PlanPro),
 		}
 
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		updatedProject := createTestProjectWithVolumes(1, "테스트 프로젝트", *slug, 1)
-		_ = updatedProject.SetFQDN(*input.FQDN)
 		_ = updatedProject.SetPlan(*input.Plan)
 		// Note: SetUpdatedAt doesn't exist in the model, updatedAt is managed internally
 
@@ -85,7 +83,6 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.NotNil(t, output)
-		assert.Equal(t, "my-project.example.com", output.FQDN)
 		assert.Equal(t, "pro", output.Plan)
 
 		mockProjectService.AssertExpectations(t)
@@ -164,7 +161,6 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 			ProjectID:    1,
 			ActingUserID: 1,
 			Name:         stringPtr("완전히 새로운 프로젝트"),
-			FQDN:         stringPtr("new.example.com"),
 			Plan:         planPtr(value.PlanPro),
 			Status:       stringPtr("running"),
 			CPULimit:     uint32Ptr(4000),
@@ -175,7 +171,6 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		updatedProject := createTestProjectWithVolumes(1, "완전히 새로운 프로젝트", *slug, 1)
-		_ = updatedProject.SetFQDN(*input.FQDN)
 		_ = updatedProject.SetPlan(*input.Plan)
 		_ = updatedProject.SetStatus(value.ProjectStatusActive)
 
@@ -195,7 +190,6 @@ func TestUpdateProjectUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, "완전히 새로운 프로젝트", output.Name)
-		assert.Equal(t, "new.example.com", output.FQDN)
 		assert.Equal(t, "pro", output.Plan)
 		assert.Equal(t, "active", output.Status)
 

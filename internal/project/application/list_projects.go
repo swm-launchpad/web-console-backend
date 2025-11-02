@@ -16,7 +16,6 @@ type ProjectListItem struct {
 	ProjectID    uint   `json:"project_id"`
 	Name         string `json:"name"`
 	Slug         string `json:"slug"`
-	FQDN         string `json:"fqdn,omitempty"`
 	Plan         string `json:"plan,omitempty"`
 	Status       string `json:"status"`
 	CPULimit     uint32 `json:"cpu_limit"`
@@ -77,10 +76,6 @@ func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsIn
 			TrafficLimit: project.Limits().TrafficLimit(),
 			CreatedAt:    project.CreatedAt().Format("2006-01-02T15:04:05Z"),
 			UpdatedAt:    project.UpdatedAt().Format("2006-01-02T15:04:05Z"),
-		}
-
-		if fqdn, ok := project.FQDN(); ok {
-			item.FQDN = fqdn
 		}
 
 		if plan, ok := project.Plan(); ok {
