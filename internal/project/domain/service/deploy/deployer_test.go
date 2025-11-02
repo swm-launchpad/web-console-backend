@@ -191,7 +191,9 @@ func TestDeployService_buildTektonRequest_VolumeNotFound(t *testing.T) {
 
 func TestDeployService_convertVolumesToDTO(t *testing.T) {
 	// Arrange
-	service := &deployService{}
+	service := &deployService{
+		registryURL: "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com",
+	}
 
 	volume1, _ := volumemodel.NewVolume(1, "data-vol", 1024)
 	slug1, _ := volumevalue.NewVolumeSlug("v2025011812000012345678")
@@ -305,7 +307,9 @@ func TestDeployService_updateDeploymentStatus_AlreadyCompleted(t *testing.T) {
 
 func TestDeployService_convertContainersToTektonFormat_Success(t *testing.T) {
 	// Arrange
-	service := &deployService{}
+	service := &deployService{
+		registryURL: "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com",
+	}
 
 	healthEndpoint := "/health"
 	healthPort := 8080
@@ -363,7 +367,7 @@ func TestDeployService_convertContainersToTektonFormat_Success(t *testing.T) {
 	assert.Equal(t, &healthEndpoint, result[0].HealthEndpoint)
 	assert.Equal(t, 3000, result[0].Port)
 	assert.Equal(t, &healthPort, result[0].HealthPort)
-	assert.Equal(t, "myapp", result[0].ImageName)
+	assert.Equal(t, "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/myapp", result[0].ImageName)
 	assert.Equal(t, "v1.0.0", result[0].ImageTag)
 	assert.Equal(t, map[string]string{"ENV": "prod"}, result[0].EnvVars)
 	assert.Equal(t, map[string]string{"API_KEY": "secret123"}, result[0].Secrets)
@@ -378,13 +382,16 @@ func TestDeployService_convertContainersToTektonFormat_Success(t *testing.T) {
 
 	// Second container (no volume mounts)
 	assert.Equal(t, "sidecar", result[1].Name)
+	assert.Equal(t, "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx", result[1].ImageName)
 	assert.Nil(t, result[1].Domain)
 	assert.Empty(t, result[1].VolumeMounts)
 }
 
 func TestDeployService_convertContainersToTektonFormat_VolumeNotFound(t *testing.T) {
 	// Arrange
-	service := &deployService{}
+	service := &deployService{
+		registryURL: "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com",
+	}
 
 	containers := []dto.ContainerInfo{
 		{
@@ -418,7 +425,9 @@ func TestDeployService_convertContainersToTektonFormat_VolumeNotFound(t *testing
 
 func TestDeployService_convertContainersToTektonFormat_NoVolumeMounts(t *testing.T) {
 	// Arrange
-	service := &deployService{}
+	service := &deployService{
+		registryURL: "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com",
+	}
 
 	containers := []dto.ContainerInfo{
 		{
@@ -448,7 +457,9 @@ func TestDeployService_convertContainersToTektonFormat_NoVolumeMounts(t *testing
 
 func TestDeployService_convertContainersToTektonFormat_EmptyContainerList(t *testing.T) {
 	// Arrange
-	service := &deployService{}
+	service := &deployService{
+		registryURL: "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com",
+	}
 	containers := []dto.ContainerInfo{}
 	volumeMap := map[uint]string{}
 
