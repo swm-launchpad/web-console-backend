@@ -121,10 +121,16 @@ func provideContainerClient(
 	getContainersForBuildAndDeployUseCase *containerCombined.GetContainersForBuildAndDeployUseCase,
 	log logger.Logger,
 ) projectDomainInfra.ContainerClient {
+	registryURL := os.Getenv("REGISTRY_URL")
+	if registryURL == "" {
+		log.Fatal(nil, "REGISTRY_URL environment variable is required")
+	}
+
 	return projectInfra.NewContainerClient(
 		getContainersForDeploymentUseCase,
 		getContainersForBuildUseCase,
 		getContainersForBuildAndDeployUseCase,
+		registryURL,
 		log,
 	)
 }

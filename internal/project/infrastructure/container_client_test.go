@@ -17,9 +17,10 @@ func TestNewContainerClient(t *testing.T) {
 		mockGetContainersForBuildUseCase := &containerBuild.GetContainersForBuildUseCase{}
 		mockGetContainersForBuildAndDeployUseCase := &containerCombined.GetContainersForBuildAndDeployUseCase{}
 		testLogger := logger.NewForTest()
+		registryURL := "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com"
 
 		// Act
-		client := NewContainerClient(mockGetContainersForDeploymentUseCase, mockGetContainersForBuildUseCase, mockGetContainersForBuildAndDeployUseCase, testLogger)
+		client := NewContainerClient(mockGetContainersForDeploymentUseCase, mockGetContainersForBuildUseCase, mockGetContainersForBuildAndDeployUseCase, registryURL, testLogger)
 
 		// Assert
 		assert.NotNil(t, client)
@@ -31,9 +32,10 @@ func TestNewContainerClient(t *testing.T) {
 		mockGetContainersForBuildUseCase := &containerBuild.GetContainersForBuildUseCase{}
 		mockGetContainersForBuildAndDeployUseCase := &containerCombined.GetContainersForBuildAndDeployUseCase{}
 		testLogger := logger.NewForTest()
+		registryURL := "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com"
 
 		// Act
-		client := NewContainerClient(mockGetContainersForDeploymentUseCase, mockGetContainersForBuildUseCase, mockGetContainersForBuildAndDeployUseCase, testLogger)
+		client := NewContainerClient(mockGetContainersForDeploymentUseCase, mockGetContainersForBuildUseCase, mockGetContainersForBuildAndDeployUseCase, registryURL, testLogger)
 		concreteClient, ok := client.(*containerClient)
 
 		// Assert
@@ -41,6 +43,7 @@ func TestNewContainerClient(t *testing.T) {
 		assert.NotNil(t, concreteClient.getContainersForDeploymentUseCase)
 		assert.NotNil(t, concreteClient.getContainersForBuildUseCase)
 		assert.NotNil(t, concreteClient.getContainersForBuildAndDeployUseCase)
+		assert.NotNil(t, concreteClient.registryURL)
 		assert.NotNil(t, concreteClient.logger)
 	})
 }
@@ -55,9 +58,10 @@ func TestContainerClient_NoDependencyOnVolumeRepo(t *testing.T) {
 		mockGetContainersForBuildUseCase := &containerBuild.GetContainersForBuildUseCase{}
 		mockGetContainersForBuildAndDeployUseCase := &containerCombined.GetContainersForBuildAndDeployUseCase{}
 		testLogger := logger.NewForTest()
+		registryURL := "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com"
 
 		// Act
-		client := NewContainerClient(mockGetContainersForDeploymentUseCase, mockGetContainersForBuildUseCase, mockGetContainersForBuildAndDeployUseCase, testLogger)
+		client := NewContainerClient(mockGetContainersForDeploymentUseCase, mockGetContainersForBuildUseCase, mockGetContainersForBuildAndDeployUseCase, registryURL, testLogger)
 		concreteClient, ok := client.(*containerClient)
 
 		// Assert
@@ -67,6 +71,7 @@ func TestContainerClient_NoDependencyOnVolumeRepo(t *testing.T) {
 		assert.NotNil(t, concreteClient.getContainersForDeploymentUseCase)
 		assert.NotNil(t, concreteClient.getContainersForBuildUseCase)
 		assert.NotNil(t, concreteClient.getContainersForBuildAndDeployUseCase)
+		assert.NotNil(t, concreteClient.registryURL)
 		assert.NotNil(t, concreteClient.logger)
 	})
 }

@@ -57,7 +57,7 @@ func TestDeployService_buildTektonRequest(t *testing.T) {
 		Containers: []dto.ContainerInfo{
 			{
 				Name:            "app",
-				ImageName:       "nginx",
+				ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx",
 				ImageTag:        "latest",
 				Port:            80,
 				HealthCheckType: "tcp",
@@ -105,7 +105,7 @@ func TestDeployService_buildTektonRequest_WithVolumeMounts(t *testing.T) {
 		Containers: []dto.ContainerInfo{
 			{
 				Name:            "mysql",
-				ImageName:       "mysql",
+				ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/mysql",
 				ImageTag:        "8.0",
 				Port:            3306,
 				HealthCheckType: "tcp",
@@ -160,7 +160,7 @@ func TestDeployService_buildTektonRequest_VolumeNotFound(t *testing.T) {
 		Containers: []dto.ContainerInfo{
 			{
 				Name:            "app",
-				ImageName:       "nginx",
+				ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx",
 				ImageTag:        "latest",
 				Port:            80,
 				HealthCheckType: "tcp",
@@ -323,7 +323,7 @@ func TestDeployService_convertContainersToTektonFormat_Success(t *testing.T) {
 			HealthEndpoint:  &healthEndpoint,
 			Port:            3000,
 			HealthPort:      &healthPort,
-			ImageName:       "myapp",
+			ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/myapp",
 			ImageTag:        "v1.0.0",
 			EnvVars:         map[string]string{"ENV": "prod"},
 			Secrets:         map[string]string{"API_KEY": "secret123"},
@@ -337,7 +337,7 @@ func TestDeployService_convertContainersToTektonFormat_Success(t *testing.T) {
 		},
 		{
 			Name:            "sidecar",
-			ImageName:       "nginx",
+			ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx",
 			ImageTag:        "latest",
 			Port:            80,
 			HealthCheckType: "tcp",
@@ -396,7 +396,7 @@ func TestDeployService_convertContainersToTektonFormat_VolumeNotFound(t *testing
 	containers := []dto.ContainerInfo{
 		{
 			Name:            "app",
-			ImageName:       "myapp",
+			ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/myapp",
 			ImageTag:        "latest",
 			Port:            3000,
 			HealthCheckType: "http",
@@ -432,7 +432,7 @@ func TestDeployService_convertContainersToTektonFormat_NoVolumeMounts(t *testing
 	containers := []dto.ContainerInfo{
 		{
 			Name:            "simple-app",
-			ImageName:       "nginx",
+			ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx",
 			ImageTag:        "latest",
 			Port:            80,
 			HealthCheckType: "tcp",
@@ -820,7 +820,7 @@ func TestDeployProject_RejectsPendingImageTag(t *testing.T) {
 		Containers: []dto.ContainerInfo{
 			{
 				Name:      "app",
-				ImageName: "nginx",
+				ImageName: "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx",
 				ImageTag:  "pending", // ← Never been built
 				Port:      80,
 			},
@@ -890,7 +890,7 @@ func TestDeployProject_AllowsBuiltContainers(t *testing.T) {
 		Containers: []dto.ContainerInfo{
 			{
 				Name:            "app",
-				ImageName:       "nginx",
+				ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx",
 				ImageTag:        "abc1234", // ← Valid commit hash tag
 				Port:            80,
 				HealthCheckType: "tcp",

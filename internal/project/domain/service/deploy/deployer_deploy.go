@@ -271,6 +271,7 @@ func (s *deployService) convertContainersToTektonFormat(
 		}
 
 		// Build TektonContainerInfo with all fields from ContainerInfo
+		// ImageName is already fully-qualified from ContainerClient
 		tektonContainer := dto.TektonContainerInfo{
 			Name:            container.Name,
 			Domain:          container.Domain,
@@ -278,7 +279,7 @@ func (s *deployService) convertContainersToTektonFormat(
 			HealthEndpoint:  container.HealthEndpoint,
 			Port:            container.Port,
 			HealthPort:      container.HealthPort,
-			ImageName:       fmt.Sprintf("%s/%s", s.registryURL, container.ImageName),
+			ImageName:       container.ImageName,
 			ImageTag:        container.ImageTag,
 			EnvVars:         container.EnvVars,
 			Secrets:         container.Secrets,

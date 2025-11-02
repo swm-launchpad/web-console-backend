@@ -20,6 +20,7 @@ type containerClient struct {
 	getContainersForDeploymentUseCase     *containerdeployment.GetContainersForDeploymentUseCase
 	getContainersForBuildUseCase          *containerbuild.GetContainersForBuildUseCase
 	getContainersForBuildAndDeployUseCase *containercombined.GetContainersForBuildAndDeployUseCase
+	registryURL                           string
 	logger                                logger.Logger
 }
 
@@ -28,12 +29,14 @@ func NewContainerClient(
 	getContainersForDeploymentUseCase *containerdeployment.GetContainersForDeploymentUseCase,
 	getContainersForBuildUseCase *containerbuild.GetContainersForBuildUseCase,
 	getContainersForBuildAndDeployUseCase *containercombined.GetContainersForBuildAndDeployUseCase,
+	registryURL string,
 	log logger.Logger,
 ) projectinfra.ContainerClient {
 	return &containerClient{
 		getContainersForDeploymentUseCase:     getContainersForDeploymentUseCase,
 		getContainersForBuildUseCase:          getContainersForBuildUseCase,
 		getContainersForBuildAndDeployUseCase: getContainersForBuildAndDeployUseCase,
+		registryURL:                           registryURL,
 		logger:                                log,
 	}
 }
@@ -67,8 +70,8 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 	containerInfos := make([]dto.ContainerInfo, 0, len(containersOutput.Containers))
 
 	for _, container := range containersOutput.Containers {
-		// Image name: use container slug
-		imageName := container.Slug
+		// Image name: use fully-qualified name with registry
+		imageName := fmt.Sprintf("%s/%s", c.registryURL, container.Slug)
 
 		// Image tag: use first 7 characters of last_built_git_commit_hash
 		// For first-time builds, last_built_git_commit_hash is NULL, so we use a placeholder
@@ -287,8 +290,8 @@ func (c *containerClient) GetContainerConfigs(ctx context.Context, projectID uin
 	deployContainerInfos := make([]dto.ContainerInfo, 0, len(combined.DeploymentContainers))
 
 	for _, container := range combined.DeploymentContainers {
-		// Image name: use container slug
-		imageName := container.Slug
+		// Image name: use fully-qualified name with registry
+		imageName := fmt.Sprintf("%s/%s", c.registryURL, container.Slug)
 
 		// Image tag: use first 7 characters of last_built_git_commit_hash
 		// For first-time builds, last_built_git_commit_hash is NULL, so we use a placeholder
