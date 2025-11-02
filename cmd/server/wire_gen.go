@@ -41,6 +41,10 @@ import (
 	"os"
 )
 
+import (
+	_ "net/http/pprof"
+)
+
 // Injectors from wire.go:
 
 func InitializeApp() (*App, error) {
@@ -311,6 +315,11 @@ func provideDeployService(
 		applicationNamespace = "application"
 	}
 
+	registryURL := os.Getenv("REGISTRY_URL")
+	if registryURL == "" {
+		log.Fatal(nil, "REGISTRY_URL environment variable is required")
+	}
+
 	projectServiceName := ""
 
 	return deploy.NewDeployer(
@@ -327,6 +336,7 @@ func provideDeployService(
 		buildPostProcessor,
 		deployNamespace,
 		applicationNamespace,
+		registryURL,
 		projectServiceName,
 		log,
 	)

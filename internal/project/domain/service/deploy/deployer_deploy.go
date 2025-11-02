@@ -278,7 +278,7 @@ func (s *deployService) convertContainersToTektonFormat(
 			HealthEndpoint:  container.HealthEndpoint,
 			Port:            container.Port,
 			HealthPort:      container.HealthPort,
-			ImageName:       container.ImageName,
+			ImageName:       fmt.Sprintf("%s/%s", s.registryURL, container.ImageName),
 			ImageTag:        container.ImageTag,
 			EnvVars:         container.EnvVars,
 			Secrets:         container.Secrets,
