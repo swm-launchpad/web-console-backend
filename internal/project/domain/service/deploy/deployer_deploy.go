@@ -230,7 +230,7 @@ func (s *deployService) buildTektonRequest(
 	deploymentConfig := dto.DeploymentConfig{
 		ProjectID:    projectIDStr,
 		ServiceName:  proj.Slug().String(), // Use project slug for per-project resource isolation in Kubernetes
-		Namespace:    s.deployNamespace,
+		Namespace:    s.applicationNamespace,
 		StableWindow: 180, // constant: 180 seconds
 		ConfigMaps:   allConfigMaps,
 		Volumes:      allVolumes,

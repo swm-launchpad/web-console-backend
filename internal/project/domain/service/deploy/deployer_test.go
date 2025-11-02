@@ -46,8 +46,9 @@ func createTestProjectForDeploy(projectID uint, operationStatus value.ProjectOpe
 func TestDeployService_buildTektonRequest(t *testing.T) {
 	// Arrange
 	service := &deployService{
-		deployNamespace:    "test-namespace",
-		projectServiceName: "test-service",
+		deployNamespace:      "deploy-pipeline",
+		applicationNamespace: "test-namespace",
+		projectServiceName:   "test-service",
 	}
 
 	proj := createTestProjectForDeploy(1, value.ProjectOperationStatusNothing)
@@ -93,8 +94,9 @@ func TestDeployService_buildTektonRequest(t *testing.T) {
 func TestDeployService_buildTektonRequest_WithVolumeMounts(t *testing.T) {
 	// Arrange
 	service := &deployService{
-		deployNamespace:    "test-namespace",
-		projectServiceName: "test-service",
+		deployNamespace:      "deploy-pipeline",
+		applicationNamespace: "test-namespace",
+		projectServiceName:   "test-service",
 	}
 
 	proj := createTestProjectForDeploy(1, value.ProjectOperationStatusNothing)
@@ -147,8 +149,9 @@ func TestDeployService_buildTektonRequest_WithVolumeMounts(t *testing.T) {
 func TestDeployService_buildTektonRequest_VolumeNotFound(t *testing.T) {
 	// Arrange
 	service := &deployService{
-		deployNamespace:    "test-namespace",
-		projectServiceName: "test-service",
+		deployNamespace:      "deploy-pipeline",
+		applicationNamespace: "test-namespace",
+		projectServiceName:   "test-service",
 	}
 
 	proj := createTestProjectForDeploy(1, value.ProjectOperationStatusNothing)
