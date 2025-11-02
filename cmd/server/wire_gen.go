@@ -41,6 +41,10 @@ import (
 	"os"
 )
 
+import (
+	_ "net/http/pprof"
+)
+
 // Injectors from wire.go:
 
 func InitializeApp() (*App, error) {
@@ -268,10 +272,16 @@ func provideContainerClient(
 	getContainersForBuildAndDeployUseCase *combined.GetContainersForBuildAndDeployUseCase,
 	log logger.Logger,
 ) infrastructure4.ContainerClient {
+	registryURL := os.Getenv("REGISTRY_URL")
+	if registryURL == "" {
+		log.Fatal(nil, "REGISTRY_URL environment variable is required")
+	}
+
 	return infrastructure3.NewContainerClient(
 		getContainersForDeploymentUseCase,
 		getContainersForBuildUseCase,
 		getContainersForBuildAndDeployUseCase,
+		registryURL,
 		log,
 	)
 }
