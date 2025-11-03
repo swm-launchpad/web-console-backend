@@ -16,13 +16,14 @@ import (
 func TestCreateContainerUseCase_Execute_Success(t *testing.T) {
 	mockContainerService := new(infrastructure.MockContainerService)
 	mockContainerRepo := new(infrastructure.MockContainerRepository)
+	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
 	mockVolumeService := new(projectinfra.MockVolumeService)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	mockTxMgr := new(db.MockTxManager)
 	testLogger := logger.NewForTest()
-	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr, testLogger)
+	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockTemplateRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	projectID := uint(10)
@@ -64,13 +65,14 @@ func TestCreateContainerUseCase_Execute_Success(t *testing.T) {
 func TestCreateContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockContainerService := new(infrastructure.MockContainerService)
 	mockContainerRepo := new(infrastructure.MockContainerRepository)
+	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
 	mockVolumeService := new(projectinfra.MockVolumeService)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	mockTxMgr := new(db.MockTxManager)
 	testLogger := logger.NewForTest()
-	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr, testLogger)
+	useCase := NewCreateContainerUseCase(mockContainerService, mockContainerRepo, mockTemplateRepo, mockPermSvc, mockResourceValidationSvc, mockVolumeService, mockInstallationRepo, mockTxMgr, testLogger)
 
 	ctx := context.Background()
 	projectID := uint(10)

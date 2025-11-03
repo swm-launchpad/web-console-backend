@@ -642,8 +642,8 @@ type Network struct {
 	ContainerID  uint32         `json:"container_id"`
 	ExternalIp   sql.NullString `json:"external_ip"`
 	Fqdn         sql.NullString `json:"fqdn"`
-	ExternalPort sql.NullInt16  `json:"external_port"`
-	InternalPort sql.NullInt16  `json:"internal_port"`
+	ExternalPort sql.NullInt32  `json:"external_port"`
+	InternalPort sql.NullInt32  `json:"internal_port"`
 	Type         NetworksType   `json:"type"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    sql.NullTime   `json:"updated_at"`

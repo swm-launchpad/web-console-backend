@@ -14,9 +14,9 @@ import (
 // ProjectService defines the interface for project-related business logic
 type ProjectService interface {
 	// CreateProject creates a new project with the given parameters
-	// limits is required, fqdn and plan are optional
+	// limits is required, plan is optional
 	// slug is automatically generated from name
-	CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *value.Plan) (*model.Project, error)
+	CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, plan *value.Plan) (*model.Project, error)
 
 	// GetProject retrieves a project by ID
 	GetProject(ctx context.Context, projectID uint) (*model.Project, error)
@@ -68,8 +68,8 @@ func NewProjectService(projectRepo repository.ProjectRepository, slugService Slu
 
 // CreateProject creates a new project with validation
 // slug is automatically generated from name
-// limits is required, fqdn and plan are optional
-func (s *projectService) CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, fqdn *string, plan *value.Plan) (*model.Project, error) {
+// limits is required, plan is optional
+func (s *projectService) CreateProject(ctx context.Context, name string, ownerID uint, limits value.ResourceLimits, plan *value.Plan) (*model.Project, error) {
 	s.logger.Info(ctx, "create project started",
 		zap.String("name", name),
 		zap.Uint("owner_id", ownerID),
@@ -137,10 +137,10 @@ func (s *projectService) CreateProject(ctx context.Context, name string, ownerID
 		return nil, err
 	}
 
-	// Create the project aggregate with all fields (including optional ones)
+	// Create the project aggregate with plan
 	// This ensures created_at and updated_at are the same at creation time
 	// Use selectedPlan (which defaults to Eco if plan was nil)
-	project, err := model.NewProject(name, slug, ownerID, limits, fqdn, &selectedPlan)
+	project, err := model.NewProject(name, slug, ownerID, limits, &selectedPlan)
 	if err != nil {
 		s.logger.Error(ctx, "failed to create project model",
 			zap.String("name", name),

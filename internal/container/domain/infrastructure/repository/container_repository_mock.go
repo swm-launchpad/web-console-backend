@@ -100,3 +100,13 @@ func (m *MockContainerRepository) GetTotalResourceUsageByProject(ctx context.Con
 	args := m.Called(ctx, projectID)
 	return args.Get(0).(uint32), args.Get(1).(uint32), args.Error(2)
 }
+
+func (m *MockContainerRepository) CheckInternalPortExistsInProject(ctx context.Context, projectID uint, internalPort uint16) (bool, error) {
+	args := m.Called(ctx, projectID, internalPort)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockContainerRepository) CheckFQDNExists(ctx context.Context, fqdn string) (bool, error) {
+	args := m.Called(ctx, fqdn)
+	return args.Bool(0), args.Error(1)
+}

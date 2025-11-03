@@ -11,6 +11,41 @@ import (
 	"time"
 )
 
+const checkFQDNExists = `-- name: CheckFQDNExists :one
+SELECT COUNT(*) > 0 as fqdn_exists
+FROM NETWORKS
+WHERE fqdn = ?
+`
+
+func (q *Queries) CheckFQDNExists(ctx context.Context, fqdn sql.NullString) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkFQDNExists, fqdn)
+	var fqdn_exists bool
+	err := row.Scan(&fqdn_exists)
+	return fqdn_exists, err
+}
+
+const checkInternalPortExistsInProject = `-- name: CheckInternalPortExistsInProject :one
+SELECT COUNT(*) > 0 as port_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE c.project_id = ?
+  AND n.internal_port = ?
+  AND c.is_deleted = 0
+FOR UPDATE
+`
+
+type CheckInternalPortExistsInProjectParams struct {
+	ProjectID    uint32        `json:"project_id"`
+	InternalPort sql.NullInt32 `json:"internal_port"`
+}
+
+func (q *Queries) CheckInternalPortExistsInProject(ctx context.Context, arg CheckInternalPortExistsInProjectParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkInternalPortExistsInProject, arg.ProjectID, arg.InternalPort)
+	var port_exists bool
+	err := row.Scan(&port_exists)
+	return port_exists, err
+}
+
 const countNetworksByContainerID = `-- name: CountNetworksByContainerID :one
 SELECT COUNT(*) as total FROM NETWORKS WHERE container_id = ?
 `
@@ -32,8 +67,8 @@ INSERT INTO NETWORKS (
 
 type CreateNetworkParams struct {
 	ContainerID  uint32         `json:"container_id"`
-	InternalPort sql.NullInt16  `json:"internal_port"`
-	ExternalPort sql.NullInt16  `json:"external_port"`
+	InternalPort sql.NullInt32  `json:"internal_port"`
+	ExternalPort sql.NullInt32  `json:"external_port"`
 	ExternalIp   sql.NullString `json:"external_ip"`
 	Fqdn         sql.NullString `json:"fqdn"`
 	Type         NetworksType   `json:"type"`
@@ -146,7 +181,7 @@ WHERE network_id = ?
 `
 
 type UpdateNetworkParams struct {
-	ExternalPort sql.NullInt16  `json:"external_port"`
+	ExternalPort sql.NullInt32  `json:"external_port"`
 	ExternalIp   sql.NullString `json:"external_ip"`
 	Fqdn         sql.NullString `json:"fqdn"`
 	UpdatedAt    sql.NullTime   `json:"updated_at"`

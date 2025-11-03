@@ -44,7 +44,7 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 		// Prepare expected limits
 		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
 
-		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*string)(nil), (*value.Plan)(nil)).Return(project, nil)
+		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*value.Plan)(nil)).Return(project, nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -87,7 +87,7 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 		// Expected limits with minimum values
 		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
 
-		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*string)(nil), (*value.Plan)(nil)).Return(project, nil)
+		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*value.Plan)(nil)).Return(project, nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -102,12 +102,11 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 		mockProjectService.AssertExpectations(t)
 	})
 
-	t.Run("성공: FQDN과 Plan이 있는 프로젝트 생성", func(t *testing.T) {
+	t.Run("성공: Plan이 있는 프로젝트 생성", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		uc := NewCreateProjectUseCase(mockProjectService, txManager, testLogger)
 
-		fqdn := "example.com"
 		plan := value.PlanEco
 		cpuLimit := uint32(1000)
 		memoryLimit := uint32(2048)
@@ -115,9 +114,8 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 		trafficLimit := uint32(256)
 
 		input := CreateProjectInput{
-			Name:         "프로젝트 with FQDN and Plan",
+			Name:         "프로젝트 with Plan",
 			OwnerID:      1,
-			FQDN:         &fqdn,
 			Plan:         &plan,
 			CPULimit:     cpuLimit,
 			MemoryLimit:  memoryLimit,
@@ -127,21 +125,19 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 
 		slug, _ := value.NewProjectSlug("p2025011812000033333333")
 		project := createTestProjectWithLimits(3, input.Name, *slug, input.OwnerID, &cpuLimit, &memoryLimit, &diskLimit, &trafficLimit)
-		// Set FQDN and Plan
-		_ = project.SetFQDN(fqdn)
+		// Set Plan
 		_ = project.SetPlan(plan)
 
 		// Prepare expected limits
 		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
 
-		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, &fqdn, &plan).Return(project, nil)
+		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, &plan).Return(project, nil)
 
 		output, err := uc.Execute(ctx, input)
 
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, uint(3), output.ProjectID)
-		assert.Equal(t, fqdn, output.FQDN)
 		assert.Equal(t, plan.String(), output.Plan)
 
 		mockProjectService.AssertExpectations(t)
@@ -186,7 +182,7 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 		}
 
 		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
-		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*string)(nil), (*value.Plan)(nil)).Return((*model.Project)(nil), projecterrors.ErrOwnerIDRequired)
+		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*value.Plan)(nil)).Return((*model.Project)(nil), projecterrors.ErrOwnerIDRequired)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -216,7 +212,7 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 		}
 
 		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
-		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*string)(nil), (*value.Plan)(nil)).Return((*model.Project)(nil), projecterrors.ErrProjectCreationFailed)
+		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*value.Plan)(nil)).Return((*model.Project)(nil), projecterrors.ErrProjectCreationFailed)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -247,7 +243,7 @@ func TestCreateProjectUseCase_Execute(t *testing.T) {
 		}
 
 		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
-		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*string)(nil), (*value.Plan)(nil)).Return((*model.Project)(nil), projecterrors.ErrProjectNameExists)
+		mockProjectService.On("CreateProject", mock.Anything, input.Name, input.OwnerID, *expectedLimits, (*value.Plan)(nil)).Return((*model.Project)(nil), projecterrors.ErrProjectNameExists)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -281,7 +277,7 @@ func createTestProjectWithLimits(id uint, name string, slug value.ProjectSlug, o
 		panic(err) // This is a test helper, panic on error
 	}
 
-	project, err := model.NewProject(name, slug, ownerID, *limits, nil, nil)
+	project, err := model.NewProject(name, slug, ownerID, *limits, nil)
 	if err != nil {
 		panic(err) // This is a test helper, panic on error
 	}

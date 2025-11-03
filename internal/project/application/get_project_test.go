@@ -165,7 +165,7 @@ func TestGetProjectUseCase_Execute(t *testing.T) {
 }
 
 func createTestProjectWithVolumes(id uint, name string, slug value.ProjectSlug, ownerID uint) *projectmodel.Project {
-	project, _ := projectmodel.NewProject(name, slug, ownerID, defaultLimits(), nil, nil)
+	project, _ := projectmodel.NewProject(name, slug, ownerID, defaultLimits(), nil)
 	project.SetProjectID(id)
 
 	cpuLimit := uint32(1000)

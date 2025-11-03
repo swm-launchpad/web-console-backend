@@ -31,7 +31,6 @@ type GetProjectOutput struct {
 	ProjectID    uint                `json:"project_id"`
 	Name         string              `json:"name"`
 	Slug         string              `json:"slug"`
-	FQDN         string              `json:"fqdn,omitempty"`
 	Plan         string              `json:"plan,omitempty"`
 	Status       string              `json:"status"`
 	CPULimit     uint32              `json:"cpu_limit"`
@@ -107,10 +106,6 @@ func buildProjectOutput(ctx context.Context, project *model.Project, volumeServi
 		UpdatedAt:    project.UpdatedAt().Format("2006-01-02T15:04:05Z"),
 		Users:        make([]ProjectUserOutput, 0),
 		Volumes:      make([]VolumeOutput, 0),
-	}
-
-	if fqdn, ok := project.FQDN(); ok {
-		output.FQDN = fqdn
 	}
 
 	if plan, ok := project.Plan(); ok {

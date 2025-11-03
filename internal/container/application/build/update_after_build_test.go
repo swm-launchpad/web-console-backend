@@ -74,6 +74,12 @@ func (m *mockUpdateContainerRepo) CountByTemplateID(ctx context.Context, templat
 func (m *mockUpdateContainerRepo) GetTotalResourceUsageByProject(ctx context.Context, projectID uint) (totalCPU uint32, totalMemory uint32, err error) {
 	return 0, 0, nil
 }
+func (m *mockUpdateContainerRepo) CheckInternalPortExistsInProject(ctx context.Context, projectID uint, internalPort uint16) (bool, error) {
+	return false, nil
+}
+func (m *mockUpdateContainerRepo) CheckFQDNExists(ctx context.Context, fqdn string) (bool, error) {
+	return false, nil
+}
 
 type mockUpdateTxManager struct {
 	runInTxFunc func(ctx context.Context, fn func(ctx context.Context) error) error

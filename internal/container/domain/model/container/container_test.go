@@ -197,19 +197,17 @@ func TestContainer_AddNetwork(t *testing.T) {
 	})
 
 	t.Run("Duplicate internal port", func(t *testing.T) {
-		_, err := container.AddNetwork(&internalPort, nil, networkType, nil, nil)
-		assert.ErrorIs(t, err, containererrors.ErrDuplicateInternalPort)
+		// Since max is 1 and we already have 1 network, we can't test duplicate port
+		// The max networks check happens before duplicate check
+		// This test is now covered by the max networks test
+		t.Skip("Skipped: with MaxNetworksPerContainer=1, duplicate check is unreachable")
 	})
 
 	t.Run("Max networks exceeded", func(t *testing.T) {
-		// Add 19 more networks (already have 1)
-		for i := 1; i < MaxNetworksPerContainer; i++ {
-			port := uint16(8081 + i)
-			_, _ = container.AddNetwork(&port, nil, networkType, nil, nil)
-		}
+		// Already have 1 network from setup, which is the max
 		assert.Len(t, container.Networks(), MaxNetworksPerContainer)
 
-		// Try to add one more
+		// Try to add one more (should fail since max is 1)
 		extraPort := uint16(9999)
 		_, err := container.AddNetwork(&extraPort, nil, networkType, nil, nil)
 		assert.ErrorIs(t, err, containererrors.ErrMaxNetworksExceeded)
@@ -222,16 +220,15 @@ func TestContainer_DeleteNetwork(t *testing.T) {
 	container.SetContainerID(1)
 
 	port1 := uint16(8080)
-	port2 := uint16(3000)
 	networkType, _ := value.NewNetworkType("tcp")
 
+	// Add only 1 network (max allowed)
 	_, _ = container.AddNetwork(&port1, nil, networkType, nil, nil)
-	_, _ = container.AddNetwork(&port2, nil, networkType, nil, nil)
 
 	t.Run("Success", func(t *testing.T) {
 		err := container.DeleteNetworkByInternalPort(port1)
 		require.NoError(t, err)
-		assert.Len(t, container.Networks(), 1)
+		assert.Len(t, container.Networks(), 0)
 	})
 
 	t.Run("Network not found", func(t *testing.T) {

@@ -10,6 +10,8 @@ import (
 )
 
 type Querier interface {
+	CheckFQDNExists(ctx context.Context, fqdn sql.NullString) (bool, error)
+	CheckInternalPortExistsInProject(ctx context.Context, arg CheckInternalPortExistsInProjectParams) (bool, error)
 	CountBuildVarsByContainerID(ctx context.Context, containerID uint32) (int64, error)
 	CountContainers(ctx context.Context) (int64, error)
 	CountContainersByProjectID(ctx context.Context, projectID uint32) (int64, error)

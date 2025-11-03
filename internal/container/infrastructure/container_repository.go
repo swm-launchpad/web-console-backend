@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
@@ -116,8 +118,8 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 	for _, network := range container.Networks() {
 		netParams := sqlc.CreateNetworkParams{
 			ContainerID:  uint32(container.ContainerID()),
-			InternalPort: uint16PtrToNullInt16(network.InternalPort()),
-			ExternalPort: uint16PtrToNullInt16(network.ExternalPort()),
+			InternalPort: uint16PtrToNullInt32(network.InternalPort()),
+			ExternalPort: uint16PtrToNullInt32(network.ExternalPort()),
 			ExternalIp:   stringPtrToNullString(network.ExternalIP()),
 			Fqdn:         stringPtrToNullString(network.FQDN()),
 			Type:         sqlc.NetworksType(network.NetworkType().String()),
@@ -125,6 +127,12 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 			UpdatedAt:    timeToNullTime(network.UpdatedAt()),
 		}
 		if _, err := qtx.CreateNetwork(ctx, netParams); err != nil {
+			// Check for FQDN duplicate key error
+			if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
+				if strings.Contains(mysqlErr.Message, "uk_networks_fqdn") {
+					return containererrors.ErrDuplicateFQDN
+				}
+			}
 			return containererrors.ErrDatabaseOperation
 		}
 	}
@@ -272,8 +280,8 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 	for _, network := range container.Networks() {
 		netParams := sqlc.CreateNetworkParams{
 			ContainerID:  uint32(container.ContainerID()),
-			InternalPort: uint16PtrToNullInt16(network.InternalPort()),
-			ExternalPort: uint16PtrToNullInt16(network.ExternalPort()),
+			InternalPort: uint16PtrToNullInt32(network.InternalPort()),
+			ExternalPort: uint16PtrToNullInt32(network.ExternalPort()),
 			ExternalIp:   stringPtrToNullString(network.ExternalIP()),
 			Fqdn:         stringPtrToNullString(network.FQDN()),
 			Type:         sqlc.NetworksType(network.NetworkType().String()),
@@ -281,6 +289,12 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 			UpdatedAt:    timeToNullTime(network.UpdatedAt()),
 		}
 		if _, err := qtx.CreateNetwork(ctx, netParams); err != nil {
+			// Check for FQDN duplicate key error
+			if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
+				if strings.Contains(mysqlErr.Message, "uk_networks_fqdn") {
+					return containererrors.ErrDuplicateFQDN
+				}
+			}
 			return containererrors.ErrDatabaseOperation
 		}
 	}
@@ -964,11 +978,11 @@ func (r *containerRepository) toDomainEnvVar(sqlcEnvVar sqlc.EnvVar) (*model.Env
 func (r *containerRepository) toDomainNetwork(sqlcNetwork sqlc.Network) (*model.Network, error) {
 	var internalPort, externalPort *uint16
 	if sqlcNetwork.InternalPort.Valid {
-		val := uint16(sqlcNetwork.InternalPort.Int16)
+		val := uint16(sqlcNetwork.InternalPort.Int32)
 		internalPort = &val
 	}
 	if sqlcNetwork.ExternalPort.Valid {
-		val := uint16(sqlcNetwork.ExternalPort.Int16)
+		val := uint16(sqlcNetwork.ExternalPort.Int32)
 		externalPort = &val
 	}
 
@@ -1058,4 +1072,47 @@ func (r *containerRepository) GetTotalResourceUsageByProject(ctx context.Context
 	}
 
 	return uint32(totalCPUInt64.Int64), uint32(totalMemoryInt64.Int64), nil
+}
+
+// CheckInternalPortExistsInProject checks if an internal port is already used by another container in the same project
+func (r *containerRepository) CheckInternalPortExistsInProject(ctx context.Context, projectID uint, internalPort uint16) (bool, error) {
+	r.logger.Debug(ctx, "checking internal port existence in project",
+		zap.Uint("project_id", projectID),
+		zap.Uint16("internal_port", internalPort),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckInternalPortExistsInProject(ctx, sqlc.CheckInternalPortExistsInProjectParams{
+		ProjectID:    uint32(projectID),
+		InternalPort: sql.NullInt32{Int32: int32(internalPort), Valid: true},
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check internal port existence",
+			zap.Uint("project_id", projectID),
+			zap.Uint16("internal_port", internalPort),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
+// CheckFQDNExists checks if an FQDN is already used by any network in the system
+func (r *containerRepository) CheckFQDNExists(ctx context.Context, fqdn string) (bool, error) {
+	r.logger.Debug(ctx, "checking FQDN existence",
+		zap.String("fqdn", fqdn),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckFQDNExists(ctx, sql.NullString{String: fqdn, Valid: true})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check FQDN existence",
+			zap.String("fqdn", fqdn),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
 }

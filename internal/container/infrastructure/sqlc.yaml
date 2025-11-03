@@ -20,3 +20,9 @@ sql:
             go_type: "time.Time"
           - db_type: "datetime"
             go_type: "time.Time"
+          - column: "networks.internal_port"
+            go_type:
+              type: "sql.NullInt32"
+          - column: "networks.external_port"
+            go_type:
+              type: "sql.NullInt32"

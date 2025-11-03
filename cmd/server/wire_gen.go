@@ -156,7 +156,7 @@ func InitializeApp() (*App, error) {
 	projectStatusHandler := handler2.NewProjectStatusHandler(getProjectStatusUseCase, refreshProjectStatusUseCase, permissionService, projectService, logger)
 	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository, logger)
 	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository, logger)
-	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, servicePermissionService, resourceValidationService, volumeService, gitHubInstallationRepository, txManager, logger)
+	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, templateRepository, servicePermissionService, resourceValidationService, volumeService, gitHubInstallationRepository, txManager, logger)
 	getContainerUseCase := application3.NewGetContainerUseCase(containerRepository, servicePermissionService, logger)
 	buildChangeDetector := service3.NewBuildChangeDetector()
 	updateContainerUseCase := application3.NewUpdateContainerUseCase(containerRepository, servicePermissionService, resourceValidationService, buildChangeDetector, gitHubInstallationRepository, txManager, logger)

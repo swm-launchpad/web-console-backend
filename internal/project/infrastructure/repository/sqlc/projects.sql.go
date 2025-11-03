@@ -26,17 +26,16 @@ func (q *Queries) CountProjects(ctx context.Context) (int64, error) {
 const createProject = `-- name: CreateProject :execresult
 
 INSERT INTO PROJECTS (
-    name, slug, fqdn, status, plan,
+    name, slug, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
     project_operation_status, active_deployment_id,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateProjectParams struct {
 	Name                   string                         `json:"name"`
 	Slug                   string                         `json:"slug"`
-	Fqdn                   sql.NullString                 `json:"fqdn"`
 	Status                 ProjectsStatus                 `json:"status"`
 	Plan                   sql.NullString                 `json:"plan"`
 	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
@@ -54,7 +53,6 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (s
 	return q.db.ExecContext(ctx, createProject,
 		arg.Name,
 		arg.Slug,
-		arg.Fqdn,
 		arg.Status,
 		arg.Plan,
 		arg.CpuLimit,
@@ -196,7 +194,7 @@ func (q *Queries) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
 
 const findProjectsWithActiveOperations = `-- name: FindProjectsWithActiveOperations :many
 SELECT
-    project_id, name, slug, fqdn, status, plan,
+    project_id, name, slug, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
     project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
@@ -210,7 +208,6 @@ type FindProjectsWithActiveOperationsRow struct {
 	ProjectID              uint32                         `json:"project_id"`
 	Name                   string                         `json:"name"`
 	Slug                   string                         `json:"slug"`
-	Fqdn                   sql.NullString                 `json:"fqdn"`
 	Status                 ProjectsStatus                 `json:"status"`
 	Plan                   sql.NullString                 `json:"plan"`
 	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
@@ -238,7 +235,6 @@ func (q *Queries) FindProjectsWithActiveOperations(ctx context.Context) ([]FindP
 			&i.ProjectID,
 			&i.Name,
 			&i.Slug,
-			&i.Fqdn,
 			&i.Status,
 			&i.Plan,
 			&i.CpuLimit,
@@ -308,7 +304,7 @@ func (q *Queries) GetAllProjectUsersByProjectID(ctx context.Context, projectID u
 
 const getProjectByID = `-- name: GetProjectByID :one
 SELECT
-    project_id, name, slug, fqdn, status, plan,
+    project_id, name, slug, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
     project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
@@ -320,7 +316,6 @@ type GetProjectByIDRow struct {
 	ProjectID              uint32                         `json:"project_id"`
 	Name                   string                         `json:"name"`
 	Slug                   string                         `json:"slug"`
-	Fqdn                   sql.NullString                 `json:"fqdn"`
 	Status                 ProjectsStatus                 `json:"status"`
 	Plan                   sql.NullString                 `json:"plan"`
 	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
@@ -342,7 +337,6 @@ func (q *Queries) GetProjectByID(ctx context.Context, projectID uint32) (GetProj
 		&i.ProjectID,
 		&i.Name,
 		&i.Slug,
-		&i.Fqdn,
 		&i.Status,
 		&i.Plan,
 		&i.CpuLimit,
@@ -361,7 +355,7 @@ func (q *Queries) GetProjectByID(ctx context.Context, projectID uint32) (GetProj
 
 const getProjectByIDForUpdate = `-- name: GetProjectByIDForUpdate :one
 SELECT
-    project_id, name, slug, fqdn, status, plan,
+    project_id, name, slug, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
     project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
@@ -374,7 +368,6 @@ type GetProjectByIDForUpdateRow struct {
 	ProjectID              uint32                         `json:"project_id"`
 	Name                   string                         `json:"name"`
 	Slug                   string                         `json:"slug"`
-	Fqdn                   sql.NullString                 `json:"fqdn"`
 	Status                 ProjectsStatus                 `json:"status"`
 	Plan                   sql.NullString                 `json:"plan"`
 	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
@@ -396,7 +389,6 @@ func (q *Queries) GetProjectByIDForUpdate(ctx context.Context, projectID uint32)
 		&i.ProjectID,
 		&i.Name,
 		&i.Slug,
-		&i.Fqdn,
 		&i.Status,
 		&i.Plan,
 		&i.CpuLimit,
@@ -415,7 +407,7 @@ func (q *Queries) GetProjectByIDForUpdate(ctx context.Context, projectID uint32)
 
 const getProjectBySlug = `-- name: GetProjectBySlug :one
 SELECT
-    project_id, name, slug, fqdn, status, plan,
+    project_id, name, slug, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
     project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
@@ -427,7 +419,6 @@ type GetProjectBySlugRow struct {
 	ProjectID              uint32                         `json:"project_id"`
 	Name                   string                         `json:"name"`
 	Slug                   string                         `json:"slug"`
-	Fqdn                   sql.NullString                 `json:"fqdn"`
 	Status                 ProjectsStatus                 `json:"status"`
 	Plan                   sql.NullString                 `json:"plan"`
 	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
@@ -449,7 +440,6 @@ func (q *Queries) GetProjectBySlug(ctx context.Context, slug string) (GetProject
 		&i.ProjectID,
 		&i.Name,
 		&i.Slug,
-		&i.Fqdn,
 		&i.Status,
 		&i.Plan,
 		&i.CpuLimit,
@@ -587,7 +577,7 @@ func (q *Queries) HardDeleteProjectUsersByProjectID(ctx context.Context, project
 
 const listProjects = `-- name: ListProjects :many
 SELECT
-    project_id, name, slug, fqdn, status, plan,
+    project_id, name, slug, status, plan,
     cpu_limit, memory_limit, disk_limit, traffic_limit,
     project_operation_status, active_deployment_id,
     created_at, updated_at, deleted_at, is_deleted
@@ -606,7 +596,6 @@ type ListProjectsRow struct {
 	ProjectID              uint32                         `json:"project_id"`
 	Name                   string                         `json:"name"`
 	Slug                   string                         `json:"slug"`
-	Fqdn                   sql.NullString                 `json:"fqdn"`
 	Status                 ProjectsStatus                 `json:"status"`
 	Plan                   sql.NullString                 `json:"plan"`
 	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
@@ -634,7 +623,6 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]L
 			&i.ProjectID,
 			&i.Name,
 			&i.Slug,
-			&i.Fqdn,
 			&i.Status,
 			&i.Plan,
 			&i.CpuLimit,
@@ -663,7 +651,7 @@ func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]L
 
 const listProjectsByUserID = `-- name: ListProjectsByUserID :many
 SELECT
-    p.project_id, p.name, p.slug, p.fqdn, p.status, p.plan,
+    p.project_id, p.name, p.slug, p.status, p.plan,
     p.cpu_limit, p.memory_limit, p.disk_limit, p.traffic_limit,
     p.project_operation_status, p.active_deployment_id,
     p.created_at, p.updated_at, p.deleted_at, p.is_deleted
@@ -679,7 +667,6 @@ type ListProjectsByUserIDRow struct {
 	ProjectID              uint32                         `json:"project_id"`
 	Name                   string                         `json:"name"`
 	Slug                   string                         `json:"slug"`
-	Fqdn                   sql.NullString                 `json:"fqdn"`
 	Status                 ProjectsStatus                 `json:"status"`
 	Plan                   sql.NullString                 `json:"plan"`
 	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
@@ -707,7 +694,6 @@ func (q *Queries) ListProjectsByUserID(ctx context.Context, userID uint32) ([]Li
 			&i.ProjectID,
 			&i.Name,
 			&i.Slug,
-			&i.Fqdn,
 			&i.Status,
 			&i.Plan,
 			&i.CpuLimit,
@@ -761,7 +747,7 @@ func (q *Queries) RestoreProjectUser(ctx context.Context, arg RestoreProjectUser
 
 const updateProject = `-- name: UpdateProject :execresult
 UPDATE PROJECTS SET
-    name = ?, fqdn = ?, status = ?, plan = ?,
+    name = ?, status = ?, plan = ?,
     cpu_limit = ?, memory_limit = ?, disk_limit = ?, traffic_limit = ?,
     project_operation_status = ?, active_deployment_id = ?,
     updated_at = ?
@@ -770,7 +756,6 @@ WHERE project_id = ? AND is_deleted = FALSE
 
 type UpdateProjectParams struct {
 	Name                   string                         `json:"name"`
-	Fqdn                   sql.NullString                 `json:"fqdn"`
 	Status                 ProjectsStatus                 `json:"status"`
 	Plan                   sql.NullString                 `json:"plan"`
 	CpuLimit               sql.NullInt32                  `json:"cpu_limit"`
@@ -786,7 +771,6 @@ type UpdateProjectParams struct {
 func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateProject,
 		arg.Name,
-		arg.Fqdn,
 		arg.Status,
 		arg.Plan,
 		arg.CpuLimit,

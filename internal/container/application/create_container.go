@@ -5,8 +5,10 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
+	templatevalue "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/template/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	projectservice "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
@@ -17,6 +19,12 @@ type VolumeToCreate struct {
 	Name      string
 	Capacity  uint32
 	MountPath string
+}
+
+type NetworkToCreate struct {
+	InternalPort uint16
+	NetworkType  string
+	FQDN         *string
 }
 
 type CreateContainerInput struct {
@@ -32,6 +40,7 @@ type CreateContainerInput struct {
 	MemoryLimit          uint32
 	TemplateConfig       map[string]interface{}
 	Volumes              []VolumeToCreate
+	Networks             []NetworkToCreate // User-specified networks (takes priority over template default_ports)
 }
 
 type CreateContainerOutput struct {
@@ -52,6 +61,7 @@ type CreateContainerOutput struct {
 type CreateContainerUseCase struct {
 	containerService      service.ContainerService
 	containerRepo         repository.ContainerRepository
+	templateRepo          repository.TemplateRepository
 	permissionSvc         service.PermissionService
 	resourceValidationSvc service.ResourceValidationService
 	volumeService         projectservice.VolumeService
@@ -63,6 +73,7 @@ type CreateContainerUseCase struct {
 func NewCreateContainerUseCase(
 	containerService service.ContainerService,
 	containerRepo repository.ContainerRepository,
+	templateRepo repository.TemplateRepository,
 	permissionSvc service.PermissionService,
 	resourceValidationSvc service.ResourceValidationService,
 	volumeService projectservice.VolumeService,
@@ -73,6 +84,7 @@ func NewCreateContainerUseCase(
 	return &CreateContainerUseCase{
 		containerService:      containerService,
 		containerRepo:         containerRepo,
+		templateRepo:          templateRepo,
 		permissionSvc:         permissionSvc,
 		resourceValidationSvc: resourceValidationSvc,
 		volumeService:         volumeService,
@@ -155,6 +167,27 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 			return err
 		}
 
+		// Validate Git URL if template requires git (must check before creating container)
+		if input.TemplateID != nil {
+			template, err := uc.templateRepo.FindByID(txCtx, *input.TemplateID)
+			if err != nil {
+				uc.logger.Error(ctx, "failed to fetch template for validation",
+					zap.Error(err),
+					zap.Uint("template_id", *input.TemplateID),
+				)
+				return err
+			}
+
+			templateConfig := template.TemplateConfig()
+			if templateConfig != nil && templateConfig.GetRequiresGit() && input.GitURL == "" {
+				uc.logger.Warn(ctx, "template requires git but no git url provided",
+					zap.Uint("template_id", *input.TemplateID),
+					zap.String("template_name", template.Name()),
+				)
+				return containererrors.ErrGitURLRequired
+			}
+		}
+
 		// Create container through service
 		// Slug is automatically generated from name by the service
 		container, err := uc.containerService.CreateContainer(
@@ -199,6 +232,208 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 			// Save container with mounts using repository
 			if err := uc.containerRepo.Save(txCtx, container); err != nil {
 				return err
+			}
+		}
+
+		// Network creation - Priority: User-specified networks > Template default_ports
+		// User-specified networks (from frontend form)
+		if len(input.Networks) > 0 {
+			uc.logger.Info(ctx, "creating networks from user input",
+				zap.Int("network_count", len(input.Networks)),
+			)
+
+			for _, networkInput := range input.Networks {
+				// Validate internal port uniqueness in project
+				portExists, err := uc.containerRepo.CheckInternalPortExistsInProject(
+					txCtx,
+					input.ProjectID,
+					networkInput.InternalPort,
+				)
+				if err != nil {
+					uc.logger.Error(ctx, "failed to check internal port existence",
+						zap.Error(err),
+						zap.Uint("project_id", input.ProjectID),
+						zap.Uint16("internal_port", networkInput.InternalPort),
+					)
+					return err
+				}
+				if portExists {
+					uc.logger.Warn(ctx, "internal port already exists in project",
+						zap.Uint("project_id", input.ProjectID),
+						zap.Uint16("internal_port", networkInput.InternalPort),
+					)
+					return containererrors.ErrDuplicateInternalPort
+				}
+
+				// Validate FQDN uniqueness if provided
+				if networkInput.FQDN != nil && *networkInput.FQDN != "" {
+					fqdnExists, err := uc.containerRepo.CheckFQDNExists(txCtx, *networkInput.FQDN)
+					if err != nil {
+						uc.logger.Error(ctx, "failed to check FQDN existence",
+							zap.Error(err),
+							zap.String("fqdn", *networkInput.FQDN),
+						)
+						return err
+					}
+					if fqdnExists {
+						uc.logger.Warn(ctx, "FQDN already exists",
+							zap.String("fqdn", *networkInput.FQDN),
+						)
+						return containererrors.ErrDuplicateFQDN
+					}
+				}
+
+				// Parse network type
+				networkType, err := value.NewNetworkType(networkInput.NetworkType)
+				if err != nil {
+					uc.logger.Error(ctx, "invalid network type in user input",
+						zap.Error(err),
+						zap.Uint16("internal_port", networkInput.InternalPort),
+						zap.String("network_type", networkInput.NetworkType),
+					)
+					return err
+				}
+
+				// Add network to container
+				internalPort := networkInput.InternalPort
+				_, err = container.AddNetwork(
+					&internalPort,
+					nil, // external_port not supported in user input
+					networkType,
+					nil, // external_ip not supported in user input
+					networkInput.FQDN,
+				)
+				if err != nil {
+					uc.logger.Error(ctx, "failed to add network from user input",
+						zap.Error(err),
+						zap.Uint16("internal_port", networkInput.InternalPort),
+						zap.String("network_type", networkInput.NetworkType),
+					)
+					return err
+				}
+
+				uc.logger.Info(ctx, "network created from user input",
+					zap.Uint16("internal_port", networkInput.InternalPort),
+					zap.String("network_type", networkInput.NetworkType),
+				)
+			}
+
+			// Save container with user-specified networks
+			if err := uc.containerRepo.Save(txCtx, container); err != nil {
+				return err
+			}
+
+			uc.logger.Info(ctx, "container saved with user-specified networks",
+				zap.Int("network_count", len(input.Networks)),
+			)
+		} else if input.TemplateID != nil {
+			// Auto-create networks from template default_ports (fallback)
+			uc.logger.Info(ctx, "fetching template for network auto-creation",
+				zap.Uint("template_id", *input.TemplateID),
+			)
+
+			template, err := uc.templateRepo.FindByID(txCtx, *input.TemplateID)
+			if err != nil {
+				uc.logger.Error(ctx, "failed to fetch template for network creation",
+					zap.Error(err),
+					zap.Uint("template_id", *input.TemplateID),
+				)
+				return err
+			}
+
+			// Get template config
+			templateConfig := template.TemplateConfig()
+			if templateConfig == nil {
+				uc.logger.Warn(ctx, "template has no config",
+					zap.Uint("template_id", *input.TemplateID),
+				)
+				templateConfig = &templatevalue.TemplateConfig{}
+			}
+
+			uc.logger.Info(ctx, "template fetched successfully",
+				zap.Uint("template_id", *input.TemplateID),
+				zap.String("template_name", template.Name()),
+				zap.Bool("requires_git", templateConfig.GetRequiresGit()),
+				zap.Int("default_ports_count", len(templateConfig.DefaultPorts)),
+			)
+
+			// Create networks from default_ports
+			defaultPorts := templateConfig.DefaultPorts
+			if len(defaultPorts) > 0 {
+				for _, defaultPort := range defaultPorts {
+					// Validate internal port uniqueness in project
+					// Containers in same project share K8s pod network interface
+					portExists, err := uc.containerRepo.CheckInternalPortExistsInProject(
+						txCtx,
+						input.ProjectID,
+						defaultPort.InternalPort,
+					)
+					if err != nil {
+						uc.logger.Error(ctx, "failed to check internal port existence",
+							zap.Error(err),
+							zap.Uint("project_id", input.ProjectID),
+							zap.Uint16("internal_port", defaultPort.InternalPort),
+						)
+						return err
+					}
+					if portExists {
+						uc.logger.Warn(ctx, "internal port already exists in project",
+							zap.Uint("project_id", input.ProjectID),
+							zap.Uint16("internal_port", defaultPort.InternalPort),
+						)
+						return containererrors.ErrDuplicateInternalPort
+					}
+
+					// Parse network type
+					networkType, err := value.NewNetworkType(defaultPort.NetworkType)
+					if err != nil {
+						uc.logger.Error(ctx, "invalid network type in default_ports",
+							zap.Error(err),
+							zap.Uint16("internal_port", defaultPort.InternalPort),
+							zap.String("network_type", defaultPort.NetworkType),
+						)
+						return err
+					}
+
+					// Add network to container
+					internalPort := defaultPort.InternalPort
+					_, err = container.AddNetwork(
+						&internalPort,
+						defaultPort.ExternalPort,
+						networkType,
+						defaultPort.ExternalIP,
+						nil, // fqdn is not set in default_ports
+					)
+					if err != nil {
+						uc.logger.Error(ctx, "failed to add network from default_ports",
+							zap.Error(err),
+							zap.Uint16("internal_port", defaultPort.InternalPort),
+							zap.String("network_type", defaultPort.NetworkType),
+						)
+						return err
+					}
+
+					uc.logger.Info(ctx, "network auto-created from template default_ports",
+						zap.Uint16("internal_port", defaultPort.InternalPort),
+						zap.String("network_type", defaultPort.NetworkType),
+					)
+				}
+
+				uc.logger.Info(ctx, "saving container with auto-created networks",
+					zap.Int("network_count", len(defaultPorts)),
+				)
+
+				// Save container with networks using repository
+				if err := uc.containerRepo.Save(txCtx, container); err != nil {
+					return err
+				}
+
+				uc.logger.Info(ctx, "container saved successfully with networks")
+
+				uc.logger.Info(ctx, "auto-created networks from template default_ports",
+					zap.Uint("template_id", *input.TemplateID),
+					zap.Int("network_count", len(defaultPorts)),
+				)
 			}
 		}
 

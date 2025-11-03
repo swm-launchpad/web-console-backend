@@ -35,3 +35,17 @@ WHERE container_id = ?;
 
 -- name: CountNetworksByContainerID :one
 SELECT COUNT(*) as total FROM NETWORKS WHERE container_id = ?;
+
+-- name: CheckInternalPortExistsInProject :one
+SELECT COUNT(*) > 0 as port_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE c.project_id = ?
+  AND n.internal_port = ?
+  AND c.is_deleted = 0
+FOR UPDATE;
+
+-- name: CheckFQDNExists :one
+SELECT COUNT(*) > 0 as fqdn_exists
+FROM NETWORKS
+WHERE fqdn = ?;

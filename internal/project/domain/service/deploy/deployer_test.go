@@ -30,7 +30,6 @@ func createTestProjectForDeploy(projectID uint, operationStatus value.ProjectOpe
 		projectID,
 		"Test Project",
 		*slug,
-		nil, // fqdn
 		value.ProjectStatusActive,
 		operationStatus,
 		nil, // activeDeploymentID
@@ -485,7 +484,6 @@ func TestDeployService_GetDeploymentStatus_WithActiveDeployment(t *testing.T) {
 		projectID,
 		"Test Project",
 		*slug,
-		nil, // fqdn
 		value.ProjectStatusActive,
 		value.ProjectOperationStatusDeploying,
 		&activeDeploymentID, // active deployment ID
@@ -542,7 +540,6 @@ func TestDeployService_GetDeploymentStatus_NoActiveDeployment(t *testing.T) {
 		projectID,
 		"Test Project",
 		*slug,
-		nil, // fqdn
 		value.ProjectStatusActive,
 		value.ProjectOperationStatusNothing,
 		nil, // no active deployment ID
@@ -635,7 +632,6 @@ func TestDeployService_RefreshActiveDeployment_Success(t *testing.T) {
 		projectID,
 		"Test Project",
 		*slug,
-		nil, // fqdn
 		value.ProjectStatusActive,
 		value.ProjectOperationStatusDeploying,
 		&activeDeploymentID, // active deployment ID
@@ -710,7 +706,6 @@ func TestDeployService_RefreshActiveDeployment_NoActiveDeployment(t *testing.T) 
 		projectID,
 		"Test Project",
 		*slug,
-		nil, // fqdn
 		value.ProjectStatusActive,
 		value.ProjectOperationStatusNothing,
 		nil, // no active deployment ID

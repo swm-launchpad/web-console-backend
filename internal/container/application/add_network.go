@@ -5,6 +5,7 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
@@ -85,6 +86,49 @@ func (uc *AddNetworkUseCase) Execute(ctx context.Context, input AddNetworkInput)
 				zap.Uint("container_id", input.ContainerID),
 			)
 			return err
+		}
+
+		// Validate internal port uniqueness in project if internal port is provided
+		// Containers in same project share K8s pod network interface
+		if input.InternalPort != nil {
+			portExists, err := uc.containerRepo.CheckInternalPortExistsInProject(
+				txCtx,
+				container.ProjectID(),
+				*input.InternalPort,
+			)
+			if err != nil {
+				uc.logger.Error(ctx, "failed to check internal port existence",
+					zap.Error(err),
+					zap.Uint("project_id", container.ProjectID()),
+					zap.Uint16("internal_port", *input.InternalPort),
+				)
+				return err
+			}
+			if portExists {
+				uc.logger.Warn(ctx, "internal port already exists in project",
+					zap.Uint("project_id", container.ProjectID()),
+					zap.Uint16("internal_port", *input.InternalPort),
+				)
+				return containererrors.ErrDuplicateInternalPort
+			}
+		}
+
+		// Validate FQDN uniqueness if FQDN is provided
+		if input.FQDN != nil && *input.FQDN != "" {
+			fqdnExists, err := uc.containerRepo.CheckFQDNExists(txCtx, *input.FQDN)
+			if err != nil {
+				uc.logger.Error(ctx, "failed to check FQDN existence",
+					zap.Error(err),
+					zap.String("fqdn", *input.FQDN),
+				)
+				return err
+			}
+			if fqdnExists {
+				uc.logger.Warn(ctx, "FQDN already exists",
+					zap.String("fqdn", *input.FQDN),
+				)
+				return containererrors.ErrDuplicateFQDN
+			}
 		}
 
 		// Create network type value object
