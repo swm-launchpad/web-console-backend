@@ -36,7 +36,7 @@ FOR UPDATE
 
 type CheckInternalPortExistsInProjectParams struct {
 	ProjectID    uint32        `json:"project_id"`
-	InternalPort sql.NullInt16 `json:"internal_port"`
+	InternalPort sql.NullInt32 `json:"internal_port"`
 }
 
 func (q *Queries) CheckInternalPortExistsInProject(ctx context.Context, arg CheckInternalPortExistsInProjectParams) (bool, error) {
@@ -67,8 +67,8 @@ INSERT INTO NETWORKS (
 
 type CreateNetworkParams struct {
 	ContainerID  uint32         `json:"container_id"`
-	InternalPort sql.NullInt16  `json:"internal_port"`
-	ExternalPort sql.NullInt16  `json:"external_port"`
+	InternalPort sql.NullInt32  `json:"internal_port"`
+	ExternalPort sql.NullInt32  `json:"external_port"`
 	ExternalIp   sql.NullString `json:"external_ip"`
 	Fqdn         sql.NullString `json:"fqdn"`
 	Type         NetworksType   `json:"type"`
@@ -181,7 +181,7 @@ WHERE network_id = ?
 `
 
 type UpdateNetworkParams struct {
-	ExternalPort sql.NullInt16  `json:"external_port"`
+	ExternalPort sql.NullInt32  `json:"external_port"`
 	ExternalIp   sql.NullString `json:"external_ip"`
 	Fqdn         sql.NullString `json:"fqdn"`
 	UpdatedAt    sql.NullTime   `json:"updated_at"`

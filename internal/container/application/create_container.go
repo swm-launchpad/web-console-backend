@@ -167,6 +167,27 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 			return err
 		}
 
+		// Validate Git URL if template requires git (must check before creating container)
+		if input.TemplateID != nil {
+			template, err := uc.templateRepo.FindByID(txCtx, *input.TemplateID)
+			if err != nil {
+				uc.logger.Error(ctx, "failed to fetch template for validation",
+					zap.Error(err),
+					zap.Uint("template_id", *input.TemplateID),
+				)
+				return err
+			}
+
+			templateConfig := template.TemplateConfig()
+			if templateConfig != nil && templateConfig.GetRequiresGit() && input.GitURL == "" {
+				uc.logger.Warn(ctx, "template requires git but no git url provided",
+					zap.Uint("template_id", *input.TemplateID),
+					zap.String("template_name", template.Name()),
+				)
+				return containererrors.ErrGitURLRequired
+			}
+		}
+
 		// Create container through service
 		// Slug is automatically generated from name by the service
 		container, err := uc.containerService.CreateContainer(
@@ -335,15 +356,6 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 				zap.Bool("requires_git", templateConfig.GetRequiresGit()),
 				zap.Int("default_ports_count", len(templateConfig.DefaultPorts)),
 			)
-
-			// Validate Git URL if template requires git
-			if templateConfig.GetRequiresGit() && input.GitURL == "" {
-				uc.logger.Warn(ctx, "template requires git but no git url provided",
-					zap.Uint("template_id", *input.TemplateID),
-					zap.String("template_name", template.Name()),
-				)
-				return containererrors.ErrGitURLRequired
-			}
 
 			// Create networks from default_ports
 			defaultPorts := templateConfig.DefaultPorts

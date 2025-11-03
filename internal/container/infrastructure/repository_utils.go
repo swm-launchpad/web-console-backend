@@ -61,11 +61,11 @@ func uintToNullInt32(u *uint) sql.NullInt32 {
 	return sql.NullInt32{Int32: int32(*u), Valid: true}
 }
 
-func uint16PtrToNullInt16(u *uint16) sql.NullInt16 {
+func uint16PtrToNullInt32(u *uint16) sql.NullInt32 {
 	if u == nil {
-		return sql.NullInt16{Valid: false}
+		return sql.NullInt32{Valid: false}
 	}
-	return sql.NullInt16{Int16: int16(*u), Valid: true}
+	return sql.NullInt32{Int32: int32(*u), Valid: true}
 }
 
 func uint32PtrToNullInt32(u *uint32) sql.NullInt32 {

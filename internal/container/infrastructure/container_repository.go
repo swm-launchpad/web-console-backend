@@ -118,8 +118,8 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 	for _, network := range container.Networks() {
 		netParams := sqlc.CreateNetworkParams{
 			ContainerID:  uint32(container.ContainerID()),
-			InternalPort: uint16PtrToNullInt16(network.InternalPort()),
-			ExternalPort: uint16PtrToNullInt16(network.ExternalPort()),
+			InternalPort: uint16PtrToNullInt32(network.InternalPort()),
+			ExternalPort: uint16PtrToNullInt32(network.ExternalPort()),
 			ExternalIp:   stringPtrToNullString(network.ExternalIP()),
 			Fqdn:         stringPtrToNullString(network.FQDN()),
 			Type:         sqlc.NetworksType(network.NetworkType().String()),
@@ -280,8 +280,8 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 	for _, network := range container.Networks() {
 		netParams := sqlc.CreateNetworkParams{
 			ContainerID:  uint32(container.ContainerID()),
-			InternalPort: uint16PtrToNullInt16(network.InternalPort()),
-			ExternalPort: uint16PtrToNullInt16(network.ExternalPort()),
+			InternalPort: uint16PtrToNullInt32(network.InternalPort()),
+			ExternalPort: uint16PtrToNullInt32(network.ExternalPort()),
 			ExternalIp:   stringPtrToNullString(network.ExternalIP()),
 			Fqdn:         stringPtrToNullString(network.FQDN()),
 			Type:         sqlc.NetworksType(network.NetworkType().String()),
@@ -978,11 +978,11 @@ func (r *containerRepository) toDomainEnvVar(sqlcEnvVar sqlc.EnvVar) (*model.Env
 func (r *containerRepository) toDomainNetwork(sqlcNetwork sqlc.Network) (*model.Network, error) {
 	var internalPort, externalPort *uint16
 	if sqlcNetwork.InternalPort.Valid {
-		val := uint16(sqlcNetwork.InternalPort.Int16)
+		val := uint16(sqlcNetwork.InternalPort.Int32)
 		internalPort = &val
 	}
 	if sqlcNetwork.ExternalPort.Valid {
-		val := uint16(sqlcNetwork.ExternalPort.Int16)
+		val := uint16(sqlcNetwork.ExternalPort.Int32)
 		externalPort = &val
 	}
 
@@ -1084,7 +1084,7 @@ func (r *containerRepository) CheckInternalPortExistsInProject(ctx context.Conte
 	qtx := r.queriesWithContext(ctx)
 	result, err := qtx.CheckInternalPortExistsInProject(ctx, sqlc.CheckInternalPortExistsInProjectParams{
 		ProjectID:    uint32(projectID),
-		InternalPort: sql.NullInt16{Int16: int16(internalPort), Valid: true},
+		InternalPort: sql.NullInt32{Int32: int32(internalPort), Valid: true},
 	})
 	if err != nil {
 		r.logger.Error(ctx, "failed to check internal port existence",

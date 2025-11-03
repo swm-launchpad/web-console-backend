@@ -481,7 +481,7 @@ func TestProject_OperationStatus(t *testing.T) {
 
 	t.Run("성공: StartDeploy - building에서 deploying으로 전환", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		_ = project.StartBuild()
 
 		err := project.StartDeploy(1)
@@ -492,7 +492,7 @@ func TestProject_OperationStatus(t *testing.T) {
 
 	t.Run("실패: StartDeploy - 이미 deploying 상태일 때", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
-		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil)
 		_ = project.StartBuild()
 		_ = project.StartDeploy(1)
 
