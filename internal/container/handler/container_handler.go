@@ -103,6 +103,13 @@ type VolumeToCreate struct {
 	MountPath string `json:"mount_path" binding:"required"`
 }
 
+// NetworkToCreate represents a network to be created with the container
+type NetworkToCreate struct {
+	InternalPort uint16  `json:"internal_port" binding:"required"`
+	NetworkType  string  `json:"network_type" binding:"required"`
+	FQDN         *string `json:"fqdn,omitempty"`
+}
+
 // CreateContainerRequest represents the request body for creating a container
 type CreateContainerRequest struct {
 	Name                 string                 `json:"name" binding:"required"`
@@ -117,6 +124,7 @@ type CreateContainerRequest struct {
 	TemplateID           *uint                  `json:"template_id,omitempty"`
 	TemplateConfig       map[string]interface{} `json:"template_config,omitempty"`
 	Volumes              []VolumeToCreate       `json:"volumes,omitempty"`
+	Networks             []NetworkToCreate      `json:"networks,omitempty"`
 }
 
 // ContainerResponse represents the response for container operations
@@ -208,6 +216,16 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 		})
 	}
 
+	// Convert networks to application layer format
+	var networks []application.NetworkToCreate
+	for _, n := range req.Networks {
+		networks = append(networks, application.NetworkToCreate{
+			InternalPort: n.InternalPort,
+			NetworkType:  n.NetworkType,
+			FQDN:         n.FQDN,
+		})
+	}
+
 	input := application.CreateContainerInput{
 		ProjectID:            projectID,
 		UserID:               userID.(uint),
@@ -221,6 +239,7 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 		TemplateID:           req.TemplateID,
 		TemplateConfig:       req.TemplateConfig,
 		Volumes:              volumes,
+		Networks:             networks,
 	}
 
 	output, err := h.createContainerUC.Execute(c.Request.Context(), input)
