@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 )
 
@@ -489,9 +490,21 @@ func TestProject_OperationStatus(t *testing.T) {
 		assert.Equal(t, value.ProjectOperationStatusNothing, project.OperationStatus())
 	})
 
-	t.Run("성공: StartDeploy - nothing에서 deploying으로 전환", func(t *testing.T) {
+	t.Run("실패: StartDeploy - nothing에서 deploying으로 전환 차단 (standalone deploy 불가)", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
 		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+
+		err := project.StartDeploy(1)
+
+		assert.Error(t, err)
+		assert.Equal(t, projecterrors.ErrInvalidStatusTransition, err)
+		assert.Equal(t, value.ProjectOperationStatusNothing, project.OperationStatus())
+	})
+
+	t.Run("성공: StartDeploy - building에서 deploying으로 전환", func(t *testing.T) {
+		slug, _ := value.NewProjectSlug("p2025011812000088888888")
+		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		_ = project.StartBuild()
 
 		err := project.StartDeploy(1)
 
@@ -502,6 +515,7 @@ func TestProject_OperationStatus(t *testing.T) {
 	t.Run("실패: StartDeploy - 이미 deploying 상태일 때", func(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
 		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
+		_ = project.StartBuild()
 		_ = project.StartDeploy(1)
 
 		err := project.StartDeploy(2)
@@ -514,6 +528,7 @@ func TestProject_OperationStatus(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
 		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
 		deploymentID := uint(1)
+		_ = project.StartBuild()
 		_ = project.StartDeploy(deploymentID)
 
 		err := project.CompleteDeploy(deploymentID)
@@ -526,6 +541,7 @@ func TestProject_OperationStatus(t *testing.T) {
 		slug, _ := value.NewProjectSlug("p2025011812000088888888")
 		project, _ := NewProject("My Project", *slug, 100, defaultLimits(), nil, nil)
 		deploymentID := uint(1)
+		_ = project.StartBuild()
 		_ = project.StartDeploy(deploymentID)
 
 		err := project.CompleteDeploy(uint(2)) // 다른 deployment ID로 시도

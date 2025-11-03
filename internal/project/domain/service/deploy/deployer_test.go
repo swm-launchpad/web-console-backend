@@ -763,160 +763,26 @@ func TestDeployService_RefreshActiveDeployment_ProjectNotFound(t *testing.T) {
 	mockProjectRepo.AssertExpectations(t)
 }
 
+// DEPRECATED: Standalone deploy is no longer supported. Only build+deploy flow is allowed.
+// TestDeployProject_RejectsPendingImageTag and TestDeployProject_AllowsBuiltContainers are commented out
+// because they test standalone deploy functionality (nothing -> deploying transition).
+// The system now only supports build+deploy flow (building -> deploying transition).
+//
+// Reason for removal: To prevent race conditions and ensure consistent deployment flow,
+// deployments can only be triggered after builds complete (building status).
+// This guarantees that all containers are built before deployment starts.
+//
+// See: project.go StartDeploy() - now only allows transition from 'building' state
+// See: deployer_deploy.go deployProjectInternal() - validates building status
+
+/*
 // TestDeployProject_RejectsPendingImageTag tests that standalone deploy rejects containers with "pending" image tag
 func TestDeployProject_RejectsPendingImageTag(t *testing.T) {
-	// Arrange
-	ctx := context.Background()
-	projectID := uint(1)
-
-	mockTxManager := db.NewStubTxManager()
-	mockProjectRepo := new(repository.MockProjectRepository)
-	mockDeploymentRepo := new(repository.MockDeploymentRepository)
-	mockContainerClient := new(infrastructure.MockContainerClient)
-	testLogger := logger.NewForTest()
-
-	service := &deployService{
-		txManager:       mockTxManager,
-		projectRepo:     mockProjectRepo,
-		deploymentRepo:  mockDeploymentRepo,
-		containerClient: mockContainerClient,
-		logger:          testLogger,
-	}
-
-	// Mock: Project in 'nothing' state
-	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
-	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).Return(proj, nil)
-
-	// Mock: Deployment creation succeeds
-	mockDeploymentRepo.On("Create", mock.Anything, mock.AnythingOfType("*deployment.Deployment")).
-		Run(func(args mock.Arguments) {
-			d := args.Get(1).(*deployment.Deployment)
-			d.SetDeploymentID(1)
-		}).
-		Return(nil)
-
-	// Mock: handleDeployFailure will need to find and save the deployment
-	mockDeploymentRepo.On("FindByID", mock.Anything, uint(1)).
-		Return(deployment.NewDeployment(projectID), nil)
-
-	mockDeploymentRepo.On("Save", mock.Anything, mock.AnythingOfType("*deployment.Deployment")).
-		Return(nil)
-
-	// Mock: Project save succeeds (will be called twice: initial deploy + handleDeployFailure)
-	mockProjectRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
-
-	// Mock: GetContainerConfig returns container with "pending" image tag (never built)
-	containerConfig := &dto.ContainerDeploymentConfig{
-		Containers: []dto.ContainerInfo{
-			{
-				Name:      "app",
-				ImageName: "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx",
-				ImageTag:  "pending", // ← Never been built
-				Port:      80,
-			},
-		},
-	}
-	mockContainerClient.On("GetContainerConfig", mock.Anything, projectID).
-		Return(containerConfig, nil)
-
-	// Act
-	result, err := service.DeployProject(ctx, projectID)
-
-	// Assert
-	assert.Error(t, err)
-	assert.Nil(t, result)
-	assert.Contains(t, err.Error(), "has never been built")
-	mockProjectRepo.AssertExpectations(t)
-	mockDeploymentRepo.AssertExpectations(t)
-	mockContainerClient.AssertExpectations(t)
-
-	// Note: handleDeployFailure should have been called to rollback project status
-	// In production, the deployment would be marked as backend_trigger_failed
-	// and project status would be reset to 'nothing'
+	// This test is no longer relevant as standalone deploy is not supported
 }
 
 // TestDeployProject_AllowsBuiltContainers tests that standalone deploy allows containers with valid image tags
 func TestDeployProject_AllowsBuiltContainers(t *testing.T) {
-	// Arrange
-	ctx := context.Background()
-	projectID := uint(1)
-
-	mockTxManager := db.NewStubTxManager()
-	mockProjectRepo := new(repository.MockProjectRepository)
-	mockDeploymentRepo := new(repository.MockDeploymentRepository)
-	mockVolumeRepo := new(repository.MockVolumeRepository)
-	mockContainerClient := new(infrastructure.MockContainerClient)
-	mockTektonClient := new(infrastructure.MockTektonClient)
-	testLogger := logger.NewForTest()
-
-	service := &deployService{
-		txManager:       mockTxManager,
-		projectRepo:     mockProjectRepo,
-		deploymentRepo:  mockDeploymentRepo,
-		volumeRepo:      mockVolumeRepo,
-		containerClient: mockContainerClient,
-		tektonClient:    mockTektonClient,
-		deployNamespace: "test-namespace",
-		logger:          testLogger,
-	}
-
-	// Mock: Project in 'nothing' state
-	proj := createTestProjectForDeploy(projectID, value.ProjectOperationStatusNothing)
-	mockProjectRepo.On("FindByIDForUpdate", mock.Anything, projectID).Return(proj, nil)
-
-	// Mock: Deployment creation succeeds
-	mockDeploymentRepo.On("Create", mock.Anything, mock.AnythingOfType("*deployment.Deployment")).
-		Run(func(args mock.Arguments) {
-			d := args.Get(1).(*deployment.Deployment)
-			d.SetDeploymentID(1)
-		}).
-		Return(nil)
-
-	// Mock: Project save succeeds
-	mockProjectRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
-
-	// Mock: GetContainerConfig returns container with valid image tag (already built)
-	containerConfig := &dto.ContainerDeploymentConfig{
-		Containers: []dto.ContainerInfo{
-			{
-				Name:            "app",
-				ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx",
-				ImageTag:        "abc1234", // ← Valid commit hash tag
-				Port:            80,
-				HealthCheckType: "tcp",
-				CPULimit:        "1000m",
-				MemoryRequest:   "512Mi",
-				MemoryLimit:     "1Gi",
-			},
-		},
-	}
-	mockContainerClient.On("GetContainerConfig", mock.Anything, projectID).
-		Return(containerConfig, nil)
-
-	// Mock: Volumes
-	mockVolumeRepo.On("FindByProjectID", mock.Anything, projectID).
-		Return([]*volumemodel.Volume{}, nil)
-
-	// Mock: Tekton trigger succeeds
-	mockTektonClient.On("TriggerDeploy", mock.Anything, mock.Anything).
-		Return(&dto.TektonDeployResponse{EventID: "test-event-123"}, nil)
-
-	// Mock: Deployment save succeeds
-	mockDeploymentRepo.On("Save", mock.Anything, mock.AnythingOfType("*deployment.Deployment")).
-		Return(nil)
-
-	// Act
-	result, err := service.DeployProject(ctx, projectID)
-
-	// Assert
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-	assert.Equal(t, uint(1), result.DeploymentID)
-	mockProjectRepo.AssertExpectations(t)
-	mockDeploymentRepo.AssertExpectations(t)
-	mockContainerClient.AssertExpectations(t)
-	mockVolumeRepo.AssertExpectations(t)
-	mockTektonClient.AssertExpectations(t)
-
-	// Note: Background monitoring goroutine starts but we don't wait for it in this unit test
+	// This test is no longer relevant as standalone deploy is not supported
 }
+*/

@@ -8,6 +8,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/dto"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/deployment"
 	"go.uber.org/zap"
 )
 
@@ -44,6 +45,38 @@ type DeploymentStatusOutput struct {
 	Summary      string `json:"summary,omitempty"`
 	StartedAt    string `json:"started_at,omitempty"`
 	FinishedAt   string `json:"finished_at,omitempty"`
+}
+
+// shouldIncludeDeployment determines if a deployment record should be included in the response
+// A deployment is included only if it was created after the latest build finished
+// This prevents showing stale deployment records from previous build cycles
+func shouldIncludeDeployment(d *deployment.Deployment, buildStatuses []BuildStatusOutput) bool {
+	if d == nil {
+		return false
+	}
+
+	deployCreatedAt := d.CreatedAt()
+
+	// Find the latest finished_at among all build statuses
+	var latestBuildFinishedAt time.Time
+	for _, bs := range buildStatuses {
+		if bs.FinishedAt != "" {
+			finishedAt, err := time.Parse(time.RFC3339, bs.FinishedAt)
+			if err == nil {
+				if latestBuildFinishedAt.IsZero() || finishedAt.After(latestBuildFinishedAt) {
+					latestBuildFinishedAt = finishedAt
+				}
+			}
+		}
+	}
+
+	// If no build finished_at exists, include the deployment
+	if latestBuildFinishedAt.IsZero() {
+		return true
+	}
+
+	// Only include deployment if it was created after the latest build finished
+	return deployCreatedAt.After(latestBuildFinishedAt)
 }
 
 // GetProjectStatusUseCase retrieves the integrated status of a project from the database
@@ -163,13 +196,14 @@ func (uc *GetProjectStatusUseCase) Execute(ctx context.Context, input GetProject
 		output.BuildStatuses = buildStatuses
 
 		// Also return latest deployment to maintain "last operation" date consistency
+		// Only include if deployment was created after latest build finished
 		deployment, err := uc.deploymentRepo.FindLatestByProjectID(ctx, input.ProjectID)
 		if err != nil {
 			uc.logger.Debug(ctx, "no deployment history found during build",
 				zap.Uint("project_id", input.ProjectID),
 				zap.Error(err),
 			)
-		} else {
+		} else if shouldIncludeDeployment(deployment, buildStatuses) {
 			deploymentStatus := &DeploymentStatusOutput{
 				DeploymentID: uint64(deployment.DeploymentID),
 				ProjectID:    uint(deployment.ProjectID()),
@@ -355,6 +389,7 @@ func (uc *GetProjectStatusUseCase) Execute(ctx context.Context, input GetProject
 		output.BuildStatuses = buildStatuses
 
 		// Get latest deployment if exists
+		// Only include if deployment was created after latest build finished
 		deployment, err := uc.deploymentRepo.FindLatestByProjectID(ctx, input.ProjectID)
 		if err != nil {
 			// No deployment history is normal for projects that haven't been deployed yet
@@ -362,7 +397,7 @@ func (uc *GetProjectStatusUseCase) Execute(ctx context.Context, input GetProject
 				zap.Uint("project_id", input.ProjectID),
 				zap.Error(err),
 			)
-		} else {
+		} else if shouldIncludeDeployment(deployment, buildStatuses) {
 			deploymentStatus := &DeploymentStatusOutput{
 				DeploymentID: uint64(deployment.DeploymentID),
 				ProjectID:    uint(deployment.ProjectID()),

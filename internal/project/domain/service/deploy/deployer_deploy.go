@@ -338,17 +338,16 @@ func (s *deployService) deployProjectInternal(
 			return err
 		}
 
-		// Verify project is in an appropriate state for deployment
-		// Expected: 'building' (from BuildAndDeployProject flow)
-		// Also acceptable: 'nothing' (for future standalone deploy scenarios)
-		// StartDeploy() will validate and reject invalid transitions
-		if proj.OperationStatus() != value.ProjectOperationStatusBuilding &&
-			proj.OperationStatus() != value.ProjectOperationStatusNothing {
-			s.logger.Error(ctx, "project in unexpected status for deployment",
+		// Verify project is in 'building' status for deployment
+		// Only BuildAndDeployProject flow is supported (building -> deploying transition)
+		// Standalone deploy (nothing -> deploying) is no longer allowed
+		if proj.OperationStatus() != value.ProjectOperationStatusBuilding {
+			s.logger.Error(ctx, "deployment must be triggered from building status",
 				zap.Uint("project_id", projectID),
-				zap.String("operation_status", string(proj.OperationStatus())),
+				zap.String("current_status", string(proj.OperationStatus())),
+				zap.String("expected_status", "building"),
 			)
-			return fmt.Errorf("project in unexpected status: %s", proj.OperationStatus())
+			return fmt.Errorf("invalid operation status for deployment: %s (expected: building)", proj.OperationStatus())
 		}
 
 		// Create deployment record with status 'untracked' FIRST
