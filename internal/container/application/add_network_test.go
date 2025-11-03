@@ -39,6 +39,7 @@ func TestAddNetworkUseCase_Execute_Success(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
+	mockRepo.On("CheckInternalPortExistsInProject", ctx, projectID, internalPort).Return(false, nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
@@ -127,6 +128,7 @@ func TestAddNetworkUseCase_Execute_DuplicateHTTPNetwork(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
+	mockRepo.On("CheckInternalPortExistsInProject", ctx, projectID, internalPort).Return(false, nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
@@ -174,6 +176,7 @@ func TestAddNetworkUseCase_Execute_DuplicateInternalPort(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
+	mockRepo.On("CheckInternalPortExistsInProject", ctx, projectID, internalPort).Return(true, nil) // Port already exists in project
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
 		Return(nil) // Execute fn, domain logic will return duplicate internal port error
@@ -218,6 +221,7 @@ func TestAddNetworkUseCase_Execute_MaxNetworksExceeded(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
+	mockRepo.On("CheckInternalPortExistsInProject", ctx, projectID, internalPort).Return(false, nil)
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
 		Return(nil) // Execute fn, domain logic will return max networks exceeded error
@@ -261,6 +265,7 @@ func TestAddNetworkUseCase_Execute_InvalidNetworkType(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
+	mockRepo.On("CheckInternalPortExistsInProject", ctx, projectID, internalPort).Return(false, nil)
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
 		Return(nil) // Execute fn, value object creation will return invalid network type error

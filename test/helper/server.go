@@ -112,7 +112,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	buildChangeDetector := containerService.NewBuildChangeDetector()
 
 	// Container UseCases
-	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, installationRepo, txManager, testLogger)
+	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, templateRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, installationRepo, txManager, testLogger)
 	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, containerPermissionSvc, testLogger)
 	listContainersUseCase := containerApp.NewListContainersUseCase(containerRepo, containerPermissionSvc, testLogger)
 	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, buildChangeDetector, installationRepo, txManager, testLogger)
@@ -419,6 +419,7 @@ func GetGitHubInstallationRepository(testDB *TestDB) userrepository.GitHubInstal
 func GetCreateContainerUseCase(ts *TestServer) *containerApp.CreateContainerUseCase {
 	testLogger := logger.NewForTest()
 	containerRepo := containerInfra.NewContainerRepository(ts.DB.DB, testLogger)
+	templateRepo := containerInfra.NewTemplateRepository(ts.DB.DB, testLogger)
 	containerSlugService := containerService.NewSlugService(containerRepo, testLogger)
 	containerSvc := containerService.NewContainerService(containerRepo, containerSlugService, testLogger)
 	projectRepository := projectRepo.NewProjectRepository(ts.DB.DB, testLogger)
@@ -432,6 +433,7 @@ func GetCreateContainerUseCase(ts *TestServer) *containerApp.CreateContainerUseC
 	return containerApp.NewCreateContainerUseCase(
 		containerSvc,
 		containerRepo,
+		templateRepo,
 		containerPermissionSvc,
 		resourceValidationSvc,
 		volumeSvc,
