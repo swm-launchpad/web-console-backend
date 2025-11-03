@@ -49,7 +49,7 @@ var (
 
 const (
 	MaxEnvVarsPerContainer   = 100
-	MaxNetworksPerContainer  = 20
+	MaxNetworksPerContainer  = 1 // Container can only have one network/port
 	MaxSecretsPerContainer   = 100
 	MaxBuildVarsPerContainer = 100
 	MaxMountsPerContainer    = 10

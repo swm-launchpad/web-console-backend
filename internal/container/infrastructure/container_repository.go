@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
@@ -125,6 +127,12 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 			UpdatedAt:    timeToNullTime(network.UpdatedAt()),
 		}
 		if _, err := qtx.CreateNetwork(ctx, netParams); err != nil {
+			// Check for FQDN duplicate key error
+			if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
+				if strings.Contains(mysqlErr.Message, "uk_networks_fqdn") {
+					return containererrors.ErrDuplicateFQDN
+				}
+			}
 			return containererrors.ErrDatabaseOperation
 		}
 	}
@@ -281,6 +289,12 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 			UpdatedAt:    timeToNullTime(network.UpdatedAt()),
 		}
 		if _, err := qtx.CreateNetwork(ctx, netParams); err != nil {
+			// Check for FQDN duplicate key error
+			if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
+				if strings.Contains(mysqlErr.Message, "uk_networks_fqdn") {
+					return containererrors.ErrDuplicateFQDN
+				}
+			}
 			return containererrors.ErrDatabaseOperation
 		}
 	}

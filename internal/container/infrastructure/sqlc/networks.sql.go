@@ -31,6 +31,7 @@ INNER JOIN CONTAINERS c ON n.container_id = c.container_id
 WHERE c.project_id = ?
   AND n.internal_port = ?
   AND c.is_deleted = 0
+FOR UPDATE
 `
 
 type CheckInternalPortExistsInProjectParams struct {
