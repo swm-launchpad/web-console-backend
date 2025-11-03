@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -53,6 +54,14 @@ func (a *App) Start() error {
 
 	// Start OAuth state cleanup goroutine
 	a.startStateCleanup()
+
+	// Start pprof server in a separate goroutine
+	go func() {
+		a.Logger.Info(ctx, "starting pprof server on :6060")
+		if err := http.ListenAndServe(":6060", nil); err != nil {
+			a.Logger.Error(ctx, "pprof server error", zap.Error(err))
+		}
+	}()
 
 	// Start server in a goroutine
 	go func() {
