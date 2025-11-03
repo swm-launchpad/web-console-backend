@@ -347,7 +347,7 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 
 			// Create networks from default_ports
 			defaultPorts := templateConfig.DefaultPorts
-			if defaultPorts != nil && len(defaultPorts) > 0 {
+			if len(defaultPorts) > 0 {
 				for _, defaultPort := range defaultPorts {
 					// Validate internal port uniqueness in project
 					// Containers in same project share K8s pod network interface

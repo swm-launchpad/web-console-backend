@@ -654,13 +654,6 @@ func (r *projectRepository) toDomainProjectUser(sqlcUser sqlc.ProjectUser) (*mod
 
 // Utility functions
 
-func stringBoolToNullString(s string, ok bool) sql.NullString {
-	if !ok {
-		return sql.NullString{Valid: false}
-	}
-	return sql.NullString{String: s, Valid: true}
-}
-
 func planToNullString(plan value.Plan, ok bool) sql.NullString {
 	if !ok {
 		return sql.NullString{Valid: false}
