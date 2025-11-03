@@ -36,19 +36,34 @@ func (s *deployService) refreshDeploymentStatus(ctx context.Context, deploymentI
 		// Need TektonEventID to perform lookup
 		eventID, hasEventID := d.TektonEventID()
 		if !hasEventID {
-			// CRITICAL DATA INCONSISTENCY: Same issue as in monitorDeployment
+			// No EventID yet - check if within grace period
+			createdAt := d.CreatedAt()
+			if time.Since(createdAt) <= 5*time.Minute {
+				// Within 5-minute grace period - EventID may not be set yet
+				s.logger.Warn(ctx, "Deployment has no EventID but within grace period",
+					zap.Uint64("deployment_id", deploymentID),
+					zap.Uint("project_id", d.ProjectID()),
+					zap.Time("created_at", createdAt),
+					zap.Duration("elapsed", time.Since(createdAt)),
+				)
+				return d, nil
+			}
+
+			// Grace period expired - CRITICAL DATA INCONSISTENCY
 			// Deployment is not completed but has no EventID - monitoring impossible
 			// Project is stuck in 'deploying' state with no recovery path
 			s.logger.Error(ctx, "CRITICAL DATA INCONSISTENCY DETECTED (RefreshDeploymentStatus)",
 				zap.Uint64("deployment_id", deploymentID),
 				zap.Uint("project_id", d.ProjectID()),
 				zap.String("status", string(d.Status())),
-				zap.String("problem", "Deployment is not completed but has NO Tekton EventID"),
+				zap.Time("created_at", createdAt),
+				zap.Duration("elapsed", time.Since(createdAt)),
+				zap.String("problem", "Deployment has NO Tekton EventID after grace period"),
 				zap.String("impact", "Cannot refresh status - project stuck in 'deploying' state"),
 				zap.String("action", "Emergency rollback - setting project->nothing, deployment->backend_tracking_failed"),
 			)
 
-			msg := "Deployment refresh impossible: no Tekton EventID found (critical data inconsistency)"
+			msg := "Deployment refresh impossible: no Tekton EventID found after 5 minutes (critical data inconsistency)"
 			s.handleDeployFailure(ctx, uint(d.ProjectID()), uint(deploymentID), deployment.DeploymentStatusBackendTrackingFailed, &msg)
 			return nil, fmt.Errorf("deployment has no Tekton EventID - emergency rollback performed")
 		}
@@ -542,8 +557,31 @@ func (s *deployService) RefreshActiveBuildStatuses(ctx context.Context, projectI
 
 	projectReset := false
 	if allCompleted && len(buildHistories) > 0 {
-		s.logger.Info(ctx, "all builds completed, resetting project status to nothing",
+		// Find the latest finished_at among all build histories
+		var latestFinishedAt time.Time
+		for _, bh := range buildHistories {
+			if finishedAt, ok := bh.FinishedAt(); ok {
+				if latestFinishedAt.IsZero() || finishedAt.After(latestFinishedAt) {
+					latestFinishedAt = finishedAt
+				}
+			}
+		}
+
+		// 5-minute grace period: Don't reset project status if builds finished recently
+		// This prevents race condition where builds complete but deployment hasn't started yet
+		if !latestFinishedAt.IsZero() && time.Since(latestFinishedAt) <= 5*time.Minute {
+			s.logger.Info(ctx, "skipping project status reset - within grace period",
+				zap.Uint("project_id", projectID),
+				zap.Time("latest_finished_at", latestFinishedAt),
+				zap.Duration("elapsed", time.Since(latestFinishedAt)),
+			)
+			return buildHistories, false, nil
+		}
+
+		s.logger.Info(ctx, "all builds completed and grace period expired, resetting project status to nothing",
 			zap.Uint("project_id", projectID),
+			zap.Time("latest_finished_at", latestFinishedAt),
+			zap.Duration("elapsed", time.Since(latestFinishedAt)),
 		)
 
 		// Reset project status using FindByIDForUpdate to prevent race conditions
@@ -600,12 +638,27 @@ func (s *deployService) refreshBuildHistoryStatus(
 		// Need TektonEventID to perform lookup
 		eventID, hasEventID := bh.TektonEventID()
 		if !hasEventID {
-			// Critical data inconsistency: build history has no event ID
-			s.logger.Error(ctx, "build history has no Tekton EventID",
+			// No EventID yet - check if within grace period
+			createdAt := bh.CreatedAt()
+			if time.Since(createdAt) <= 5*time.Minute {
+				// Within 5-minute grace period - EventID may not be set yet
+				s.logger.Warn(ctx, "build history has no EventID but within grace period",
+					zap.Uint("build_history_id", bh.BuildHistoryID),
+					zap.Uint("container_id", bh.ContainerID()),
+					zap.Time("created_at", createdAt),
+					zap.Duration("elapsed", time.Since(createdAt)),
+				)
+				return bh, nil
+			}
+
+			// Grace period expired - critical data inconsistency
+			s.logger.Error(ctx, "build history has no Tekton EventID after grace period",
 				zap.Uint("build_history_id", bh.BuildHistoryID),
 				zap.Uint("container_id", bh.ContainerID()),
+				zap.Time("created_at", createdAt),
+				zap.Duration("elapsed", time.Since(createdAt)),
 			)
-			msg := "Build history has no Tekton EventID (critical data inconsistency)"
+			msg := "Build history has no Tekton EventID after 5 minutes (critical data inconsistency)"
 			if err := bh.UpdateBackendStatus(build_history.BuildHistoryStatusBackendTrackingFailed, &msg); err != nil {
 				return nil, err
 			}

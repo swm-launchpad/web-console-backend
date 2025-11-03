@@ -542,9 +542,9 @@ func (p *Project) StartDeploy(deploymentID uint) error {
 		return projecterrors.ErrCannotModifyDeletedProject
 	}
 
-	// Allow transition from 'nothing' (standalone deploy) or 'building' (build+deploy flow)
-	if p.operationStatus != value.ProjectOperationStatusNothing &&
-		p.operationStatus != value.ProjectOperationStatusBuilding {
+	// Only allow transition from 'building' (build+deploy flow)
+	// Standalone deploy (nothing -> deploying) is no longer supported
+	if p.operationStatus != value.ProjectOperationStatusBuilding {
 		return projecterrors.ErrInvalidStatusTransition
 	}
 

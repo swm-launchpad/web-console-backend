@@ -325,6 +325,7 @@ func (uc *RefreshProjectStatusUseCase) Execute(ctx context.Context, input Refres
 		output.BuildStatuses = buildStatuses
 
 		// Get latest deployment if exists
+		// Only include if deployment was created after latest build finished
 		deployment, err := uc.deploymentRepo.FindLatestByProjectID(ctx, input.ProjectID)
 		if err != nil {
 			// No deployment history is normal for projects that haven't been deployed yet
@@ -332,7 +333,7 @@ func (uc *RefreshProjectStatusUseCase) Execute(ctx context.Context, input Refres
 				zap.Uint("project_id", input.ProjectID),
 				zap.Error(err),
 			)
-		} else {
+		} else if shouldIncludeDeployment(deployment, buildStatuses) {
 			deploymentStatus := &DeploymentStatusOutput{
 				DeploymentID: uint64(deployment.DeploymentID),
 				ProjectID:    uint(deployment.ProjectID()),
