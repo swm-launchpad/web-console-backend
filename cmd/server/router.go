@@ -23,7 +23,6 @@ type Router struct {
 	passwordResetHandler *userHTTP.PasswordResetHandler
 	githubHandler        *userHTTP.GitHubHandler
 	projectHandler       *projectHTTP.ProjectHandler
-	volumeHandler        *projectHTTP.VolumeHandler
 	deploymentHandler    *projectHTTP.DeploymentHandler
 	projectStatusHandler *projectHTTP.ProjectStatusHandler
 	containerHandler     *containerHTTP.ContainerHandler
@@ -43,7 +42,6 @@ func NewRouter(
 	passwordResetHandler *userHTTP.PasswordResetHandler,
 	githubHandler *userHTTP.GitHubHandler,
 	projectHandler *projectHTTP.ProjectHandler,
-	volumeHandler *projectHTTP.VolumeHandler,
 	deploymentHandler *projectHTTP.DeploymentHandler,
 	projectStatusHandler *projectHTTP.ProjectStatusHandler,
 	containerHandler *containerHTTP.ContainerHandler,
@@ -77,7 +75,6 @@ func NewRouter(
 		passwordResetHandler: passwordResetHandler,
 		githubHandler:        githubHandler,
 		projectHandler:       projectHandler,
-		volumeHandler:        volumeHandler,
 		deploymentHandler:    deploymentHandler,
 		projectStatusHandler: projectStatusHandler,
 		containerHandler:     containerHandler,
@@ -174,15 +171,6 @@ func (r *Router) Setup() {
 			projects.GET("/:slug/containers", r.containerHandler.ListContainers)
 		}
 
-		// Volume routes (protected)
-		volumes := v1.Group("/volumes")
-		volumes.Use(r.authMiddleware.RequireAuth())
-		{
-			volumes.POST("", r.volumeHandler.AddVolume)
-			volumes.GET("", r.volumeHandler.GetVolumes)
-			volumes.DELETE("/:slug", r.volumeHandler.RemoveVolume)
-		}
-
 		// Container routes (protected)
 		// Container slugs are globally unique, no need for project slug in URL
 		containers := v1.Group("/containers")
@@ -221,9 +209,10 @@ func (r *Router) Setup() {
 			containers.PUT("/:slug/build-vars/:key", r.containerHandler.UpdateBuildVar)
 			containers.DELETE("/:slug/build-vars/:key", r.containerHandler.DeleteBuildVar)
 
-			// Mounts
-			containers.POST("/:slug/mounts", r.containerHandler.AddMount)
-			containers.DELETE("/:slug/mounts/:volume_id", r.containerHandler.DeleteMount)
+			// Volumes (container sub-resource)
+			containers.GET("/:slug/volumes", r.containerHandler.ListVolumes)
+			containers.POST("/:slug/volumes", r.containerHandler.AddVolume)
+			containers.DELETE("/:slug/volumes/:volume_id", r.containerHandler.DeleteVolume)
 
 			// Build logs
 			containers.POST("/:slug/build-log-token", r.buildLogHandler.CreateBuildLogToken)
