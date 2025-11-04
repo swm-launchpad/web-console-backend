@@ -671,6 +671,36 @@ func (r *containerRepository) FindBySlug(ctx context.Context, slug string) (*mod
 		return nil, err
 	}
 
+	// Load secrets
+	sqlcSecrets, err := qtx.GetSecretsByContainerID(ctx, uint32(container.ContainerID()))
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, containererrors.ErrDatabaseOperation
+	}
+
+	if err := r.loadSecrets(container, sqlcSecrets); err != nil {
+		return nil, err
+	}
+
+	// Load build variables
+	sqlcBuildVars, err := qtx.GetBuildVarsByContainerID(ctx, uint32(container.ContainerID()))
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, containererrors.ErrDatabaseOperation
+	}
+
+	if err := r.loadBuildVars(container, sqlcBuildVars); err != nil {
+		return nil, err
+	}
+
+	// Load mounts
+	sqlcMounts, err := qtx.GetMountsByContainerID(ctx, uint32(container.ContainerID()))
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, containererrors.ErrDatabaseOperation
+	}
+
+	if err := r.loadMounts(container, sqlcMounts); err != nil {
+		return nil, err
+	}
+
 	r.logger.Info(ctx, "container repository find by slug completed",
 		zap.Uint("container_id", container.ContainerID()),
 		zap.String("slug", slug),
