@@ -98,9 +98,6 @@ func SetupTestServer(t *testing.T) *TestServer {
 	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, txManager, testLogger)
 	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, txManager, testLogger)
 	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc, testLogger)
-	addVolumeUseCase := projectApp.NewAddVolumeUseCase(volumeSvc, txManager, testLogger)
-	getVolumesUseCase := projectApp.NewGetVolumesUseCase(volumeSvc, testLogger)
-	removeVolumeUseCase := projectApp.NewRemoveVolumeUseCase(volumeSvc, txManager, testLogger)
 
 	// Container dependencies
 	containerRepo := containerInfra.NewContainerRepository(testDB.DB, testLogger)
@@ -116,7 +113,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, containerPermissionSvc, testLogger)
 	listContainersUseCase := containerApp.NewListContainersUseCase(containerRepo, containerPermissionSvc, testLogger)
 	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, buildChangeDetector, installationRepo, txManager, testLogger)
-	deleteContainerUseCase := containerApp.NewDeleteContainerUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	deleteContainerUseCase := containerApp.NewDeleteContainerUseCase(containerRepo, containerPermissionSvc, volumeSvc, txManager, testLogger)
 	addEnvVarUseCase := containerApp.NewAddEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	updateEnvVarUseCase := containerApp.NewUpdateEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	deleteEnvVarUseCase := containerApp.NewDeleteEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
@@ -150,14 +147,6 @@ func SetupTestServer(t *testing.T) *TestServer {
 		settingsSvc,
 		testLogger,
 	)
-	volumeHandler := projectHTTP.NewVolumeHandler(
-		addVolumeUseCase,
-		getVolumesUseCase,
-		removeVolumeUseCase,
-		permissionSvc,
-		volumeSvc,
-		testLogger,
-	)
 	containerHandler := containerHTTP.NewContainerHandler(
 		createContainerUseCase,
 		getContainerUseCase,
@@ -178,7 +167,9 @@ func SetupTestServer(t *testing.T) *TestServer {
 		addMountUseCase,
 		deleteMountUseCase,
 		projectSvc,
+		volumeSvc,
 		containerSvc,
+		containerPermissionSvc,
 		testLogger,
 	)
 	templateHandler := containerHTTP.NewTemplateHandler(
@@ -227,15 +218,6 @@ func SetupTestServer(t *testing.T) *TestServer {
 		projects.GET("/:slug/containers", containerHandler.ListContainers)
 	}
 
-	// Volume routes (protected)
-	volumes := v1.Group("/volumes")
-	volumes.Use(authMiddleware.RequireAuth())
-	{
-		volumes.POST("", volumeHandler.AddVolume)
-		volumes.GET("", volumeHandler.GetVolumes)
-		volumes.DELETE("/:slug", volumeHandler.RemoveVolume)
-	}
-
 	// Container routes (protected, slug-based)
 	containers := v1.Group("/containers")
 	containers.Use(authMiddleware.RequireAuth())
@@ -264,9 +246,10 @@ func SetupTestServer(t *testing.T) *TestServer {
 		containers.PUT("/:slug/secrets/:key", containerHandler.UpdateSecret)
 		containers.DELETE("/:slug/secrets/:key", containerHandler.DeleteSecret)
 
-		// Mounts
-		containers.POST("/:slug/mounts", containerHandler.AddMount)
-		containers.DELETE("/:slug/mounts/:volume_id", containerHandler.DeleteMount)
+		// Volumes (container sub-resource)
+		containers.GET("/:slug/volumes", containerHandler.ListVolumes)
+		containers.POST("/:slug/volumes", containerHandler.AddVolume)
+		containers.DELETE("/:slug/volumes/:volume_id", containerHandler.DeleteVolume)
 	}
 
 	// Template routes (protected)
@@ -463,4 +446,62 @@ func GetUpdateContainerUseCase(ts *TestServer) *containerApp.UpdateContainerUseC
 		txManager,
 		testLogger,
 	)
+}
+
+// GetProjectDiskUsage returns the total disk usage for a project
+func (ts *TestServer) GetProjectDiskUsage(t *testing.T, projectID uint) uint32 {
+	t.Helper()
+
+	var totalDisk uint32
+	query := `
+		SELECT COALESCE(SUM(capacity), 0) as total_disk
+		FROM VOLUMES
+		WHERE project_id = ?
+	`
+	err := ts.DB.DB.QueryRow(query, projectID).Scan(&totalDisk)
+	if err != nil {
+		t.Fatalf("Failed to get project disk usage: %v", err)
+	}
+
+	return totalDisk
+}
+
+// GetContainerStatus returns whether the container exists and is deleted
+func (ts *TestServer) GetContainerStatus(t *testing.T, containerID uint) (exists bool, isDeleted bool) {
+	t.Helper()
+
+	var deletedAt *string
+	query := `
+		SELECT deleted_at
+		FROM CONTAINERS
+		WHERE container_id = ?
+	`
+	err := ts.DB.DB.QueryRow(query, containerID).Scan(&deletedAt)
+	if err != nil {
+		// Container does not exist
+		return false, false
+	}
+
+	// Container exists
+	exists = true
+	isDeleted = (deletedAt != nil)
+	return exists, isDeleted
+}
+
+// VolumeExists checks if a volume exists in the database
+func (ts *TestServer) VolumeExists(t *testing.T, volumeID uint) bool {
+	t.Helper()
+
+	var count int
+	query := `
+		SELECT COUNT(*)
+		FROM VOLUMES
+		WHERE volume_id = ?
+	`
+	err := ts.DB.DB.QueryRow(query, volumeID).Scan(&count)
+	if err != nil {
+		t.Fatalf("Failed to check if volume exists: %v", err)
+	}
+
+	return count > 0
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	projectservice "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	"go.uber.org/zap"
 )
 
@@ -23,6 +24,7 @@ type DeleteContainerOutput struct {
 type DeleteContainerUseCase struct {
 	containerRepo repository.ContainerRepository
 	permissionSvc service.PermissionService
+	volumeService projectservice.VolumeService
 	txManager     db.TxManager
 	logger        logger.Logger
 }
@@ -30,12 +32,14 @@ type DeleteContainerUseCase struct {
 func NewDeleteContainerUseCase(
 	containerRepo repository.ContainerRepository,
 	permissionSvc service.PermissionService,
+	volumeService projectservice.VolumeService,
 	txManager db.TxManager,
 	log logger.Logger,
 ) *DeleteContainerUseCase {
 	return &DeleteContainerUseCase{
 		containerRepo: containerRepo,
 		permissionSvc: permissionSvc,
+		volumeService: volumeService,
 		txManager:     txManager,
 		logger:        log,
 	}
@@ -71,7 +75,7 @@ func (uc *DeleteContainerUseCase) Execute(ctx context.Context, input DeleteConta
 			return err
 		}
 
-		// Soft delete
+		// Soft delete container first
 		if err := container.SoftDelete(); err != nil {
 			uc.logger.Error(ctx, "failed to soft delete container",
 				zap.Error(err),
@@ -87,6 +91,38 @@ func (uc *DeleteContainerUseCase) Execute(ctx context.Context, input DeleteConta
 				zap.Uint("container_id", input.ContainerID),
 			)
 			return err
+		}
+
+		// Delete all volumes mounted to this container
+		// Done after soft delete to avoid FK constraint issues
+		// Mounts will be cascade deleted when volumes are deleted
+		mounts := container.Mounts()
+		if len(mounts) > 0 {
+			uc.logger.Info(ctx, "cleaning up volumes after container soft delete",
+				zap.Uint("container_id", input.ContainerID),
+				zap.Int("volume_count", len(mounts)),
+			)
+
+			for _, mount := range mounts {
+				volumeID := mount.VolumeID()
+
+				if err := uc.volumeService.DeleteVolume(txCtx, volumeID); err != nil {
+					// Log warning but continue deletion
+					// Volume might be already deleted or have other issues
+					uc.logger.Warn(ctx, "failed to delete volume during container deletion",
+						zap.Uint("container_id", input.ContainerID),
+						zap.Uint("volume_id", volumeID),
+						zap.String("mount_path", mount.MountPath()),
+						zap.Error(err),
+					)
+				} else {
+					uc.logger.Info(ctx, "volume deleted successfully",
+						zap.Uint("container_id", input.ContainerID),
+						zap.Uint("volume_id", volumeID),
+						zap.String("mount_path", mount.MountPath()),
+					)
+				}
+			}
 		}
 
 		// Extract values
