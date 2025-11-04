@@ -35,7 +35,9 @@ type ContainerHandler struct {
 	addMountUC        *application.AddMountUseCase
 	deleteMountUC     *application.DeleteMountUseCase
 	projectService    projectservice.ProjectService
+	volumeService     projectservice.VolumeService
 	containerService  containerservice.ContainerService
+	permissionSvc     containerservice.PermissionService
 	logger            logger.Logger
 }
 
@@ -68,7 +70,9 @@ func NewContainerHandler(
 	addMountUC *application.AddMountUseCase,
 	deleteMountUC *application.DeleteMountUseCase,
 	projectService projectservice.ProjectService,
+	volumeService projectservice.VolumeService,
 	containerService containerservice.ContainerService,
+	permissionSvc containerservice.PermissionService,
 	log logger.Logger,
 ) *ContainerHandler {
 	return &ContainerHandler{
@@ -91,7 +95,9 @@ func NewContainerHandler(
 		addMountUC:        addMountUC,
 		deleteMountUC:     deleteMountUC,
 		projectService:    projectService,
+		volumeService:     volumeService,
 		containerService:  containerService,
+		permissionSvc:     permissionSvc,
 		logger:            log,
 	}
 }
@@ -1407,173 +1413,6 @@ func (h *ContainerHandler) ListSecrets(c *gin.Context) {
 	response.OK(c, gin.H{"secrets": output.Secrets})
 }
 
-// AddMountRequest represents the request body for adding a mount
-type AddMountRequest struct {
-	VolumeID  uint   `json:"volume_id" binding:"required"`
-	MountPath string `json:"mount_path" binding:"required"`
-}
-
-// AddMount handles adding a volume mount to a container
-func (h *ContainerHandler) AddMount(c *gin.Context) {
-	ctx := c.Request.Context()
-	containerSlug := c.Param("slug")
-
-	h.logger.Info(ctx, "add mount handler started",
-		zap.String("handler", "AddMount"),
-		zap.String("container_slug", containerSlug),
-	)
-
-	// Get user ID from context
-	userID, exists := c.Get(auth.ContextKeyUserID)
-	if !exists {
-		h.logger.Warn(ctx, "user not authenticated",
-			zap.String("handler", "AddMount"),
-		)
-		response.Error(c, auth.ErrUnauthorized, mapContainerError)
-		return
-	}
-
-	container, err := h.getContainerBySlug(c)
-	if err != nil {
-		h.logger.Error(ctx, "failed to get container by slug",
-			zap.Error(err),
-			zap.String("handler", "AddMount"),
-			zap.String("container_slug", containerSlug),
-		)
-		response.Error(c, err, mapContainerError)
-		return
-	}
-
-	// Bind request body
-	var req AddMountRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		h.logger.Warn(ctx, "request validation failed",
-			zap.Error(err),
-			zap.String("handler", "AddMount"),
-			zap.Uint("container_id", container.ContainerID()),
-		)
-		response.Error(c, containererrors.ErrInvalidFormat, mapContainerError)
-		return
-	}
-
-	// Prepare input
-	input := application.AddMountInput{
-		ContainerID: container.ContainerID(),
-		UserID:      userID.(uint),
-		VolumeID:    req.VolumeID,
-		MountPath:   req.MountPath,
-	}
-
-	output, err := h.addMountUC.Execute(c.Request.Context(), input)
-	if err != nil {
-		h.logger.Error(ctx, "add mount use case failed",
-			zap.Error(err),
-			zap.String("handler", "AddMount"),
-			zap.Uint("user_id", userID.(uint)),
-			zap.Uint("container_id", container.ContainerID()),
-			zap.Uint("volume_id", req.VolumeID),
-			zap.String("mount_path", req.MountPath),
-		)
-		response.Error(c, err, mapContainerError)
-		return
-	}
-
-	h.logger.Info(ctx, "add mount handler completed",
-		zap.String("handler", "AddMount"),
-		zap.Uint("user_id", userID.(uint)),
-		zap.Uint("container_id", container.ContainerID()),
-		zap.Uint("volume_id", req.VolumeID),
-		zap.String("mount_path", req.MountPath),
-	)
-
-	response.Created(c, output)
-}
-
-// DeleteMount handles deleting a volume mount from a container
-func (h *ContainerHandler) DeleteMount(c *gin.Context) {
-	ctx := c.Request.Context()
-	containerSlug := c.Param("slug")
-	volumeIDStr := c.Param("volume_id")
-
-	h.logger.Info(ctx, "delete mount handler started",
-		zap.String("handler", "DeleteMount"),
-		zap.String("container_slug", containerSlug),
-		zap.String("volume_id", volumeIDStr),
-	)
-
-	// Get user ID from context
-	userID, exists := c.Get(auth.ContextKeyUserID)
-	if !exists {
-		h.logger.Warn(ctx, "user not authenticated",
-			zap.String("handler", "DeleteMount"),
-		)
-		response.Error(c, auth.ErrUnauthorized, mapContainerError)
-		return
-	}
-
-	container, err := h.getContainerBySlug(c)
-	if err != nil {
-		h.logger.Error(ctx, "failed to get container by slug",
-			zap.Error(err),
-			zap.String("handler", "DeleteMount"),
-			zap.String("container_slug", containerSlug),
-		)
-		response.Error(c, err, mapContainerError)
-		return
-	}
-
-	// Parse volume ID from URL
-	if volumeIDStr == "" {
-		h.logger.Warn(ctx, "missing volume_id parameter",
-			zap.String("handler", "DeleteMount"),
-			zap.Uint("container_id", container.ContainerID()),
-		)
-		response.Error(c, containererrors.ErrMissingField, mapContainerError)
-		return
-	}
-
-	volumeID, err := strconv.ParseUint(volumeIDStr, 10, 32)
-	if err != nil {
-		h.logger.Warn(ctx, "invalid volume_id format",
-			zap.Error(err),
-			zap.String("handler", "DeleteMount"),
-			zap.Uint("container_id", container.ContainerID()),
-			zap.String("volume_id", volumeIDStr),
-		)
-		response.Error(c, err, mapContainerError)
-		return
-	}
-
-	// Prepare input
-	input := application.DeleteMountInput{
-		ContainerID: container.ContainerID(),
-		UserID:      userID.(uint),
-		VolumeID:    uint(volumeID),
-	}
-
-	output, err := h.deleteMountUC.Execute(c.Request.Context(), input)
-	if err != nil {
-		h.logger.Error(ctx, "delete mount use case failed",
-			zap.Error(err),
-			zap.String("handler", "DeleteMount"),
-			zap.Uint("user_id", userID.(uint)),
-			zap.Uint("container_id", container.ContainerID()),
-			zap.Uint("volume_id", uint(volumeID)),
-		)
-		response.Error(c, err, mapContainerError)
-		return
-	}
-
-	h.logger.Info(ctx, "delete mount handler completed",
-		zap.String("handler", "DeleteMount"),
-		zap.Uint("user_id", userID.(uint)),
-		zap.Uint("container_id", container.ContainerID()),
-		zap.Uint("volume_id", uint(volumeID)),
-	)
-
-	response.OK(c, output)
-}
-
 // ============================================================================
 // Build Variable Handlers
 // ============================================================================
@@ -1876,4 +1715,318 @@ func (h *ContainerHandler) DeleteBuildVar(c *gin.Context) {
 	)
 
 	response.OK(c, output)
+}
+
+// ====================
+// Volume Management (Container sub-resource)
+// ====================
+
+// VolumeResponse represents a volume with mount information
+type VolumeResponse struct {
+	VolumeID  uint   `json:"volume_id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	Capacity  uint32 `json:"capacity"`
+	MountPath string `json:"mount_path"`
+	CreatedAt string `json:"created_at"`
+}
+
+// ListVolumes handles listing all volumes mounted to a container
+// GET /api/v1/containers/:slug/volumes
+func (h *ContainerHandler) ListVolumes(c *gin.Context) {
+	ctx := c.Request.Context()
+	containerSlug := c.Param("slug")
+
+	h.logger.Info(ctx, "list volumes handler started",
+		zap.String("handler", "ListVolumes"),
+		zap.String("container_slug", containerSlug),
+	)
+
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "ListVolumes"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	// Get container by slug
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "ListVolumes"),
+			zap.String("container_slug", containerSlug),
+			zap.Uint("user_id", userID.(uint)),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Check permission using GetContainerUseCase (security fix - consistent with ListEnvVars, ListSecrets pattern)
+	input := application.GetContainerInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+
+	_, err = h.getContainerUC.Execute(c.Request.Context(), input)
+	if err != nil {
+		h.logger.Error(ctx, "permission check failed",
+			zap.Error(err),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Build response with volume and mount information
+	volumes := make([]VolumeResponse, 0, len(container.Mounts()))
+	for _, mount := range container.Mounts() {
+		// Get volume details from volume service
+		volume, err := h.volumeService.GetVolume(c.Request.Context(), mount.VolumeID())
+		if err != nil {
+			h.logger.Error(ctx, "failed to get volume details",
+				zap.Error(err),
+				zap.Uint("volume_id", mount.VolumeID()),
+			)
+			// Skip volumes that were deleted
+			continue
+		}
+
+		volumes = append(volumes, VolumeResponse{
+			VolumeID:  volume.VolumeID(),
+			Name:      volume.Name(),
+			Slug:      volume.Slug().String(),
+			Capacity:  volume.Capacity(),
+			MountPath: mount.MountPath(),
+			CreatedAt: volume.CreatedAt().Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	h.logger.Info(ctx, "list volumes handler completed",
+		zap.String("handler", "ListVolumes"),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.Int("volume_count", len(volumes)),
+	)
+
+	response.OK(c, map[string]interface{}{
+		"volumes": volumes,
+	})
+}
+
+// AddVolumeRequest represents the request body for adding a volume to a container
+type AddVolumeRequest struct {
+	Name      string `json:"name" binding:"required,min=1,max=255"`
+	Capacity  uint32 `json:"capacity" binding:"required,min=128,max=2048"`
+	MountPath string `json:"mount_path" binding:"required"`
+}
+
+// AddVolume handles creating a new volume and mounting it to a container
+// POST /api/v1/containers/:slug/volumes
+func (h *ContainerHandler) AddVolume(c *gin.Context) {
+	ctx := c.Request.Context()
+	containerSlug := c.Param("slug")
+
+	h.logger.Info(ctx, "add volume handler started",
+		zap.String("handler", "AddVolume"),
+		zap.String("container_slug", containerSlug),
+	)
+
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "AddVolume"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	// Get container by slug
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "AddVolume"),
+			zap.String("container_slug", containerSlug),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Step 0: Check permission BEFORE creating volume (security fix)
+	if err := h.permissionSvc.CanUserModifyContainer(c.Request.Context(), userID.(uint), container.ContainerID()); err != nil {
+		h.logger.Warn(ctx, "permission check failed",
+			zap.Error(err),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	var req AddVolumeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Warn(ctx, "request validation failed",
+			zap.Error(err),
+			zap.String("handler", "AddVolume"),
+		)
+		response.Error(c, containererrors.ErrValidationFailed, mapContainerError, response.WithDetails(map[string]any{
+			"message": "Invalid request format: " + err.Error(),
+		}))
+		return
+	}
+
+	// Step 1: Create volume using volume service
+	volume, err := h.volumeService.CreateVolume(c.Request.Context(), container.ProjectID(), req.Name, req.Capacity)
+	if err != nil {
+		h.logger.Error(ctx, "failed to create volume",
+			zap.Error(err),
+			zap.String("handler", "AddVolume"),
+			zap.Uint("project_id", container.ProjectID()),
+			zap.String("volume_name", req.Name),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Step 2: Mount volume to container using AddMountUseCase
+	mountInput := application.AddMountInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+		VolumeID:    volume.VolumeID(),
+		MountPath:   req.MountPath,
+	}
+
+	mountOutput, err := h.addMountUC.Execute(c.Request.Context(), mountInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to mount volume",
+			zap.Error(err),
+			zap.String("handler", "AddVolume"),
+			zap.Uint("container_id", container.ContainerID()),
+			zap.Uint("volume_id", volume.VolumeID()),
+		)
+
+		// Rollback: Delete orphan volume on mount failure
+		if deleteErr := h.volumeService.DeleteVolume(c.Request.Context(), volume.VolumeID()); deleteErr != nil {
+			h.logger.Error(ctx, "failed to cleanup orphan volume after mount failure",
+				zap.Error(deleteErr),
+				zap.Uint("volume_id", volume.VolumeID()),
+				zap.NamedError("original_error", err),
+			)
+		}
+
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	h.logger.Info(ctx, "add volume handler completed",
+		zap.String("handler", "AddVolume"),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.Uint("volume_id", volume.VolumeID()),
+		zap.String("mount_path", req.MountPath),
+	)
+
+	volumeResp := VolumeResponse{
+		VolumeID:  volume.VolumeID(),
+		Name:      volume.Name(),
+		Slug:      volume.Slug().String(),
+		Capacity:  volume.Capacity(),
+		MountPath: mountOutput.MountPath,
+		CreatedAt: mountOutput.CreatedAt,
+	}
+
+	response.Created(c, volumeResp)
+}
+
+// DeleteVolume handles deleting a volume from a container
+// DELETE /api/v1/containers/:slug/volumes/:volume_id
+func (h *ContainerHandler) DeleteVolume(c *gin.Context) {
+	ctx := c.Request.Context()
+	containerSlug := c.Param("slug")
+	volumeIDStr := c.Param("volume_id")
+
+	h.logger.Info(ctx, "delete volume handler started",
+		zap.String("handler", "DeleteVolume"),
+		zap.String("container_slug", containerSlug),
+		zap.String("volume_id", volumeIDStr),
+	)
+
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "DeleteVolume"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	// Parse volume ID
+	volumeID, err := strconv.ParseUint(volumeIDStr, 10, 32)
+	if err != nil {
+		h.logger.Warn(ctx, "invalid volume ID parameter",
+			zap.Error(err),
+			zap.String("handler", "DeleteVolume"),
+			zap.String("volume_id_str", volumeIDStr),
+		)
+		response.Error(c, containererrors.ErrValidationFailed, mapContainerError)
+		return
+	}
+
+	// Get container by slug
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "DeleteVolume"),
+			zap.String("container_slug", containerSlug),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Step 1: Unmount volume using DeleteMountUseCase
+	unmountInput := application.DeleteMountInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+		VolumeID:    uint(volumeID),
+	}
+
+	_, err = h.deleteMountUC.Execute(c.Request.Context(), unmountInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to unmount volume",
+			zap.Error(err),
+			zap.String("handler", "DeleteVolume"),
+			zap.Uint("container_id", container.ContainerID()),
+			zap.Uint64("volume_id", volumeID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Step 2: Delete volume using volume service
+	err = h.volumeService.DeleteVolume(c.Request.Context(), uint(volumeID))
+	if err != nil {
+		h.logger.Error(ctx, "failed to delete volume",
+			zap.Error(err),
+			zap.String("handler", "DeleteVolume"),
+			zap.Uint64("volume_id", volumeID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	h.logger.Info(ctx, "delete volume handler completed",
+		zap.String("handler", "DeleteVolume"),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.Uint64("volume_id", volumeID),
+	)
+
+	response.OK(c, map[string]interface{}{
+		"message": "volume deleted successfully",
+	})
 }
