@@ -224,3 +224,17 @@ func createMockContainerWithMaxSecrets(containerID, projectID uint) *model.Conta
 	}
 	return c
 }
+
+// createMockContainerWithMounts creates a container with 2 mounts for testing
+func createMockContainerWithMounts(containerID, projectID uint) *model.Container {
+	c := createMockContainer(containerID, projectID)
+
+	// Add 2 mounts
+	mount1, _ := model.NewMount(containerID, uint(1000), "/app/data1")
+	mount2, _ := model.NewMount(containerID, uint(1001), "/app/data2")
+
+	_ = c.AddMountDirect(mount1)
+	_ = c.AddMountDirect(mount2)
+
+	return c
+}
