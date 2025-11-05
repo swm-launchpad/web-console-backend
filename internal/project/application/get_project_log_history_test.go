@@ -3,6 +3,8 @@ package application
 import (
 	"context"
 	"errors"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +16,19 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 )
+
+// mockReadCloser is a test helper that implements io.ReadCloser
+type mockReadCloser struct {
+	*strings.Reader
+}
+
+func (m *mockReadCloser) Close() error {
+	return nil
+}
+
+func newMockReadCloser(data string) io.ReadCloser {
+	return &mockReadCloser{Reader: strings.NewReader(data)}
+}
 
 func TestGetProjectLogHistoryUseCase_Execute_Success(t *testing.T) {
 	// Setup
@@ -41,31 +56,20 @@ func TestGetProjectLogHistoryUseCase_Execute_Success(t *testing.T) {
 	// Mock FindByID - returns project
 	mockProjectRepo.On("FindByID", ctx, uint(10)).Return(mockProject, nil)
 
-	// Mock QueryApplicationLogsHistory
-	mockLogs := []infrastructure.ApplicationLogEntry{
-		{
-			Timestamp:     time.Now().Add(-1 * time.Hour),
-			ContainerName: "app",
-			LogLine:       "Application started",
-		},
-		{
-			Timestamp:     time.Now().Add(-2 * time.Hour),
-			ContainerName: "app",
-			LogLine:       "Connecting to database",
-		},
-	}
-	mockLokiClient.On("QueryApplicationLogsHistory", ctx, "p2025011812000012345678", before, 100).
-		Return(mockLogs, nil)
+	// Mock QueryApplicationLogsHistoryRaw - returns raw stream
+	mockStream := newMockReadCloser(`{"status":"success","data":{"result":[]}}`)
+	mockLokiClient.On("QueryApplicationLogsHistoryRaw", ctx, "p2025011812000012345678", before, 100).
+		Return(mockStream, nil)
 
 	// Execute
-	output, err := useCase.Execute(ctx, input)
+	stream, err := useCase.Execute(ctx, input)
 
 	// Assert
 	assert.NoError(t, err)
-	assert.NotNil(t, output)
-	assert.Len(t, output.Logs, 2)
-	assert.Equal(t, "Application started", output.Logs[0].LogLine)
-	assert.Equal(t, "Connecting to database", output.Logs[1].LogLine)
+	assert.NotNil(t, stream)
+
+	// Verify stream can be closed
+	assert.NoError(t, stream.Close())
 
 	mockProjectRepo.AssertExpectations(t)
 	mockLokiClient.AssertExpectations(t)
@@ -97,18 +101,18 @@ func TestGetProjectLogHistoryUseCase_Execute_DefaultLimit(t *testing.T) {
 	// Mock FindByID - returns project
 	mockProjectRepo.On("FindByID", ctx, uint(10)).Return(mockProject, nil)
 
-	// Mock QueryApplicationLogsHistory - should be called with limit=100
-	mockLogs := []infrastructure.ApplicationLogEntry{}
-	mockLokiClient.On("QueryApplicationLogsHistory", ctx, "p2025011812000012345678", mock.AnythingOfType("time.Time"), 100).
-		Return(mockLogs, nil)
+	// Mock QueryApplicationLogsHistoryRaw - should be called with limit=100
+	mockStream := newMockReadCloser(`{"status":"success","data":{"result":[]}}`)
+	mockLokiClient.On("QueryApplicationLogsHistoryRaw", ctx, "p2025011812000012345678", mock.AnythingOfType("time.Time"), 100).
+		Return(mockStream, nil)
 
 	// Execute
-	output, err := useCase.Execute(ctx, input)
+	stream, err := useCase.Execute(ctx, input)
 
 	// Assert
 	assert.NoError(t, err)
-	assert.NotNil(t, output)
-	assert.Len(t, output.Logs, 0)
+	assert.NotNil(t, stream)
+	assert.NoError(t, stream.Close())
 
 	mockProjectRepo.AssertExpectations(t)
 	mockLokiClient.AssertExpectations(t)
@@ -138,16 +142,16 @@ func TestGetProjectLogHistoryUseCase_Execute_ProjectNotFound(t *testing.T) {
 		Return(nil, projecterrors.ErrProjectNotFound)
 
 	// Execute
-	output, err := useCase.Execute(ctx, input)
+	stream, err := useCase.Execute(ctx, input)
 
 	// Assert
 	assert.Error(t, err)
 	assert.Equal(t, projecterrors.ErrProjectNotFound, err)
-	assert.Nil(t, output)
+	assert.Nil(t, stream)
 
 	mockProjectRepo.AssertExpectations(t)
 	// LokiClient should not be called
-	mockLokiClient.AssertNotCalled(t, "QueryApplicationLogsHistory")
+	mockLokiClient.AssertNotCalled(t, "QueryApplicationLogsHistoryRaw")
 }
 
 func TestGetProjectLogHistoryUseCase_Execute_LokiQueryFails(t *testing.T) {
@@ -176,18 +180,18 @@ func TestGetProjectLogHistoryUseCase_Execute_LokiQueryFails(t *testing.T) {
 	// Mock FindByID - returns project
 	mockProjectRepo.On("FindByID", ctx, uint(10)).Return(mockProject, nil)
 
-	// Mock QueryApplicationLogsHistory - Loki fails
+	// Mock QueryApplicationLogsHistoryRaw - Loki fails
 	lokiError := errors.New("loki query timeout")
-	mockLokiClient.On("QueryApplicationLogsHistory", ctx, "p2025011812000012345678", before, 100).
+	mockLokiClient.On("QueryApplicationLogsHistoryRaw", ctx, "p2025011812000012345678", before, 100).
 		Return(nil, lokiError)
 
 	// Execute
-	output, err := useCase.Execute(ctx, input)
+	stream, err := useCase.Execute(ctx, input)
 
 	// Assert
 	assert.Error(t, err)
 	assert.Equal(t, lokiError, err)
-	assert.Nil(t, output)
+	assert.Nil(t, stream)
 
 	mockProjectRepo.AssertExpectations(t)
 	mockLokiClient.AssertExpectations(t)
@@ -219,18 +223,18 @@ func TestGetProjectLogHistoryUseCase_Execute_EmptyLogs(t *testing.T) {
 	// Mock FindByID - returns project
 	mockProjectRepo.On("FindByID", ctx, uint(10)).Return(mockProject, nil)
 
-	// Mock QueryApplicationLogsHistory - returns empty logs
-	mockLogs := []infrastructure.ApplicationLogEntry{}
-	mockLokiClient.On("QueryApplicationLogsHistory", ctx, "p2025011812000012345678", before, 100).
-		Return(mockLogs, nil)
+	// Mock QueryApplicationLogsHistoryRaw - returns empty result
+	mockStream := newMockReadCloser(`{"status":"success","data":{"result":[]}}`)
+	mockLokiClient.On("QueryApplicationLogsHistoryRaw", ctx, "p2025011812000012345678", before, 100).
+		Return(mockStream, nil)
 
 	// Execute
-	output, err := useCase.Execute(ctx, input)
+	stream, err := useCase.Execute(ctx, input)
 
 	// Assert - empty logs is still success
 	assert.NoError(t, err)
-	assert.NotNil(t, output)
-	assert.Len(t, output.Logs, 0)
+	assert.NotNil(t, stream)
+	assert.NoError(t, stream.Close())
 
 	mockProjectRepo.AssertExpectations(t)
 	mockLokiClient.AssertExpectations(t)
@@ -262,25 +266,18 @@ func TestGetProjectLogHistoryUseCase_Execute_CustomLimit(t *testing.T) {
 	// Mock FindByID - returns project
 	mockProjectRepo.On("FindByID", ctx, uint(10)).Return(mockProject, nil)
 
-	// Mock QueryApplicationLogsHistory - should be called with limit=50
-	mockLogs := make([]infrastructure.ApplicationLogEntry, 50)
-	for i := 0; i < 50; i++ {
-		mockLogs[i] = infrastructure.ApplicationLogEntry{
-			Timestamp:     time.Now().Add(-time.Duration(i) * time.Minute),
-			ContainerName: "app",
-			LogLine:       "log line",
-		}
-	}
-	mockLokiClient.On("QueryApplicationLogsHistory", ctx, "p2025011812000012345678", before, 50).
-		Return(mockLogs, nil)
+	// Mock QueryApplicationLogsHistoryRaw - should be called with limit=50
+	mockStream := newMockReadCloser(`{"status":"success","data":{"result":[]}}`)
+	mockLokiClient.On("QueryApplicationLogsHistoryRaw", ctx, "p2025011812000012345678", before, 50).
+		Return(mockStream, nil)
 
 	// Execute
-	output, err := useCase.Execute(ctx, input)
+	stream, err := useCase.Execute(ctx, input)
 
 	// Assert
 	assert.NoError(t, err)
-	assert.NotNil(t, output)
-	assert.Len(t, output.Logs, 50)
+	assert.NotNil(t, stream)
+	assert.NoError(t, stream.Close())
 
 	mockProjectRepo.AssertExpectations(t)
 	mockLokiClient.AssertExpectations(t)

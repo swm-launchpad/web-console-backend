@@ -17,6 +17,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 )
 
@@ -394,10 +395,14 @@ func (h *ProjectLogHandler) GetProjectLogHistory(c *gin.Context) {
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil || limit <= 0 || limit > 1000 {
-		h.logger.Error(ctx, "Invalid limit parameter",
+		h.logger.Warn(ctx, "Invalid limit parameter",
 			zap.String("limit", limitStr),
+			zap.Error(err),
 		)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit parameter"})
+		response.Error(c, projecterrors.ErrInvalidFormat, mapProjectError, response.WithDetails(map[string]any{
+			"message": "Invalid limit parameter (expected 1-1000)",
+			"field":   "limit",
+		}))
 		return
 	}
 
@@ -417,11 +422,14 @@ func (h *ProjectLogHandler) GetProjectLogHistory(c *gin.Context) {
 	if beforeStr != "" {
 		before, err = time.Parse(time.RFC3339Nano, beforeStr)
 		if err != nil {
-			h.logger.Error(ctx, "Invalid before timestamp",
+			h.logger.Warn(ctx, "Invalid before timestamp",
 				zap.String("before", beforeStr),
 				zap.Error(err),
 			)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid before timestamp"})
+			response.Error(c, projecterrors.ErrInvalidFormat, mapProjectError, response.WithDetails(map[string]any{
+				"message": "Invalid before timestamp format (expected RFC3339Nano)",
+				"field":   "before",
+			}))
 			return
 		}
 	}
@@ -431,11 +439,14 @@ func (h *ProjectLogHandler) GetProjectLogHistory(c *gin.Context) {
 	if afterStr != "" {
 		after, err = time.Parse(time.RFC3339Nano, afterStr)
 		if err != nil {
-			h.logger.Error(ctx, "Invalid after timestamp",
+			h.logger.Warn(ctx, "Invalid after timestamp",
 				zap.String("after", afterStr),
 				zap.Error(err),
 			)
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid after timestamp"})
+			response.Error(c, projecterrors.ErrInvalidFormat, mapProjectError, response.WithDetails(map[string]any{
+				"message": "Invalid after timestamp format (expected RFC3339Nano)",
+				"field":   "after",
+			}))
 			return
 		}
 	}
@@ -456,7 +467,7 @@ func (h *ProjectLogHandler) GetProjectLogHistory(c *gin.Context) {
 		Limit:     limit,
 	}
 
-	output, err := h.historyUC.Execute(ctx, input)
+	lokiResponse, err := h.historyUC.Execute(ctx, input)
 	if err != nil {
 		h.logger.Error(ctx, "Failed to get project log history",
 			zap.String("slug", slug),
@@ -466,12 +477,32 @@ func (h *ProjectLogHandler) GetProjectLogHistory(c *gin.Context) {
 		response.Error(c, err, mapProjectError)
 		return
 	}
+	defer func() {
+		_ = lokiResponse.Close()
+	}()
 
-	h.logger.Info(ctx, "Project log history query completed",
+	h.logger.Info(ctx, "Streaming historical project logs to client",
 		zap.String("slug", slug),
 		zap.Uint("project_id", project.ProjectID()),
-		zap.Int("log_count", len(output.Logs)),
 	)
 
-	response.OK(c, output)
+	// Set response headers for JSON streaming
+	c.Header("Content-Type", "application/json")
+	c.Header("Transfer-Encoding", "chunked")
+
+	// Stream Loki response to client
+	_, err = io.Copy(c.Writer, lokiResponse)
+	if err != nil {
+		h.logger.Error(ctx, "Failed to stream historical logs to client",
+			zap.String("slug", slug),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.Error(err),
+		)
+		return
+	}
+
+	h.logger.Info(ctx, "Historical project logs sent successfully",
+		zap.String("slug", slug),
+		zap.Uint("project_id", project.ProjectID()),
+	)
 }

@@ -1,7 +1,6 @@
 package infrastructure
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -12,8 +11,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -86,7 +83,7 @@ func (c *lokiClient) StreamApplicationLogs(ctx context.Context, projectSlug stri
 
 	// Establish WebSocket connection
 	dialer := websocket.Dialer{}
-	conn, resp, err := dialer.DialContext(ctx, fullURL, headers)
+	conn, _, err := dialer.DialContext(ctx, fullURL, headers)
 	if err != nil {
 		c.logger.Error(ctx, "Failed to connect to Loki WebSocket",
 			zap.String("url", fullURL),
@@ -94,87 +91,194 @@ func (c *lokiClient) StreamApplicationLogs(ctx context.Context, projectSlug stri
 		)
 		return nil, fmt.Errorf("failed to connect to Loki: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
 
 	c.logger.Info(ctx, "Loki WebSocket connected for application logs",
 		zap.String("project_slug", projectSlug),
 	)
 
-	// Wrap with monitored reader that checks pod status every 30 seconds
-	baseReader := newApplicationLogReader(conn, c.logger, ctx)
-	return newMonitoredApplicationLogReader(baseReader, c.kubeClient, projectSlug, c.logger, ctx), nil
+	// Create a pipe for streaming data
+	pr, pw := io.Pipe()
+
+	// Create cancellable context for coordinated shutdown
+	wsCtx, wsCancel := context.WithCancel(ctx)
+
+	// Start goroutine to read from WebSocket and write to pipe
+	go func() {
+		c.logger.Debug(wsCtx, "Application log outer goroutine STARTED",
+			zap.String("project_slug", projectSlug),
+		)
+		defer func() {
+			c.logger.Debug(wsCtx, "Application log outer goroutine EXITING (defer cleanup complete)",
+				zap.String("project_slug", projectSlug),
+			)
+		}()
+		defer func() {
+			_ = pw.Close()
+		}()
+		defer func() {
+			c.logger.Debug(wsCtx, "Defer: Starting cleanup sequence for application logs",
+				zap.String("project_slug", projectSlug),
+			)
+
+			// Step 1: Force any blocked ReadMessage() to timeout immediately
+			// SetReadDeadline is the ONLY way to interrupt a blocked ReadMessage() call
+			c.logger.Debug(wsCtx, "Defer: Setting read deadline to NOW")
+			_ = conn.SetReadDeadline(time.Now())
+
+			// Step 2: Send proper WebSocket close frame to Loki server
+			// This signals Loki to decrement its connection counter
+			c.logger.Debug(wsCtx, "Defer: Sending close frame to Loki")
+			closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
+			writeDeadline := time.Now().Add(time.Second)
+			if err := conn.WriteControl(websocket.CloseMessage, closeMsg, writeDeadline); err != nil {
+				c.logger.Debug(wsCtx, "Defer: Failed to send close frame to Loki", zap.Error(err))
+			} else {
+				c.logger.Debug(wsCtx, "Defer: Close frame sent successfully")
+			}
+
+			// Step 3: Close the connection
+			c.logger.Debug(wsCtx, "Defer: Closing WebSocket connection")
+			_ = conn.Close()
+			c.logger.Debug(wsCtx, "Defer: WebSocket connection closed")
+		}()
+
+		// WebSocket message structure
+		type wsMessage struct {
+			messageType int
+			message     []byte
+			err         error
+		}
+
+		// Channel for WebSocket messages
+		msgChan := make(chan wsMessage, 1)
+
+		// Read WebSocket messages in a separate goroutine
+		go func() {
+			c.logger.Debug(wsCtx, "Application log inner read goroutine STARTED",
+				zap.String("project_slug", projectSlug),
+			)
+			defer func() {
+				c.logger.Debug(wsCtx, "Application log inner read goroutine EXITING",
+					zap.String("project_slug", projectSlug),
+				)
+			}()
+
+			for {
+				c.logger.Debug(wsCtx, "Inner: Calling ReadMessage() - WILL BLOCK until message or deadline")
+				messageType, message, err := conn.ReadMessage()
+				c.logger.Debug(wsCtx, "Inner: ReadMessage() returned",
+					zap.Error(err),
+					zap.Int("messageType", messageType),
+					zap.Int("messageSize", len(message)),
+				)
+
+				c.logger.Debug(wsCtx, "Inner: Attempting to send to msgChan...")
+				select {
+				case msgChan <- wsMessage{messageType, message, err}:
+					c.logger.Debug(wsCtx, "Inner: Successfully sent to msgChan")
+					if err != nil {
+						c.logger.Debug(wsCtx, "Inner: Error detected, returning from inner goroutine")
+						return // Exit on error
+					}
+				case <-wsCtx.Done():
+					c.logger.Debug(wsCtx, "Inner: ctx.Done() detected while trying to send to msgChan, returning")
+					return // Exit on context cancellation
+				}
+			}
+		}()
+
+		// Monitor both context cancellation and WebSocket messages
+		for {
+			select {
+			case <-wsCtx.Done():
+				c.logger.Debug(wsCtx, "Outer: ctx.Done() received, initiating shutdown",
+					zap.String("project_slug", projectSlug),
+				)
+				c.logger.Debug(wsCtx, "Outer: Returning to execute defers")
+				return
+
+			case msg := <-msgChan:
+				if msg.err != nil {
+					if websocket.IsCloseError(msg.err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+						c.logger.Debug(wsCtx, "Loki WebSocket closed normally for application logs",
+							zap.String("project_slug", projectSlug),
+						)
+					} else {
+						c.logger.Warn(wsCtx, "Error reading from Loki WebSocket for application logs",
+							zap.String("project_slug", projectSlug),
+							zap.Error(msg.err),
+						)
+						pw.CloseWithError(msg.err)
+					}
+					return
+				}
+
+				// Only process text messages (logs are sent as text)
+				if msg.messageType == websocket.TextMessage {
+					// Write log message to pipe
+					if _, err := pw.Write(msg.message); err != nil {
+						c.logger.Warn(wsCtx, "Error writing to pipe for application logs",
+							zap.String("project_slug", projectSlug),
+							zap.Error(err),
+						)
+						return
+					}
+					// Note: No newline needed - WebSocket messages are already delimited by Loki
+				}
+			}
+		}
+	}()
+
+	// Start pod monitoring goroutine
+	go c.monitorPodsAndCancelOnDeath(wsCtx, wsCancel, projectSlug)
+
+	return pr, nil
 }
 
-// applicationLogReader wraps WebSocket connection as io.ReadCloser
-// It reads Loki tail messages and formats them with [container_name] prefix
-type applicationLogReader struct {
-	conn   *websocket.Conn
-	buffer *bytes.Buffer
-	logger logger.Logger
-	ctx    context.Context
-}
+// monitorPodsAndCancelOnDeath monitors application pod status and cancels context when pods die
+func (c *lokiClient) monitorPodsAndCancelOnDeath(ctx context.Context, cancel context.CancelFunc, projectSlug string) {
+	c.logger.Info(ctx, "Started pod monitoring for application logs",
+		zap.String("project_slug", projectSlug),
+	)
 
-func newApplicationLogReader(conn *websocket.Conn, logger logger.Logger, ctx context.Context) *applicationLogReader {
-	return &applicationLogReader{
-		conn:   conn,
-		buffer: &bytes.Buffer{},
-		logger: logger,
-		ctx:    ctx,
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Context cancelled - cleanup goroutine
+			c.logger.Info(ctx, "Pod monitoring goroutine stopped",
+				zap.String("project_slug", projectSlug),
+			)
+			return
+
+		case <-ticker.C:
+			// Check if pods are still running
+			podsRunning, err := c.kubeClient.CheckApplicationPodsRunning(ctx, projectSlug)
+			if err != nil {
+				c.logger.Warn(ctx, "Failed to check pod status during monitoring",
+					zap.String("project_slug", projectSlug),
+					zap.Error(err),
+				)
+				// Don't cancel on error - could be temporary network issue
+				continue
+			}
+
+			if !podsRunning {
+				c.logger.Info(ctx, "Application pods died - cancelling WebSocket stream",
+					zap.String("project_slug", projectSlug),
+				)
+				// Cancel context to trigger shutdown of WebSocket goroutines
+				cancel()
+				return
+			}
+
+			c.logger.Debug(ctx, "Pod status check: running",
+				zap.String("project_slug", projectSlug),
+			)
+		}
 	}
-}
-
-func (r *applicationLogReader) Read(p []byte) (int, error) {
-	// If buffer is empty, read next WebSocket message
-	for r.buffer.Len() == 0 {
-		_, message, err := r.conn.ReadMessage()
-		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				return 0, io.EOF
-			}
-			return 0, fmt.Errorf("failed to read from websocket: %w", err)
-		}
-
-		// Parse Loki tail response
-		var tailResp struct {
-			Streams []struct {
-				Stream map[string]string `json:"stream"`
-				Values [][]string        `json:"values"`
-			} `json:"streams"`
-		}
-
-		if err := json.Unmarshal(message, &tailResp); err != nil {
-			r.logger.Warn(r.ctx, "Failed to parse Loki tail response", zap.Error(err))
-			continue
-		}
-
-		// Format each log line with [container_name] prefix
-		for _, stream := range tailResp.Streams {
-			containerName := stream.Stream["container"]
-			if containerName == "" {
-				containerName = "unknown"
-			}
-
-			for _, value := range stream.Values {
-				// value[0] = timestamp (nanoseconds)
-				// value[1] = log line
-				timestampNano, _ := strconv.ParseInt(value[0], 10, 64)
-				timestamp := time.Unix(0, timestampNano).Format(time.RFC3339)
-				logLine := value[1]
-
-				// Format: [container_name] timestamp log_line\n
-				formatted := fmt.Sprintf("[%s] %s %s\n", containerName, timestamp, logLine)
-				r.buffer.WriteString(formatted)
-			}
-		}
-	}
-
-	// Read from buffer
-	return r.buffer.Read(p)
-}
-
-func (r *applicationLogReader) Close() error {
-	r.logger.Info(r.ctx, "Closing application log WebSocket reader")
-	return r.conn.Close()
 }
 
 // QueryApplicationLogsHistory queries historical logs with pagination using HTTP API
@@ -291,16 +395,21 @@ func (c *lokiClient) QueryApplicationLogsHistory(ctx context.Context, projectSlu
 
 			entries = append(entries, infrastructure.ApplicationLogEntry{
 				Timestamp:     timestamp,
+				TimestampNs:   value[0], // Preserve nanosecond timestamp from Loki
 				ContainerName: containerName,
 				LogLine:       logLine,
 			})
 		}
 	}
 
-	// Sort by timestamp (oldest first)
+	// Sort by nanosecond timestamp (oldest first) for precise ordering
 	// Loki returns in backward direction (newest first), so we reverse it
+	// Use TimestampNs (string) instead of Timestamp to preserve nanosecond precision
 	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Timestamp.Before(entries[j].Timestamp)
+		// Parse nanosecond timestamps as int64 for comparison
+		iNs, _ := strconv.ParseInt(entries[i].TimestampNs, 10, 64)
+		jNs, _ := strconv.ParseInt(entries[j].TimestampNs, 10, 64)
+		return iNs < jNs
 	})
 
 	c.logger.Info(ctx, "Application log history query completed",
@@ -309,114 +418,6 @@ func (c *lokiClient) QueryApplicationLogsHistory(ctx context.Context, projectSlu
 	)
 
 	return entries, nil
-}
-
-// monitoredApplicationLogReader wraps applicationLogReader and monitors pod status
-// Closes the connection automatically if pods die
-type monitoredApplicationLogReader struct {
-	reader      io.ReadCloser
-	kubeClient  infrastructure.KubeClient
-	projectSlug string
-	logger      logger.Logger
-	ctx         context.Context
-	cancel      context.CancelFunc
-	closeOnce   sync.Once
-	closed      atomic.Bool
-}
-
-func newMonitoredApplicationLogReader(
-	reader io.ReadCloser,
-	kubeClient infrastructure.KubeClient,
-	projectSlug string,
-	logger logger.Logger,
-	parentCtx context.Context,
-) *monitoredApplicationLogReader {
-	// Create cancellable context for goroutine cleanup
-	ctx, cancel := context.WithCancel(parentCtx)
-
-	m := &monitoredApplicationLogReader{
-		reader:      reader,
-		kubeClient:  kubeClient,
-		projectSlug: projectSlug,
-		logger:      logger,
-		ctx:         ctx,
-		cancel:      cancel,
-	}
-
-	// Start background goroutine to monitor pod status
-	go m.monitorPodStatus()
-
-	m.logger.Info(ctx, "Started pod monitoring for application logs",
-		zap.String("project_slug", projectSlug),
-	)
-
-	return m
-}
-
-// monitorPodStatus checks pod status every 30 seconds and closes connection if pods die
-func (m *monitoredApplicationLogReader) monitorPodStatus() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-m.ctx.Done():
-			// Context cancelled - cleanup goroutine
-			m.logger.Info(m.ctx, "Pod monitoring goroutine stopped",
-				zap.String("project_slug", m.projectSlug),
-			)
-			return
-
-		case <-ticker.C:
-			// Check if pods are still running
-			podsRunning, err := m.kubeClient.CheckApplicationPodsRunning(m.ctx, m.projectSlug)
-			if err != nil {
-				m.logger.Warn(m.ctx, "Failed to check pod status during monitoring",
-					zap.String("project_slug", m.projectSlug),
-					zap.Error(err),
-				)
-				// Don't close on error - could be temporary network issue
-				continue
-			}
-
-			if !podsRunning {
-				m.logger.Info(m.ctx, "Application pods died - closing WebSocket",
-					zap.String("project_slug", m.projectSlug),
-				)
-				// Close the connection gracefully
-				_ = m.Close()
-				return
-			}
-
-			m.logger.Debug(m.ctx, "Pod status check: running",
-				zap.String("project_slug", m.projectSlug),
-			)
-		}
-	}
-}
-
-func (m *monitoredApplicationLogReader) Read(p []byte) (int, error) {
-	if m.closed.Load() {
-		return 0, io.EOF
-	}
-	return m.reader.Read(p)
-}
-
-func (m *monitoredApplicationLogReader) Close() error {
-	var err error
-	m.closeOnce.Do(func() {
-		m.closed.Store(true)
-		m.logger.Info(m.ctx, "Closing monitored application log reader",
-			zap.String("project_slug", m.projectSlug),
-		)
-
-		// Cancel context to stop monitoring goroutine
-		m.cancel()
-
-		// Close underlying reader
-		err = m.reader.Close()
-	})
-	return err
 }
 
 // QueryApplicationLogsAfter queries logs after a specific timestamp for forward pagination
@@ -528,16 +529,21 @@ func (c *lokiClient) QueryApplicationLogsAfter(ctx context.Context, projectSlug 
 
 			entries = append(entries, infrastructure.ApplicationLogEntry{
 				Timestamp:     timestamp,
+				TimestampNs:   value[0], // Preserve nanosecond timestamp from Loki
 				ContainerName: containerName,
 				LogLine:       logLine,
 			})
 		}
 	}
 
+	// Sort by nanosecond timestamp (oldest first) for precise ordering
 	// Loki returns in forward direction (oldest first)
-	// Already in correct order, no need to reverse
+	// Use TimestampNs (string) instead of Timestamp to preserve nanosecond precision
 	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Timestamp.Before(entries[j].Timestamp)
+		// Parse nanosecond timestamps as int64 for comparison
+		iNs, _ := strconv.ParseInt(entries[i].TimestampNs, 10, 64)
+		jNs, _ := strconv.ParseInt(entries[j].TimestampNs, 10, 64)
+		return iNs < jNs
 	})
 
 	c.logger.Info(ctx, "Application log forward query completed",
@@ -546,4 +552,147 @@ func (c *lokiClient) QueryApplicationLogsAfter(ctx context.Context, projectSlug 
 	)
 
 	return entries, nil
+}
+
+// QueryApplicationLogsHistoryRaw queries historical logs as raw Loki JSON stream (backward direction)
+func (c *lokiClient) QueryApplicationLogsHistoryRaw(ctx context.Context, projectSlug string, before time.Time, limit int) (io.ReadCloser, error) {
+	// Build LogQL query
+	// Match all revisions (e.g., projectSlug-00001, projectSlug-00002) and exclude sidecar containers
+	query := fmt.Sprintf(`{namespace="application",app=~"%s-[0-9]+",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
+
+	// Determine time range
+	end := before
+	if end.IsZero() {
+		end = time.Now()
+	}
+
+	// 24-hour limit
+	start := end.Add(-24 * time.Hour)
+
+	// Build URL
+	params := url.Values{}
+	params.Add("query", query)
+	params.Add("direction", "backward") // Latest first
+	params.Add("limit", strconv.Itoa(limit))
+	params.Add("start", fmt.Sprintf("%d", start.UnixNano()))
+	params.Add("end", fmt.Sprintf("%d", end.UnixNano()))
+
+	fullURL := fmt.Sprintf("%s/loki/api/v1/query_range?%s", c.baseURL, params.Encode())
+
+	c.logger.Info(ctx, "Querying Loki for raw application log history",
+		zap.String("project_slug", projectSlug),
+		zap.Time("start", start),
+		zap.Time("end", end),
+		zap.Int("limit", limit),
+	)
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add authentication headers
+	if c.username != "" && c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+	if c.orgID != "" {
+		req.Header.Set("X-Scope-OrgID", c.orgID)
+	}
+
+	// Execute request
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		c.logger.Error(ctx, "Failed to query Loki",
+			zap.String("url", fullURL),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("failed to query Loki: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		defer func() { _ = resp.Body.Close() }()
+		body, _ := io.ReadAll(resp.Body)
+		c.logger.Error(ctx, "Loki returned non-OK status",
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("body", string(body)),
+		)
+		return nil, fmt.Errorf("loki returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	c.logger.Info(ctx, "Successfully retrieved raw application log history from Loki",
+		zap.String("project_slug", projectSlug),
+	)
+
+	// Return response body as ReadCloser (caller must close it)
+	return resp.Body, nil
+}
+
+// QueryApplicationLogsAfterRaw queries logs as raw Loki JSON stream (forward direction)
+func (c *lokiClient) QueryApplicationLogsAfterRaw(ctx context.Context, projectSlug string, after time.Time, limit int) (io.ReadCloser, error) {
+	// Build LogQL query
+	// Match all revisions (e.g., projectSlug-00001, projectSlug-00002) and exclude sidecar containers
+	query := fmt.Sprintf(`{namespace="application",app=~"%s-[0-9]+",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
+
+	// Determine time range
+	start := after
+	end := time.Now()
+
+	// Build URL
+	params := url.Values{}
+	params.Add("query", query)
+	params.Add("direction", "forward") // Forward direction for newer logs
+	params.Add("limit", strconv.Itoa(limit))
+	params.Add("start", fmt.Sprintf("%d", start.UnixNano()))
+	params.Add("end", fmt.Sprintf("%d", end.UnixNano()))
+
+	fullURL := fmt.Sprintf("%s/loki/api/v1/query_range?%s", c.baseURL, params.Encode())
+
+	c.logger.Info(ctx, "Querying Loki for raw newer application logs (forward)",
+		zap.String("project_slug", projectSlug),
+		zap.Time("after", after),
+		zap.Time("end", end),
+		zap.Int("limit", limit),
+	)
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add authentication headers
+	if c.username != "" && c.password != "" {
+		req.SetBasicAuth(c.username, c.password)
+	}
+	if c.orgID != "" {
+		req.Header.Set("X-Scope-OrgID", c.orgID)
+	}
+
+	// Execute request
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		c.logger.Error(ctx, "Failed to query Loki",
+			zap.String("url", fullURL),
+			zap.Error(err),
+		)
+		return nil, fmt.Errorf("failed to query Loki: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		defer func() { _ = resp.Body.Close() }()
+		body, _ := io.ReadAll(resp.Body)
+		c.logger.Error(ctx, "Loki returned non-OK status",
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("body", string(body)),
+		)
+		return nil, fmt.Errorf("loki returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	c.logger.Info(ctx, "Successfully retrieved raw application logs (forward) from Loki",
+		zap.String("project_slug", projectSlug),
+	)
+
+	// Return response body as ReadCloser (caller must close it)
+	return resp.Body, nil
 }

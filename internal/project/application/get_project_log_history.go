@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"go.uber.org/zap"
@@ -16,10 +17,6 @@ type GetProjectLogHistoryInput struct {
 	Before    time.Time // Zero value means current time (backward pagination)
 	After     time.Time // For forward pagination
 	Limit     int       // Default 100
-}
-
-type GetProjectLogHistoryOutput struct {
-	Logs []infrastructure.ApplicationLogEntry `json:"logs"`
 }
 
 type GetProjectLogHistoryUseCase struct {
@@ -40,7 +37,7 @@ func NewGetProjectLogHistoryUseCase(
 	}
 }
 
-func (uc *GetProjectLogHistoryUseCase) Execute(ctx context.Context, input GetProjectLogHistoryInput) (*GetProjectLogHistoryOutput, error) {
+func (uc *GetProjectLogHistoryUseCase) Execute(ctx context.Context, input GetProjectLogHistoryInput) (io.ReadCloser, error) {
 	uc.logger.Info(ctx, "Querying application log history",
 		zap.Uint("project_id", input.ProjectID),
 		zap.Time("before", input.Before),
@@ -72,15 +69,15 @@ func (uc *GetProjectLogHistoryUseCase) Execute(ctx context.Context, input GetPro
 		zap.Int("limit", limit),
 	)
 
-	// 3. Query Loki (forward or backward based on input)
-	var logs []infrastructure.ApplicationLogEntry
+	// 3. Query Loki raw stream (forward or backward based on input)
+	var logStream io.ReadCloser
 
 	if !input.After.IsZero() {
 		// Forward pagination: get logs after specific timestamp
 		uc.logger.Info(ctx, "Using forward pagination (after timestamp)",
 			zap.Time("after", input.After),
 		)
-		logs, err = uc.lokiClient.QueryApplicationLogsAfter(
+		logStream, err = uc.lokiClient.QueryApplicationLogsAfterRaw(
 			ctx,
 			projectSlug,
 			input.After,
@@ -91,7 +88,7 @@ func (uc *GetProjectLogHistoryUseCase) Execute(ctx context.Context, input GetPro
 		uc.logger.Info(ctx, "Using backward pagination (before timestamp)",
 			zap.Time("before", input.Before),
 		)
-		logs, err = uc.lokiClient.QueryApplicationLogsHistory(
+		logStream, err = uc.lokiClient.QueryApplicationLogsHistoryRaw(
 			ctx,
 			projectSlug,
 			input.Before,
@@ -107,10 +104,9 @@ func (uc *GetProjectLogHistoryUseCase) Execute(ctx context.Context, input GetPro
 		return nil, err
 	}
 
-	uc.logger.Info(ctx, "Application log history query completed",
+	uc.logger.Info(ctx, "Application log history query started - streaming raw response",
 		zap.String("project_slug", projectSlug),
-		zap.Int("log_count", len(logs)),
 	)
 
-	return &GetProjectLogHistoryOutput{Logs: logs}, nil
+	return logStream, nil
 }
