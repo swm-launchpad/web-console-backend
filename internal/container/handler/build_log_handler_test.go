@@ -100,11 +100,17 @@ func TestBuildLogHandler_GetBuildLogHistory_Success(t *testing.T) {
 	mockContainerService.On("GetContainerBySlug", ctx, containerSlug).
 		Return(testContainer, nil)
 
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, containerID).
+		Return([]*build_history.BuildHistory{}, nil)
+
 	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, containerID).
 		Return(completedBuild, nil)
 
+	// Note: GetBuildLogHistoryUseCase now adds 5-minute buffer to finishedAt
+	expectedEndTime := finishedAt.Add(5 * time.Minute)
 	mockLogData := io.NopCloser(strings.NewReader(`{"status":"success","data":{"resultType":"streams","result":[]}}`))
-	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, finishedAt).
+	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, expectedEndTime, 1000).
 		Return(mockLogData, nil)
 
 	// Setup router
@@ -334,6 +340,10 @@ func TestBuildLogHandler_GetBuildLogHistory_NoBuildHistory(t *testing.T) {
 	mockContainerService.On("GetContainerBySlug", ctx, containerSlug).
 		Return(testContainer, nil)
 
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, containerID).
+		Return([]*build_history.BuildHistory{}, nil)
+
 	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, containerID).
 		Return(nil, projecterrors.ErrBuildHistoryNotFound)
 
@@ -430,12 +440,18 @@ func TestBuildLogHandler_GetBuildLogHistory_LokiFailure(t *testing.T) {
 	mockContainerService.On("GetContainerBySlug", ctx, containerSlug).
 		Return(testContainer, nil)
 
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, containerID).
+		Return([]*build_history.BuildHistory{}, nil)
+
 	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, containerID).
 		Return(completedBuild, nil)
 
 	// Mock Loki failure
+	// Note: GetBuildLogHistoryUseCase now adds 5-minute buffer to finishedAt
+	expectedEndTime := finishedAt.Add(5 * time.Minute)
 	lokiError := errors.New("loki connection failed")
-	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, finishedAt).
+	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, expectedEndTime, 1000).
 		Return(nil, lokiError)
 
 	// Setup router

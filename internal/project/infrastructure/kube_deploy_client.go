@@ -608,3 +608,43 @@ func (k *kubeClient) getContainerLogs(ctx context.Context, podName, containerNam
 
 	return logs.String(), nil
 }
+
+// CheckApplicationPodsRunning checks if any running application pods exist for the project
+func (k *kubeClient) CheckApplicationPodsRunning(ctx context.Context, projectSlug string) (bool, error) {
+	// Get application namespace from environment
+	appNamespace := os.Getenv("KUBE_APPLICATION_NAMESPACE")
+	if appNamespace == "" {
+		appNamespace = "application"
+	}
+
+	k.logger.Info(ctx, "Checking application pods",
+		zap.String("project_slug", projectSlug),
+		zap.String("namespace", appNamespace),
+	)
+
+	// List pods with Knative service label and Running phase
+	pods, err := k.clientset.CoreV1().Pods(appNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("serving.knative.dev/service=%s", projectSlug),
+		FieldSelector: "status.phase=Running",
+	})
+
+	if err != nil {
+		k.logger.Error(ctx, "Failed to list application pods",
+			zap.String("project_slug", projectSlug),
+			zap.String("namespace", appNamespace),
+			zap.Error(err),
+		)
+		return false, projecterrors.ErrKubernetesUnavailable
+	}
+
+	exists := len(pods.Items) > 0
+
+	k.logger.Info(ctx, "Application pods check completed",
+		zap.String("project_slug", projectSlug),
+		zap.String("namespace", appNamespace),
+		zap.Bool("running", exists),
+		zap.Int("pod_count", len(pods.Items)),
+	)
+
+	return exists, nil
+}

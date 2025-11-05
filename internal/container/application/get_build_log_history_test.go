@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
@@ -41,6 +42,10 @@ func TestGetBuildLogHistoryUseCase_Execute_Success(t *testing.T) {
 	// Mock permission check - user has access
 	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, uint(10)).
+		Return([]*build_history.BuildHistory{}, nil)
+
 	// Create completed build with all required fields
 	pipelineRunName := "image-build-push-run-abc123"
 	startedAt := time.Now().Add(-1 * time.Hour)
@@ -64,8 +69,10 @@ func TestGetBuildLogHistoryUseCase_Execute_Success(t *testing.T) {
 		Return(completedBuild, nil)
 
 	// Mock QueryPipelineRunLogsHTTP
+	// Note: UseCase now adds 5-minute buffer to finishedAt
+	expectedEndTime := finishedAt.Add(5 * time.Minute)
 	mockLogData := io.NopCloser(strings.NewReader(`{"status":"success","data":{"resultType":"streams","result":[]}}`))
-	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, finishedAt).
+	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, expectedEndTime, 1000).
 		Return(mockLogData, nil)
 
 	// Execute
@@ -106,6 +113,10 @@ func TestGetBuildLogHistoryUseCase_Execute_NoBuildHistory(t *testing.T) {
 
 	// Mock permission check - user has access
 	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(999)).Return(nil)
+
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, uint(999)).
+		Return([]*build_history.BuildHistory{}, nil)
 
 	// Mock FindLatestByContainerID - no build history
 	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(999)).
@@ -148,6 +159,10 @@ func TestGetBuildLogHistoryUseCase_Execute_BuildNotCompleted(t *testing.T) {
 	// Mock permission check - user has access
 	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, uint(10)).
+		Return([]*build_history.BuildHistory{}, nil)
+
 	// Create running build (not completed)
 	pipelineRunName := "image-build-push-run-running"
 	startedAt := time.Now().Add(-10 * time.Minute)
@@ -169,18 +184,27 @@ func TestGetBuildLogHistoryUseCase_Execute_BuildNotCompleted(t *testing.T) {
 	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(10)).
 		Return(runningBuild, nil)
 
+	// Mock QueryPipelineRunLogsHTTP for running build
+	// Note: Running builds use time.Now() + 5min buffer as endTime (capped at current time)
+	// We can't predict exact time.Now(), so we verify it's called with correct pipeline name
+	mockLogData := io.NopCloser(strings.NewReader(`{"status":"success","data":{"resultType":"streams","result":[]}}`))
+	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, mock.Anything, 1000).
+		Return(mockLogData, nil)
+
 	// Execute
 	logData, err := useCase.Execute(ctx, input)
 
-	// Assert - should fail because build is not completed
-	assert.Error(t, err)
-	assert.Equal(t, projecterrors.ErrBuildHistoryNotFound, err)
-	assert.Nil(t, logData)
+	// Assert - should succeed for running builds (now supported)
+	assert.NoError(t, err)
+	assert.NotNil(t, logData)
+
+	// Verify we can read from the response
+	data, _ := io.ReadAll(logData)
+	assert.Contains(t, string(data), "success")
 
 	mockBuildHistoryRepo.AssertExpectations(t)
 	mockPermissionService.AssertExpectations(t)
-	// Loki client should not be called
-	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
+	mockLokiClient.AssertExpectations(t)
 }
 
 func TestGetBuildLogHistoryUseCase_Execute_NoPipelineRunName(t *testing.T) {
@@ -205,6 +229,10 @@ func TestGetBuildLogHistoryUseCase_Execute_NoPipelineRunName(t *testing.T) {
 
 	// Mock permission check - user has access
 	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
+
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, uint(10)).
+		Return([]*build_history.BuildHistory{}, nil)
 
 	// Create completed build WITHOUT PipelineRunName
 	startedAt := time.Now().Add(-1 * time.Hour)
@@ -264,6 +292,10 @@ func TestGetBuildLogHistoryUseCase_Execute_NoStartedAt(t *testing.T) {
 	// Mock permission check - user has access
 	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, uint(10)).
+		Return([]*build_history.BuildHistory{}, nil)
+
 	// Create completed build WITHOUT StartedAt
 	pipelineRunName := "image-build-push-run-no-start"
 	finishedAt := time.Now().Add(-30 * time.Minute)
@@ -322,6 +354,10 @@ func TestGetBuildLogHistoryUseCase_Execute_NoFinishedAt(t *testing.T) {
 	// Mock permission check - user has access
 	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, uint(10)).
+		Return([]*build_history.BuildHistory{}, nil)
+
 	// Create completed build WITHOUT FinishedAt (shouldn't happen in reality)
 	pipelineRunName := "image-build-push-run-no-finish"
 	startedAt := time.Now().Add(-1 * time.Hour)
@@ -343,18 +379,27 @@ func TestGetBuildLogHistoryUseCase_Execute_NoFinishedAt(t *testing.T) {
 	mockBuildHistoryRepo.On("FindLatestByContainerID", ctx, uint(10)).
 		Return(completedBuild, nil)
 
+	// Mock QueryPipelineRunLogsHTTP for build without finishedAt
+	// Note: Build without finishedAt uses time.Now() + 5min buffer as endTime (capped at current time)
+	// We can't predict exact time.Now(), so we verify it's called with correct pipeline name
+	mockLogData := io.NopCloser(strings.NewReader(`{"status":"success","data":{"resultType":"streams","result":[]}}`))
+	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, mock.Anything, 1000).
+		Return(mockLogData, nil)
+
 	// Execute
 	logData, err := useCase.Execute(ctx, input)
 
-	// Assert
-	assert.Error(t, err)
-	assert.Equal(t, projecterrors.ErrBuildHistoryNotFound, err)
-	assert.Nil(t, logData)
+	// Assert - should succeed (treat missing finishedAt like running build)
+	assert.NoError(t, err)
+	assert.NotNil(t, logData)
+
+	// Verify we can read from the response
+	data, _ := io.ReadAll(logData)
+	assert.Contains(t, string(data), "success")
 
 	mockBuildHistoryRepo.AssertExpectations(t)
 	mockPermissionService.AssertExpectations(t)
-	// Loki client should not be called
-	mockLokiClient.AssertNotCalled(t, "QueryPipelineRunLogsHTTP")
+	mockLokiClient.AssertExpectations(t)
 }
 
 func TestGetBuildLogHistoryUseCase_Execute_LokiQueryFails(t *testing.T) {
@@ -380,6 +425,10 @@ func TestGetBuildLogHistoryUseCase_Execute_LokiQueryFails(t *testing.T) {
 	// Mock permission check - user has access
 	mockPermissionService.On("CanUserAccessContainer", ctx, uint(1), uint(10)).Return(nil)
 
+	// Mock FindActiveByContainerID - no active builds
+	mockBuildHistoryRepo.On("FindActiveByContainerID", ctx, uint(10)).
+		Return([]*build_history.BuildHistory{}, nil)
+
 	// Create valid completed build
 	pipelineRunName := "image-build-push-run-loki-fail"
 	startedAt := time.Now().Add(-1 * time.Hour)
@@ -403,8 +452,10 @@ func TestGetBuildLogHistoryUseCase_Execute_LokiQueryFails(t *testing.T) {
 		Return(completedBuild, nil)
 
 	// Mock QueryPipelineRunLogsHTTP - fails
+	// Note: UseCase now adds 5-minute buffer to finishedAt
+	expectedEndTime := finishedAt.Add(5 * time.Minute)
 	lokiError := errors.New("loki connection failed")
-	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, finishedAt).
+	mockLokiClient.On("QueryPipelineRunLogsHTTP", ctx, pipelineRunName, []string{"ecr-repository-check"}, startedAt, expectedEndTime, 1000).
 		Return(nil, lokiError)
 
 	// Execute

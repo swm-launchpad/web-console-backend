@@ -113,6 +113,20 @@ func InitializeApp() (*App, error) {
 	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, logger)
 	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
 	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService, settingsService, logger)
+	string2 := provideJWTSecret(configConfig)
+	createProjectLogTokenUseCase := application2.NewCreateProjectLogTokenUseCase(projectRepository, string2, logger)
+	kubeClient, err := provideKubeDeployClient(logger)
+	if err != nil {
+		return nil, err
+	}
+	lokiClient := provideProjectLokiClient(configConfig, kubeClient, logger)
+	streamProjectLogsUseCase := application2.NewStreamProjectLogsUseCase(projectRepository, lokiClient, kubeClient, logger)
+	getProjectLogHistoryUseCase := application2.NewGetProjectLogHistoryUseCase(projectRepository, lokiClient, logger)
+	projectLogHandler := provideProjectLogHandler(createProjectLogTokenUseCase, streamProjectLogsUseCase, getProjectLogHistoryUseCase, projectRepository, permissionService, string2, logger)
+	addVolumeUseCase := application2.NewAddVolumeUseCase(volumeService, txManager, logger)
+	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService, logger)
+	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager, logger)
+	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService, volumeService, logger)
 	deploymentRepository := repository.NewDeploymentRepository(db, logger)
 	buildHistoryRepository := repository.NewBuildHistoryRepository(db, logger)
 	containerRepository := infrastructure2.NewContainerRepository(db, logger)
@@ -124,10 +138,6 @@ func InitializeApp() (*App, error) {
 	getContainersForBuildAndDeployUseCase := combined.NewGetContainersForBuildAndDeployUseCase(containerService, templateRepository, logger)
 	containerClient := provideContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, getContainersForBuildAndDeployUseCase, logger)
 	tektonClient, err := provideTektonDeployClient(logger)
-	if err != nil {
-		return nil, err
-	}
-	kubeClient, err := provideKubeDeployClient(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -176,14 +186,14 @@ func InitializeApp() (*App, error) {
 	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository, logger)
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase, logger)
 	createBuildLogTokenUseCase := application3.NewCreateBuildLogTokenUseCase(servicePermissionService, jwtUtil, logger)
-	lokiClient := provideLokiClient(configConfig, logger)
-	streamBuildLogsUseCase := application3.NewStreamBuildLogsUseCase(buildHistoryRepository, lokiClient, logger)
-	getBuildLogHistoryUseCase := application3.NewGetBuildLogHistoryUseCase(buildHistoryRepository, lokiClient, servicePermissionService, logger)
+	infrastructureLokiClient := provideLokiClient(configConfig, logger)
+	streamBuildLogsUseCase := application3.NewStreamBuildLogsUseCase(buildHistoryRepository, infrastructureLokiClient, logger)
+	getBuildLogHistoryUseCase := application3.NewGetBuildLogHistoryUseCase(buildHistoryRepository, infrastructureLokiClient, servicePermissionService, logger)
 	buildLogHandler := provideBuildLogHandler(createBuildLogTokenUseCase, streamBuildLogsUseCase, getBuildLogHistoryUseCase, containerService, jwtUtil, logger)
 	settingsHandler := settings.NewSettingsHandler(settingsService, logger)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	loggingMiddleware := provideLoggingMiddleware(logger)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, buildLogHandler, settingsHandler, authMiddleware, loggingMiddleware)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, projectLogHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, buildLogHandler, settingsHandler, authMiddleware, loggingMiddleware)
 	app := NewApp(configConfig, db, router, oAuthStateRepository, logger)
 	return app, nil
 }
@@ -203,6 +213,11 @@ func provideTxManager(database *sql.DB) db.TxManager {
 // provideJWTUtil creates a JWT utility from config
 func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
 	return jwt.NewJWTUtil(cfg.JWT.Secret)
+}
+
+// provideJWTSecret extracts JWT secret from config
+func provideJWTSecret(cfg *config.Config) string {
+	return cfg.JWT.Secret
 }
 
 // provideLogger creates a logger from config
@@ -373,9 +388,14 @@ func provideGitHubHandler(
 	)
 }
 
-// provideLokiClient creates a Loki client from config
+// provideLokiClient creates a Loki client from config for container domain
 func provideLokiClient(cfg *config.Config, log logger.Logger) infrastructure5.LokiClient {
 	return infrastructure2.NewLokiClient(cfg, log)
+}
+
+// provideProjectLokiClient creates a Loki client from config for project domain
+func provideProjectLokiClient(cfg *config.Config, kubeClient infrastructure4.KubeClient, log logger.Logger) infrastructure4.LokiClient {
+	return infrastructure3.NewLokiClient(cfg, kubeClient, log)
 }
 
 // provideBuildLogHandler creates a build log handler with all dependencies
@@ -393,6 +413,27 @@ func provideBuildLogHandler(
 		getBuildLogHistoryUC,
 		containerService,
 		jwtUtil,
+		log,
+	)
+}
+
+// provideProjectLogHandler creates a project log handler with all dependencies
+func provideProjectLogHandler(
+	createTokenUC *application2.CreateProjectLogTokenUseCase,
+	streamLogsUC *application2.StreamProjectLogsUseCase,
+	historyUC *application2.GetProjectLogHistoryUseCase,
+	projectRepo repository2.ProjectRepository,
+	permissionService service2.PermissionService,
+	jwtSecret string,
+	log logger.Logger,
+) *handler2.ProjectLogHandler {
+	return handler2.NewProjectLogHandler(
+		createTokenUC,
+		streamLogsUC,
+		historyUC,
+		projectRepo,
+		permissionService,
+		jwtSecret,
 		log,
 	)
 }

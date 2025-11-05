@@ -83,6 +83,7 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrInvalidDeploymentRequest:   {StatusCode: http.StatusBadRequest, Code: "INVALID_DEPLOYMENT_REQUEST", Message: "Invalid deployment request"},
 	projecterrors.ErrTektonDeploymentFailed:     {StatusCode: http.StatusInternalServerError, Code: "DEPLOYMENT_TRIGGER_FAILED", Message: "Failed to trigger deployment"},
 	projecterrors.ErrInvalidTektonResponse:      {StatusCode: http.StatusInternalServerError, Code: "INVALID_TEKTON_RESPONSE", Message: "Invalid Tekton response"},
+	projecterrors.ErrNoRunningPods:              {StatusCode: http.StatusServiceUnavailable, Code: "NO_RUNNING_PODS", Message: "No application pods are currently running"},
 
 	// Deployment errors
 	projecterrors.ErrDeploymentNotFound:          {StatusCode: http.StatusNotFound, Code: "DEPLOYMENT_NOT_FOUND", Message: "Deployment not found"},

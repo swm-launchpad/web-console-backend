@@ -58,6 +58,11 @@ func provideJWTUtil(cfg *config.Config) *jwt.JWTUtil {
 	return jwt.NewJWTUtil(cfg.JWT.Secret)
 }
 
+// provideJWTSecret extracts JWT secret from config
+func provideJWTSecret(cfg *config.Config) string {
+	return cfg.JWT.Secret
+}
+
 // provideLogger creates a logger from config
 func provideLogger(cfg *config.Config) (logger.Logger, error) {
 	loggerCfg := logger.Config{
@@ -227,9 +232,14 @@ func provideGitHubHandler(
 	)
 }
 
-// provideLokiClient creates a Loki client from config
+// provideLokiClient creates a Loki client from config for container domain
 func provideLokiClient(cfg *config.Config, log logger.Logger) containerDomainInfra.LokiClient {
 	return containerInfra.NewLokiClient(cfg, log)
+}
+
+// provideProjectLokiClient creates a Loki client from config for project domain
+func provideProjectLokiClient(cfg *config.Config, kubeClient projectDomainInfra.KubeClient, log logger.Logger) projectDomainInfra.LokiClient {
+	return projectInfra.NewLokiClient(cfg, kubeClient, log)
 }
 
 // provideBuildLogHandler creates a build log handler with all dependencies
@@ -251,6 +261,27 @@ func provideBuildLogHandler(
 	)
 }
 
+// provideProjectLogHandler creates a project log handler with all dependencies
+func provideProjectLogHandler(
+	createTokenUC *projectApp.CreateProjectLogTokenUseCase,
+	streamLogsUC *projectApp.StreamProjectLogsUseCase,
+	historyUC *projectApp.GetProjectLogHistoryUseCase,
+	projectRepo projectDomainRepo.ProjectRepository,
+	permissionService projectService.PermissionService,
+	jwtSecret string,
+	log logger.Logger,
+) *projectHTTP.ProjectLogHandler {
+	return projectHTTP.NewProjectLogHandler(
+		createTokenUC,
+		streamLogsUC,
+		historyUC,
+		projectRepo,
+		permissionService,
+		jwtSecret,
+		log,
+	)
+}
+
 func InitializeApp() (*App, error) {
 	wire.Build(
 		// Config
@@ -267,6 +298,7 @@ func InitializeApp() (*App, error) {
 
 		// Auth infrastructure
 		provideJWTUtil,
+		provideJWTSecret,
 		password.NewPasswordUtil,
 
 		// Email service
@@ -319,6 +351,7 @@ func InitializeApp() (*App, error) {
 		provideContainerClient,
 		provideTektonBuildClient,
 		provideKubeBuildClient,
+		provideProjectLokiClient,
 		projectInfra.NewContainerUpdateAdapter,
 		wire.Bind(new(projectDomainInfra.ContainerUpdater), new(*projectInfra.ContainerUpdateAdapter)),
 
@@ -344,6 +377,12 @@ func InitializeApp() (*App, error) {
 		projectApp.NewDeployProjectUseCase,
 		projectApp.NewGetProjectStatusUseCase,
 		projectApp.NewRefreshProjectStatusUseCase,
+		projectApp.NewCreateProjectLogTokenUseCase,
+		projectApp.NewStreamProjectLogsUseCase,
+		projectApp.NewGetProjectLogHistoryUseCase,
+		projectApp.NewAddVolumeUseCase,
+		projectApp.NewGetVolumesUseCase,
+		projectApp.NewRemoveVolumeUseCase,
 
 		// Container infrastructure
 		containerInfra.NewContainerRepository,
@@ -393,8 +432,10 @@ func InitializeApp() (*App, error) {
 		userHTTP.NewPasswordResetHandler,
 		provideGitHubHandler,
 		projectHTTP.NewProjectHandler,
+		projectHTTP.NewVolumeHandler,
 		projectHTTP.NewDeploymentHandler,
 		projectHTTP.NewProjectStatusHandler,
+		provideProjectLogHandler,
 		containerHTTP.NewContainerHandler,
 		containerHTTP.NewTemplateHandler,
 		provideBuildLogHandler,

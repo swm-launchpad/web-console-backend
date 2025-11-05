@@ -36,3 +36,8 @@ func (m *MockKubeClient) FindPipelineRunNameByEventID(ctx context.Context, event
 	args := m.Called(ctx, eventID)
 	return args.String(0), args.Error(1)
 }
+
+func (m *MockKubeClient) CheckApplicationPodsRunning(ctx context.Context, projectSlug string) (bool, error) {
+	args := m.Called(ctx, projectSlug)
+	return args.Bool(0), args.Error(1)
+}

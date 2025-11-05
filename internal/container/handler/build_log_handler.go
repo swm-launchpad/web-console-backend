@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application"
+	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	containerservice "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 )
 
@@ -436,9 +438,12 @@ func (h *BuildLogHandler) StreamBuildLogs(c *gin.Context) {
 
 // GetBuildLogHistory handles GET /api/v1/containers/:slug/build-logs/history
 // @Summary Get historical build logs via HTTP
-// @Description Retrieves historical build logs for the latest completed build from Loki via HTTP. Requires standard authentication.
+// @Description Retrieves historical build logs for the latest or active build from Loki via HTTP. Supports optional 'before' and 'after' parameters for filtering by timestamp, and 'limit' for batch size (useful for burst loading large log sets). Requires standard authentication.
 // @Tags containers
 // @Param slug path string true "Container slug"
+// @Param before query string false "RFC3339 timestamp to filter logs before (e.g., 2024-01-15T10:30:00Z)"
+// @Param after query string false "RFC3339 timestamp to filter logs after (e.g., 2024-01-15T10:00:00Z) for burst loading"
+// @Param limit query int false "Maximum number of logs to return (default: 1000, max: 5000)"
 // @Success 200 {object} object "Loki query_range response (JSON)"
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 401 {object} response.ErrorResponse
@@ -478,6 +483,66 @@ func (h *BuildLogHandler) GetBuildLogHistory(c *gin.Context) {
 	input := application.GetBuildLogHistoryInput{
 		UserID:      userID.(uint),
 		ContainerID: container.ContainerID(),
+	}
+
+	// Parse optional 'before' query parameter (RFC3339Nano format)
+	if beforeStr := c.Query("before"); beforeStr != "" {
+		beforeTime, err := time.Parse(time.RFC3339Nano, beforeStr)
+		if err != nil {
+			h.logger.Warn(ctx, "Invalid before timestamp format",
+				zap.String("before", beforeStr),
+				zap.Error(err),
+			)
+			response.Error(c, containererrors.ErrInvalidFormat, mapContainerError, response.WithDetails(map[string]any{
+				"message": "Invalid before timestamp format (expected RFC3339Nano)",
+				"field":   "before",
+			}))
+			return
+		}
+		input.Before = beforeTime
+		h.logger.Info(ctx, "Filtering logs before timestamp",
+			zap.Time("before", beforeTime),
+		)
+	}
+
+	// Parse optional 'after' query parameter (RFC3339Nano format) for burst loading
+	if afterStr := c.Query("after"); afterStr != "" {
+		afterTime, err := time.Parse(time.RFC3339Nano, afterStr)
+		if err != nil {
+			h.logger.Warn(ctx, "Invalid after timestamp format",
+				zap.String("after", afterStr),
+				zap.Error(err),
+			)
+			response.Error(c, containererrors.ErrInvalidFormat, mapContainerError, response.WithDetails(map[string]any{
+				"message": "Invalid after timestamp format (expected RFC3339Nano)",
+				"field":   "after",
+			}))
+			return
+		}
+		input.After = afterTime
+		h.logger.Info(ctx, "Filtering logs after timestamp",
+			zap.Time("after", afterTime),
+		)
+	}
+
+	// Parse optional 'limit' query parameter (default: 1000, max: 5000)
+	if limitStr := c.Query("limit"); limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil || limit <= 0 || limit > 5000 {
+			h.logger.Warn(ctx, "Invalid limit parameter",
+				zap.String("limit", limitStr),
+				zap.Error(err),
+			)
+			response.Error(c, containererrors.ErrInvalidFormat, mapContainerError, response.WithDetails(map[string]any{
+				"message": "Invalid limit parameter (expected 1-5000)",
+				"field":   "limit",
+			}))
+			return
+		}
+		input.Limit = limit
+		h.logger.Info(ctx, "Using custom limit for logs",
+			zap.Int("limit", limit),
+		)
 	}
 
 	lokiResponse, err := h.getBuildLogHistoryUC.Execute(ctx, input)

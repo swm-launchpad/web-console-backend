@@ -66,7 +66,7 @@ unit-test:
 
 build:
 	@echo "Building $(BINARY_NAME)..."
-	go build $(BUILD_FLAGS) $(LDFLAGS) -o $(BINARY_PATH) $(MAIN_PATH)
+	go build $(BUILD_FLAGS) $(LDFLAGS) -o $(BINARY_PATH) ./cmd/server
 	@echo "Done"
 
 dev:

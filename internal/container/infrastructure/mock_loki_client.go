@@ -23,8 +23,8 @@ func (m *MockLokiClient) StreamPipelineRunLogs(ctx context.Context, pipelineRunN
 }
 
 // QueryPipelineRunLogsHTTP mocks the QueryPipelineRunLogsHTTP method
-func (m *MockLokiClient) QueryPipelineRunLogsHTTP(ctx context.Context, pipelineRunName string, excludeTasks []string, startTime, endTime time.Time) (io.ReadCloser, error) {
-	args := m.Called(ctx, pipelineRunName, excludeTasks, startTime, endTime)
+func (m *MockLokiClient) QueryPipelineRunLogsHTTP(ctx context.Context, pipelineRunName string, excludeTasks []string, startTime, endTime time.Time, limit int) (io.ReadCloser, error) {
+	args := m.Called(ctx, pipelineRunName, excludeTasks, startTime, endTime, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

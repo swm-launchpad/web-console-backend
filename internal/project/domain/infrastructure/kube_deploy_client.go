@@ -135,4 +135,33 @@ type KubeClient interface {
 	//   }
 	//   status, err := client.GetPipelineRunStatus(ctx, name)
 	FindPipelineRunNameByEventID(ctx context.Context, eventID string) (string, error)
+
+	// CheckApplicationPodsRunning checks if any running application pods exist for the project.
+	// This is used to determine if real-time log streaming is available.
+	// Application pods are Knative service pods running in the "application" namespace.
+	//
+	// The implementation filters pods by:
+	//   - Label: serving.knative.dev/service=<projectSlug>
+	//   - Namespace: application (from KUBE_APPLICATION_NAMESPACE)
+	//   - Status: phase=Running
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectSlug: The Knative service name (same as project slug)
+	//
+	// Returns:
+	//   - bool: true if at least one running pod exists, false otherwise
+	//   - error: An error if the operation fails
+	//
+	// Example usage:
+	//   running, err := client.CheckApplicationPodsRunning(ctx, "spring-helloworld")
+	//   if err != nil {
+	//       return err
+	//   }
+	//   if running {
+	//       // Stream real-time logs
+	//   } else {
+	//       // Query historical logs
+	//   }
+	CheckApplicationPodsRunning(ctx context.Context, projectSlug string) (bool, error)
 }
