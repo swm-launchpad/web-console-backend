@@ -14,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 
+	"github.com/swm-launchpad/web-console-backend/internal/common/auth"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
@@ -73,7 +74,15 @@ func NewProjectLogHandler(
 func (h *ProjectLogHandler) CreateProjectLogToken(c *gin.Context) {
 	ctx := c.Request.Context()
 	slug := c.Param("slug")
-	userID := c.GetUint("user_id")
+
+	// Get user ID from context (set by auth middleware)
+	userIDVal, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Error(ctx, "User ID not found in context")
+		response.Error(c, auth.ErrUnauthorized, mapProjectError)
+		return
+	}
+	userID := userIDVal.(uint)
 
 	h.logger.Info(ctx, "Creating project log token",
 		zap.String("slug", slug),
@@ -433,8 +442,16 @@ func (h *ProjectLogHandler) GetProjectLogHistory(c *gin.Context) {
 		return
 	}
 
+	// Get user ID from context (set by auth middleware)
+	userIDVal, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Error(ctx, "User ID not found in context")
+		response.Error(c, auth.ErrUnauthorized, mapProjectError)
+		return
+	}
+	userID := userIDVal.(uint)
+
 	// Check user permission for project access
-	userID := c.GetUint("user_id")
 	if err := h.permissionService.CanUserAccessProject(ctx, userID, project.ProjectID()); err != nil {
 		h.logger.Warn(ctx, "User permission check failed for project log history",
 			zap.String("slug", slug),
