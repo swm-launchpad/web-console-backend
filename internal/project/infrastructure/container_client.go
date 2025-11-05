@@ -95,8 +95,21 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 			)
 		}
 
-		// Health check: always "none"
-		healthCheckType := "none"
+		// Health check: set based on network type
+		var healthCheckType string
+		if len(container.Networks) > 0 {
+			networkType := container.Networks[0].NetworkType
+			switch networkType {
+			case "http":
+				healthCheckType = "http"
+			case "tcp":
+				healthCheckType = "tcp"
+			default:
+				healthCheckType = "none"
+			}
+		} else {
+			healthCheckType = "none"
+		}
 
 		// Port and Domain: from first network (assuming only one network per container)
 		var port int
@@ -315,8 +328,21 @@ func (c *containerClient) GetContainerConfigs(ctx context.Context, projectID uin
 			)
 		}
 
-		// Health check: always "none"
-		healthCheckType := "none"
+		// Health check: set based on network type
+		var healthCheckType string
+		if len(container.Networks) > 0 {
+			networkType := container.Networks[0].NetworkType
+			switch networkType {
+			case "http":
+				healthCheckType = "http"
+			case "tcp":
+				healthCheckType = "tcp"
+			default:
+				healthCheckType = "none"
+			}
+		} else {
+			healthCheckType = "none"
+		}
 
 		// Port and Domain: from first network (assuming only one network per container)
 		var port int
@@ -491,6 +517,16 @@ func (c *containerClient) GetUnifiedContainerConfig(ctx context.Context, project
 					// to avoid capturing loop variable pointer
 					fqdn := net.FQDN
 					domain = &fqdn
+				}
+
+				// Set health check type based on network type
+				switch net.NetworkType {
+				case "http":
+					healthCheckType = "http"
+				case "tcp":
+					healthCheckType = "tcp"
+				default:
+					healthCheckType = "none"
 				}
 			}
 		}
