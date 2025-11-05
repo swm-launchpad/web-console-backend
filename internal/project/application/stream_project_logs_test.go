@@ -137,7 +137,7 @@ func TestStreamProjectLogsUseCase_Execute_NoPodsRunning(t *testing.T) {
 
 	// Assert
 	assert.Error(t, err)
-	assert.EqualError(t, err, "no pods running")
+	assert.EqualError(t, err, "no application pods running")
 	assert.Nil(t, logStream)
 
 	mockProjectRepo.AssertExpectations(t)
