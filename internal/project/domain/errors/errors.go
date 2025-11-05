@@ -22,6 +22,7 @@ var (
 	ErrInvalidStatusTransition    = errors.New("invalid status transition")
 	ErrCannotModifyDeletedProject = errors.New("cannot modify deleted project")
 	ErrProjectAlreadyDeploying    = errors.New("project operation already in progress")
+	ErrProjectOperationInProgress = errors.New("cannot delete project: operation in progress (building or deploying)")
 )
 
 // Permission errors - access control and authorization errors

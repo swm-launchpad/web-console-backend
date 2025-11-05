@@ -21,6 +21,7 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrProjectNotActive:           {StatusCode: http.StatusForbidden, Code: "PROJECT_NOT_ACTIVE", Message: "Project is not active"},
 	projecterrors.ErrCannotModifyDeletedProject: {StatusCode: http.StatusForbidden, Code: "CANNOT_MODIFY_DELETED_PROJECT", Message: "Cannot modify deleted project"},
 	projecterrors.ErrProjectAlreadyDeploying:    {StatusCode: http.StatusConflict, Code: "PROJECT_ALREADY_DEPLOYING", Message: "Project operation already in progress"},
+	projecterrors.ErrProjectOperationInProgress: {StatusCode: http.StatusConflict, Code: "PROJECT_OPERATION_IN_PROGRESS", Message: "Cannot delete project: operation in progress (building or deploying)"},
 
 	// Permission errors
 	projecterrors.ErrPermissionDenied:      {StatusCode: http.StatusForbidden, Code: "PERMISSION_DENIED", Message: "Permission denied"},
