@@ -210,7 +210,8 @@ func (c *lokiClient) StreamPipelineRunLogs(ctx context.Context, pipelineRunName 
 // QueryPipelineRunLogsHTTP retrieves historical logs for a completed PipelineRun via Loki HTTP API
 // Uses /loki/api/v1/query_range for querying historical logs (not real-time streaming)
 // startTime and endTime define the time range to query (use build's startedAt/finishedAt)
-func (c *lokiClient) QueryPipelineRunLogsHTTP(ctx context.Context, pipelineRunName string, excludeTasks []string, startTime, endTime time.Time) (io.ReadCloser, error) {
+// limit specifies the maximum number of log entries to return
+func (c *lokiClient) QueryPipelineRunLogsHTTP(ctx context.Context, pipelineRunName string, excludeTasks []string, startTime, endTime time.Time, limit int) (io.ReadCloser, error) {
 	// Build LogQL query
 	query := c.buildLogQLQuery(pipelineRunName, excludeTasks)
 
@@ -222,8 +223,8 @@ func (c *lokiClient) QueryPipelineRunLogsHTTP(ctx context.Context, pipelineRunNa
 	params.Add("query", query)
 	params.Add("start", fmt.Sprintf("%d", startTime.UnixNano()))
 	params.Add("end", fmt.Sprintf("%d", endTime.UnixNano()))
-	params.Add("limit", "5000")        // Maximum entries for completed builds
-	params.Add("direction", "forward") // Chronological order
+	params.Add("limit", fmt.Sprintf("%d", limit)) // Use provided limit
+	params.Add("direction", "forward")            // Chronological order
 
 	fullURL := queryURL + "?" + params.Encode()
 
@@ -232,6 +233,7 @@ func (c *lokiClient) QueryPipelineRunLogsHTTP(ctx context.Context, pipelineRunNa
 		zap.String("query", query),
 		zap.Time("start", startTime),
 		zap.Time("end", endTime),
+		zap.Int("limit", limit),
 	)
 
 	// Create HTTP request
