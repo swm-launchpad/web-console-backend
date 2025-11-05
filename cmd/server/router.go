@@ -23,6 +23,8 @@ type Router struct {
 	passwordResetHandler *userHTTP.PasswordResetHandler
 	githubHandler        *userHTTP.GitHubHandler
 	projectHandler       *projectHTTP.ProjectHandler
+	projectLogHandler    *projectHTTP.ProjectLogHandler
+	volumeHandler        *projectHTTP.VolumeHandler
 	deploymentHandler    *projectHTTP.DeploymentHandler
 	projectStatusHandler *projectHTTP.ProjectStatusHandler
 	containerHandler     *containerHTTP.ContainerHandler
@@ -42,6 +44,8 @@ func NewRouter(
 	passwordResetHandler *userHTTP.PasswordResetHandler,
 	githubHandler *userHTTP.GitHubHandler,
 	projectHandler *projectHTTP.ProjectHandler,
+	projectLogHandler *projectHTTP.ProjectLogHandler,
+	volumeHandler *projectHTTP.VolumeHandler,
 	deploymentHandler *projectHTTP.DeploymentHandler,
 	projectStatusHandler *projectHTTP.ProjectStatusHandler,
 	containerHandler *containerHTTP.ContainerHandler,
@@ -75,6 +79,8 @@ func NewRouter(
 		passwordResetHandler: passwordResetHandler,
 		githubHandler:        githubHandler,
 		projectHandler:       projectHandler,
+		projectLogHandler:    projectLogHandler,
+		volumeHandler:        volumeHandler,
 		deploymentHandler:    deploymentHandler,
 		projectStatusHandler: projectStatusHandler,
 		containerHandler:     containerHandler,
@@ -169,6 +175,19 @@ func (r *Router) Setup() {
 			// Container routes under project (RESTful)
 			projects.POST("/:slug/containers", r.containerHandler.CreateContainer)
 			projects.GET("/:slug/containers", r.containerHandler.ListContainers)
+
+			// Application logs (runtime logs)
+			projects.POST("/:slug/application-logs/token", r.projectLogHandler.CreateProjectLogToken)
+			projects.GET("/:slug/application-logs/history", r.projectLogHandler.GetProjectLogHistory)
+		}
+
+		// Volume routes (protected)
+		volumes := v1.Group("/volumes")
+		volumes.Use(r.authMiddleware.RequireAuth())
+		{
+			volumes.POST("", r.volumeHandler.AddVolume)
+			volumes.GET("", r.volumeHandler.GetVolumes)
+			volumes.DELETE("/:slug", r.volumeHandler.RemoveVolume)
 		}
 
 		// Container routes (protected)
@@ -222,6 +241,10 @@ func (r *Router) Setup() {
 		// Build log streaming WebSocket endpoint (public with token validation)
 		// Placed outside auth middleware to allow token-based authentication via query param
 		v1.GET("/containers/:slug/build-logs/stream", r.buildLogHandler.StreamBuildLogs)
+
+		// Application log streaming WebSocket endpoint (public with token validation)
+		// Placed outside auth middleware to allow token-based authentication via query param
+		v1.GET("/projects/:slug/application-logs/stream", r.projectLogHandler.StreamProjectLogs)
 
 		// Template routes (public - no auth required)
 		templates := v1.Group("/templates")

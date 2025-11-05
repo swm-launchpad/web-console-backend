@@ -27,3 +27,11 @@ func (m *MockLokiClient) QueryApplicationLogsHistory(ctx context.Context, projec
 	}
 	return args.Get(0).([]ApplicationLogEntry), args.Error(1)
 }
+
+func (m *MockLokiClient) QueryApplicationLogsAfter(ctx context.Context, projectSlug string, after time.Time, limit int) ([]ApplicationLogEntry, error) {
+	args := m.Called(ctx, projectSlug, after, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]ApplicationLogEntry), args.Error(1)
+}
