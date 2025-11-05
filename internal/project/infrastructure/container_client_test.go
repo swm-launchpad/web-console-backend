@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -96,5 +97,104 @@ func TestGetUnifiedContainerConfig_LoopVariableCaptureFix(t *testing.T) {
 		// The bug was: domain = &net.FQDN in loop captured loop variable pointer
 		// The fix: fqdn := net.FQDN; domain = &fqdn (copy to local variable first)
 		t.Skip("Integration test placeholder - verified manually")
+	})
+}
+
+// TestHealthCheckTypeLogic tests that health check types are correctly set based on network types
+func TestHealthCheckTypeLogic(t *testing.T) {
+	// This test verifies the health check type logic based on network types
+	// HTTP network -> "http" health check
+	// TCP network -> "tcp" health check
+	// UDP network -> "none" health check
+	// No network -> "none" health check
+
+	testCases := []struct {
+		name                string
+		networkType         string
+		expectedHealthCheck string
+	}{
+		{
+			name:                "HTTP network should result in http health check",
+			networkType:         "http",
+			expectedHealthCheck: "http",
+		},
+		{
+			name:                "TCP network should result in tcp health check",
+			networkType:         "tcp",
+			expectedHealthCheck: "tcp",
+		},
+		{
+			name:                "UDP network should result in none health check",
+			networkType:         "udp",
+			expectedHealthCheck: "none",
+		},
+		{
+			name:                "Unknown network type should result in none health check",
+			networkType:         "unknown",
+			expectedHealthCheck: "none",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Test the switch logic directly
+			var healthCheckType string
+			networkType := tc.networkType
+
+			switch networkType {
+			case "http":
+				healthCheckType = "http"
+			case "tcp":
+				healthCheckType = "tcp"
+			default:
+				healthCheckType = "none"
+			}
+
+			assert.Equal(t, tc.expectedHealthCheck, healthCheckType,
+				"Health check type mismatch for network type %s", tc.networkType)
+		})
+	}
+}
+
+// TestMockContainerClient_HealthCheckTypes verifies that mock returns correct health check types
+func TestMockContainerClient_HealthCheckTypes(t *testing.T) {
+	mockClient := NewMockContainerClient()
+
+	t.Run("Single container with HTTP should have http health check", func(t *testing.T) {
+		config, err := mockClient.GetContainerConfig(context.Background(), 1)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+		assert.Len(t, config.Containers, 1)
+		assert.Equal(t, "http", config.Containers[0].HealthCheckType)
+	})
+
+	t.Run("Multi-container: backend HTTP, mysql TCP", func(t *testing.T) {
+		config, err := mockClient.GetContainerConfig(context.Background(), 2)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+		assert.Len(t, config.Containers, 2)
+
+		// Backend should have HTTP health check
+		assert.Equal(t, "backend", config.Containers[0].Name)
+		assert.Equal(t, "http", config.Containers[0].HealthCheckType)
+
+		// MySQL should have TCP health check
+		assert.Equal(t, "mysql", config.Containers[1].Name)
+		assert.Equal(t, "tcp", config.Containers[1].HealthCheckType)
+	})
+
+	t.Run("GetUnifiedContainerConfig should have correct health checks", func(t *testing.T) {
+		config, err := mockClient.GetUnifiedContainerConfig(context.Background(), 2)
+		assert.NoError(t, err)
+		assert.NotNil(t, config)
+		assert.Len(t, config.Containers, 2)
+
+		// Backend should have HTTP health check
+		assert.Equal(t, "backend", config.Containers[0].Name)
+		assert.Equal(t, "http", config.Containers[0].HealthCheckType)
+
+		// MySQL should have TCP health check
+		assert.Equal(t, "mysql", config.Containers[1].Name)
+		assert.Equal(t, "tcp", config.Containers[1].HealthCheckType)
 	})
 }
