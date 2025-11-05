@@ -118,6 +118,7 @@ var (
 	ErrInvalidBuildRequest          = errors.New("invalid build request")
 	ErrTektonBuildFailed            = errors.New("tekton build request failed")
 	ErrInvalidTektonResponse        = errors.New("invalid response from tekton API")
+	ErrNoRunningPods                = errors.New("no application pods running")
 )
 
 // Service errors - errors related to business service operations
