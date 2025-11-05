@@ -122,7 +122,7 @@ func InitializeApp() (*App, error) {
 	lokiClient := provideProjectLokiClient(configConfig, kubeClient, logger)
 	streamProjectLogsUseCase := application2.NewStreamProjectLogsUseCase(projectRepository, lokiClient, kubeClient, logger)
 	getProjectLogHistoryUseCase := application2.NewGetProjectLogHistoryUseCase(projectRepository, lokiClient, logger)
-	projectLogHandler := provideProjectLogHandler(createProjectLogTokenUseCase, streamProjectLogsUseCase, getProjectLogHistoryUseCase, projectRepository, string2, logger)
+	projectLogHandler := provideProjectLogHandler(createProjectLogTokenUseCase, streamProjectLogsUseCase, getProjectLogHistoryUseCase, projectRepository, permissionService, string2, logger)
 	addVolumeUseCase := application2.NewAddVolumeUseCase(volumeService, txManager, logger)
 	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService, logger)
 	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager, logger)
@@ -423,6 +423,7 @@ func provideProjectLogHandler(
 	streamLogsUC *application2.StreamProjectLogsUseCase,
 	historyUC *application2.GetProjectLogHistoryUseCase,
 	projectRepo repository2.ProjectRepository,
+	permissionService service2.PermissionService,
 	jwtSecret string,
 	log logger.Logger,
 ) *handler2.ProjectLogHandler {
@@ -431,6 +432,7 @@ func provideProjectLogHandler(
 		streamLogsUC,
 		historyUC,
 		projectRepo,
+		permissionService,
 		jwtSecret,
 		log,
 	)

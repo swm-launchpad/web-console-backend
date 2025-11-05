@@ -19,6 +19,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
 
 // WebSocketError represents a structured error message for WebSocket
@@ -31,13 +32,14 @@ type WebSocketError struct {
 
 // ProjectLogHandler handles project application log related HTTP requests
 type ProjectLogHandler struct {
-	createTokenUC *application.CreateProjectLogTokenUseCase
-	streamLogsUC  *application.StreamProjectLogsUseCase
-	historyUC     *application.GetProjectLogHistoryUseCase
-	projectRepo   repository.ProjectRepository
-	jwtSecret     string
-	logger        logger.Logger
-	upgrader      websocket.Upgrader
+	createTokenUC     *application.CreateProjectLogTokenUseCase
+	streamLogsUC      *application.StreamProjectLogsUseCase
+	historyUC         *application.GetProjectLogHistoryUseCase
+	projectRepo       repository.ProjectRepository
+	permissionService service.PermissionService
+	jwtSecret         string
+	logger            logger.Logger
+	upgrader          websocket.Upgrader
 }
 
 // NewProjectLogHandler creates a new ProjectLogHandler instance
@@ -46,16 +48,18 @@ func NewProjectLogHandler(
 	streamLogsUC *application.StreamProjectLogsUseCase,
 	historyUC *application.GetProjectLogHistoryUseCase,
 	projectRepo repository.ProjectRepository,
+	permissionService service.PermissionService,
 	jwtSecret string,
 	log logger.Logger,
 ) *ProjectLogHandler {
 	return &ProjectLogHandler{
-		createTokenUC: createTokenUC,
-		streamLogsUC:  streamLogsUC,
-		historyUC:     historyUC,
-		projectRepo:   projectRepo,
-		jwtSecret:     jwtSecret,
-		logger:        log,
+		createTokenUC:     createTokenUC,
+		streamLogsUC:      streamLogsUC,
+		historyUC:         historyUC,
+		projectRepo:       projectRepo,
+		permissionService: permissionService,
+		jwtSecret:         jwtSecret,
+		logger:            log,
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return true // Allow all origins for now
@@ -76,7 +80,7 @@ func (h *ProjectLogHandler) CreateProjectLogToken(c *gin.Context) {
 		zap.Uint("user_id", userID),
 	)
 
-	// Find project by slug (permission check)
+	// Find project by slug
 	project, err := h.projectRepo.FindBySlug(ctx, slug)
 	if err != nil {
 		h.logger.Error(ctx, "Project not found for log token",
@@ -84,6 +88,18 @@ func (h *ProjectLogHandler) CreateProjectLogToken(c *gin.Context) {
 			zap.Error(err),
 		)
 		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	// Check user permission for project access
+	if err := h.permissionService.CanUserAccessProject(ctx, userID, project.ProjectID()); err != nil {
+		h.logger.Warn(ctx, "User permission check failed for project log token",
+			zap.String("slug", slug),
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.Error(err),
+		)
+		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
 		return
 	}
 
@@ -406,7 +422,7 @@ func (h *ProjectLogHandler) GetProjectLogHistory(c *gin.Context) {
 		return
 	}
 
-	// Find project by slug (permission check)
+	// Find project by slug
 	project, err := h.projectRepo.FindBySlug(ctx, slug)
 	if err != nil {
 		h.logger.Error(ctx, "Project not found for log history",
@@ -414,6 +430,19 @@ func (h *ProjectLogHandler) GetProjectLogHistory(c *gin.Context) {
 			zap.Error(err),
 		)
 		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	// Check user permission for project access
+	userID := c.GetUint("user_id")
+	if err := h.permissionService.CanUserAccessProject(ctx, userID, project.ProjectID()); err != nil {
+		h.logger.Warn(ctx, "User permission check failed for project log history",
+			zap.String("slug", slug),
+			zap.Uint("user_id", userID),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.Error(err),
+		)
+		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
 		return
 	}
 

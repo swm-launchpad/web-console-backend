@@ -267,6 +267,7 @@ func provideProjectLogHandler(
 	streamLogsUC *projectApp.StreamProjectLogsUseCase,
 	historyUC *projectApp.GetProjectLogHistoryUseCase,
 	projectRepo projectDomainRepo.ProjectRepository,
+	permissionService projectService.PermissionService,
 	jwtSecret string,
 	log logger.Logger,
 ) *projectHTTP.ProjectLogHandler {
@@ -275,6 +276,7 @@ func provideProjectLogHandler(
 		streamLogsUC,
 		historyUC,
 		projectRepo,
+		permissionService,
 		jwtSecret,
 		log,
 	)
