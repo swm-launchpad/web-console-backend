@@ -150,6 +150,11 @@ func provideTektonBuildClient(log logger.Logger) (projectDomainInfra.TektonBuild
 	return projectInfra.NewTektonBuildClient(log)
 }
 
+// provideTektonCleanupClient creates a Tekton cleanup client from environment variables
+func provideTektonCleanupClient(log logger.Logger) (projectDomainInfra.TektonCleanupClient, error) {
+	return projectInfra.NewTektonCleanupClient(log)
+}
+
 // provideDeployService creates a DeployService with all dependencies
 func provideDeployService(
 	txManager db.TxManager,
@@ -351,6 +356,7 @@ func InitializeApp() (*App, error) {
 		provideContainerClient,
 		provideTektonBuildClient,
 		provideKubeBuildClient,
+		provideTektonCleanupClient,
 		provideProjectLokiClient,
 		projectInfra.NewContainerUpdateAdapter,
 		wire.Bind(new(projectDomainInfra.ContainerUpdater), new(*projectInfra.ContainerUpdateAdapter)),

@@ -109,7 +109,11 @@ func InitializeApp() (*App, error) {
 	getProjectUseCase := application2.NewGetProjectUseCase(projectService, volumeService, logger)
 	getProjectBySlugUseCase := application2.NewGetProjectBySlugUseCase(projectService, volumeService, logger)
 	updateProjectUseCase := application2.NewUpdateProjectUseCase(projectService, txManager, logger)
-	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, txManager, logger)
+	tektonCleanupClient, err := provideTektonCleanupClient(logger)
+	if err != nil {
+		return nil, err
+	}
+	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, tektonCleanupClient, txManager, logger)
 	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, logger)
 	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
 	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService, settingsService, logger)
@@ -305,6 +309,11 @@ func provideKubeBuildClient(log logger.Logger) (infrastructure4.KubeBuildClient,
 // provideTektonBuildClient creates a Tekton build client from environment variables
 func provideTektonBuildClient(log logger.Logger) (infrastructure4.TektonBuildClient, error) {
 	return infrastructure3.NewTektonBuildClient(log)
+}
+
+// provideTektonCleanupClient creates a Tekton cleanup client from environment variables
+func provideTektonCleanupClient(log logger.Logger) (infrastructure4.TektonCleanupClient, error) {
+	return infrastructure3.NewTektonCleanupClient(log)
 }
 
 // provideDeployService creates a DeployService with all dependencies
