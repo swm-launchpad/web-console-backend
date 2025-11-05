@@ -97,18 +97,24 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 
 		// Health check: set based on network type
 		var healthCheckType string
+		var healthEndpoint *string
 		if len(container.Networks) > 0 {
 			networkType := container.Networks[0].NetworkType
 			switch networkType {
 			case "http":
 				healthCheckType = "http"
+				endpoint := "/"
+				healthEndpoint = &endpoint
 			case "tcp":
 				healthCheckType = "tcp"
+				healthEndpoint = nil
 			default:
 				healthCheckType = "none"
+				healthEndpoint = nil
 			}
 		} else {
 			healthCheckType = "none"
+			healthEndpoint = nil
 		}
 
 		// Port and Domain: from first network (assuming only one network per container)
@@ -158,7 +164,7 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 			Name:            container.Slug, // Use slug as container name for Kubernetes
 			Domain:          domain,
 			HealthCheckType: healthCheckType,
-			HealthEndpoint:  nil, // No health endpoint for "none" type
+			HealthEndpoint:  healthEndpoint,
 			Port:            port,
 			HealthPort:      nil, // No separate health port
 			ImageName:       imageName,
@@ -330,18 +336,24 @@ func (c *containerClient) GetContainerConfigs(ctx context.Context, projectID uin
 
 		// Health check: set based on network type
 		var healthCheckType string
+		var healthEndpoint *string
 		if len(container.Networks) > 0 {
 			networkType := container.Networks[0].NetworkType
 			switch networkType {
 			case "http":
 				healthCheckType = "http"
+				endpoint := "/"
+				healthEndpoint = &endpoint
 			case "tcp":
 				healthCheckType = "tcp"
+				healthEndpoint = nil
 			default:
 				healthCheckType = "none"
+				healthEndpoint = nil
 			}
 		} else {
 			healthCheckType = "none"
+			healthEndpoint = nil
 		}
 
 		// Port and Domain: from first network (assuming only one network per container)
@@ -391,7 +403,7 @@ func (c *containerClient) GetContainerConfigs(ctx context.Context, projectID uin
 			Name:            container.Slug, // Use slug as container name for Kubernetes
 			Domain:          domain,
 			HealthCheckType: healthCheckType,
-			HealthEndpoint:  nil, // No health endpoint for "none" type
+			HealthEndpoint:  healthEndpoint,
 			Port:            port,
 			HealthPort:      nil, // No separate health port
 			ImageName:       imageName,
@@ -523,10 +535,14 @@ func (c *containerClient) GetUnifiedContainerConfig(ctx context.Context, project
 				switch net.NetworkType {
 				case "http":
 					healthCheckType = "http"
+					endpoint := "/"
+					healthEndpoint = &endpoint
 				case "tcp":
 					healthCheckType = "tcp"
+					healthEndpoint = nil
 				default:
 					healthCheckType = "none"
+					healthEndpoint = nil
 				}
 			}
 		}
