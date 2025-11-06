@@ -48,8 +48,9 @@ func NewLokiClient(cfg *config.Config, kubeClient infrastructure.KubeClient, log
 // StreamApplicationLogs streams real-time logs from application pods via WebSocket
 func (c *lokiClient) StreamApplicationLogs(ctx context.Context, projectSlug string, since time.Time) (io.ReadCloser, error) {
 	// Build LogQL query for application namespace
-	// Match all revisions (e.g., projectSlug-00001, projectSlug-00002) and exclude sidecar containers
-	query := fmt.Sprintf(`{namespace="application",app=~"%s-[0-9]+",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
+	// Match application namespace logs for the project (app label equals project slug)
+	// Exclude sidecar containers (queue-proxy, istio-proxy, nginx-proxy)
+	query := fmt.Sprintf(`{namespace="application",app="%s",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
 
 	// Convert http(s):// to ws(s)://
 	wsURL := strings.Replace(c.baseURL, "https://", "wss://", 1)
@@ -284,8 +285,9 @@ func (c *lokiClient) monitorPodsAndCancelOnDeath(ctx context.Context, cancel con
 // QueryApplicationLogsHistory queries historical logs with pagination using HTTP API
 func (c *lokiClient) QueryApplicationLogsHistory(ctx context.Context, projectSlug string, before time.Time, limit int) ([]infrastructure.ApplicationLogEntry, error) {
 	// Build LogQL query
-	// Match all revisions (e.g., projectSlug-00001, projectSlug-00002) and exclude sidecar containers
-	query := fmt.Sprintf(`{namespace="application",app=~"%s-[0-9]+",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
+	// Match application namespace logs for the project (app label equals project slug)
+	// Exclude sidecar containers (queue-proxy, istio-proxy, nginx-proxy)
+	query := fmt.Sprintf(`{namespace="application",app="%s",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
 
 	// Determine time range
 	end := before
@@ -423,8 +425,9 @@ func (c *lokiClient) QueryApplicationLogsHistory(ctx context.Context, projectSlu
 // QueryApplicationLogsAfter queries logs after a specific timestamp for forward pagination
 func (c *lokiClient) QueryApplicationLogsAfter(ctx context.Context, projectSlug string, after time.Time, limit int) ([]infrastructure.ApplicationLogEntry, error) {
 	// Build LogQL query
-	// Match all revisions (e.g., projectSlug-00001, projectSlug-00002) and exclude sidecar containers
-	query := fmt.Sprintf(`{namespace="application",app=~"%s-[0-9]+",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
+	// Match application namespace logs for the project (app label equals project slug)
+	// Exclude sidecar containers (queue-proxy, istio-proxy, nginx-proxy)
+	query := fmt.Sprintf(`{namespace="application",app="%s",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
 
 	// Determine time range
 	start := after
@@ -557,8 +560,9 @@ func (c *lokiClient) QueryApplicationLogsAfter(ctx context.Context, projectSlug 
 // QueryApplicationLogsHistoryRaw queries historical logs as raw Loki JSON stream (backward direction)
 func (c *lokiClient) QueryApplicationLogsHistoryRaw(ctx context.Context, projectSlug string, before time.Time, limit int) (io.ReadCloser, error) {
 	// Build LogQL query
-	// Match all revisions (e.g., projectSlug-00001, projectSlug-00002) and exclude sidecar containers
-	query := fmt.Sprintf(`{namespace="application",app=~"%s-[0-9]+",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
+	// Match application namespace logs for the project (app label equals project slug)
+	// Exclude sidecar containers (queue-proxy, istio-proxy, nginx-proxy)
+	query := fmt.Sprintf(`{namespace="application",app="%s",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
 
 	// Determine time range
 	end := before
@@ -631,8 +635,9 @@ func (c *lokiClient) QueryApplicationLogsHistoryRaw(ctx context.Context, project
 // QueryApplicationLogsAfterRaw queries logs as raw Loki JSON stream (forward direction)
 func (c *lokiClient) QueryApplicationLogsAfterRaw(ctx context.Context, projectSlug string, after time.Time, limit int) (io.ReadCloser, error) {
 	// Build LogQL query
-	// Match all revisions (e.g., projectSlug-00001, projectSlug-00002) and exclude sidecar containers
-	query := fmt.Sprintf(`{namespace="application",app=~"%s-[0-9]+",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
+	// Match application namespace logs for the project (app label equals project slug)
+	// Exclude sidecar containers (queue-proxy, istio-proxy, nginx-proxy)
+	query := fmt.Sprintf(`{namespace="application",app="%s",container!~"queue-proxy|istio-proxy|nginx-proxy"}`, projectSlug)
 
 	// Determine time range
 	start := after
