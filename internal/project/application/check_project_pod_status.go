@@ -16,7 +16,9 @@ type CheckProjectPodStatusInput struct {
 // CheckProjectPodStatusOutput represents the output for checking project pod status
 type CheckProjectPodStatusOutput struct {
 	Exists          bool   `json:"exists"`
+	Status          string `json:"status,omitempty"`
 	Phase           string `json:"phase,omitempty"`
+	Reason          string `json:"reason,omitempty"`
 	ReadyContainers int    `json:"ready_containers,omitempty"`
 	TotalContainers int    `json:"total_containers,omitempty"`
 }
@@ -56,7 +58,9 @@ func (uc *CheckProjectPodStatusUseCase) Execute(ctx context.Context, input Check
 
 	output := &CheckProjectPodStatusOutput{
 		Exists:          podStatus.Exists,
+		Status:          podStatus.Status,
 		Phase:           podStatus.Phase,
+		Reason:          podStatus.Reason,
 		ReadyContainers: podStatus.ReadyContainers,
 		TotalContainers: podStatus.TotalContainers,
 	}
@@ -64,6 +68,7 @@ func (uc *CheckProjectPodStatusUseCase) Execute(ctx context.Context, input Check
 	uc.logger.Info(ctx, "Project pod status retrieved",
 		zap.Uint("project_id", input.ProjectID),
 		zap.Bool("exists", output.Exists),
+		zap.String("status", output.Status),
 		zap.String("phase", output.Phase),
 	)
 
