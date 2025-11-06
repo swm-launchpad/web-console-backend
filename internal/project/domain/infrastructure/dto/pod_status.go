@@ -7,9 +7,18 @@ type PodStatus struct {
 	// Exists indicates whether at least one pod exists for the project
 	Exists bool
 
-	// Phase is the current phase of the pod (e.g., "Running", "Pending", "Failed")
+	// Status is the kubectl-style status string (e.g., "Running", "ContainerCreating", "CrashLoopBackOff")
+	// This matches what kubectl shows in the STATUS column
+	// Empty if no pod exists
+	Status string
+
+	// Phase is the raw Kubernetes pod phase (e.g., "Running", "Pending", "Failed")
 	// Empty if no pod exists
 	Phase string
+
+	// Reason provides additional context for the status (optional)
+	// Examples: "ContainerCreating", "CrashLoopBackOff", "ImagePullBackOff"
+	Reason string
 
 	// ReadyContainers is the number of containers that are ready
 	// 0 if no pod exists
