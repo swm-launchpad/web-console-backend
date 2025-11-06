@@ -22,6 +22,7 @@ import (
 	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	containerInfra "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	projectApp "github.com/swm-launchpad/web-console-backend/internal/project/application"
+	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
@@ -96,7 +97,13 @@ func SetupTestServer(t *testing.T) *TestServer {
 	getProjectUseCase := projectApp.NewGetProjectUseCase(projectSvc, volumeSvc, testLogger)
 	getProjectBySlugUseCase := projectApp.NewGetProjectBySlugUseCase(projectSvc, volumeSvc, testLogger)
 	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, txManager, testLogger)
-	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, txManager, testLogger)
+	mockTektonCleanupClient := new(projectInfra.MockTektonCleanupClient)
+	// Allow any cleanup calls to return nil (fire-and-forget behavior in tests)
+	mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockContainerSlugProvider := new(projectInfra.MockContainerSlugProvider)
+	// Allow any container slug queries to return empty list
+	mockContainerSlugProvider.On("GetContainerSlugsByProjectID", mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
+	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc, testLogger)
 
 	// Container dependencies

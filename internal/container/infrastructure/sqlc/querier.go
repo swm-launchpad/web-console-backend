@@ -67,6 +67,7 @@ type Querier interface {
 	GetSecretByKey(ctx context.Context, arg GetSecretByKeyParams) (Secret, error)
 	GetSecretsByContainerID(ctx context.Context, containerID uint32) ([]Secret, error)
 	GetTotalResourceUsageByProject(ctx context.Context, projectID uint32) (GetTotalResourceUsageByProjectRow, error)
+	ListContainerSlugsByProjectIDIncludingDeleted(ctx context.Context, projectID uint32) ([]string, error)
 	ListContainers(ctx context.Context, arg ListContainersParams) ([]Container, error)
 	ListContainersByProjectID(ctx context.Context, projectID uint32) ([]Container, error)
 	UpdateBuildVar(ctx context.Context, arg UpdateBuildVarParams) (sql.Result, error)

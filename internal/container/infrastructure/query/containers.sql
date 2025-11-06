@@ -83,3 +83,8 @@ SELECT
     COALESCE(SUM(memory_limit), 0) as total_memory
 FROM CONTAINERS
 WHERE project_id = ? AND is_deleted = FALSE;
+
+-- name: ListContainerSlugsByProjectIDIncludingDeleted :many
+SELECT slug
+FROM CONTAINERS
+WHERE project_id = ?;

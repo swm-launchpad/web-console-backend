@@ -77,6 +77,9 @@ func (m *mockUpdateContainerRepo) GetTotalResourceUsageByProject(ctx context.Con
 func (m *mockUpdateContainerRepo) CheckInternalPortExistsInProject(ctx context.Context, projectID uint, internalPort uint16) (bool, error) {
 	return false, nil
 }
+func (m *mockUpdateContainerRepo) FindAllSlugsByProjectIDIncludingDeleted(ctx context.Context, projectID uint) ([]string, error) {
+	return nil, nil
+}
 func (m *mockUpdateContainerRepo) CheckFQDNExists(ctx context.Context, fqdn string) (bool, error) {
 	return false, nil
 }
