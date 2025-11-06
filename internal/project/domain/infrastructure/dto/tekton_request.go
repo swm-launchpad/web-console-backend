@@ -32,6 +32,10 @@ type DeploymentConfig struct {
 	// StableWindow is the observation period for scale-to-zero decisions in seconds (constant: 180)
 	StableWindow int `json:"stable_window"`
 
+	// Plan is the project plan type: "free", "eco", or "pro"
+	// This determines scale-to-zero behavior and resource allocation policies
+	Plan string `json:"plan"`
+
 	// ConfigMaps contains ConfigMap configurations (managed at project level)
 	ConfigMaps []ConfigMapInfo `json:"config_maps"`
 

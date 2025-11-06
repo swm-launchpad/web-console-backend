@@ -226,12 +226,19 @@ func (s *deployService) buildTektonRequest(
 		return nil, err
 	}
 
+	// Extract plan from project (default to "eco" if not set)
+	planStr := "eco"
+	if plan, hasPlan := proj.Plan(); hasPlan {
+		planStr = plan.String()
+	}
+
 	// Build deployment config
 	deploymentConfig := dto.DeploymentConfig{
 		ProjectID:    projectIDStr,
 		ServiceName:  proj.Slug().String(), // Use project slug for per-project resource isolation in Kubernetes
 		Namespace:    s.applicationNamespace,
 		StableWindow: 180, // constant: 180 seconds
+		Plan:         planStr,
 		ConfigMaps:   allConfigMaps,
 		Volumes:      allVolumes,
 		Containers:   tektonContainers,
