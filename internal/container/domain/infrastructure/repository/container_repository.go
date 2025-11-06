@@ -73,4 +73,9 @@ type ContainerRepository interface {
 	// CheckFQDNExists checks if an FQDN is already used by any network in the system
 	// Used for validating FQDN global uniqueness
 	CheckFQDNExists(ctx context.Context, fqdn string) (bool, error)
+
+	// FindAllSlugsByProjectIDIncludingDeleted retrieves all container slugs for a project
+	// INCLUDING soft-deleted containers. Used for cleanup operations that need to remove
+	// all resources including those from deleted containers.
+	FindAllSlugsByProjectIDIncludingDeleted(ctx context.Context, projectID uint) ([]string, error)
 }

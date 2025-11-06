@@ -1146,3 +1146,22 @@ func (r *containerRepository) CheckFQDNExists(ctx context.Context, fqdn string) 
 
 	return result, nil
 }
+
+// FindAllSlugsByProjectIDIncludingDeleted retrieves all container slugs for a project including soft-deleted containers
+func (r *containerRepository) FindAllSlugsByProjectIDIncludingDeleted(ctx context.Context, projectID uint) ([]string, error) {
+	r.logger.Debug(ctx, "finding all container slugs by project ID including deleted",
+		zap.Uint("project_id", projectID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	slugs, err := qtx.ListContainerSlugsByProjectIDIncludingDeleted(ctx, uint32(projectID))
+	if err != nil {
+		r.logger.Error(ctx, "failed to find container slugs by project ID",
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return nil, containererrors.ErrDatabaseOperation
+	}
+
+	return slugs, nil
+}

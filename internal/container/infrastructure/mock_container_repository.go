@@ -128,3 +128,12 @@ func (m *MockContainerRepository) CheckFQDNExists(ctx context.Context, fqdn stri
 	args := m.Called(ctx, fqdn)
 	return args.Bool(0), args.Error(1)
 }
+
+// FindAllSlugsByProjectIDIncludingDeleted mocks the FindAllSlugsByProjectIDIncludingDeleted method
+func (m *MockContainerRepository) FindAllSlugsByProjectIDIncludingDeleted(ctx context.Context, projectID uint) ([]string, error) {
+	args := m.Called(ctx, projectID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]string), args.Error(1)
+}

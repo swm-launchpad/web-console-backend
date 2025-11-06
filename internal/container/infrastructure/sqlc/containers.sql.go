@@ -300,6 +300,35 @@ func (q *Queries) GetTotalResourceUsageByProject(ctx context.Context, projectID 
 	return i, err
 }
 
+const listContainerSlugsByProjectIDIncludingDeleted = `-- name: ListContainerSlugsByProjectIDIncludingDeleted :many
+SELECT slug
+FROM CONTAINERS
+WHERE project_id = ?
+`
+
+func (q *Queries) ListContainerSlugsByProjectIDIncludingDeleted(ctx context.Context, projectID uint32) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listContainerSlugsByProjectIDIncludingDeleted, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var slug string
+		if err := rows.Scan(&slug); err != nil {
+			return nil, err
+		}
+		items = append(items, slug)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listContainers = `-- name: ListContainers :many
 SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
 FROM CONTAINERS
