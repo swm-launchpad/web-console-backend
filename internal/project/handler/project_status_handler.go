@@ -12,26 +12,29 @@ import (
 )
 
 type ProjectStatusHandler struct {
-	getProjectStatusUseCase     *application.GetProjectStatusUseCase
-	refreshProjectStatusUseCase *application.RefreshProjectStatusUseCase
-	permissionService           service.PermissionService
-	projectService              service.ProjectService
-	logger                      logger.Logger
+	getProjectStatusUseCase      *application.GetProjectStatusUseCase
+	refreshProjectStatusUseCase  *application.RefreshProjectStatusUseCase
+	checkProjectPodStatusUseCase *application.CheckProjectPodStatusUseCase
+	permissionService            service.PermissionService
+	projectService               service.ProjectService
+	logger                       logger.Logger
 }
 
 func NewProjectStatusHandler(
 	getProjectStatusUseCase *application.GetProjectStatusUseCase,
 	refreshProjectStatusUseCase *application.RefreshProjectStatusUseCase,
+	checkProjectPodStatusUseCase *application.CheckProjectPodStatusUseCase,
 	permissionService service.PermissionService,
 	projectService service.ProjectService,
 	log logger.Logger,
 ) *ProjectStatusHandler {
 	return &ProjectStatusHandler{
-		getProjectStatusUseCase:     getProjectStatusUseCase,
-		refreshProjectStatusUseCase: refreshProjectStatusUseCase,
-		permissionService:           permissionService,
-		projectService:              projectService,
-		logger:                      log,
+		getProjectStatusUseCase:      getProjectStatusUseCase,
+		refreshProjectStatusUseCase:  refreshProjectStatusUseCase,
+		checkProjectPodStatusUseCase: checkProjectPodStatusUseCase,
+		permissionService:            permissionService,
+		projectService:               projectService,
+		logger:                       log,
 	}
 }
 
@@ -204,6 +207,94 @@ func (h *ProjectStatusHandler) RefreshProjectStatus(c *gin.Context) {
 		zap.Uint("project_id", project.ProjectID()),
 		zap.String("slug", slug),
 		zap.String("operation_status", output.OperationStatus),
+	)
+
+	response.OK(c, output)
+}
+
+// GetProjectHealth handles GET /api/v1/projects/:slug/health
+// This endpoint checks if the project's pod is running in the application namespace
+// Used to verify if the Knative Service pod is available and healthy
+func (h *ProjectStatusHandler) GetProjectHealth(c *gin.Context) {
+	ctx := c.Request.Context()
+	slug := c.Param("slug")
+
+	h.logger.Info(ctx, "get project health handler started",
+		zap.String("handler", "GetProjectHealth"),
+		zap.String("slug", slug),
+	)
+
+	// Get user ID from context (set by auth middleware)
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "GetProjectHealth"),
+			zap.String("slug", slug),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapProjectError)
+		return
+	}
+
+	// Get project slug from URL
+	if slug == "" {
+		h.logger.Warn(ctx, "missing slug parameter",
+			zap.String("handler", "GetProjectHealth"),
+		)
+		response.Error(c, projecterrors.ErrMissingField, mapProjectError)
+		return
+	}
+
+	// Get project by slug first to get project ID
+	project, err := h.projectService.GetProjectBySlug(c.Request.Context(), slug)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get project by slug",
+			zap.Error(err),
+			zap.String("handler", "GetProjectHealth"),
+			zap.String("slug", slug),
+		)
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	// Check user permission for project access
+	// Return project not found instead of permission denied to prevent information disclosure
+	if err := h.permissionService.CanUserAccessProject(c.Request.Context(), userID.(uint), project.ProjectID()); err != nil {
+		h.logger.Warn(ctx, "user permission check failed",
+			zap.Error(err),
+			zap.String("handler", "GetProjectHealth"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.String("slug", slug),
+		)
+		response.Error(c, projecterrors.ErrProjectNotFound, mapProjectError)
+		return
+	}
+
+	// Execute use case
+	input := application.CheckProjectPodStatusInput{
+		ProjectID: project.ProjectID(),
+	}
+
+	output, err := h.checkProjectPodStatusUseCase.Execute(c.Request.Context(), input)
+	if err != nil {
+		h.logger.Error(ctx, "check project pod status use case failed",
+			zap.Error(err),
+			zap.String("handler", "GetProjectHealth"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.String("slug", slug),
+		)
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	h.logger.Info(ctx, "get project health handler completed",
+		zap.String("handler", "GetProjectHealth"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("project_id", project.ProjectID()),
+		zap.String("slug", slug),
+		zap.Bool("pod_exists", output.Exists),
+		zap.String("phase", output.Phase),
 	)
 
 	response.OK(c, output)

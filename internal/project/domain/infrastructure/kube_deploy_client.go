@@ -164,4 +164,32 @@ type KubeClient interface {
 	//       // Query historical logs
 	//   }
 	CheckApplicationPodsRunning(ctx context.Context, projectSlug string) (bool, error)
+
+	// GetProjectPodStatus retrieves the status of the application pod for a project.
+	// This is used to check if the project's Knative Service pod is running and healthy.
+	// Application pods are Knative service pods running in the "application" namespace.
+	//
+	// The implementation filters pods by:
+	//   - Label: project-id=<projectID>
+	//   - Namespace: application (from KUBE_APPLICATION_NAMESPACE)
+	//
+	// Since each project has only one pod, this returns the status of the first pod found.
+	//
+	// Parameters:
+	//   - ctx: Context for cancellation and timeout control
+	//   - projectID: The unique identifier of the project
+	//
+	// Returns:
+	//   - *dto.PodStatus: The pod status (Exists=false if no pod found)
+	//   - error: An error if the operation fails
+	//
+	// Example usage:
+	//   status, err := client.GetProjectPodStatus(ctx, 123)
+	//   if err != nil {
+	//       return err
+	//   }
+	//   if status.Exists && status.Phase == "Running" {
+	//       // Pod is running and healthy
+	//   }
+	GetProjectPodStatus(ctx context.Context, projectID uint) (*dto.PodStatus, error)
 }

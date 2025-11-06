@@ -172,6 +172,9 @@ func (r *Router) Setup() {
 			projects.GET("/:slug/status", r.projectStatusHandler.GetProjectStatus)
 			projects.GET("/:slug/status/refresh", r.projectStatusHandler.RefreshProjectStatus)
 
+			// Health check route (pod status in application namespace)
+			projects.GET("/:slug/health", r.projectStatusHandler.GetProjectHealth)
+
 			// Container routes under project (RESTful)
 			projects.POST("/:slug/containers", r.containerHandler.CreateContainer)
 			projects.GET("/:slug/containers", r.containerHandler.ListContainers)

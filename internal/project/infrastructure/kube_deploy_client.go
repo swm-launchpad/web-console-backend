@@ -29,7 +29,7 @@ import (
 // Kubernetes client to retrieve Pod logs.
 type kubeClient struct {
 	dynamicClient  dynamic.Interface
-	clientset      *kubernetes.Clientset
+	clientset      kubernetes.Interface
 	namespace      string
 	pipelineRunGVR schema.GroupVersionResource
 	taskRunGVR     schema.GroupVersionResource
@@ -647,4 +647,88 @@ func (k *kubeClient) CheckApplicationPodsRunning(ctx context.Context, projectSlu
 	)
 
 	return exists, nil
+}
+
+// GetProjectPodStatus retrieves the status of the application pod for a project
+func (k *kubeClient) GetProjectPodStatus(ctx context.Context, projectID uint) (*dto.PodStatus, error) {
+	// Get application namespace from environment
+	appNamespace := os.Getenv("KUBE_APPLICATION_NAMESPACE")
+	if appNamespace == "" {
+		appNamespace = "application"
+	}
+
+	k.logger.Info(ctx, "Getting project pod status",
+		zap.Uint("project_id", projectID),
+		zap.String("namespace", appNamespace),
+	)
+
+	// List pods with project-id label (no phase filter to get all pods)
+	pods, err := k.clientset.CoreV1().Pods(appNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("project-id=%d", projectID),
+	})
+
+	if err != nil {
+		k.logger.Error(ctx, "Failed to list project pods",
+			zap.Uint("project_id", projectID),
+			zap.String("namespace", appNamespace),
+			zap.Error(err),
+		)
+		return nil, projecterrors.ErrKubernetesUnavailable
+	}
+
+	// If no pods found, return exists=false
+	if len(pods.Items) == 0 {
+		k.logger.Info(ctx, "No pods found for project",
+			zap.Uint("project_id", projectID),
+			zap.String("namespace", appNamespace),
+		)
+		return &dto.PodStatus{
+			Exists:          false,
+			Phase:           "",
+			ReadyContainers: 0,
+			TotalContainers: 0,
+		}, nil
+	}
+
+	// If multiple pods exist (e.g., during rolling update or scale-up),
+	// select the most recently created pod (shortest runtime)
+	if len(pods.Items) > 1 {
+		sort.Slice(pods.Items, func(i, j int) bool {
+			// Sort by CreationTimestamp descending (most recent first)
+			return pods.Items[i].CreationTimestamp.After(pods.Items[j].CreationTimestamp.Time)
+		})
+		k.logger.Info(ctx, "Multiple pods found, selecting most recent",
+			zap.Uint("project_id", projectID),
+			zap.Int("pod_count", len(pods.Items)),
+			zap.String("selected_pod", pods.Items[0].Name),
+			zap.Time("creation_time", pods.Items[0].CreationTimestamp.Time),
+		)
+	}
+
+	pod := pods.Items[0]
+
+	// Count ready containers
+	readyContainers := 0
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Ready {
+			readyContainers++
+		}
+	}
+
+	totalContainers := len(pod.Status.ContainerStatuses)
+
+	k.logger.Info(ctx, "Project pod status retrieved",
+		zap.Uint("project_id", projectID),
+		zap.String("namespace", appNamespace),
+		zap.String("phase", string(pod.Status.Phase)),
+		zap.Int("ready_containers", readyContainers),
+		zap.Int("total_containers", totalContainers),
+	)
+
+	return &dto.PodStatus{
+		Exists:          true,
+		Phase:           string(pod.Status.Phase),
+		ReadyContainers: readyContainers,
+		TotalContainers: totalContainers,
+	}, nil
 }
