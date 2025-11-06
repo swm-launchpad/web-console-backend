@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -59,7 +60,7 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService.On("GetProject", mock.Anything, input.ProjectID).Return(testProject, nil)
 		mockVolumeService.On("DeleteVolumesByProjectID", mock.Anything, input.ProjectID).Return(nil)
 		mockProjectService.On("DeleteProject", mock.Anything, input.ProjectID).Return(nil)
-		mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, testProject.Slug().String(), "application").Return(nil)
+		mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, strconv.FormatUint(uint64(input.ProjectID), 10), "application").Return(nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -112,7 +113,7 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService.On("GetProject", mock.Anything, input.ProjectID).Return(testProject, nil)
 		mockVolumeService.On("DeleteVolumesByProjectID", mock.Anything, input.ProjectID).Return(nil)
 		mockProjectService.On("DeleteProject", mock.Anything, input.ProjectID).Return(nil)
-		mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, testProject.Slug().String(), "application").Return(nil)
+		mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, strconv.FormatUint(uint64(input.ProjectID), 10), "application").Return(nil)
 
 		output, err := uc.Execute(ctx, input)
 
