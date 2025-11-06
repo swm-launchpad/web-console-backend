@@ -42,7 +42,8 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
@@ -135,7 +136,8 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
@@ -186,7 +188,8 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
@@ -263,7 +266,8 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
@@ -331,7 +335,8 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		getBySlugUseCase := application.NewGetProjectBySlugUseCase(mockProjectService, mockVolumeService, testLogger)
 		updateUseCase := application.NewUpdateProjectUseCase(mockProjectService, txManager, testLogger)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
-		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
+		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})

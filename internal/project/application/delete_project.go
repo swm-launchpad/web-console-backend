@@ -22,26 +22,29 @@ type DeleteProjectOutput struct {
 }
 
 type DeleteProjectUseCase struct {
-	projectService      service.ProjectService
-	volumeService       service.VolumeService
-	tektonCleanupClient infrastructure.TektonCleanupClient
-	txManager           db.TxManager
-	logger              logger.Logger
+	projectService        service.ProjectService
+	volumeService         service.VolumeService
+	tektonCleanupClient   infrastructure.TektonCleanupClient
+	containerSlugProvider infrastructure.ContainerSlugProvider
+	txManager             db.TxManager
+	logger                logger.Logger
 }
 
 func NewDeleteProjectUseCase(
 	projectService service.ProjectService,
 	volumeService service.VolumeService,
 	tektonCleanupClient infrastructure.TektonCleanupClient,
+	containerSlugProvider infrastructure.ContainerSlugProvider,
 	txManager db.TxManager,
 	log logger.Logger,
 ) *DeleteProjectUseCase {
 	return &DeleteProjectUseCase{
-		projectService:      projectService,
-		volumeService:       volumeService,
-		tektonCleanupClient: tektonCleanupClient,
-		txManager:           txManager,
-		logger:              log,
+		projectService:        projectService,
+		volumeService:         volumeService,
+		tektonCleanupClient:   tektonCleanupClient,
+		containerSlugProvider: containerSlugProvider,
+		txManager:             txManager,
+		logger:                log,
 	}
 }
 
@@ -106,20 +109,38 @@ func (uc *DeleteProjectUseCase) Execute(ctx context.Context, input DeleteProject
 		zap.String("project_slug", projectSlug),
 	)
 
+	// Get all container slugs (including soft-deleted) for cleanup
+	containerSlugs, err := uc.containerSlugProvider.GetContainerSlugsByProjectID(ctx, input.ProjectID)
+	if err != nil {
+		uc.logger.Warn(ctx, "failed to get container slugs for cleanup (continuing with empty list)",
+			zap.Error(err),
+			zap.Uint("project_id", input.ProjectID),
+		)
+		// Continue with empty list - not fatal
+		containerSlugs = []string{}
+	}
+
+	uc.logger.Info(ctx, "retrieved container slugs for cleanup",
+		zap.Uint("project_id", input.ProjectID),
+		zap.Int("container_count", len(containerSlugs)),
+	)
+
 	// Trigger Tekton cleanup pipeline (Tekton API returns 202 and runs asynchronously)
-	// Pass project_id as string for Tekton API
+	// Pass project_id as string and container slugs (image names) for Tekton API
 	projectIDStr := strconv.FormatUint(uint64(input.ProjectID), 10)
-	if err := uc.tektonCleanupClient.TriggerCleanup(ctx, projectIDStr, "application"); err != nil {
+	if err := uc.tektonCleanupClient.TriggerCleanup(ctx, projectIDStr, "application", containerSlugs); err != nil {
 		// Log the error but don't fail the deletion - Tekton cleanup is fire-and-forget
 		uc.logger.Warn(ctx, "failed to trigger tekton cleanup pipeline (continuing with deletion)",
 			zap.Error(err),
 			zap.Uint("project_id", input.ProjectID),
 			zap.String("project_slug", projectSlug),
+			zap.Int("container_count", len(containerSlugs)),
 		)
 	} else {
 		uc.logger.Info(ctx, "tekton cleanup pipeline triggered successfully",
 			zap.Uint("project_id", input.ProjectID),
 			zap.String("project_slug", projectSlug),
+			zap.Int("container_count", len(containerSlugs)),
 		)
 	}
 

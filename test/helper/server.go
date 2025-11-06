@@ -99,8 +99,11 @@ func SetupTestServer(t *testing.T) *TestServer {
 	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, txManager, testLogger)
 	mockTektonCleanupClient := new(projectInfra.MockTektonCleanupClient)
 	// Allow any cleanup calls to return nil (fire-and-forget behavior in tests)
-	mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
-	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, mockTektonCleanupClient, txManager, testLogger)
+	mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+	mockContainerSlugProvider := new(projectInfra.MockContainerSlugProvider)
+	// Allow any container slug queries to return empty list
+	mockContainerSlugProvider.On("GetContainerSlugsByProjectID", mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
+	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc, testLogger)
 
 	// Container dependencies

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
@@ -27,9 +28,10 @@ type tektonCleanupClient struct {
 
 // tektonCleanupRequest represents the request body for the cleanup API.
 type tektonCleanupRequest struct {
-	ProjectID string `json:"project_id"`
-	DryRun    string `json:"dry_run"`
-	Namespace string `json:"namespace"`
+	ProjectID       string `json:"project_id"`
+	Namespace       string `json:"namespace"`
+	DryRun          string `json:"dry_run"`
+	ECRRepositories string `json:"ecr_repositories"`
 }
 
 // NewTektonCleanupClient creates a new Tekton cleanup client using configuration from environment variables.
@@ -66,10 +68,11 @@ func NewTektonCleanupClient(log logger.Logger) (infrastructure.TektonCleanupClie
 
 // TriggerCleanup sends a cleanup request to the Tekton cleanup API.
 // This is a fire-and-forget operation that triggers resource cleanup asynchronously.
-func (t *tektonCleanupClient) TriggerCleanup(ctx context.Context, projectID, namespace string) error {
+func (t *tektonCleanupClient) TriggerCleanup(ctx context.Context, projectID, namespace string, imageNames []string) error {
 	t.logger.Info(ctx, "tekton cleanup client trigger started",
 		zap.String("project_id", projectID),
 		zap.String("namespace", namespace),
+		zap.Int("image_count", len(imageNames)),
 	)
 
 	// If namespace is empty, use default
@@ -77,11 +80,15 @@ func (t *tektonCleanupClient) TriggerCleanup(ctx context.Context, projectID, nam
 		namespace = "application"
 	}
 
+	// Join image names into comma-separated string for ecr_repositories field
+	ecrRepositories := strings.Join(imageNames, ",")
+
 	// Create request body
 	requestBody := tektonCleanupRequest{
-		ProjectID: projectID,
-		DryRun:    "false", // Always perform actual cleanup
-		Namespace: namespace,
+		ProjectID:       projectID,
+		Namespace:       namespace,
+		DryRun:          "false", // Always perform actual cleanup
+		ECRRepositories: ecrRepositories,
 	}
 
 	// Marshal request to JSON

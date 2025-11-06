@@ -28,6 +28,7 @@ type TektonCleanupClient interface {
 	//   - ctx: Context for cancellation and timeout control
 	//   - projectID: The unique identifier of the project to clean up
 	//   - namespace: Kubernetes namespace (default: "application")
+	//   - imageNames: List of container slugs (image names) to clean up
 	//
 	// Returns:
 	//   - error: An error if the request fails, authentication fails, or Tekton rejects the request
@@ -40,10 +41,10 @@ type TektonCleanupClient interface {
 	//   - ErrTektonCleanupFailed: Tekton rejected the cleanup request
 	//
 	// Example usage:
-	//   err := client.TriggerCleanup(ctx, "my-project-123", "application")
+	//   err := client.TriggerCleanup(ctx, "my-project-123", "application", []string{"container1", "container2"})
 	//   if err != nil {
 	//       log.Printf("Warning: Failed to trigger cleanup: %v", err)
 	//       // Continue with project deletion anyway
 	//   }
-	TriggerCleanup(ctx context.Context, projectID, namespace string) error
+	TriggerCleanup(ctx context.Context, projectID, namespace string, imageNames []string) error
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
-	projectinfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
+	projectsvc "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	userinfra "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 )
 
@@ -19,7 +19,7 @@ func TestCreateContainerUseCase_Execute_Success(t *testing.T) {
 	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
-	mockVolumeService := new(projectinfra.MockVolumeService)
+	mockVolumeService := new(projectsvc.MockVolumeService)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	mockTxMgr := new(db.MockTxManager)
 	testLogger := logger.NewForTest()
@@ -68,7 +68,7 @@ func TestCreateContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	mockResourceValidationSvc := new(infrastructure.MockResourceValidationService)
-	mockVolumeService := new(projectinfra.MockVolumeService)
+	mockVolumeService := new(projectsvc.MockVolumeService)
 	mockInstallationRepo := new(userinfra.MockGitHubInstallationRepository)
 	mockTxMgr := new(db.MockTxManager)
 	testLogger := logger.NewForTest()

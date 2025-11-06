@@ -113,7 +113,10 @@ func InitializeApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, tektonCleanupClient, txManager, logger)
+	containerRepository := infrastructure2.NewContainerRepository(db, logger)
+	getContainerSlugsByProjectIDUseCase := application3.NewGetContainerSlugsByProjectIDUseCase(containerRepository, logger)
+	containerSlugProvider := infrastructure3.NewContainerSlugProvider(getContainerSlugsByProjectIDUseCase, logger)
+	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, tektonCleanupClient, containerSlugProvider, txManager, logger)
 	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, logger)
 	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
 	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService, settingsService, logger)
@@ -133,7 +136,6 @@ func InitializeApp() (*App, error) {
 	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, permissionService, volumeService, logger)
 	deploymentRepository := repository.NewDeploymentRepository(db, logger)
 	buildHistoryRepository := repository.NewBuildHistoryRepository(db, logger)
-	containerRepository := infrastructure2.NewContainerRepository(db, logger)
 	serviceSlugService := service3.NewSlugService(containerRepository, logger)
 	containerService := service3.NewContainerService(containerRepository, serviceSlugService, logger)
 	getContainersForDeploymentUseCase := deployment.NewGetContainersForDeploymentUseCase(containerService)

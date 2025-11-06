@@ -360,6 +360,7 @@ func InitializeApp() (*App, error) {
 		provideProjectLokiClient,
 		projectInfra.NewContainerUpdateAdapter,
 		wire.Bind(new(projectDomainInfra.ContainerUpdater), new(*projectInfra.ContainerUpdateAdapter)),
+		projectInfra.NewContainerSlugProvider,
 
 		// Project domain services
 		projectService.NewSlugService,
@@ -430,6 +431,7 @@ func InitializeApp() (*App, error) {
 		containerApp.NewCreateBuildLogTokenUseCase,
 		containerApp.NewStreamBuildLogsUseCase,
 		containerApp.NewGetBuildLogHistoryUseCase,
+		containerApp.NewGetContainerSlugsByProjectIDUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,

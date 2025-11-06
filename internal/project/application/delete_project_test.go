@@ -49,18 +49,22 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		testLogger := logger.NewForTest()
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
 		}
 
 		testProject := createTestProjectForDeletion(input.ProjectID, "p20250105123456abcd1234")
+		containerSlugs := []string{"c20251106123456abc", "c20251106789012def"}
+
 		mockProjectService.On("GetProject", mock.Anything, input.ProjectID).Return(testProject, nil)
 		mockVolumeService.On("DeleteVolumesByProjectID", mock.Anything, input.ProjectID).Return(nil)
 		mockProjectService.On("DeleteProject", mock.Anything, input.ProjectID).Return(nil)
-		mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, strconv.FormatUint(uint64(input.ProjectID), 10), "application").Return(nil)
+		mockContainerSlugProvider.On("GetContainerSlugsByProjectID", mock.Anything, input.ProjectID).Return(containerSlugs, nil)
+		mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, strconv.FormatUint(uint64(input.ProjectID), 10), "application", containerSlugs).Return(nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -70,6 +74,7 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 
 		mockProjectService.AssertExpectations(t)
 		mockVolumeService.AssertExpectations(t)
+		mockContainerSlugProvider.AssertExpectations(t)
 		mockTektonCleanupClient.AssertExpectations(t)
 	})
 
@@ -77,8 +82,9 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		testLogger := logger.NewForTest()
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
@@ -102,8 +108,9 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		testLogger := logger.NewForTest()
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
@@ -113,7 +120,8 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService.On("GetProject", mock.Anything, input.ProjectID).Return(testProject, nil)
 		mockVolumeService.On("DeleteVolumesByProjectID", mock.Anything, input.ProjectID).Return(nil)
 		mockProjectService.On("DeleteProject", mock.Anything, input.ProjectID).Return(nil)
-		mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, strconv.FormatUint(uint64(input.ProjectID), 10), "application").Return(nil)
+		mockContainerSlugProvider.On("GetContainerSlugsByProjectID", mock.Anything, input.ProjectID).Return([]string{}, nil)
+		mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, strconv.FormatUint(uint64(input.ProjectID), 10), "application", []string{}).Return(nil)
 
 		output, err := uc.Execute(ctx, input)
 
@@ -122,6 +130,7 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 
 		mockProjectService.AssertExpectations(t)
 		mockVolumeService.AssertExpectations(t)
+		mockContainerSlugProvider.AssertExpectations(t)
 		mockTektonCleanupClient.AssertExpectations(t)
 	})
 
@@ -129,8 +138,9 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		testLogger := logger.NewForTest()
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 0,
@@ -155,8 +165,9 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		testLogger := logger.NewForTest()
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 999,
@@ -177,8 +188,9 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		testLogger := logger.NewForTest()
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
@@ -203,8 +215,9 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		testLogger := logger.NewForTest()
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
@@ -229,8 +242,9 @@ func TestDeleteProjectUseCase_Execute(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		mockVolumeService := new(service.MockVolumeService)
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
+		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		testLogger := logger.NewForTest()
-		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, txManager, testLogger)
+		uc := NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 
 		input := DeleteProjectInput{
 			ProjectID: 1,
