@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/db"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
@@ -106,7 +107,9 @@ func (uc *DeleteProjectUseCase) Execute(ctx context.Context, input DeleteProject
 	)
 
 	// Trigger Tekton cleanup pipeline (Tekton API returns 202 and runs asynchronously)
-	if err := uc.tektonCleanupClient.TriggerCleanup(ctx, projectSlug, "application"); err != nil {
+	// Pass project_id as string for Tekton API
+	projectIDStr := strconv.FormatUint(uint64(input.ProjectID), 10)
+	if err := uc.tektonCleanupClient.TriggerCleanup(ctx, projectIDStr, "application"); err != nil {
 		// Log the error but don't fail the deletion - Tekton cleanup is fire-and-forget
 		uc.logger.Warn(ctx, "failed to trigger tekton cleanup pipeline (continuing with deletion)",
 			zap.Error(err),
