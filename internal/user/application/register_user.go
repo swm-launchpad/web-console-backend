@@ -11,10 +11,9 @@ import (
 )
 
 type RegisterUserInput struct {
-	Username string
-	Password string
 	Email    string
-	Name     string
+	Password string
+	Nickname string
 }
 
 type RegisterUserOutput struct {
@@ -48,28 +47,23 @@ func NewRegisterUserUseCase(
 
 func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserInput) (*RegisterUserOutput, error) {
 	uc.logger.Info(ctx, "user registration started",
-		zap.String("username", input.Username),
 		zap.String("email", input.Email),
+		zap.String("nickname", input.Nickname),
 	)
 
 	var output *RegisterUserOutput
 	var userEmail string
-	var username string
+	var nickname string
 	var verificationTokenStr string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
-		var name *string
-		if input.Name != "" {
-			name = &input.Name
-		}
-
 		// Register user through AuthenticationService (user will be in 'pending' status)
-		user, token, err := uc.authService.RegisterUser(txCtx, input.Username, input.Password, input.Email, name)
+		user, token, err := uc.authService.RegisterUser(txCtx, input.Email, input.Password, input.Nickname)
 		if err != nil {
 			uc.logger.Error(ctx, "failed to register user",
 				zap.Error(err),
-				zap.String("username", input.Username),
 				zap.String("email", input.Email),
+				zap.String("nickname", input.Nickname),
 			)
 			return err
 		}
@@ -91,12 +85,12 @@ func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserIn
 
 		// Store for email sending (outside transaction)
 		userEmail = user.Email
-		username = user.Username
+		nickname = user.Nickname
 		verificationTokenStr = verificationToken.Token
 
 		uc.logger.Info(ctx, "user registered successfully",
 			zap.Uint("user_id", user.UserID),
-			zap.String("username", username),
+			zap.String("nickname", nickname),
 		)
 
 		return nil
@@ -107,7 +101,7 @@ func (uc *RegisterUserUseCase) Execute(ctx context.Context, input RegisterUserIn
 
 	// Send verification email (outside transaction to avoid holding DB connection)
 	// If email sending fails, we log it but don't fail the registration
-	if err := uc.emailService.SendVerificationEmail(ctx, userEmail, username, verificationTokenStr); err != nil {
+	if err := uc.emailService.SendVerificationEmail(ctx, userEmail, nickname, verificationTokenStr); err != nil {
 		uc.logger.Error(ctx, "failed to send verification email",
 			zap.Error(err),
 			zap.Uint("user_id", output.UserID),

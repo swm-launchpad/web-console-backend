@@ -11,29 +11,29 @@ type MockAuthService struct {
 	mock.Mock
 }
 
-func (m *MockAuthService) RegisterUser(ctx context.Context, username, plainPassword, email string, name *string) (*model.User, string, error) {
-	args := m.Called(ctx, username, plainPassword, email, name)
+func (m *MockAuthService) RegisterUser(ctx context.Context, email, plainPassword, nickname string) (*model.User, string, error) {
+	args := m.Called(ctx, email, plainPassword, nickname)
 	if args.Get(0) == nil {
 		return nil, args.String(1), args.Error(2)
 	}
 	return args.Get(0).(*model.User), args.String(1), args.Error(2)
 }
 
-func (m *MockAuthService) AuthenticateUser(ctx context.Context, username, plainPassword string) (*model.User, string, error) {
-	args := m.Called(ctx, username, plainPassword)
+func (m *MockAuthService) AuthenticateUser(ctx context.Context, email, plainPassword string) (*model.User, string, error) {
+	args := m.Called(ctx, email, plainPassword)
 	if args.Get(0) == nil {
 		return nil, args.String(1), args.Error(2)
 	}
 	return args.Get(0).(*model.User), args.String(1), args.Error(2)
 }
 
-func (m *MockAuthService) ValidateRegistrationInput(username, plainPassword, email string) error {
-	args := m.Called(username, plainPassword, email)
+func (m *MockAuthService) ValidateRegistrationInput(email, plainPassword, nickname string) error {
+	args := m.Called(email, plainPassword, nickname)
 	return args.Error(0)
 }
 
-func (m *MockAuthService) ValidateLoginInput(username, plainPassword string) error {
-	args := m.Called(username, plainPassword)
+func (m *MockAuthService) ValidateLoginInput(email, plainPassword string) error {
+	args := m.Called(email, plainPassword)
 	return args.Error(0)
 }
 

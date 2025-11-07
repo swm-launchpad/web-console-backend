@@ -22,12 +22,11 @@ func TestVolumeSecurity_AddVolume_UnauthorizedUser_E2E(t *testing.T) {
 	t.Run("권한 없는 사용자는 다른 프로젝트의 컨테이너에 volume 추가 불가", func(t *testing.T) {
 		// User1: 프로젝트 소유자
 		user1RegisterReq := map[string]string{
-			"username": "owner_security1",
-			"password": "TestPassword123!",
 			"email":    "owner_security1@example.com",
-			"name":     "Owner User 1",
+			"password": "TestPassword123!",
+			"nickname": "Owner User 1",
 		}
-		w := server.MakeRequest("POST", "/auth/register", user1RegisterReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", user1RegisterReq)
 		require.Equal(t, http.StatusCreated, w.Code)
 
 		var user1Resp map[string]interface{}
@@ -71,12 +70,11 @@ func TestVolumeSecurity_AddVolume_UnauthorizedUser_E2E(t *testing.T) {
 
 		// User2: 공격자 (권한 없음)
 		user2RegisterReq := map[string]string{
-			"username": "hacker_security1",
-			"password": "TestPassword123!",
 			"email":    "hacker_security1@example.com",
-			"name":     "Hacker User",
+			"password": "TestPassword123!",
+			"nickname": "Hacker User",
 		}
-		w = server.MakeRequest("POST", "/auth/register", user2RegisterReq)
+		w = server.MakeRequest("POST", "/api/v1/auth/register", user2RegisterReq)
 		require.Equal(t, http.StatusCreated, w.Code)
 
 		var user2Resp map[string]interface{}
@@ -128,12 +126,11 @@ func TestVolumeSecurity_AddVolume_MountFailureRollback_E2E(t *testing.T) {
 	t.Run("Mount 실패 시 volume이 rollback되어 orphan volume이 생성되지 않음", func(t *testing.T) {
 		// 사용자 등록
 		registerReq := map[string]string{
-			"username": "rollback_test_user",
-			"password": "TestPassword123!",
 			"email":    "rollback@example.com",
-			"name":     "Rollback Test User",
+			"password": "TestPassword123!",
+			"nickname": "Rollback Test User",
 		}
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		require.Equal(t, http.StatusCreated, w.Code)
 
 		var registerResp map[string]interface{}
@@ -235,12 +232,11 @@ func TestVolumeSecurity_ListVolumes_UnauthorizedAccess_E2E(t *testing.T) {
 	t.Run("권한 없는 사용자는 다른 프로젝트의 volume 정보를 조회할 수 없음", func(t *testing.T) {
 		// User1: 프로젝트 소유자
 		user1RegisterReq := map[string]string{
-			"username": "owner_security2",
-			"password": "TestPassword123!",
 			"email":    "owner_security2@example.com",
-			"name":     "Owner User 2",
+			"password": "TestPassword123!",
+			"nickname": "Owner User 2",
 		}
-		w := server.MakeRequest("POST", "/auth/register", user1RegisterReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", user1RegisterReq)
 		require.Equal(t, http.StatusCreated, w.Code)
 
 		var user1Resp map[string]interface{}
@@ -295,12 +291,11 @@ func TestVolumeSecurity_ListVolumes_UnauthorizedAccess_E2E(t *testing.T) {
 
 		// User2: 공격자 (권한 없음)
 		user2RegisterReq := map[string]string{
-			"username": "spy_security2",
-			"password": "TestPassword123!",
 			"email":    "spy_security2@example.com",
-			"name":     "Spy User",
+			"password": "TestPassword123!",
+			"nickname": "Spy User",
 		}
-		w = server.MakeRequest("POST", "/auth/register", user2RegisterReq)
+		w = server.MakeRequest("POST", "/api/v1/auth/register", user2RegisterReq)
 		require.Equal(t, http.StatusCreated, w.Code)
 
 		var user2Resp map[string]interface{}

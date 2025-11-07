@@ -24,13 +24,12 @@ func TestProjectFlow_E2E(t *testing.T) {
 	t.Run("전체 프로젝트 플로우: 생성 → 조회 → 수정 → 삭제", func(t *testing.T) {
 		// Step 1: 사용자 등록 (프로젝트 생성을 위한 사용자)
 		registerReq := map[string]string{
-			"username": "projectuser",
-			"password": "TestPassword123!",
 			"email":    "project@example.com",
-			"name":     "Project Test User",
+			"password": "TestPassword123!",
+			"nickname": "Project Test User",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var registerResp map[string]interface{}
@@ -170,11 +169,11 @@ func TestProjectPermissions_E2E(t *testing.T) {
 	t.Run("프로젝트 권한 테스트", func(t *testing.T) {
 		// Owner 사용자 생성
 		ownerReq := map[string]string{
-			"username": "owner",
-			"password": "OwnerPass123!",
 			"email":    "owner@example.com",
+			"password": "OwnerPass123!",
+			"nickname": "Owner",
 		}
-		w := server.MakeRequest("POST", "/auth/register", ownerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", ownerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 		var ownerResp map[string]interface{}
 		_ = json.Unmarshal(w.Body.Bytes(), &ownerResp)
@@ -182,11 +181,11 @@ func TestProjectPermissions_E2E(t *testing.T) {
 
 		// Other 사용자 생성
 		otherReq := map[string]string{
-			"username": "other",
-			"password": "OtherPass123!",
 			"email":    "other@example.com",
+			"password": "OtherPass123!",
+			"nickname": "Other",
 		}
-		w = server.MakeRequest("POST", "/auth/register", otherReq)
+		w = server.MakeRequest("POST", "/api/v1/auth/register", otherReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 		var otherResp map[string]interface{}
 		_ = json.Unmarshal(w.Body.Bytes(), &otherResp)
@@ -238,13 +237,12 @@ func TestProjectLimit_E2E(t *testing.T) {
 	t.Run("사용자당 최대 3개 프로젝트 제한", func(t *testing.T) {
 		// Step 1: 사용자 등록
 		registerReq := map[string]string{
-			"username": "limituser",
-			"password": "TestPassword123!",
 			"email":    "limit@example.com",
-			"name":     "Limit Test User",
+			"password": "TestPassword123!",
+			"nickname": "Limit Test User",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var registerResp map[string]interface{}
@@ -358,11 +356,11 @@ func TestProjectSecurityPolicies_E2E(t *testing.T) {
 	t.Run("user_id 파라미터 보안 정책 테스트", func(t *testing.T) {
 		// User 1 생성
 		user1Req := map[string]string{
-			"username": "user1",
-			"password": "User1Pass123!",
 			"email":    "user1@example.com",
+			"password": "User1Pass123!",
+			"nickname": "User1",
 		}
-		w := server.MakeRequest("POST", "/auth/register", user1Req)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", user1Req)
 		assert.Equal(t, http.StatusCreated, w.Code)
 		var user1Resp map[string]interface{}
 		_ = json.Unmarshal(w.Body.Bytes(), &user1Resp)
@@ -372,11 +370,11 @@ func TestProjectSecurityPolicies_E2E(t *testing.T) {
 
 		// User 2 생성 (현재 테스트에서는 사용되지 않지만 추후 확장을 위해 생성)
 		user2Req := map[string]string{
-			"username": "user2",
-			"password": "User2Pass123!",
 			"email":    "user2@example.com",
+			"password": "User2Pass123!",
+			"nickname": "User2",
 		}
-		w = server.MakeRequest("POST", "/auth/register", user2Req)
+		w = server.MakeRequest("POST", "/api/v1/auth/register", user2Req)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		// User 1이 자신의 프로젝트 목록 조회 (성공해야 함)

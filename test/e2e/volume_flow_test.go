@@ -23,13 +23,12 @@ func TestVolumeFlow_E2E(t *testing.T) {
 	t.Run("전체 볼륨 플로우: 프로젝트 생성 → 컨테이너 생성 → 볼륨 추가 → 조회 → 삭제", func(t *testing.T) {
 		// Step 1: 사용자 등록
 		registerReq := map[string]string{
-			"username": "volumeuser",
-			"password": "TestPassword123!",
 			"email":    "volume@example.com",
-			"name":     "Volume Test User",
+			"password": "TestPassword123!",
+			"nickname": "Volume Test User",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var registerResp map[string]interface{}
@@ -159,13 +158,12 @@ func TestVolumeConstraints_E2E(t *testing.T) {
 	t.Run("볼륨 제약 조건 테스트", func(t *testing.T) {
 		// 사용자 등록 및 인증
 		registerReq := map[string]string{
-			"username": "volumeconstraintuser",
-			"password": "TestPassword123!",
 			"email":    "volumeconstraint@example.com",
-			"name":     "Volume Constraint User",
+			"password": "TestPassword123!",
+			"nickname": "Volume Constraint User",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var registerResp map[string]interface{}

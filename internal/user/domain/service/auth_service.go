@@ -21,16 +21,16 @@ var (
 // AuthService defines the interface for authentication-related business logic
 type AuthService interface {
 	// RegisterUser registers a new user with validation
-	RegisterUser(ctx context.Context, username, plainPassword, email string, name *string) (*model.User, string, error)
+	RegisterUser(ctx context.Context, email, plainPassword, nickname string) (*model.User, string, error)
 
 	// AuthenticateUser authenticates a user and returns a token
-	AuthenticateUser(ctx context.Context, username, plainPassword string) (*model.User, string, error)
+	AuthenticateUser(ctx context.Context, email, plainPassword string) (*model.User, string, error)
 
 	// ValidateRegistrationInput validates user registration input
-	ValidateRegistrationInput(username, plainPassword, email string) error
+	ValidateRegistrationInput(email, plainPassword, nickname string) error
 
 	// ValidateLoginInput validates user login input
-	ValidateLoginInput(username, plainPassword string) error
+	ValidateLoginInput(email, plainPassword string) error
 
 	// GenerateToken generates a JWT token for the user
 	GenerateToken(ctx context.Context, userID uint) (string, error)
@@ -66,26 +66,17 @@ func NewAuthService(
 }
 
 // RegisterUser registers a new user with all necessary validations and setup
-func (s *authService) RegisterUser(ctx context.Context, username, plainPassword, email string, name *string) (*model.User, string, error) {
+func (s *authService) RegisterUser(ctx context.Context, email, plainPassword, nickname string) (*model.User, string, error) {
 	s.logger.Info(ctx, "register user started",
-		zap.String("username", username),
 		zap.String("email", email),
+		zap.String("nickname", nickname),
 	)
 
 	// Validate input
-	if err := s.ValidateRegistrationInput(username, plainPassword, email); err != nil {
+	if err := s.ValidateRegistrationInput(email, plainPassword, nickname); err != nil {
 		s.logger.Error(ctx, "registration input validation failed",
 			zap.Error(err),
-			zap.String("username", username),
-		)
-		return nil, "", err
-	}
-
-	// Check username availability
-	if err := s.userService.CheckUsernameAvailability(ctx, username); err != nil {
-		s.logger.Error(ctx, "username availability check failed",
-			zap.Error(err),
-			zap.String("username", username),
+			zap.String("email", email),
 		)
 		return nil, "", err
 	}
@@ -104,18 +95,18 @@ func (s *authService) RegisterUser(ctx context.Context, username, plainPassword,
 	if err != nil {
 		s.logger.Error(ctx, "password hashing failed",
 			zap.Error(err),
-			zap.String("username", username),
+			zap.String("email", email),
 		)
 		return nil, "", err
 	}
 
 	// Create user through UserService
-	user, err := s.userService.CreateUser(ctx, username, email, passwordHash, name)
+	user, err := s.userService.CreateUser(ctx, email, passwordHash, nickname)
 	if err != nil {
 		s.logger.Error(ctx, "user creation failed",
 			zap.Error(err),
-			zap.String("username", username),
 			zap.String("email", email),
+			zap.String("nickname", nickname),
 		)
 		return nil, "", err
 	}
@@ -132,33 +123,33 @@ func (s *authService) RegisterUser(ctx context.Context, username, plainPassword,
 
 	s.logger.Info(ctx, "register user completed",
 		zap.Uint("user_id", user.UserID),
-		zap.String("username", username),
+		zap.String("email", email),
 	)
 
 	return user, token, nil
 }
 
 // AuthenticateUser authenticates a user and returns a token
-func (s *authService) AuthenticateUser(ctx context.Context, username, plainPassword string) (*model.User, string, error) {
+func (s *authService) AuthenticateUser(ctx context.Context, email, plainPassword string) (*model.User, string, error) {
 	s.logger.Info(ctx, "authenticate user started",
-		zap.String("username", username),
+		zap.String("email", email),
 	)
 
 	// Validate input
-	if err := s.ValidateLoginInput(username, plainPassword); err != nil {
+	if err := s.ValidateLoginInput(email, plainPassword); err != nil {
 		s.logger.Error(ctx, "login input validation failed",
 			zap.Error(err),
-			zap.String("username", username),
+			zap.String("email", email),
 		)
 		return nil, "", err
 	}
 
-	// Get user by username
-	user, err := s.userService.GetUserByUsername(ctx, username)
+	// Get user by email
+	user, err := s.userService.GetUserByEmail(ctx, email)
 	if err != nil {
 		s.logger.Error(ctx, "user not found",
 			zap.Error(err),
-			zap.String("username", username),
+			zap.String("email", email),
 		)
 		return nil, "", ErrInvalidCredentials
 	}
@@ -193,20 +184,21 @@ func (s *authService) AuthenticateUser(ctx context.Context, username, plainPassw
 
 	s.logger.Info(ctx, "authenticate user completed",
 		zap.Uint("user_id", user.UserID),
-		zap.String("username", username),
+		zap.String("email", email),
 	)
 
 	return user, token, nil
 }
 
 // ValidateRegistrationInput validates user registration input
-func (s *authService) ValidateRegistrationInput(username, plainPassword, email string) error {
-	// Validate username
-	if username == "" {
-		return usererrors.ErrUsernameRequired
+func (s *authService) ValidateRegistrationInput(email, plainPassword, nickname string) error {
+	// Validate email
+	if email == "" {
+		return usererrors.ErrEmailRequired
 	}
-	if len(username) < 3 {
-		return usererrors.ErrUsernameTooShort
+	// Basic email validation
+	if !strings.Contains(email, "@") || !strings.Contains(email, ".") {
+		return ErrInvalidEmail
 	}
 
 	// Validate password
@@ -217,22 +209,21 @@ func (s *authService) ValidateRegistrationInput(username, plainPassword, email s
 		return ErrWeakPassword
 	}
 
-	// Validate email
-	if email == "" {
-		return usererrors.ErrEmailRequired
+	// Validate nickname
+	if nickname == "" {
+		return usererrors.ErrNicknameRequired
 	}
-	// Basic email validation
-	if !strings.Contains(email, "@") || !strings.Contains(email, ".") {
-		return ErrInvalidEmail
+	if len(nickname) < 2 {
+		return usererrors.ErrNicknameTooShort
 	}
 
 	return nil
 }
 
 // ValidateLoginInput validates user login input
-func (s *authService) ValidateLoginInput(username, plainPassword string) error {
-	if username == "" {
-		return usererrors.ErrUsernameRequired
+func (s *authService) ValidateLoginInput(email, plainPassword string) error {
+	if email == "" {
+		return usererrors.ErrEmailRequired
 	}
 	if plainPassword == "" {
 		return usererrors.ErrPasswordRequired

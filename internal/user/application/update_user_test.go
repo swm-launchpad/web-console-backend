@@ -30,9 +30,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 
 		existingUser := &model.User{
 			UserID:       userID,
-			Username:     "testuser",
+			Nickname:     "testuser",
 			Email:        "test@example.com",
-			Name:         stringPtr("Old Name"),
 			Phone:        stringPtr("010-0000-0000"),
 			Organization: stringPtr("Old Org"),
 			Status:       model.UserStatusActive,
@@ -45,7 +44,7 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 
 		input := UpdateUserInput{
 			UserID:       userID,
-			Name:         &name,
+			Nickname:     &name,
 			Phone:        &phone,
 			Organization: &organization,
 		}
@@ -57,9 +56,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, userID, output.UserID)
-		assert.Equal(t, "testuser", output.Username)
 		assert.Equal(t, "test@example.com", output.Email)
-		assert.Equal(t, name, output.Name)
+		assert.Equal(t, name, output.Nickname)
 		assert.Equal(t, phone, output.Phone)
 		assert.Equal(t, organization, output.Organization)
 		assert.Equal(t, string(model.UserStatusActive), output.Status)
@@ -78,9 +76,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 
 		existingUser := &model.User{
 			UserID:       userID,
-			Username:     "testuser2",
+			Nickname:     "testuser2",
 			Email:        "test2@example.com",
-			Name:         stringPtr("Old Name"),
 			Phone:        nil,
 			Organization: nil,
 			Status:       model.UserStatusActive,
@@ -92,8 +89,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 		mockUserService.On("UpdateUser", ctx, mock.AnythingOfType("*model.User")).Return(nil)
 
 		input := UpdateUserInput{
-			UserID: userID,
-			Name:   &name,
+			UserID:   userID,
+			Nickname: &name,
 		}
 
 		// Act
@@ -102,7 +99,7 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 		// Assert
 		assert.NoError(t, err)
 		assert.NotNil(t, output)
-		assert.Equal(t, name, output.Name)
+		assert.Equal(t, name, output.Nickname)
 
 		mockUserService.AssertExpectations(t)
 	})
@@ -119,8 +116,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 		mockUserService.On("GetUserByID", ctx, userID).Return((*model.User)(nil), usererrors.ErrUserNotFound)
 
 		input := UpdateUserInput{
-			UserID: userID,
-			Name:   &name,
+			UserID:   userID,
+			Nickname: &name,
 		}
 
 		// Act
@@ -145,7 +142,7 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 
 		inactiveUser := &model.User{
 			UserID:   userID,
-			Username: "inactiveuser",
+			Nickname: "inactiveuser",
 			Email:    "inactive@example.com",
 			Status:   model.UserStatusInactive,
 		}
@@ -154,8 +151,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 		mockUserService.On("ValidateUserCredentials", ctx, inactiveUser).Return(usererrors.ErrUserNotActive)
 
 		input := UpdateUserInput{
-			UserID: userID,
-			Name:   &name,
+			UserID:   userID,
+			Nickname: &name,
 		}
 
 		// Act
@@ -179,7 +176,7 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 
 		existingUser := &model.User{
 			UserID:   userID,
-			Username: "testuser",
+			Nickname: "testuser",
 			Email:    "test@example.com",
 			Status:   model.UserStatusActive,
 		}
@@ -213,7 +210,7 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 
 		existingUser := &model.User{
 			UserID:   userID,
-			Username: "testuser",
+			Nickname: "testuser",
 			Email:    "test@example.com",
 			Status:   model.UserStatusActive,
 		}
@@ -223,8 +220,8 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 		mockUserService.On("UpdateUser", ctx, mock.AnythingOfType("*model.User")).Return(errors.New("database error"))
 
 		input := UpdateUserInput{
-			UserID: userID,
-			Name:   &name,
+			UserID:   userID,
+			Nickname: &name,
 		}
 
 		// Act

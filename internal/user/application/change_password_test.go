@@ -30,7 +30,7 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "testuser",
+			Nickname:     "testnick",
 			Email:        "test@example.com",
 			PasswordHash: oldHash,
 			Status:       model.UserStatusActive,
@@ -99,7 +99,7 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:   userID,
-			Username: "inactiveuser",
+			Nickname: "inactive",
 			Email:    "inactive@example.com",
 			Status:   model.UserStatusInactive,
 		}
@@ -138,7 +138,7 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "testuser",
+			Nickname:     "testnick",
 			Email:        "test@example.com",
 			PasswordHash: oldHash,
 			Status:       model.UserStatusActive,
@@ -180,7 +180,7 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "testuser",
+			Nickname:     "testnick",
 			Email:        "test@example.com",
 			PasswordHash: oldHash,
 			Status:       model.UserStatusActive,
@@ -222,7 +222,7 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "testuser",
+			Nickname:     "testnick",
 			Email:        "test@example.com",
 			PasswordHash: oldHash,
 			Status:       model.UserStatusActive,
@@ -265,7 +265,7 @@ func TestChangePasswordUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "testuser",
+			Nickname:     "testnick",
 			Email:        "test@example.com",
 			PasswordHash: oldHash,
 			Status:       model.UserStatusActive,

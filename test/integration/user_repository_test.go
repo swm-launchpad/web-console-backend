@@ -31,15 +31,13 @@ func TestUserRepository_Integration(t *testing.T) {
 
 	t.Run("Create and FindByID", func(t *testing.T) {
 		// Given
-		name := "Test User"
 		phone := "010-1234-5678"
 		org := "Test Corp"
 
 		user := &model.User{
-			Username:     "testuser",
+			Nickname:     "testnick",
 			PasswordHash: "$2a$10$hashedpassword",
 			Email:        "test@example.com",
-			Name:         &name,
 			Phone:        &phone,
 			Organization: &org,
 			Status:       model.UserStatusActive,
@@ -60,43 +58,18 @@ func TestUserRepository_Integration(t *testing.T) {
 		// Then
 		require.NoError(t, err)
 		assert.Equal(t, user.UserID, foundUser.UserID)
-		assert.Equal(t, user.Username, foundUser.Username)
 		assert.Equal(t, user.Email, foundUser.Email)
-		assert.Equal(t, *user.Name, *foundUser.Name)
+		assert.Equal(t, user.Nickname, foundUser.Nickname)
 		assert.Equal(t, *user.Phone, *foundUser.Phone)
 		assert.Equal(t, *user.Organization, *foundUser.Organization)
 		assert.Equal(t, user.Status, foundUser.Status)
-	})
-
-	t.Run("FindByUsername", func(t *testing.T) {
-		// Given
-		user := &model.User{
-			Username:     "uniqueuser",
-			PasswordHash: "$2a$10$hashedpassword",
-			Email:        "username@example.com",
-			Status:       model.UserStatusActive,
-			IsDeleted:    false,
-			CreatedAt:    time.Now(),
-		}
-
-		// Create user first
-		err := userRepo.Create(ctx, user)
-		require.NoError(t, err)
-
-		// When
-		foundUser, err := userRepo.FindByUsername(ctx, "uniqueuser")
-
-		// Then
-		require.NoError(t, err)
-		assert.Equal(t, user.UserID, foundUser.UserID)
-		assert.Equal(t, user.Username, foundUser.Username)
 	})
 
 	t.Run("FindByEmail", func(t *testing.T) {
 		// Given
 		email := "findbyemail@example.com"
 		user := &model.User{
-			Username:     "emailuser",
+			Nickname:     "emailuser",
 			PasswordHash: "$2a$10$hashedpassword",
 			Email:        email,
 			Status:       model.UserStatusActive,
@@ -120,7 +93,7 @@ func TestUserRepository_Integration(t *testing.T) {
 	t.Run("Update", func(t *testing.T) {
 		// Given
 		user := &model.User{
-			Username:     "updateuser",
+			Nickname:     "updateuser",
 			PasswordHash: "$2a$10$hashedpassword",
 			Email:        "update@example.com",
 			Status:       model.UserStatusActive,
@@ -134,12 +107,12 @@ func TestUserRepository_Integration(t *testing.T) {
 
 		// When - Update
 		newEmail := "newemail@example.com"
-		newName := "Updated Name"
+		newNickname := "updatednick"
 		newPhone := "010-9999-8888"
 		now := time.Now()
 
 		user.Email = newEmail
-		user.Name = &newName
+		user.Nickname = newNickname
 		user.Phone = &newPhone
 		user.Status = model.UserStatusInactive
 		user.UpdatedAt = &now
@@ -153,7 +126,7 @@ func TestUserRepository_Integration(t *testing.T) {
 		updatedUser, err := userRepo.FindByID(ctx, user.UserID)
 		require.NoError(t, err)
 		assert.Equal(t, newEmail, updatedUser.Email)
-		assert.Equal(t, newName, *updatedUser.Name)
+		assert.Equal(t, newNickname, updatedUser.Nickname)
 		assert.Equal(t, newPhone, *updatedUser.Phone)
 		assert.Equal(t, model.UserStatusInactive, updatedUser.Status)
 	})
@@ -161,7 +134,7 @@ func TestUserRepository_Integration(t *testing.T) {
 	t.Run("Delete (Soft Delete)", func(t *testing.T) {
 		// Given
 		user := &model.User{
-			Username:     "deleteuser",
+			Nickname:     "deleteuser",
 			PasswordHash: "$2a$10$hashedpassword",
 			Email:        "delete@example.com",
 			Status:       model.UserStatusActive,
@@ -184,53 +157,17 @@ func TestUserRepository_Integration(t *testing.T) {
 		assert.True(t, errors.Is(err, usererrors.ErrUserNotFound))
 		assert.Nil(t, deletedUser)
 
-		// Verify deleted user is not found by username either
-		deletedUser, err = userRepo.FindByUsername(ctx, "deleteuser")
+		// Verify deleted user is not found by email either
+		deletedUser, err = userRepo.FindByEmail(ctx, "delete@example.com")
 		assert.True(t, errors.Is(err, usererrors.ErrUserNotFound))
 		assert.Nil(t, deletedUser)
-	})
-
-	t.Run("ExistsByUsername", func(t *testing.T) {
-		// Given
-		user := &model.User{
-			Username:     "existsuser",
-			PasswordHash: "$2a$10$hashedpassword",
-			Email:        "exists@example.com",
-			Status:       model.UserStatusActive,
-			IsDeleted:    false,
-			CreatedAt:    time.Now(),
-		}
-
-		// When - Before creation
-		exists, err := userRepo.ExistsByUsername(ctx, "existsuser")
-		require.NoError(t, err)
-		assert.False(t, exists)
-
-		// Create user
-		err = userRepo.Create(ctx, user)
-		require.NoError(t, err)
-
-		// When - After creation
-		exists, err = userRepo.ExistsByUsername(ctx, "existsuser")
-
-		// Then
-		require.NoError(t, err)
-		assert.True(t, exists)
-
-		// When - After soft delete
-		err = userRepo.Delete(ctx, user.UserID)
-		require.NoError(t, err)
-
-		exists, err = userRepo.ExistsByUsername(ctx, "existsuser")
-		require.NoError(t, err)
-		assert.False(t, exists) // Soft deleted users should not exist
 	})
 
 	t.Run("ExistsByEmail", func(t *testing.T) {
 		// Given
 		email := "existsemail@example.com"
 		user := &model.User{
-			Username:     "emailexistsuser",
+			Nickname:     "emailexistsuser",
 			PasswordHash: "$2a$10$hashedpassword",
 			Email:        email,
 			Status:       model.UserStatusActive,
@@ -265,7 +202,7 @@ func TestUserRepository_Integration(t *testing.T) {
 		txRepo := infrastructure.NewUserRepository(tx, testLogger)
 
 		user := &model.User{
-			Username:     "txuser",
+			Nickname:     "txnick",
 			PasswordHash: "$2a$10$hashedpassword",
 			Email:        "txtest@example.com",
 			Status:       model.UserStatusActive,
@@ -278,27 +215,27 @@ func TestUserRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify user exists in transaction
-		foundInTx, err := txRepo.FindByUsername(ctx, "txuser")
+		foundInTx, err := txRepo.FindByEmail(ctx, "txtest@example.com")
 		require.NoError(t, err)
 		assert.NotNil(t, foundInTx)
-		assert.Equal(t, "txuser", foundInTx.Username)
+		assert.Equal(t, "txnick", foundInTx.Nickname)
 
 		// Rollback transaction
 		err = tx.Rollback()
 		require.NoError(t, err)
 
 		// Then - Verify user doesn't exist after rollback
-		foundAfterRollback, err := userRepo.FindByUsername(ctx, "txuser")
+		foundAfterRollback, err := userRepo.FindByEmail(ctx, "txtest@example.com")
 		assert.True(t, errors.Is(err, usererrors.ErrUserNotFound))
 		assert.Nil(t, foundAfterRollback)
 	})
 
-	t.Run("Duplicate Username Error", func(t *testing.T) {
+	t.Run("Duplicate Email Error", func(t *testing.T) {
 		// Given
 		user1 := &model.User{
-			Username:     "duplicateusername",
+			Nickname:     "user1",
 			PasswordHash: "$2a$10$hashedpassword",
-			Email:        "dup1@example.com",
+			Email:        "duplicate@example.com",
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
 			CreatedAt:    time.Now(),
@@ -308,11 +245,11 @@ func TestUserRepository_Integration(t *testing.T) {
 		err := userRepo.Create(ctx, user1)
 		require.NoError(t, err)
 
-		// Try to create second user with same username
+		// Try to create second user with same email
 		user2 := &model.User{
-			Username:     "duplicateusername",
+			Nickname:     "user2",
 			PasswordHash: "$2a$10$hashedpassword",
-			Email:        "dup2@example.com",
+			Email:        "duplicate@example.com",
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
 			CreatedAt:    time.Now(),
@@ -330,7 +267,7 @@ func TestUserRepository_Integration(t *testing.T) {
 		// Given
 		user := &model.User{
 			UserID:       999999, // Non-existent ID
-			Username:     "nonexistent",
+			Nickname:     "nonexistent",
 			PasswordHash: "$2a$10$hashedpassword",
 			Email:        "nonexistent@example.com",
 			Status:       model.UserStatusActive,

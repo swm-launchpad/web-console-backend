@@ -16,17 +16,16 @@ func TestToDomainUser(t *testing.T) {
 	t.Run("모든 필드가 채워진 경우", func(t *testing.T) {
 		// Arrange
 		now := time.Now()
-		name := "Test User"
+		nickname := "testnick"
 		phone := "010-1234-5678"
 		org := "Test Org"
 
 		// Act
 		result := toDomainUser(
 			uint(123),
-			"testuser",
 			"$2a$10$hashedpassword",
 			sql.NullTime{Time: now, Valid: true},
-			sql.NullString{String: name, Valid: true},
+			nickname,
 			"test@example.com",
 			sql.NullString{String: phone, Valid: true},
 			sql.NullString{String: org, Valid: true},
@@ -39,12 +38,10 @@ func TestToDomainUser(t *testing.T) {
 
 		// Assert
 		assert.Equal(t, uint(123), result.UserID)
-		assert.Equal(t, "testuser", result.Username)
 		assert.Equal(t, "$2a$10$hashedpassword", result.PasswordHash)
 		assert.NotNil(t, result.PasswordUpdatedAt)
 		assert.Equal(t, now, *result.PasswordUpdatedAt)
-		assert.NotNil(t, result.Name)
-		assert.Equal(t, name, *result.Name)
+		assert.Equal(t, nickname, result.Nickname)
 		assert.Equal(t, "test@example.com", result.Email)
 		assert.NotNil(t, result.Phone)
 		assert.Equal(t, phone, *result.Phone)
@@ -65,11 +62,10 @@ func TestToDomainUser(t *testing.T) {
 		// Act
 		result := toDomainUser(
 			uint(456),
-			"nulluser",
 			"hashedpwd",
-			sql.NullTime{},   // NULL
-			sql.NullString{}, // NULL
-			"",               // empty email becomes nil
+			sql.NullTime{}, // NULL
+			"newnick",      // nickname is NOT NULL
+			"test@example.com",
 			sql.NullString{}, // NULL
 			sql.NullString{}, // NULL
 			sqlc.UsersStatusInactive,
@@ -81,10 +77,9 @@ func TestToDomainUser(t *testing.T) {
 
 		// Assert
 		assert.Equal(t, uint(456), result.UserID)
-		assert.Equal(t, "nulluser", result.Username)
+		assert.Equal(t, "newnick", result.Nickname)
 		assert.Nil(t, result.PasswordUpdatedAt)
-		assert.Nil(t, result.Name)
-		assert.Equal(t, "", result.Email)
+		assert.Equal(t, "test@example.com", result.Email)
 		assert.Nil(t, result.Phone)
 		assert.Nil(t, result.Organization)
 		assert.Equal(t, model.UserStatusInactive, result.Status)
@@ -177,13 +172,13 @@ func TestIsDuplicateError(t *testing.T) {
 	})
 
 	t.Run("Duplicate entry를 포함하는 에러", func(t *testing.T) {
-		err := errors.New("Error 1062: Duplicate entry 'testuser' for key 'username'")
+		err := errors.New("Error 1062: Duplicate entry 'test@example.com' for key 'email'")
 		result := isDuplicateError(err)
 		assert.True(t, result)
 	})
 
 	t.Run("UNIQUE constraint 에러", func(t *testing.T) {
-		err := errors.New("UNIQUE constraint failed: users.username")
+		err := errors.New("UNIQUE constraint failed: users.email")
 		result := isDuplicateError(err)
 		assert.True(t, result)
 	})

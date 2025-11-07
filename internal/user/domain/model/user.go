@@ -17,10 +17,9 @@ const (
 
 type User struct {
 	UserID            uint
-	Username          string
 	PasswordHash      string
 	PasswordUpdatedAt *time.Time
-	Name              *string
+	Nickname          string
 	Email             string
 	Phone             *string
 	Organization      *string
@@ -31,18 +30,21 @@ type User struct {
 	UpdatedAt         *time.Time
 }
 
-func NewUser(username, email string) (*User, error) {
-	if username == "" {
-		return nil, usererrors.ErrUsernameRequired
-	}
+func NewUser(email, nickname string) (*User, error) {
 	if email == "" {
 		return nil, usererrors.ErrEmailRequired
+	}
+	if nickname == "" {
+		return nil, usererrors.ErrNicknameRequired
+	}
+	if len(nickname) < 2 {
+		return nil, usererrors.ErrNicknameTooShort
 	}
 
 	now := time.Now()
 	return &User{
-		Username:  username,
 		Email:     email,
+		Nickname:  nickname,
 		Status:    UserStatusPending,
 		IsDeleted: false,
 		CreatedAt: now,

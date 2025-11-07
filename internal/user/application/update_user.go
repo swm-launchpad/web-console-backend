@@ -11,16 +11,15 @@ import (
 
 type UpdateUserInput struct {
 	UserID       uint
-	Name         *string
+	Nickname     *string
 	Phone        *string
 	Organization *string
 }
 
 type UpdateUserOutput struct {
 	UserID       uint
-	Username     string
 	Email        string
-	Name         string
+	Nickname     string
 	Phone        string
 	Organization string
 	Status       string
@@ -64,8 +63,14 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 
 	// Update fields
 	updated := false
-	if input.Name != nil {
-		user.Name = input.Name
+	if input.Nickname != nil {
+		if *input.Nickname == "" {
+			return nil, usererrors.ErrNicknameRequired
+		}
+		if len(*input.Nickname) < 2 {
+			return nil, usererrors.ErrNicknameTooShort
+		}
+		user.Nickname = *input.Nickname
 		updated = true
 	}
 	if input.Phone != nil {
@@ -96,14 +101,11 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 	// Map to output
 	output := &UpdateUserOutput{
 		UserID:   user.UserID,
-		Username: user.Username,
 		Email:    user.Email,
+		Nickname: user.Nickname,
 		Status:   string(user.Status),
 	}
 
-	if user.Name != nil {
-		output.Name = *user.Name
-	}
 	if user.Phone != nil {
 		output.Phone = *user.Phone
 	}
@@ -113,7 +115,7 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 
 	uc.logger.Info(ctx, "update user completed",
 		zap.Uint("user_id", user.UserID),
-		zap.String("username", user.Username),
+		zap.String("email", user.Email),
 	)
 
 	return output, nil

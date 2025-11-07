@@ -21,7 +21,6 @@ type Querier interface {
 	DeleteUserTokensByType(ctx context.Context, arg DeleteUserTokensByTypeParams) error
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
 	ExistsByInstallationID(ctx context.Context, installationID uint64) (bool, error)
-	ExistsByUsername(ctx context.Context, username string) (bool, error)
 	FindInstallationByIDIncludingRevoked(ctx context.Context, installationID uint64) (FindInstallationByIDIncludingRevokedRow, error)
 	FindLatestTokenByUserAndType(ctx context.Context, arg FindLatestTokenByUserAndTypeParams) (VerificationToken, error)
 	FindTokenByToken(ctx context.Context, token string) (VerificationToken, error)
@@ -30,7 +29,6 @@ type Querier interface {
 	GetOAuthStateByState(ctx context.Context, state string) (OauthState, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
 	GetUserByID(ctx context.Context, userID uint32) (GetUserByIDRow, error)
-	GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error)
 	MarkInstallationAsRevoked(ctx context.Context, arg MarkInstallationAsRevokedParams) (sql.Result, error)
 	MarkOAuthStateAsConsumed(ctx context.Context, arg MarkOAuthStateAsConsumedParams) (sql.Result, error)
 	MarkTokenAsUsed(ctx context.Context, arg MarkTokenAsUsedParams) error

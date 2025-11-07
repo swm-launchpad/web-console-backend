@@ -23,13 +23,12 @@ func TestProjectWithVolumesCascadeDelete_E2E(t *testing.T) {
 	t.Run("프로젝트 삭제 시 컨테이너와 볼륨 cascade 삭제 확인", func(t *testing.T) {
 		// Step 1: 사용자 등록
 		registerReq := map[string]string{
-			"username": "cascadeuser",
-			"password": "TestPassword123!",
 			"email":    "cascade@example.com",
-			"name":     "Cascade Test User",
+			"password": "TestPassword123!",
+			"nickname": "Cascade Test User",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var registerResp map[string]interface{}

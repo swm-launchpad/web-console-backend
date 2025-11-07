@@ -29,18 +29,15 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
-			Username: "testuser",
-			Password: "password123",
 			Email:    "test@example.com",
-			Name:     "Test User",
+			Password: "password123",
+			Nickname: "Test User",
 		}
 
-		name := "Test User"
 		expectedUser := &model.User{
 			UserID:   1,
-			Username: input.Username,
 			Email:    input.Email,
-			Name:     &name,
+			Nickname: input.Nickname,
 			Status:   model.UserStatusPending, // Changed to pending
 		}
 		expectedToken := "jwt_token"
@@ -54,7 +51,7 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		}
 
 		mockAuthService.
-			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, &name).
+			On("RegisterUser", mock.Anything, input.Email, input.Password, input.Nickname).
 			Return(expectedUser, expectedToken, nil)
 
 		mockTokenService.
@@ -62,7 +59,7 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Return(verificationToken, nil)
 
 		mockEmailService.
-			On("SendVerificationEmail", mock.Anything, input.Email, input.Username, verificationToken.Token).
+			On("SendVerificationEmail", mock.Anything, input.Email, input.Nickname, verificationToken.Token).
 			Return(nil)
 
 		output, err := uc.Execute(ctx, input)
@@ -85,17 +82,15 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
-			Username: "testuser",
-			Password: "password123",
 			Email:    "test@example.com",
-			Name:     "",
+			Password: "password123",
+			Nickname: "testnick2",
 		}
 
 		expectedUser := &model.User{
 			UserID:   2,
-			Username: input.Username,
 			Email:    input.Email,
-			Name:     nil,
+			Nickname: input.Nickname,
 			Status:   model.UserStatusPending,
 		}
 		expectedToken := "jwt_token"
@@ -109,7 +104,7 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		}
 
 		mockAuthService.
-			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
+			On("RegisterUser", mock.Anything, input.Email, input.Password, input.Nickname).
 			Return(expectedUser, expectedToken, nil)
 
 		mockTokenService.
@@ -117,7 +112,7 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 			Return(verificationToken, nil)
 
 		mockEmailService.
-			On("SendVerificationEmail", mock.Anything, input.Email, input.Username, verificationToken.Token).
+			On("SendVerificationEmail", mock.Anything, input.Email, input.Nickname, verificationToken.Token).
 			Return(nil)
 
 		output, err := uc.Execute(ctx, input)
@@ -140,48 +135,20 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
-			Username: "",
+			Email:    "",
 			Password: "password123",
-			Email:    "test@example.com",
-			Name:     "",
+			Nickname: "testnick",
 		}
 
 		mockAuthService.
-			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
-			Return((*model.User)(nil), "", errors.New("username is required"))
+			On("RegisterUser", mock.Anything, input.Email, input.Password, input.Nickname).
+			Return((*model.User)(nil), "", errors.New("email is required"))
 
 		output, err := uc.Execute(ctx, input)
 
 		assert.Error(t, err)
 		assert.Nil(t, output)
-		assert.Contains(t, err.Error(), "username is required")
-
-		mockAuthService.AssertExpectations(t)
-	})
-
-	t.Run("실패: username 이미 존재", func(t *testing.T) {
-		mockAuthService := new(service.MockAuthService)
-		mockTokenService := new(service.MockTokenService)
-		mockEmailService := new(email.MockService)
-		testLogger := logger.NewForTest()
-		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
-
-		input := RegisterUserInput{
-			Username: "existinguser",
-			Password: "password123",
-			Email:    "test@example.com",
-			Name:     "",
-		}
-
-		mockAuthService.
-			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
-			Return((*model.User)(nil), "", errors.New("username already exists"))
-
-		output, err := uc.Execute(ctx, input)
-
-		assert.Error(t, err)
-		assert.Nil(t, output)
-		assert.Contains(t, err.Error(), "username already exists")
+		assert.Contains(t, err.Error(), "email is required")
 
 		mockAuthService.AssertExpectations(t)
 	})
@@ -194,14 +161,13 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "password123",
-			Email:    "existing@example.com",
-			Name:     "",
+			Nickname: "",
 		}
 
 		mockAuthService.
-			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
+			On("RegisterUser", mock.Anything, input.Email, input.Password, input.Nickname).
 			Return((*model.User)(nil), "", errors.New("email already exists"))
 
 		output, err := uc.Execute(ctx, input)
@@ -221,14 +187,13 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "weak",
-			Email:    "test@example.com",
-			Name:     "",
+			Nickname: "",
 		}
 
 		mockAuthService.
-			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
+			On("RegisterUser", mock.Anything, input.Email, input.Password, input.Nickname).
 			Return((*model.User)(nil), "", errors.New("password is too weak"))
 
 		output, err := uc.Execute(ctx, input)
@@ -248,14 +213,13 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "password123",
-			Email:    "invalid-email",
-			Name:     "",
+			Nickname: "",
 		}
 
 		mockAuthService.
-			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
+			On("RegisterUser", mock.Anything, input.Email, input.Password, input.Nickname).
 			Return((*model.User)(nil), "", errors.New("invalid email format"))
 
 		output, err := uc.Execute(ctx, input)
@@ -275,14 +239,13 @@ func TestRegisterUserUseCase_Execute(t *testing.T) {
 		uc := NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 
 		input := RegisterUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "password123",
-			Email:    "test@example.com",
-			Name:     "",
+			Nickname: "",
 		}
 
 		mockAuthService.
-			On("RegisterUser", mock.Anything, input.Username, input.Password, input.Email, (*string)(nil)).
+			On("RegisterUser", mock.Anything, input.Email, input.Password, input.Nickname).
 			Return((*model.User)(nil), "", errors.New("token generation failed"))
 
 		output, err := uc.Execute(ctx, input)

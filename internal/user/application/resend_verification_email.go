@@ -51,7 +51,7 @@ func (uc *ResendVerificationEmailUseCase) Execute(ctx context.Context, input Res
 	)
 
 	var verificationTokenStr string
-	var username string
+	var nickname string
 	var userEmail string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
@@ -71,11 +71,15 @@ func (uc *ResendVerificationEmailUseCase) Execute(ctx context.Context, input Res
 
 		// Check if user is already active
 		if user.IsActive() {
-			uc.logger.Warn(ctx, "user is already active",
+			uc.logger.Info(ctx, "user is already verified",
 				zap.Uint("user_id", user.UserID),
 				zap.String("email", input.Email),
 			)
-			return usererrors.ErrEmailNotVerified // User is already verified
+			// User is already verified - skip token generation and email sending
+			nickname = user.Nickname
+			userEmail = user.Email
+			// verificationTokenStr remains empty (indicates already verified)
+			return nil
 		}
 
 		// Check rate limiting
@@ -108,7 +112,7 @@ func (uc *ResendVerificationEmailUseCase) Execute(ctx context.Context, input Res
 
 		// Store for email sending (outside transaction)
 		verificationTokenStr = verificationToken.Token
-		username = user.Username
+		nickname = user.Nickname
 		userEmail = user.Email
 
 		return nil
@@ -118,19 +122,28 @@ func (uc *ResendVerificationEmailUseCase) Execute(ctx context.Context, input Res
 	}
 
 	// Send verification email (outside transaction)
-	if err := uc.emailService.SendVerificationEmail(ctx, userEmail, username, verificationTokenStr); err != nil {
-		uc.logger.Error(ctx, "failed to resend verification email",
-			zap.Error(err),
+	// Only send if token was created (user not already verified)
+	if verificationTokenStr != "" {
+		if err := uc.emailService.SendVerificationEmail(ctx, userEmail, nickname, verificationTokenStr); err != nil {
+			uc.logger.Error(ctx, "failed to resend verification email",
+				zap.Error(err),
+				zap.String("email", userEmail),
+			)
+			return nil, usererrors.ErrEmailSendFailed
+		}
+
+		uc.logger.Info(ctx, "verification email resent successfully",
 			zap.String("email", userEmail),
 		)
-		return nil, usererrors.ErrEmailSendFailed
 	}
 
-	uc.logger.Info(ctx, "verification email resent successfully",
-		zap.String("email", userEmail),
-	)
+	// Prepare response message based on whether email was sent
+	message := "Verification email has been resent"
+	if verificationTokenStr == "" {
+		message = "Email is already verified"
+	}
 
 	return &ResendVerificationEmailOutput{
-		Message: "Verification email has been resent",
+		Message: message,
 	}, nil
 }

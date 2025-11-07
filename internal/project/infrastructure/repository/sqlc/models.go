@@ -662,7 +662,6 @@ type Project struct {
 	ProjectID uint32         `json:"project_id"`
 	Name      string         `json:"name"`
 	Slug      string         `json:"slug"`
-	Fqdn      sql.NullString `json:"fqdn"`
 	Status    ProjectsStatus `json:"status"`
 	// Current operation status of the project
 	ProjectOperationStatus ProjectsProjectOperationStatus `json:"project_operation_status"`
@@ -723,10 +722,8 @@ type Template struct {
 
 type User struct {
 	UserID            uint32         `json:"user_id"`
-	Username          string         `json:"username"`
 	PasswordHash      string         `json:"password_hash"`
 	PasswordUpdatedAt sql.NullTime   `json:"password_updated_at"`
-	Name              sql.NullString `json:"name"`
 	Email             string         `json:"email"`
 	Phone             sql.NullString `json:"phone"`
 	Status            UsersStatus    `json:"status"`
@@ -735,6 +732,7 @@ type User struct {
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
 	DeletedAt         sql.NullTime   `json:"deleted_at"`
 	IsDeleted         bool           `json:"is_deleted"`
+	Nickname          string         `json:"nickname"`
 }
 
 type VerificationToken struct {

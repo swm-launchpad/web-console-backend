@@ -15,9 +15,8 @@ type GetUserInput struct {
 
 type GetUserOutput struct {
 	UserID       uint
-	Username     string
 	Email        string
-	Name         string
+	Nickname     string
 	Phone        string
 	Organization string
 	Status       string
@@ -54,16 +53,13 @@ func (uc *GetUserUseCase) Execute(ctx context.Context, input GetUserInput) (*Get
 	// Map domain model to output
 	output := &GetUserOutput{
 		UserID:    user.UserID,
-		Username:  user.Username,
 		Email:     user.Email,
+		Nickname:  user.Nickname,
 		Status:    string(user.Status),
 		CreatedAt: user.CreatedAt,
 	}
 
 	// Map optional fields
-	if user.Name != nil {
-		output.Name = *user.Name
-	}
 	if user.Phone != nil {
 		output.Phone = *user.Phone
 	}
@@ -73,7 +69,7 @@ func (uc *GetUserUseCase) Execute(ctx context.Context, input GetUserInput) (*Get
 
 	uc.logger.Info(ctx, "get user completed",
 		zap.Uint("user_id", user.UserID),
-		zap.String("username", user.Username),
+		zap.String("email", user.Email),
 	)
 
 	return output, nil

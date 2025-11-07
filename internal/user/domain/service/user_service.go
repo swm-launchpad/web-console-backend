@@ -19,13 +19,10 @@ var (
 // UserService defines the interface for user-related business logic
 type UserService interface {
 	// CreateUser creates a new user with the given information
-	CreateUser(ctx context.Context, username, email string, passwordHash string, name *string) (*model.User, error)
+	CreateUser(ctx context.Context, email, passwordHash, nickname string) (*model.User, error)
 
 	// GetUserByID retrieves a user by their ID
 	GetUserByID(ctx context.Context, userID uint) (*model.User, error)
-
-	// GetUserByUsername retrieves a user by their username
-	GetUserByUsername(ctx context.Context, username string) (*model.User, error)
 
 	// GetUserByEmail retrieves a user by their email
 	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
@@ -41,9 +38,6 @@ type UserService interface {
 
 	// UpdatePassword updates user's password
 	UpdatePassword(ctx context.Context, userID uint, passwordHash string) error
-
-	// CheckUsernameAvailability checks if username is available
-	CheckUsernameAvailability(ctx context.Context, username string) error
 
 	// CheckEmailAvailability checks if email is available
 	CheckEmailAvailability(ctx context.Context, email string) error
@@ -64,25 +58,20 @@ func NewUserService(userRepo repository.UserRepository, log logger.Logger) UserS
 }
 
 // CreateUser creates a new user with validation
-func (s *userService) CreateUser(ctx context.Context, username, email string, passwordHash string, name *string) (*model.User, error) {
+func (s *userService) CreateUser(ctx context.Context, email, passwordHash, nickname string) (*model.User, error) {
 	s.logger.Info(ctx, "create user started",
-		zap.String("username", username),
 		zap.String("email", email),
+		zap.String("nickname", nickname),
 	)
 
 	// Create user model
-	user, err := model.NewUser(username, email)
+	user, err := model.NewUser(email, nickname)
 	if err != nil {
 		s.logger.Error(ctx, "failed to create user model",
 			zap.Error(err),
-			zap.String("username", username),
+			zap.String("email", email),
 		)
 		return nil, err
-	}
-
-	// Set additional fields
-	if name != nil && *name != "" {
-		user.Name = name
 	}
 
 	// Set password
@@ -95,14 +84,14 @@ func (s *userService) CreateUser(ctx context.Context, username, email string, pa
 	if err := s.userRepo.Create(ctx, user); err != nil {
 		s.logger.Error(ctx, "failed to save user",
 			zap.Error(err),
-			zap.String("username", username),
+			zap.String("email", email),
 		)
 		return nil, err
 	}
 
 	s.logger.Info(ctx, "create user completed",
 		zap.Uint("user_id", user.UserID),
-		zap.String("username", username),
+		zap.String("email", email),
 	)
 
 	return user, nil
@@ -115,15 +104,6 @@ func (s *userService) GetUserByID(ctx context.Context, userID uint) (*model.User
 	}
 
 	return s.userRepo.FindByID(ctx, userID)
-}
-
-// GetUserByUsername retrieves a user by username
-func (s *userService) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
-	if username == "" {
-		return nil, ErrInvalidUserData
-	}
-
-	return s.userRepo.FindByUsername(ctx, username)
 }
 
 // GetUserByEmail retrieves a user by email
@@ -185,31 +165,6 @@ func (s *userService) UpdatePassword(ctx context.Context, userID uint, passwordH
 	user.UpdatePassword(passwordHash)
 
 	return s.UpdateUser(ctx, user)
-}
-
-// CheckUsernameAvailability checks if username is available
-func (s *userService) CheckUsernameAvailability(ctx context.Context, username string) error {
-	if username == "" {
-		return ErrInvalidUserData
-	}
-
-	exists, err := s.userRepo.ExistsByUsername(ctx, username)
-	if err != nil {
-		s.logger.Error(ctx, "failed to check username existence",
-			zap.Error(err),
-			zap.String("username", username),
-		)
-		return err
-	}
-
-	if exists {
-		s.logger.Info(ctx, "username already exists",
-			zap.String("username", username),
-		)
-		return usererrors.ErrUsernameExists
-	}
-
-	return nil
 }
 
 // CheckEmailAvailability checks if email is available

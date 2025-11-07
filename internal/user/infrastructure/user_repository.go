@@ -30,15 +30,14 @@ func NewUserRepository(db sqlc.DBTX, log logger.Logger) repository.UserRepositor
 
 func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 	r.logger.Info(ctx, "user repository create started",
-		zap.String("username", user.Username),
 		zap.String("email", user.Email),
+		zap.String("nickname", user.Nickname),
 	)
 
 	params := sqlc.CreateUserParams{
-		Username:          user.Username,
 		PasswordHash:      user.PasswordHash,
 		PasswordUpdatedAt: toNullTime(user.PasswordUpdatedAt),
-		Name:              toNullString(user.Name),
+		Nickname:          user.Nickname,
 		Email:             user.Email,
 		Phone:             toNullString(user.Phone),
 		Organization:      toNullString(user.Organization),
@@ -51,17 +50,16 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 
 	result, err := r.queriesWithContext(ctx).CreateUser(ctx, params)
 	if err != nil {
-		// Check for duplicate username or email
+		// Check for duplicate email
 		if isDuplicateError(err) {
 			r.logger.Error(ctx, "duplicate user",
-				zap.String("username", user.Username),
 				zap.String("email", user.Email),
 				zap.Error(err),
 			)
 			return usererrors.ErrUserAlreadyExists
 		}
 		r.logger.Error(ctx, "failed to create user",
-			zap.String("username", user.Username),
+			zap.String("email", user.Email),
 			zap.Error(err),
 		)
 		return usererrors.ErrDatabaseUnavailable
@@ -71,7 +69,7 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 	lastID, err := result.LastInsertId()
 	if err != nil {
 		r.logger.Error(ctx, "failed to get last insert ID",
-			zap.String("username", user.Username),
+			zap.String("email", user.Email),
 			zap.Error(err),
 		)
 		return err
@@ -80,7 +78,7 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 
 	r.logger.Info(ctx, "user repository create completed",
 		zap.Uint("user_id", user.UserID),
-		zap.String("username", user.Username),
+		zap.String("email", user.Email),
 	)
 	return nil
 }
@@ -88,13 +86,13 @@ func (r *userRepository) Create(ctx context.Context, user *model.User) error {
 func (r *userRepository) Update(ctx context.Context, user *model.User) error {
 	r.logger.Info(ctx, "user repository update started",
 		zap.Uint("user_id", user.UserID),
-		zap.String("username", user.Username),
+		zap.String("email", user.Email),
 	)
 
 	params := sqlc.UpdateUserParams{
 		PasswordHash:      user.PasswordHash,
 		PasswordUpdatedAt: toNullTime(user.PasswordUpdatedAt),
-		Name:              toNullString(user.Name),
+		Nickname:          user.Nickname,
 		Email:             user.Email,
 		Phone:             toNullString(user.Phone),
 		Organization:      toNullString(user.Organization),
@@ -154,36 +152,9 @@ func (r *userRepository) FindByID(ctx context.Context, userID uint) (*model.User
 
 	return toDomainUser(
 		uint(sqlcUser.UserID),
-		sqlcUser.Username,
 		sqlcUser.PasswordHash,
 		sqlcUser.PasswordUpdatedAt,
-		sqlcUser.Name,
-		sqlcUser.Email,
-		sqlcUser.Phone,
-		sqlcUser.Organization,
-		sqlc.UsersStatus(sqlcUser.Status),
-		sqlcUser.IsDeleted,
-		sqlcUser.DeletedAt,
-		sqlcUser.CreatedAt,
-		sqlcUser.UpdatedAt,
-	), nil
-}
-
-func (r *userRepository) FindByUsername(ctx context.Context, username string) (*model.User, error) {
-	sqlcUser, err := r.queriesWithContext(ctx).GetUserByUsername(ctx, username)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, usererrors.ErrUserNotFound
-		}
-		return nil, usererrors.ErrDatabaseUnavailable
-	}
-
-	return toDomainUser(
-		uint(sqlcUser.UserID),
-		sqlcUser.Username,
-		sqlcUser.PasswordHash,
-		sqlcUser.PasswordUpdatedAt,
-		sqlcUser.Name,
+		sqlcUser.Nickname,
 		sqlcUser.Email,
 		sqlcUser.Phone,
 		sqlcUser.Organization,
@@ -206,10 +177,9 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*model.
 
 	return toDomainUser(
 		uint(sqlcUser.UserID),
-		sqlcUser.Username,
 		sqlcUser.PasswordHash,
 		sqlcUser.PasswordUpdatedAt,
-		sqlcUser.Name,
+		sqlcUser.Nickname,
 		sqlcUser.Email,
 		sqlcUser.Phone,
 		sqlcUser.Organization,
@@ -246,10 +216,6 @@ func (r *userRepository) Delete(ctx context.Context, userID uint) error {
 	return nil
 }
 
-func (r *userRepository) ExistsByUsername(ctx context.Context, username string) (bool, error) {
-	return r.queriesWithContext(ctx).ExistsByUsername(ctx, username)
-}
-
 func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
 	return r.queriesWithContext(ctx).ExistsByEmail(ctx, email)
 }
@@ -264,10 +230,9 @@ func (r *userRepository) queriesWithContext(ctx context.Context) *sqlc.Queries {
 // Helper function for converting between domain and sqlc models
 func toDomainUser(
 	userID uint,
-	username string,
 	passwordHash string,
 	passwordUpdatedAt sql.NullTime,
-	name sql.NullString,
+	nickname string,
 	email string,
 	phone sql.NullString,
 	organization sql.NullString,
@@ -279,10 +244,9 @@ func toDomainUser(
 ) *model.User {
 	return &model.User{
 		UserID:            userID,
-		Username:          username,
 		PasswordHash:      passwordHash,
 		PasswordUpdatedAt: nullTimeToPtr(passwordUpdatedAt),
-		Name:              nullStringToPtr(name),
+		Nickname:          nickname,
 		Email:             email,
 		Phone:             nullStringToPtr(phone),
 		Organization:      nullStringToPtr(organization),

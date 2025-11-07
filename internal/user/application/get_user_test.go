@@ -32,9 +32,8 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "testuser",
+			Nickname:     name,
 			Email:        email,
-			Name:         &name,
 			Phone:        &phone,
 			Organization: &organization,
 			Status:       model.UserStatusActive,
@@ -57,9 +56,8 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, userID, output.UserID)
-		assert.Equal(t, "testuser", output.Username)
 		assert.Equal(t, email, output.Email)
-		assert.Equal(t, name, output.Name)
+		assert.Equal(t, name, output.Nickname)
 		assert.Equal(t, phone, output.Phone)
 		assert.Equal(t, organization, output.Organization)
 		assert.Equal(t, "active", output.Status)
@@ -79,9 +77,8 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "minimaluser",
+			Nickname:     "minimaluser",
 			Email:        "minimal@example.com",
-			Name:         nil,
 			Phone:        nil,
 			Organization: nil,
 			Status:       model.UserStatusPending,
@@ -104,9 +101,8 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, userID, output.UserID)
-		assert.Equal(t, "minimaluser", output.Username)
+		assert.Equal(t, "minimaluser", output.Nickname)
 		assert.Equal(t, "minimal@example.com", output.Email)
-		assert.Empty(t, output.Name)
 		assert.Empty(t, output.Phone)
 		assert.Empty(t, output.Organization)
 		assert.Equal(t, "pending", output.Status)
@@ -134,7 +130,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 			user := &model.User{
 				UserID:    userID,
-				Username:  "statususer",
+				Nickname:  "statususer",
 				Email:     "status@example.com",
 				Status:    status,
 				IsDeleted: false,
@@ -247,7 +243,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:    userID,
-			Username:  "deleteduser",
+			Nickname:  "deleteduser",
 			Email:     "deleted@example.com",
 			Status:    model.UserStatusActive,
 			IsDeleted: true,
@@ -270,7 +266,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, userID, output.UserID)
-		assert.Equal(t, "deleteduser", output.Username)
+		assert.Equal(t, "deleteduser", output.Nickname)
 		assert.Equal(t, "active", output.Status) // 삭제되었어도 상태는 유지
 
 		mockService.AssertExpectations(t)
@@ -291,9 +287,8 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "fulluser",
+			Nickname:     name,
 			Email:        email,
-			Name:         &name,
 			Phone:        &phone,
 			Organization: &organization,
 			Status:       model.UserStatusActive,
@@ -316,9 +311,8 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, userID, output.UserID)
-		assert.Equal(t, "fulluser", output.Username)
 		assert.Equal(t, email, output.Email)
-		assert.Equal(t, name, output.Name)
+		assert.Equal(t, name, output.Nickname)
 		assert.Equal(t, phone, output.Phone)
 		assert.Equal(t, organization, output.Organization)
 		assert.Equal(t, "active", output.Status)
@@ -338,11 +332,10 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "emptyfields",
+			Nickname:     emptyStr, // 빈 문자열
 			Email:        "empty@example.com",
-			Name:         &emptyStr, // 빈 문자열
-			Phone:        nil,       // nil
-			Organization: nil,       // nil
+			Phone:        nil, // nil
+			Organization: nil, // nil
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
 			CreatedAt:    now,
@@ -363,9 +356,8 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, output)
 		assert.Equal(t, userID, output.UserID)
-		assert.Equal(t, "emptyfields", output.Username)
 		assert.Equal(t, "empty@example.com", output.Email)
-		assert.Empty(t, output.Name) // 빈 문자열
+		assert.Empty(t, output.Nickname) // 빈 문자열
 		assert.Empty(t, output.Phone)
 		assert.Empty(t, output.Organization)
 
@@ -387,7 +379,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 
 		user := &model.User{
 			UserID:    maxUserID,
-			Username:  "maxuser",
+			Nickname:  "maxuser",
 			Email:     "max@example.com",
 			Status:    model.UserStatusActive,
 			IsDeleted: false,
@@ -413,7 +405,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		mockService.AssertExpectations(t)
 	})
 
-	t.Run("매우 긴 username 가진 사용자", func(t *testing.T) {
+	t.Run("매우 긴 nickname 가진 사용자", func(t *testing.T) {
 		// Arrange
 		mockService := new(service.MockUserService)
 		testLogger := logger.NewForTest()
@@ -428,7 +420,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 
 		user := &model.User{
 			UserID:    userID,
-			Username:  longUsername,
+			Nickname:  longUsername,
 			Email:     "long@example.com",
 			Status:    model.UserStatusActive,
 			IsDeleted: false,
@@ -449,7 +441,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 		// Assert
 		require.NoError(t, err)
 		assert.NotNil(t, output)
-		assert.Equal(t, longUsername, output.Username)
+		assert.Equal(t, longUsername, output.Nickname)
 
 		mockService.AssertExpectations(t)
 	})
@@ -465,7 +457,7 @@ func TestGetUserUseCase_EdgeCases(t *testing.T) {
 
 		user := &model.User{
 			UserID:    userID,
-			Username:  "noupdateuser",
+			Nickname:  "noupdateuser",
 			Email:     "noupdate@example.com",
 			Status:    model.UserStatusActive,
 			IsDeleted: false,

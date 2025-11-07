@@ -18,14 +18,14 @@ func setupTestUserAndProject(t *testing.T, testDB *helper.TestDB, userID uint, p
 	t.Helper()
 
 	// Create user
-	username := "testuser"
+	nickname := "testuser"
 	if userID != 100 {
-		username = "testuser" + string(rune(userID))
+		nickname = "testuser" + string(rune(userID))
 	}
-	email := username + "@example.com"
+	email := nickname + "@example.com"
 
-	_, err := testDB.DB.Exec("INSERT INTO USERS (user_id, username, email, password_hash, status) VALUES (?, ?, ?, ?, ?)",
-		userID, username, email, "hashedpassword", "active")
+	_, err := testDB.DB.Exec("INSERT INTO USERS (user_id, nickname, email, password_hash, status) VALUES (?, ?, ?, ?, ?)",
+		userID, nickname, email, "hashedpassword", "active")
 	require.NoError(t, err)
 
 	// Create project with valid 23-character slug (p + 14-digit timestamp + 8-char random)
@@ -40,12 +40,12 @@ func setupTestUserAndProject(t *testing.T, testDB *helper.TestDB, userID uint, p
 }
 
 // setupTestUser creates only a user in the database
-func setupTestUser(t *testing.T, testDB *helper.TestDB, userID uint, username string) {
+func setupTestUser(t *testing.T, testDB *helper.TestDB, userID uint, nickname string) {
 	t.Helper()
 
-	email := username + "@example.com"
-	_, err := testDB.DB.Exec("INSERT INTO USERS (user_id, username, email, password_hash, status) VALUES (?, ?, ?, ?, ?)",
-		userID, username, email, "hashedpassword", "active")
+	email := nickname + "@example.com"
+	_, err := testDB.DB.Exec("INSERT INTO USERS (user_id, nickname, email, password_hash, status) VALUES (?, ?, ?, ?, ?)",
+		userID, nickname, email, "hashedpassword", "active")
 	require.NoError(t, err)
 }
 

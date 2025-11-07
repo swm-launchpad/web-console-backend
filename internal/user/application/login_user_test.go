@@ -22,21 +22,20 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		uc := NewLoginUserUseCase(mockAuthService, testLogger)
 
 		input := LoginUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "password123",
 		}
 
-		name := "Test User"
+		nickname := "testnick"
 		expectedUser := &model.User{
 			UserID:   1,
-			Username: input.Username,
 			Email:    "test@example.com",
-			Name:     &name,
+			Nickname: nickname,
 			Status:   model.UserStatusActive,
 		}
 		expectedToken := "jwt_token"
 
-		mockAuthService.On("AuthenticateUser", ctx, input.Username, input.Password).
+		mockAuthService.On("AuthenticateUser", ctx, input.Email, input.Password).
 			Return(expectedUser, expectedToken, nil)
 
 		// Act
@@ -47,34 +46,32 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, uint(1), output.UserID)
 		assert.Equal(t, expectedToken, output.Token)
-		assert.Equal(t, input.Username, output.Username)
 		assert.Equal(t, "test@example.com", output.Email)
-		assert.Equal(t, name, output.Name)
+		assert.Equal(t, nickname, output.Nickname)
 
 		mockAuthService.AssertExpectations(t)
 	})
 
-	t.Run("성공: name이 없는 사용자 로그인", func(t *testing.T) {
+	t.Run("성공: 다른 사용자 로그인", func(t *testing.T) {
 		// Arrange
 		mockAuthService := new(service.MockAuthService)
 		testLogger := logger.NewForTest()
 		uc := NewLoginUserUseCase(mockAuthService, testLogger)
 
 		input := LoginUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "password123",
 		}
 
 		expectedUser := &model.User{
 			UserID:   2,
-			Username: input.Username,
 			Email:    "test@example.com",
-			Name:     nil,
+			Nickname: "testnick2",
 			Status:   model.UserStatusActive,
 		}
 		expectedToken := "jwt_token"
 
-		mockAuthService.On("AuthenticateUser", ctx, input.Username, input.Password).
+		mockAuthService.On("AuthenticateUser", ctx, input.Email, input.Password).
 			Return(expectedUser, expectedToken, nil)
 
 		// Act
@@ -85,26 +82,25 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, uint(2), output.UserID)
 		assert.Equal(t, expectedToken, output.Token)
-		assert.Equal(t, input.Username, output.Username)
 		assert.Equal(t, "test@example.com", output.Email)
-		assert.Empty(t, output.Name)
+		assert.Equal(t, "testnick2", output.Nickname)
 
 		mockAuthService.AssertExpectations(t)
 	})
 
-	t.Run("실패: 빈 username", func(t *testing.T) {
+	t.Run("실패: 빈 email", func(t *testing.T) {
 		// Arrange
 		mockAuthService := new(service.MockAuthService)
 		testLogger := logger.NewForTest()
 		uc := NewLoginUserUseCase(mockAuthService, testLogger)
 
 		input := LoginUserInput{
-			Username: "",
+			Email:    "",
 			Password: "password123",
 		}
 
-		mockAuthService.On("AuthenticateUser", ctx, input.Username, input.Password).
-			Return((*model.User)(nil), "", errors.New("username is required"))
+		mockAuthService.On("AuthenticateUser", ctx, input.Email, input.Password).
+			Return((*model.User)(nil), "", errors.New("email is required"))
 
 		// Act
 		output, err := uc.Execute(ctx, input)
@@ -112,7 +108,7 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, output)
-		assert.Contains(t, err.Error(), "username is required")
+		assert.Contains(t, err.Error(), "email is required")
 
 		mockAuthService.AssertExpectations(t)
 	})
@@ -124,11 +120,11 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		uc := NewLoginUserUseCase(mockAuthService, testLogger)
 
 		input := LoginUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "",
 		}
 
-		mockAuthService.On("AuthenticateUser", ctx, input.Username, input.Password).
+		mockAuthService.On("AuthenticateUser", ctx, input.Email, input.Password).
 			Return((*model.User)(nil), "", errors.New("password is required"))
 
 		// Act
@@ -149,11 +145,11 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		uc := NewLoginUserUseCase(mockAuthService, testLogger)
 
 		input := LoginUserInput{
-			Username: "nonexistent",
+			Email:    "nonexistent",
 			Password: "password123",
 		}
 
-		mockAuthService.On("AuthenticateUser", ctx, input.Username, input.Password).
+		mockAuthService.On("AuthenticateUser", ctx, input.Email, input.Password).
 			Return((*model.User)(nil), "", errors.New("invalid credentials"))
 
 		// Act
@@ -174,11 +170,11 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		uc := NewLoginUserUseCase(mockAuthService, testLogger)
 
 		input := LoginUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "wrongpassword",
 		}
 
-		mockAuthService.On("AuthenticateUser", ctx, input.Username, input.Password).
+		mockAuthService.On("AuthenticateUser", ctx, input.Email, input.Password).
 			Return((*model.User)(nil), "", errors.New("invalid credentials"))
 
 		// Act
@@ -199,11 +195,11 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		uc := NewLoginUserUseCase(mockAuthService, testLogger)
 
 		input := LoginUserInput{
-			Username: "inactiveuser",
+			Email:    "inactiveuser",
 			Password: "password123",
 		}
 
-		mockAuthService.On("AuthenticateUser", ctx, input.Username, input.Password).
+		mockAuthService.On("AuthenticateUser", ctx, input.Email, input.Password).
 			Return((*model.User)(nil), "", errors.New("user account is not active"))
 
 		// Act
@@ -224,11 +220,11 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		uc := NewLoginUserUseCase(mockAuthService, testLogger)
 
 		input := LoginUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "password123",
 		}
 
-		mockAuthService.On("AuthenticateUser", ctx, input.Username, input.Password).
+		mockAuthService.On("AuthenticateUser", ctx, input.Email, input.Password).
 			Return((*model.User)(nil), "", errors.New("token generation failed"))
 
 		// Act
@@ -249,26 +245,24 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		uc := NewLoginUserUseCase(mockAuthService, testLogger)
 
 		input := LoginUserInput{
-			Username: "testuser",
+			Email:    "testuser",
 			Password: "password123",
 		}
 
 		// Different user with various status
-		name := ""
 		phone := "010-1234-5678"
 		org := "Test Org"
 		expectedUser := &model.User{
 			UserID:       3,
-			Username:     input.Username,
 			Email:        "test@example.com",
-			Name:         &name,
+			Nickname:     "testnick3",
 			Phone:        &phone,
 			Organization: &org,
 			Status:       model.UserStatusActive,
 		}
 		expectedToken := "jwt_token"
 
-		mockAuthService.On("AuthenticateUser", ctx, input.Username, input.Password).
+		mockAuthService.On("AuthenticateUser", ctx, input.Email, input.Password).
 			Return(expectedUser, expectedToken, nil)
 
 		// Act
@@ -279,9 +273,8 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		assert.NotNil(t, output)
 		assert.Equal(t, uint(3), output.UserID)
 		assert.Equal(t, expectedToken, output.Token)
-		assert.Equal(t, input.Username, output.Username)
 		assert.Equal(t, "test@example.com", output.Email)
-		assert.Empty(t, output.Name) // Empty string
+		assert.Equal(t, "testnick3", output.Nickname)
 
 		mockAuthService.AssertExpectations(t)
 	})

@@ -9,53 +9,53 @@ import (
 )
 
 func TestNewUser(t *testing.T) {
-	t.Run("성공: 유효한 username과 email로 User 생성", func(t *testing.T) {
-		username := "testuser"
+	t.Run("성공: 유효한 email과 nickname으로 User 생성", func(t *testing.T) {
 		email := "test@example.com"
+		nickname := "testnick"
 
-		user, err := NewUser(username, email)
+		user, err := NewUser(email, nickname)
 
 		require.NoError(t, err)
 		assert.NotNil(t, user)
-		assert.Equal(t, username, user.Username)
 		assert.Equal(t, email, user.Email)
+		assert.Equal(t, nickname, user.Nickname)
 		assert.Equal(t, UserStatusPending, user.Status)
 		assert.False(t, user.IsDeleted)
 		assert.NotZero(t, user.CreatedAt)
 		assert.NotNil(t, user.UpdatedAt)
 	})
 
-	t.Run("실패: username이 빈 문자열", func(t *testing.T) {
-		username := ""
-		email := "test@example.com"
-
-		user, err := NewUser(username, email)
-
-		assert.Error(t, err)
-		assert.Nil(t, user)
-		assert.Equal(t, "username is required", err.Error())
-	})
-
 	t.Run("실패: email이 빈 문자열", func(t *testing.T) {
-		username := "testuser"
 		email := ""
+		nickname := "testnick"
 
-		user, err := NewUser(username, email)
+		user, err := NewUser(email, nickname)
 
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		assert.Equal(t, "email is required", err.Error())
 	})
 
-	t.Run("실패: username과 email 모두 빈 문자열", func(t *testing.T) {
-		username := ""
-		email := ""
+	t.Run("실패: nickname이 빈 문자열", func(t *testing.T) {
+		email := "test@example.com"
+		nickname := ""
 
-		user, err := NewUser(username, email)
+		user, err := NewUser(email, nickname)
 
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.Equal(t, "username is required", err.Error())
+		assert.Equal(t, "nickname is required", err.Error())
+	})
+
+	t.Run("실패: nickname이 너무 짧음", func(t *testing.T) {
+		email := "test@example.com"
+		nickname := "a"
+
+		user, err := NewUser(email, nickname)
+
+		assert.Error(t, err)
+		assert.Nil(t, user)
+		assert.Equal(t, "nickname must be at least 2 characters long", err.Error())
 	})
 }
 
