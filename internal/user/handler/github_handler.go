@@ -19,6 +19,7 @@ type GitHubHandler struct {
 	getInstallationUseCase      *application.GetGitHubInstallationUseCase
 	generateTokenUseCase        *application.GenerateInstallationTokenUseCase
 	listRepositoriesUseCase     *application.ListRepositoriesUseCase
+	listBranchesUseCase         *application.ListBranchesUseCase
 	startInstallationUseCase    *application.StartInstallationUseCase
 	installationCallbackUseCase *application.InstallationCallbackUseCase
 	frontendURL                 string
@@ -31,6 +32,7 @@ func NewGitHubHandler(
 	getInstallationUseCase *application.GetGitHubInstallationUseCase,
 	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
 	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	listBranchesUseCase *application.ListBranchesUseCase,
 	startInstallationUseCase *application.StartInstallationUseCase,
 	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	frontendURL string,
@@ -42,6 +44,7 @@ func NewGitHubHandler(
 		getInstallationUseCase:      getInstallationUseCase,
 		generateTokenUseCase:        generateTokenUseCase,
 		listRepositoriesUseCase:     listRepositoriesUseCase,
+		listBranchesUseCase:         listBranchesUseCase,
 		startInstallationUseCase:    startInstallationUseCase,
 		installationCallbackUseCase: installationCallbackUseCase,
 		frontendURL:                 frontendURL,
@@ -317,6 +320,81 @@ func (h *GitHubHandler) ListRepositories(c *gin.Context) {
 		zap.Uint("user_id", userID),
 		zap.Int64("installation_id", installationID),
 		zap.Int("repository_count", len(output.Repositories)),
+	)
+
+	response.OK(c, output)
+}
+
+// ListBranches lists all branches for a repository
+// GET /api/v1/github/installations/:installation_id/repositories/:owner/:repo/branches
+func (h *GitHubHandler) ListBranches(c *gin.Context) {
+	ctx := c.Request.Context()
+	h.logger.Info(ctx, "list branches handler started",
+		zap.String("handler", "ListBranches"),
+	)
+
+	userID := getUserIDFromContext(c)
+	if userID == 0 {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "ListBranches"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapUserError)
+		return
+	}
+
+	installationIDStr := c.Param("installation_id")
+	installationID, err := strconv.ParseInt(installationIDStr, 10, 64)
+	if err != nil || installationID <= 0 {
+		h.logger.Warn(ctx, "invalid installation id parameter",
+			zap.Error(err),
+			zap.String("handler", "ListBranches"),
+			zap.String("installation_id_str", installationIDStr),
+		)
+		response.Error(c, usererrors.ErrInvalidInstallationID, mapUserError)
+		return
+	}
+
+	owner := c.Param("owner")
+	repo := c.Param("repo")
+
+	if owner == "" || repo == "" {
+		h.logger.Warn(ctx, "owner and repo are required",
+			zap.String("handler", "ListBranches"),
+			zap.String("owner", owner),
+			zap.String("repo", repo),
+		)
+		response.Error(c, usererrors.ErrValidationFailed, mapUserError)
+		return
+	}
+
+	input := application.ListBranchesInput{
+		UserID:         userID,
+		InstallationID: installationID,
+		Owner:          owner,
+		Repo:           repo,
+	}
+
+	output, err := h.listBranchesUseCase.Execute(c.Request.Context(), input)
+	if err != nil {
+		h.logger.Error(ctx, "list branches use case failed",
+			zap.Error(err),
+			zap.String("handler", "ListBranches"),
+			zap.Uint("user_id", userID),
+			zap.Int64("installation_id", installationID),
+			zap.String("owner", owner),
+			zap.String("repo", repo),
+		)
+		response.Error(c, err, mapUserError)
+		return
+	}
+
+	h.logger.Info(ctx, "list branches handler completed",
+		zap.String("handler", "ListBranches"),
+		zap.Uint("user_id", userID),
+		zap.Int64("installation_id", installationID),
+		zap.String("owner", owner),
+		zap.String("repo", repo),
+		zap.Int("branch_count", len(output.Branches)),
 	)
 
 	response.OK(c, output)

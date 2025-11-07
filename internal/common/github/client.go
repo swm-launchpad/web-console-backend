@@ -291,6 +291,16 @@ type Repository struct {
 	CloneURL string `json:"clone_url"`
 }
 
+// Branch represents a GitHub repository branch
+type Branch struct {
+	Name      string `json:"name"`
+	Protected bool   `json:"protected"`
+	Commit    struct {
+		SHA string `json:"sha"`
+		URL string `json:"url"`
+	} `json:"commit"`
+}
+
 // ListRepositories lists all repositories accessible by the installation
 func (c *Client) ListRepositories(installationID int64) ([]Repository, error) {
 	// Create installation access token
@@ -329,6 +339,44 @@ func (c *Client) ListRepositories(installationID int64) ([]Repository, error) {
 	}
 
 	return repoResp.Repositories, nil
+}
+
+// ListBranches lists all branches for a repository
+func (c *Client) ListBranches(installationID int64, owner, repo string) ([]Branch, error) {
+	// Create installation access token
+	token, err := c.CreateInstallationToken(installationID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Request to list branches
+	url := fmt.Sprintf("%s/repos/%s/%s/branches", githubAPIBaseURL, owner, repo)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token.Token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list branches: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to list branches: status %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var branches []Branch
+	if err := json.NewDecoder(resp.Body).Decode(&branches); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return branches, nil
 }
 
 // IsTokenExpired checks if a token has expired or will expire within the buffer time
