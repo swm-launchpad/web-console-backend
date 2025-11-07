@@ -203,7 +203,7 @@ func (p *Project) SetName(name string) error {
 		return projecterrors.ErrNameRequired
 	}
 
-	if len(name) > 255 {
+	if len(name) > 32 {
 		return projecterrors.ErrNameTooLong
 	}
 

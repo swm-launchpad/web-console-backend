@@ -73,8 +73,8 @@ func NewContainer(
 	if name == "" {
 		return nil, containererrors.ErrNameRequired
 	}
-	// Name is for display purposes, allow up to 255 characters
-	if len(name) > 255 {
+	// Name is for display purposes, allow up to 32 characters
+	if len(name) > 32 {
 		return nil, containererrors.ErrNameTooLong
 	}
 
@@ -141,8 +141,8 @@ func (c *Container) ChangeName(name string) error {
 		return containererrors.ErrNameRequired
 	}
 
-	// Name is for display purposes, allow up to 255 characters
-	if len(name) > 255 {
+	// Name is for display purposes, allow up to 32 characters
+	if len(name) > 32 {
 		return containererrors.ErrNameTooLong
 	}
 

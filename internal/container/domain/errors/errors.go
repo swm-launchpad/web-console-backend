@@ -33,7 +33,7 @@ var (
 // Validation errors - input validation and data integrity errors
 var (
 	ErrNameRequired      = errors.New("container name is required")
-	ErrNameTooLong       = errors.New("container name must not exceed 255 characters")
+	ErrNameTooLong       = errors.New("container name must not exceed 32 characters")
 	ErrSlugRequired      = errors.New("container slug is required")
 	ErrInvalidSlug       = errors.New("invalid container slug")
 	ErrSlugInvalidLength = errors.New("slug must be exactly 23 characters")
