@@ -309,8 +309,8 @@ func (c *Client) ListRepositories(installationID int64) ([]Repository, error) {
 		return nil, err
 	}
 
-	// Request to list repositories
-	url := fmt.Sprintf("%s/installation/repositories", githubAPIBaseURL)
+	// Request to list repositories with per_page parameter (max 100)
+	url := fmt.Sprintf("%s/installation/repositories?per_page=100", githubAPIBaseURL)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
