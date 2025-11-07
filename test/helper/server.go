@@ -59,7 +59,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 
 	// Email Service 초기화 (테스트용 Mock 사용)
 	mockEmailService := new(email.MockService)
-	// Mock email service to always succeed (ctx, email, username, token)
+	// Mock email service to always succeed (ctx, email, nickname, token)
 	mockEmailService.On("SendVerificationEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	mockEmailService.On("SendPasswordResetEmail", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
@@ -192,21 +192,23 @@ func SetupTestServer(t *testing.T) *TestServer {
 	router := gin.New()
 	router.Use(gin.Recovery())
 
-	// Routes
-	authGroup := router.Group("/auth")
-	{
-		authGroup.POST("/register", authHandler.Register)
-		authGroup.POST("/login", authHandler.Login)
-	}
-
 	// API v1 routes
 	v1 := router.Group("/api/v1")
+
+	// Auth routes (public)
+	auth := v1.Group("/auth")
+	{
+		auth.POST("/register", authHandler.Register)
+		auth.POST("/login", authHandler.Login)
+	}
 
 	// User routes (protected)
 	users := v1.Group("/users")
 	users.Use(authMiddleware.RequireAuth())
 	{
 		users.GET("/me", userHandler.GetCurrentUser)
+		users.PUT("/me", userHandler.UpdateCurrentUser)
+		users.PUT("/me/password", userHandler.ChangePassword)
 		users.GET("/:id", userHandler.GetUserByID)
 	}
 
@@ -337,16 +339,16 @@ func (ts *TestServer) MakeAuthRequest(method, path string, body interface{}, tok
 }
 
 // RegisterUser는 테스트용 사용자를 등록하고 토큰을 반환합니다
-func (ts *TestServer) RegisterUser(t *testing.T, username, password, email string) (uint, string) {
+func (ts *TestServer) RegisterUser(t *testing.T, email, password, nickname string) (uint, string) {
 	t.Helper()
 
 	reqBody := map[string]string{
-		"username": username,
-		"password": password,
 		"email":    email,
+		"password": password,
+		"nickname": nickname,
 	}
 
-	w := ts.MakeRequest("POST", "/auth/register", reqBody)
+	w := ts.MakeRequest("POST", "/api/v1/auth/register", reqBody)
 
 	if w.Code != http.StatusCreated {
 		t.Fatalf("Failed to register user: %s", w.Body.String())
@@ -373,15 +375,15 @@ func (ts *TestServer) RegisterUser(t *testing.T, username, password, email strin
 }
 
 // LoginUser는 테스트용 로그인을 수행하고 토큰을 반환합니다
-func (ts *TestServer) LoginUser(t *testing.T, username, password string) (uint, string) {
+func (ts *TestServer) LoginUser(t *testing.T, email, password string) (uint, string) {
 	t.Helper()
 
 	reqBody := map[string]string{
-		"username": username,
+		"email":    email,
 		"password": password,
 	}
 
-	w := ts.MakeRequest("POST", "/auth/login", reqBody)
+	w := ts.MakeRequest("POST", "/api/v1/auth/login", reqBody)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("Failed to login user: %s", w.Body.String())

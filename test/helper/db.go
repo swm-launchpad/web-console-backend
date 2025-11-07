@@ -86,6 +86,8 @@ func (tdb *TestDB) Migrate() error {
 	// Apply consolidated schema migration
 	migrations := []string{
 		"000001_initial_schema.up.sql",
+		"000002_remove_project_fqdn_add_network_unique.up.sql",
+		"000003_username_to_email_login.up.sql",
 	}
 
 	for _, migration := range migrations {
@@ -141,24 +143,24 @@ func (tdb *TestDB) Cleanup() {
 	}
 }
 
-// GetUserByUsername retrieves a user by username from the database
-func (tdb *TestDB) GetUserByUsername(username string) (map[string]interface{}, error) {
-	query := "SELECT user_id, username, email, password_hash, status, created_at, updated_at FROM USERS WHERE username = ?"
-	row := tdb.DB.QueryRow(query, username)
+// GetUserByEmail retrieves a user by email from the database
+func (tdb *TestDB) GetUserByEmail(email string) (map[string]interface{}, error) {
+	query := "SELECT user_id, email, nickname, password_hash, status, created_at, updated_at FROM USERS WHERE email = ?"
+	row := tdb.DB.QueryRow(query, email)
 
 	var userID uint
-	var usernameVal, email, passwordHash, status string
+	var emailVal, nickname, passwordHash, status string
 	var createdAt, updatedAt time.Time
 
-	err := row.Scan(&userID, &usernameVal, &email, &passwordHash, &status, &createdAt, &updatedAt)
+	err := row.Scan(&userID, &emailVal, &nickname, &passwordHash, &status, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
 
 	return map[string]interface{}{
 		"user_id":       userID,
-		"username":      usernameVal,
-		"email":         email,
+		"email":         emailVal,
+		"nickname":      nickname,
 		"password_hash": passwordHash,
 		"status":        status,
 		"created_at":    createdAt,
