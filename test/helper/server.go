@@ -134,6 +134,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	deleteBuildVarUseCase := containerApp.NewDeleteBuildVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	addMountUseCase := containerApp.NewAddMountUseCase(containerRepo, containerPermissionSvc, volumeSvc, txManager, testLogger)
 	deleteMountUseCase := containerApp.NewDeleteMountUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	checkFQDNUseCase := containerApp.NewCheckFQDNUseCase(containerRepo, testLogger)
 
 	// Template UseCases
 	getTemplatesUseCase := containerApp.NewGetTemplatesUseCase(templateRepo, testLogger)
@@ -173,6 +174,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 		deleteBuildVarUseCase,
 		addMountUseCase,
 		deleteMountUseCase,
+		checkFQDNUseCase,
 		projectSvc,
 		volumeSvc,
 		containerSvc,

@@ -219,6 +219,7 @@ func provideGitHubHandler(
 	getInstallationUseCase *application.GetGitHubInstallationUseCase,
 	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
 	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	listBranchesUseCase *application.ListBranchesUseCase,
 	startInstallationUseCase *application.StartInstallationUseCase,
 	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	cfg *config.Config,
@@ -230,6 +231,7 @@ func provideGitHubHandler(
 		getInstallationUseCase,
 		generateTokenUseCase,
 		listRepositoriesUseCase,
+		listBranchesUseCase,
 		startInstallationUseCase,
 		installationCallbackUseCase,
 		cfg.Frontend.URL,
@@ -343,6 +345,7 @@ func InitializeApp() (*App, error) {
 		application.NewGetGitHubInstallationUseCase,
 		application.NewGenerateInstallationTokenUseCase,
 		application.NewListRepositoriesUseCase,
+		application.NewListBranchesUseCase,
 		application.NewStartInstallationUseCase,
 		application.NewInstallationCallbackUseCase,
 
@@ -433,6 +436,7 @@ func InitializeApp() (*App, error) {
 		containerApp.NewStreamBuildLogsUseCase,
 		containerApp.NewGetBuildLogHistoryUseCase,
 		containerApp.NewGetContainerSlugsByProjectIDUseCase,
+		containerApp.NewCheckFQDNUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,

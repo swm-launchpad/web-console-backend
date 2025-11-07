@@ -34,6 +34,7 @@ type ContainerHandler struct {
 	deleteBuildVarUC  *application.DeleteBuildVarUseCase
 	addMountUC        *application.AddMountUseCase
 	deleteMountUC     *application.DeleteMountUseCase
+	checkFQDNUC       *application.CheckFQDNUseCase
 	projectService    projectservice.ProjectService
 	volumeService     projectservice.VolumeService
 	containerService  containerservice.ContainerService
@@ -69,6 +70,7 @@ func NewContainerHandler(
 	deleteBuildVarUC *application.DeleteBuildVarUseCase,
 	addMountUC *application.AddMountUseCase,
 	deleteMountUC *application.DeleteMountUseCase,
+	checkFQDNUC *application.CheckFQDNUseCase,
 	projectService projectservice.ProjectService,
 	volumeService projectservice.VolumeService,
 	containerService containerservice.ContainerService,
@@ -94,6 +96,7 @@ func NewContainerHandler(
 		deleteBuildVarUC:  deleteBuildVarUC,
 		addMountUC:        addMountUC,
 		deleteMountUC:     deleteMountUC,
+		checkFQDNUC:       checkFQDNUC,
 		projectService:    projectService,
 		volumeService:     volumeService,
 		containerService:  containerService,
@@ -2029,4 +2032,46 @@ func (h *ContainerHandler) DeleteVolume(c *gin.Context) {
 	response.OK(c, map[string]interface{}{
 		"message": "volume deleted successfully",
 	})
+}
+
+// CheckFQDN handles checking if an FQDN is already in use
+func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
+	ctx := c.Request.Context()
+	fqdn := c.Query("fqdn")
+
+	h.logger.Debug(ctx, "check FQDN handler started",
+		zap.String("handler", "CheckFQDN"),
+		zap.String("fqdn", fqdn),
+	)
+
+	if fqdn == "" {
+		h.logger.Warn(ctx, "missing FQDN parameter",
+			zap.String("handler", "CheckFQDN"),
+		)
+		response.Error(c, containererrors.ErrMissingField, mapContainerError)
+		return
+	}
+
+	input := application.CheckFQDNInput{
+		FQDN: fqdn,
+	}
+
+	output, err := h.checkFQDNUC.Execute(ctx, input)
+	if err != nil {
+		h.logger.Error(ctx, "failed to check FQDN",
+			zap.Error(err),
+			zap.String("handler", "CheckFQDN"),
+			zap.String("fqdn", fqdn),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	h.logger.Debug(ctx, "check FQDN handler completed",
+		zap.String("handler", "CheckFQDN"),
+		zap.String("fqdn", fqdn),
+		zap.Bool("exists", output.Exists),
+	)
+
+	response.OK(c, output)
 }

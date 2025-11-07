@@ -154,6 +154,7 @@ func (r *Router) Setup() {
 			github.GET("/installations", r.githubHandler.GetInstallations)
 			github.DELETE("/installations/:installation_id", r.githubHandler.DisconnectGitHub)
 			github.GET("/installations/:installation_id/repositories", r.githubHandler.ListRepositories)
+			github.GET("/installations/:installation_id/repositories/:owner/:repo/branches", r.githubHandler.ListBranches)
 			github.POST("/token", r.githubHandler.GenerateInstallationToken)
 		}
 
@@ -242,6 +243,9 @@ func (r *Router) Setup() {
 			containers.POST("/:slug/build-log-token", r.buildLogHandler.CreateBuildLogToken)
 			containers.GET("/:slug/build-logs/history", r.buildLogHandler.GetBuildLogHistory)
 		}
+
+		// FQDN check endpoint (public - no auth required for checking availability)
+		v1.GET("/containers/check-fqdn", r.containerHandler.CheckFQDN)
 
 		// Build log streaming WebSocket endpoint (public with token validation)
 		// Placed outside auth middleware to allow token-based authentication via query param
