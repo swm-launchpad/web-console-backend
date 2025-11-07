@@ -15,10 +15,10 @@ import (
 // Service defines the interface for email operations
 type Service interface {
 	// SendVerificationEmail sends an email verification link to the user
-	SendVerificationEmail(ctx context.Context, email, username, token string) error
+	SendVerificationEmail(ctx context.Context, email, nickname, token string) error
 
 	// SendPasswordResetEmail sends a password reset link to the user
-	SendPasswordResetEmail(ctx context.Context, email, username, token string) error
+	SendPasswordResetEmail(ctx context.Context, email, nickname, token string) error
 }
 
 // service is the concrete implementation of Service
@@ -59,17 +59,17 @@ func NewService(host string, port int, username, password, from, frontendURL str
 }
 
 // SendVerificationEmail sends an email verification link
-func (s *service) SendVerificationEmail(ctx context.Context, email, username, token string) error {
+func (s *service) SendVerificationEmail(ctx context.Context, email, nickname, token string) error {
 	s.logger.Info(ctx, "email service send verification email started",
 		zap.String("email", email),
-		zap.String("username", username),
+		zap.String("nickname", nickname),
 	)
 
 	subject := "이메일 인증 - Launchpad Web Console"
 
 	// Create email body from template
 	body, err := s.renderTemplate("verification.html", map[string]string{
-		"Username":    username,
+		"Nickname":    nickname,
 		"Token":       token,
 		"FrontendURL": s.frontendURL,
 	})
@@ -96,17 +96,17 @@ func (s *service) SendVerificationEmail(ctx context.Context, email, username, to
 }
 
 // SendPasswordResetEmail sends a password reset link
-func (s *service) SendPasswordResetEmail(ctx context.Context, email, username, token string) error {
+func (s *service) SendPasswordResetEmail(ctx context.Context, email, nickname, token string) error {
 	s.logger.Info(ctx, "email service send password reset email started",
 		zap.String("email", email),
-		zap.String("username", username),
+		zap.String("nickname", nickname),
 	)
 
 	subject := "비밀번호 재설정 - Launchpad Web Console"
 
 	// Create email body from template
 	body, err := s.renderTemplate("password_reset.html", map[string]string{
-		"Username":    username,
+		"Nickname":    nickname,
 		"Token":       token,
 		"FrontendURL": s.frontendURL,
 	})
