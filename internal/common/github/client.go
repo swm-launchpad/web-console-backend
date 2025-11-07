@@ -328,7 +328,18 @@ func (c *Client) ListRepositories(installationID int64) ([]Repository, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to list repositories: status %d, body: %s", resp.StatusCode, string(body))
+		// Handle specific error cases
+		switch resp.StatusCode {
+		case http.StatusNotFound:
+			// Installation not found - app may have been uninstalled
+			return nil, fmt.Errorf("%w: status %d, body: %s", ErrInstallationNotFound, resp.StatusCode, string(body))
+		case http.StatusForbidden, http.StatusUnauthorized:
+			// Access forbidden - insufficient permissions
+			return nil, fmt.Errorf("%w: status %d, body: %s", ErrInstallationUnauthorized, resp.StatusCode, string(body))
+		default:
+			// Generic error for other status codes
+			return nil, fmt.Errorf("failed to list repositories: status %d, body: %s", resp.StatusCode, string(body))
+		}
 	}
 
 	var repoResp struct {
@@ -368,7 +379,18 @@ func (c *Client) ListBranches(installationID int64, owner, repo string) ([]Branc
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to list branches: status %d, body: %s", resp.StatusCode, string(body))
+		// Handle specific error cases
+		switch resp.StatusCode {
+		case http.StatusNotFound:
+			// Installation not found or repository not accessible
+			return nil, fmt.Errorf("%w: status %d, body: %s", ErrInstallationNotFound, resp.StatusCode, string(body))
+		case http.StatusForbidden, http.StatusUnauthorized:
+			// Access forbidden - insufficient permissions
+			return nil, fmt.Errorf("%w: status %d, body: %s", ErrInstallationUnauthorized, resp.StatusCode, string(body))
+		default:
+			// Generic error for other status codes
+			return nil, fmt.Errorf("failed to list branches: status %d, body: %s", resp.StatusCode, string(body))
+		}
 	}
 
 	var branches []Branch
