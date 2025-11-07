@@ -4,6 +4,8 @@ sql:
     queries: "query"
     schema:
       - "../../../../migration/000001_initial_schema.up.sql"
+      - "../../../../migration/000002_remove_project_fqdn_add_network_unique.up.sql"
+      - "../../../../migration/000003_username_to_email_login.up.sql"
     gen:
       go:
         package: "sqlc"
