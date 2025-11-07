@@ -23,12 +23,12 @@ func TestContainerWithoutVolume_E2E(t *testing.T) {
 	t.Run("볼륨 없이 컨테이너 생성 (일반 애플리케이션 템플릿)", func(t *testing.T) {
 		// Step 1: 사용자 등록
 		registerReq := map[string]string{
-			"username": "appuser",
-			"password": "TestPassword123!",
 			"email":    "app@example.com",
+			"password": "TestPassword123!",
+			"nickname": "App User",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var registerResp map[string]interface{}

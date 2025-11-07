@@ -23,13 +23,12 @@ func TestUserFlow_E2E(t *testing.T) {
 	t.Run("전체 사용자 플로우: 회원가입 → 로그인 → 프로필 조회", func(t *testing.T) {
 		// Step 1: 회원가입
 		registerReq := map[string]string{
-			"username": "e2euser",
-			"password": "TestPassword123!",
 			"email":    "e2e@example.com",
-			"name":     "E2E Test User",
+			"password": "TestPassword123!",
+			"nickname": "E2E Test User",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var registerResp map[string]interface{}
@@ -54,11 +53,11 @@ func TestUserFlow_E2E(t *testing.T) {
 
 		// Step 2: 로그인
 		loginReq := map[string]string{
-			"username": "e2euser",
+			"email":    "e2e@example.com",
 			"password": "TestPassword123!",
 		}
 
-		w = server.MakeRequest("POST", "/auth/login", loginReq)
+		w = server.MakeRequest("POST", "/api/v1/auth/login", loginReq)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var loginResp map[string]interface{}
@@ -71,9 +70,8 @@ func TestUserFlow_E2E(t *testing.T) {
 
 		// 로그인 응답 검증
 		assert.Equal(t, float64(userID), loginData["user_id"])
-		assert.Equal(t, "e2euser", loginData["username"])
 		assert.Equal(t, "e2e@example.com", loginData["email"])
-		assert.Equal(t, "E2E Test User", loginData["name"])
+		assert.Equal(t, "E2E Test User", loginData["nickname"])
 		assert.NotEmpty(t, loginData["token"])
 		assert.Equal(t, "Login successful", loginData["message"])
 
@@ -93,9 +91,8 @@ func TestUserFlow_E2E(t *testing.T) {
 
 		// 프로필 응답 검증
 		assert.Equal(t, float64(userID), profileData["user_id"])
-		assert.Equal(t, "e2euser", profileData["username"])
 		assert.Equal(t, "e2e@example.com", profileData["email"])
-		assert.Equal(t, "E2E Test User", profileData["name"])
+		assert.Equal(t, "E2E Test User", profileData["nickname"])
 		assert.Equal(t, "active", profileData["status"])
 		assert.NotEmpty(t, profileData["created_at"])
 
@@ -107,12 +104,12 @@ func TestUserFlow_E2E(t *testing.T) {
 	t.Run("잘못된 인증정보로 로그인 실패", func(t *testing.T) {
 		// 먼저 사용자 등록
 		registerReq := map[string]string{
-			"username": "failuser",
-			"password": "CorrectPassword123!",
 			"email":    "fail@example.com",
+			"password": "CorrectPassword123!",
+			"nickname": "failuser",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		// Activate user for testing
@@ -125,11 +122,11 @@ func TestUserFlow_E2E(t *testing.T) {
 
 		// 잘못된 비밀번호로 로그인 시도
 		loginReq := map[string]string{
-			"username": "failuser",
+			"email":    "fail@example.com",
 			"password": "WrongPassword123!",
 		}
 
-		w = server.MakeRequest("POST", "/auth/login", loginReq)
+		w = server.MakeRequest("POST", "/api/v1/auth/login", loginReq)
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 
 		var errorResp map[string]interface{}
@@ -141,55 +138,25 @@ func TestUserFlow_E2E(t *testing.T) {
 		assert.Contains(t, errorData["message"], "Invalid credentials")
 	})
 
-	t.Run("중복된 username으로 회원가입 실패", func(t *testing.T) {
-		// 첫 번째 사용자 등록
-		registerReq := map[string]string{
-			"username": "duplicateuser",
-			"password": "Password123!",
-			"email":    "first@example.com",
-		}
-
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
-		assert.Equal(t, http.StatusCreated, w.Code)
-
-		// 같은 username으로 두 번째 사용자 등록 시도
-		registerReq = map[string]string{
-			"username": "duplicateuser",
-			"password": "Password456!",
-			"email":    "second@example.com",
-		}
-
-		w = server.MakeRequest("POST", "/auth/register", registerReq)
-		assert.Equal(t, http.StatusConflict, w.Code)
-
-		var errorResp map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &errorResp)
-		require.NoError(t, err)
-		assert.False(t, errorResp["success"].(bool))
-		errorData := errorResp["error"].(map[string]interface{})
-		assert.Equal(t, "USERNAME_EXISTS", errorData["code"]) // Username exists
-		assert.Contains(t, errorData["message"], "already exists")
-	})
-
 	t.Run("중복된 email로 회원가입 실패", func(t *testing.T) {
 		// 첫 번째 사용자 등록
 		registerReq := map[string]string{
-			"username": "user1",
-			"password": "Password123!",
 			"email":    "duplicate@example.com",
+			"password": "Password123!",
+			"nickname": "user1",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		// 같은 email로 두 번째 사용자 등록 시도
 		registerReq = map[string]string{
-			"username": "user2",
-			"password": "Password456!",
 			"email":    "duplicate@example.com",
+			"password": "Password456!",
+			"nickname": "user2",
 		}
 
-		w = server.MakeRequest("POST", "/auth/register", registerReq)
+		w = server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusConflict, w.Code)
 
 		var errorResp map[string]interface{}
@@ -197,7 +164,7 @@ func TestUserFlow_E2E(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, errorResp["success"].(bool))
 		errorData := errorResp["error"].(map[string]interface{})
-		assert.Equal(t, "EMAIL_EXISTS", errorData["code"]) // Email exists
+		assert.Equal(t, "EMAIL_EXISTS", errorData["code"])
 		assert.Contains(t, errorData["message"], "already exists")
 	})
 
@@ -216,7 +183,7 @@ func TestUserFlow_E2E(t *testing.T) {
 
 	t.Run("ID로 다른 사용자 조회", func(t *testing.T) {
 		// 사용자 등록
-		userID, token := server.RegisterUser(t, "viewuser", "Password123!", "view@example.com")
+		userID, token := server.RegisterUser(t, "view@example.com", "Password123!", "viewuser")
 
 		// ID로 사용자 조회 (인증 필요)
 		w := server.MakeAuthRequest("GET", fmt.Sprintf("/api/v1/users/%d", userID), nil, token)
@@ -231,13 +198,13 @@ func TestUserFlow_E2E(t *testing.T) {
 		userData := userResp["data"].(map[string]interface{})
 
 		assert.Equal(t, float64(userID), userData["user_id"])
-		assert.Equal(t, "viewuser", userData["username"])
+		assert.Equal(t, "viewuser", userData["nickname"])
 		assert.Equal(t, "view@example.com", userData["email"])
 	})
 
 	t.Run("존재하지 않는 사용자 조회", func(t *testing.T) {
 		// 인증을 위한 사용자 생성
-		_, token := server.RegisterUser(t, "notfounduser", "Password123!", "notfound@example.com")
+		_, token := server.RegisterUser(t, "notfound@example.com", "Password123!", "notfounduser")
 
 		w := server.MakeAuthRequest("GET", "/api/v1/users/999999", nil, token)
 		assert.Equal(t, http.StatusNotFound, w.Code)
@@ -253,26 +220,26 @@ func TestUserFlow_E2E(t *testing.T) {
 
 	t.Run("잘못된 요청 형식 처리", func(t *testing.T) {
 		// 잘못된 JSON
-		w := server.MakeRequest("POST", "/auth/register", "invalid json")
+		w := server.MakeRequest("POST", "/api/v1/auth/register", "invalid json")
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
 		// 필수 필드 누락
 		incompleteReq := map[string]string{
-			"username": "incomplete",
-			// password와 email 누락
+			"email": "incomplete@example.com",
+			// password와 nickname 누락
 		}
 
-		w = server.MakeRequest("POST", "/auth/register", incompleteReq)
+		w = server.MakeRequest("POST", "/api/v1/auth/register", incompleteReq)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
 		// 짧은 비밀번호
 		weakPasswordReq := map[string]string{
-			"username": "weakpass",
-			"password": "123", // 최소 8자
 			"email":    "weak@example.com",
+			"password": "123", // 최소 8자
+			"nickname": "weakpass",
 		}
 
-		w = server.MakeRequest("POST", "/auth/register", weakPasswordReq)
+		w = server.MakeRequest("POST", "/api/v1/auth/register", weakPasswordReq)
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
@@ -284,12 +251,12 @@ func TestUserFlow_E2E(t *testing.T) {
 				defer func() { done <- true }()
 
 				registerReq := map[string]string{
-					"username": fmt.Sprintf("concurrent%d", index),
-					"password": "Password123!",
 					"email":    fmt.Sprintf("concurrent%d@example.com", index),
+					"password": "Password123!",
+					"nickname": fmt.Sprintf("concurrent%d", index),
 				}
 
-				w := server.MakeRequest("POST", "/auth/register", registerReq)
+				w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 				assert.Equal(t, http.StatusCreated, w.Code)
 			}(i)
 		}
@@ -301,18 +268,18 @@ func TestUserFlow_E2E(t *testing.T) {
 
 		// Activate all concurrently registered users
 		for i := 0; i < 5; i++ {
-			_, err := server.DB.DB.Exec("UPDATE USERS SET status = 'active' WHERE username = ?", fmt.Sprintf("concurrent%d", i))
+			_, err := server.DB.DB.Exec("UPDATE USERS SET status = 'active' WHERE email = ?", fmt.Sprintf("concurrent%d@example.com", i))
 			require.NoError(t, err)
 		}
 
 		// 등록된 사용자들 확인
 		for i := 0; i < 5; i++ {
 			loginReq := map[string]string{
-				"username": fmt.Sprintf("concurrent%d", i),
+				"email":    fmt.Sprintf("concurrent%d@example.com", i),
 				"password": "Password123!",
 			}
 
-			w := server.MakeRequest("POST", "/auth/login", loginReq)
+			w := server.MakeRequest("POST", "/api/v1/auth/login", loginReq)
 			assert.Equal(t, http.StatusOK, w.Code)
 		}
 	})
@@ -338,12 +305,12 @@ func TestPasswordSecurity_E2E(t *testing.T) {
 
 		for i, password := range weakPasswords {
 			registerReq := map[string]string{
-				"username": fmt.Sprintf("weak%d", i),
-				"password": password,
 				"email":    fmt.Sprintf("test%d@example.com", i),
+				"password": password,
+				"nickname": fmt.Sprintf("weak%d", i),
 			}
 
-			w := server.MakeRequest("POST", "/auth/register", registerReq)
+			w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 			assert.Equal(t, http.StatusBadRequest, w.Code, "Password should be rejected: %s (length: %d)", password, len(password))
 		}
 	})
@@ -362,12 +329,12 @@ func TestPasswordSecurity_E2E(t *testing.T) {
 
 		for i, password := range acceptablePasswords {
 			registerReq := map[string]string{
-				"username": fmt.Sprintf("accept%d", i),
-				"password": password,
 				"email":    fmt.Sprintf("accept%d@example.com", i),
+				"password": password,
+				"nickname": fmt.Sprintf("accept%d", i),
 			}
 
-			w := server.MakeRequest("POST", "/auth/register", registerReq)
+			w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 			assert.Equal(t, http.StatusCreated, w.Code, "Password should be accepted: %s (length: %d)", password, len(password))
 		}
 	})
@@ -378,20 +345,20 @@ func TestPasswordSecurity_E2E(t *testing.T) {
 
 		for i := 0; i < 2; i++ {
 			registerReq := map[string]string{
-				"username": fmt.Sprintf("hashtest%d", i),
-				"password": password,
 				"email":    fmt.Sprintf("hashtest%d@example.com", i),
+				"password": password,
+				"nickname": fmt.Sprintf("hashtest%d", i),
 			}
 
-			w := server.MakeRequest("POST", "/auth/register", registerReq)
+			w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 			require.Equal(t, http.StatusCreated, w.Code)
 		}
 
 		// DB에서 직접 해시 확인 (해시가 다른지 검증)
-		user1, err := server.DB.GetUserByUsername("hashtest0")
+		user1, err := server.DB.GetUserByEmail("hashtest0@example.com")
 		require.NoError(t, err)
 
-		user2, err := server.DB.GetUserByUsername("hashtest1")
+		user2, err := server.DB.GetUserByEmail("hashtest1@example.com")
 		require.NoError(t, err)
 
 		// 같은 비밀번호라도 해시는 달라야 함 (salt 때문)

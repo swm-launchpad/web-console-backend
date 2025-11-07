@@ -23,13 +23,12 @@ func TestContainerDeleteWithVolumes_E2E(t *testing.T) {
 	t.Run("컨테이너 삭제 시 모든 볼륨과 마운트도 삭제되어야 함", func(t *testing.T) {
 		// Step 1: Register user
 		registerReq := map[string]string{
-			"username": "volumedeleteuser",
-			"password": "TestPassword123!",
 			"email":    "volumedelete@example.com",
-			"name":     "Volume Delete Test User",
+			"password": "TestPassword123!",
+			"nickname": "Volume Delete Test User",
 		}
 
-		w := server.MakeRequest("POST", "/auth/register", registerReq)
+		w := server.MakeRequest("POST", "/api/v1/auth/register", registerReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
 
 		var registerResp map[string]interface{}
