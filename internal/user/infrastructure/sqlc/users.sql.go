@@ -13,17 +13,16 @@ import (
 
 const createUser = `-- name: CreateUser :execresult
 INSERT INTO USERS (
-    username, password_hash, password_updated_at,
-    name, email, phone, organization,
+    password_hash, password_updated_at,
+    nickname, email, phone, organization,
     status, is_deleted, deleted_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateUserParams struct {
-	Username          string         `json:"username"`
 	PasswordHash      string         `json:"password_hash"`
 	PasswordUpdatedAt sql.NullTime   `json:"password_updated_at"`
-	Name              sql.NullString `json:"name"`
+	Nickname          string         `json:"nickname"`
 	Email             string         `json:"email"`
 	Phone             sql.NullString `json:"phone"`
 	Organization      sql.NullString `json:"organization"`
@@ -36,10 +35,9 @@ type CreateUserParams struct {
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, createUser,
-		arg.Username,
 		arg.PasswordHash,
 		arg.PasswordUpdatedAt,
-		arg.Name,
+		arg.Nickname,
 		arg.Email,
 		arg.Phone,
 		arg.Organization,
@@ -80,21 +78,10 @@ func (q *Queries) ExistsByEmail(ctx context.Context, email string) (bool, error)
 	return user_exists, err
 }
 
-const existsByUsername = `-- name: ExistsByUsername :one
-SELECT EXISTS(SELECT 1 FROM USERS WHERE username = ? AND is_deleted = FALSE) as user_exists
-`
-
-func (q *Queries) ExistsByUsername(ctx context.Context, username string) (bool, error) {
-	row := q.db.QueryRowContext(ctx, existsByUsername, username)
-	var user_exists bool
-	err := row.Scan(&user_exists)
-	return user_exists, err
-}
-
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT
-    user_id, username, password_hash, password_updated_at,
-    name, email, phone, organization,
+    user_id, password_hash, password_updated_at,
+    nickname, email, phone, organization,
     status, is_deleted, deleted_at, created_at, updated_at
 FROM USERS
 WHERE email = ? AND is_deleted = FALSE
@@ -102,10 +89,9 @@ WHERE email = ? AND is_deleted = FALSE
 
 type GetUserByEmailRow struct {
 	UserID            uint32         `json:"user_id"`
-	Username          string         `json:"username"`
 	PasswordHash      string         `json:"password_hash"`
 	PasswordUpdatedAt sql.NullTime   `json:"password_updated_at"`
-	Name              sql.NullString `json:"name"`
+	Nickname          string         `json:"nickname"`
 	Email             string         `json:"email"`
 	Phone             sql.NullString `json:"phone"`
 	Organization      sql.NullString `json:"organization"`
@@ -121,10 +107,9 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 	var i GetUserByEmailRow
 	err := row.Scan(
 		&i.UserID,
-		&i.Username,
 		&i.PasswordHash,
 		&i.PasswordUpdatedAt,
-		&i.Name,
+		&i.Nickname,
 		&i.Email,
 		&i.Phone,
 		&i.Organization,
@@ -139,8 +124,8 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 
 const getUserByID = `-- name: GetUserByID :one
 SELECT
-    user_id, username, password_hash, password_updated_at,
-    name, email, phone, organization,
+    user_id, password_hash, password_updated_at,
+    nickname, email, phone, organization,
     status, is_deleted, deleted_at, created_at, updated_at
 FROM USERS
 WHERE user_id = ? AND is_deleted = FALSE
@@ -148,10 +133,9 @@ WHERE user_id = ? AND is_deleted = FALSE
 
 type GetUserByIDRow struct {
 	UserID            uint32         `json:"user_id"`
-	Username          string         `json:"username"`
 	PasswordHash      string         `json:"password_hash"`
 	PasswordUpdatedAt sql.NullTime   `json:"password_updated_at"`
-	Name              sql.NullString `json:"name"`
+	Nickname          string         `json:"nickname"`
 	Email             string         `json:"email"`
 	Phone             sql.NullString `json:"phone"`
 	Organization      sql.NullString `json:"organization"`
@@ -167,56 +151,9 @@ func (q *Queries) GetUserByID(ctx context.Context, userID uint32) (GetUserByIDRo
 	var i GetUserByIDRow
 	err := row.Scan(
 		&i.UserID,
-		&i.Username,
 		&i.PasswordHash,
 		&i.PasswordUpdatedAt,
-		&i.Name,
-		&i.Email,
-		&i.Phone,
-		&i.Organization,
-		&i.Status,
-		&i.IsDeleted,
-		&i.DeletedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT
-    user_id, username, password_hash, password_updated_at,
-    name, email, phone, organization,
-    status, is_deleted, deleted_at, created_at, updated_at
-FROM USERS
-WHERE username = ? AND is_deleted = FALSE
-`
-
-type GetUserByUsernameRow struct {
-	UserID            uint32         `json:"user_id"`
-	Username          string         `json:"username"`
-	PasswordHash      string         `json:"password_hash"`
-	PasswordUpdatedAt sql.NullTime   `json:"password_updated_at"`
-	Name              sql.NullString `json:"name"`
-	Email             string         `json:"email"`
-	Phone             sql.NullString `json:"phone"`
-	Organization      sql.NullString `json:"organization"`
-	Status            UsersStatus    `json:"status"`
-	IsDeleted         bool           `json:"is_deleted"`
-	DeletedAt         sql.NullTime   `json:"deleted_at"`
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         sql.NullTime   `json:"updated_at"`
-}
-
-func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUserByUsernameRow, error) {
-	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
-	var i GetUserByUsernameRow
-	err := row.Scan(
-		&i.UserID,
-		&i.Username,
-		&i.PasswordHash,
-		&i.PasswordUpdatedAt,
-		&i.Name,
+		&i.Nickname,
 		&i.Email,
 		&i.Phone,
 		&i.Organization,
@@ -231,7 +168,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (GetUs
 
 const updateUser = `-- name: UpdateUser :execresult
 UPDATE USERS SET
-    password_hash = ?, password_updated_at = ?, name = ?,
+    password_hash = ?, password_updated_at = ?, nickname = ?,
     email = ?, phone = ?, organization = ?,
     status = ?, is_deleted = ?, deleted_at = ?, updated_at = ?
 WHERE user_id = ?
@@ -240,7 +177,7 @@ WHERE user_id = ?
 type UpdateUserParams struct {
 	PasswordHash      string         `json:"password_hash"`
 	PasswordUpdatedAt sql.NullTime   `json:"password_updated_at"`
-	Name              sql.NullString `json:"name"`
+	Nickname          string         `json:"nickname"`
 	Email             string         `json:"email"`
 	Phone             sql.NullString `json:"phone"`
 	Organization      sql.NullString `json:"organization"`
@@ -255,7 +192,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (sql.Res
 	return q.db.ExecContext(ctx, updateUser,
 		arg.PasswordHash,
 		arg.PasswordUpdatedAt,
-		arg.Name,
+		arg.Nickname,
 		arg.Email,
 		arg.Phone,
 		arg.Organization,
