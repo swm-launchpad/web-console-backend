@@ -24,13 +24,12 @@ func TestUserService_CreateUser(t *testing.T) {
 		testLogger := logger.NewForTest()
 		service := NewUserService(mockRepo, testLogger)
 
-		username := "testuser"
 		email := "test@example.com"
 		passwordHash := "hashed_password"
-		name := "Test User"
+		nickname := "testnick"
 
 		mockRepo.On("Create", ctx, mock.MatchedBy(func(user *model.User) bool {
-			return user.Username == username &&
+			return user.Nickname == nickname &&
 				user.Email == email &&
 				user.PasswordHash == passwordHash &&
 				user.Status == model.UserStatusPending &&
@@ -38,61 +37,33 @@ func TestUserService_CreateUser(t *testing.T) {
 		})).Return(nil)
 
 		// Act
-		user, err := service.CreateUser(ctx, username, email, passwordHash, &name)
+		user, err := service.CreateUser(ctx, email, passwordHash, nickname)
 
 		// Assert
 		require.NoError(t, err)
 		assert.NotNil(t, user)
-		assert.Equal(t, username, user.Username)
 		assert.Equal(t, email, user.Email)
+		assert.Equal(t, nickname, user.Nickname)
 		assert.Equal(t, passwordHash, user.PasswordHash)
-		assert.Equal(t, name, *user.Name)
 		assert.Equal(t, model.UserStatusPending, user.Status)
 		assert.False(t, user.IsDeleted)
 
 		mockRepo.AssertExpectations(t)
 	})
 
-	t.Run("성공: name 없이 사용자 생성", func(t *testing.T) {
-		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		testLogger := logger.NewForTest()
-		service := NewUserService(mockRepo, testLogger)
-
-		username := "testuser2"
-		email := "test2@example.com"
-		passwordHash := "hashed_password2"
-
-		mockRepo.On("Create", ctx, mock.MatchedBy(func(user *model.User) bool {
-			return user.Username == username &&
-				user.Email == email &&
-				user.Name == nil
-		})).Return(nil)
-
-		// Act
-		user, err := service.CreateUser(ctx, username, email, passwordHash, nil)
-
-		// Assert
-		require.NoError(t, err)
-		assert.NotNil(t, user)
-		assert.Nil(t, user.Name)
-
-		mockRepo.AssertExpectations(t)
-	})
-
-	t.Run("실패: 빈 username", func(t *testing.T) {
+	t.Run("실패: 빈 nickname", func(t *testing.T) {
 		// Arrange
 		mockRepo := new(infrastructure.MockUserRepository)
 		testLogger := logger.NewForTest()
 		service := NewUserService(mockRepo, testLogger)
 
 		// Act
-		user, err := service.CreateUser(ctx, "", "test@example.com", "password", nil)
+		user, err := service.CreateUser(ctx, "test@example.com", "password", "")
 
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, user)
-		assert.Contains(t, err.Error(), "username is required")
+		assert.Contains(t, err.Error(), "nickname is required")
 
 		mockRepo.AssertNotCalled(t, "Create")
 	})
@@ -104,7 +75,7 @@ func TestUserService_CreateUser(t *testing.T) {
 		service := NewUserService(mockRepo, testLogger)
 
 		// Act
-		user, err := service.CreateUser(ctx, "testuser", "", "password", nil)
+		user, err := service.CreateUser(ctx, "", "password", "testnick")
 
 		// Assert
 		assert.Error(t, err)
@@ -120,14 +91,14 @@ func TestUserService_CreateUser(t *testing.T) {
 		testLogger := logger.NewForTest()
 		service := NewUserService(mockRepo, testLogger)
 
-		username := "testuser"
 		email := "test@example.com"
 		passwordHash := "hashed_password"
+		nickname := "testnick"
 
 		mockRepo.On("Create", ctx, mock.Anything).Return(errors.New("database error"))
 
 		// Act
-		user, err := service.CreateUser(ctx, username, email, passwordHash, nil)
+		user, err := service.CreateUser(ctx, email, passwordHash, nickname)
 
 		// Assert
 		assert.Error(t, err)
@@ -143,14 +114,14 @@ func TestUserService_CreateUser(t *testing.T) {
 		testLogger := logger.NewForTest()
 		service := NewUserService(mockRepo, testLogger)
 
-		username := "existing"
 		email := "existing@example.com"
 		passwordHash := "hashed_password"
+		nickname := "existing"
 
 		mockRepo.On("Create", ctx, mock.Anything).Return(usererrors.ErrUserAlreadyExists)
 
 		// Act
-		user, err := service.CreateUser(ctx, username, email, passwordHash, nil)
+		user, err := service.CreateUser(ctx, email, passwordHash, nickname)
 
 		// Assert
 		assert.Error(t, err)
@@ -173,7 +144,7 @@ func TestUserService_GetUserByID(t *testing.T) {
 		userID := uint(1)
 		expectedUser := &model.User{
 			UserID:   userID,
-			Username: "testuser",
+			Nickname: "testuser",
 			Email:    "test@example.com",
 		}
 
@@ -229,53 +200,6 @@ func TestUserService_GetUserByID(t *testing.T) {
 	})
 }
 
-func TestUserService_GetUserByUsername(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("성공: 유효한 username으로 사용자 조회", func(t *testing.T) {
-		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		testLogger := logger.NewForTest()
-		service := NewUserService(mockRepo, testLogger)
-
-		username := "testuser"
-		expectedUser := &model.User{
-			UserID:   1,
-			Username: username,
-			Email:    "test@example.com",
-		}
-
-		mockRepo.On("FindByUsername", ctx, username).Return(expectedUser, nil)
-
-		// Act
-		user, err := service.GetUserByUsername(ctx, username)
-
-		// Assert
-		require.NoError(t, err)
-		assert.NotNil(t, user)
-		assert.Equal(t, expectedUser, user)
-
-		mockRepo.AssertExpectations(t)
-	})
-
-	t.Run("실패: 빈 username", func(t *testing.T) {
-		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		testLogger := logger.NewForTest()
-		service := NewUserService(mockRepo, testLogger)
-
-		// Act
-		user, err := service.GetUserByUsername(ctx, "")
-
-		// Assert
-		assert.Error(t, err)
-		assert.Nil(t, user)
-		assert.Equal(t, ErrInvalidUserData, err)
-
-		mockRepo.AssertNotCalled(t, "FindByUsername")
-	})
-}
-
 func TestUserService_GetUserByEmail(t *testing.T) {
 	ctx := context.Background()
 
@@ -288,7 +212,7 @@ func TestUserService_GetUserByEmail(t *testing.T) {
 		email := "test@example.com"
 		expectedUser := &model.User{
 			UserID:   1,
-			Username: "testuser",
+			Nickname: "testuser",
 			Email:    email,
 		}
 
@@ -334,7 +258,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 
 		user := &model.User{
 			UserID:   1,
-			Username: "testuser",
+			Nickname: "testuser",
 			Email:    "test@example.com",
 		}
 
@@ -376,7 +300,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 
 		user := &model.User{
 			UserID:   0,
-			Username: "testuser",
+			Nickname: "testuser",
 			Email:    "test@example.com",
 		}
 
@@ -404,7 +328,7 @@ func TestUserService_ActivateUser(t *testing.T) {
 		now := time.Now()
 		user := &model.User{
 			UserID:    userID,
-			Username:  "testuser",
+			Nickname:  "testuser",
 			Email:     "test@example.com",
 			Status:    model.UserStatusPending,
 			IsDeleted: false,
@@ -454,7 +378,7 @@ func TestUserService_ActivateUser(t *testing.T) {
 		userID := uint(1)
 		user := &model.User{
 			UserID:    userID,
-			Username:  "testuser",
+			Nickname:  "testuser",
 			IsDeleted: true,
 		}
 
@@ -482,7 +406,7 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 
 		user := &model.User{
 			UserID:    1,
-			Username:  "testuser",
+			Nickname:  "testuser",
 			Status:    model.UserStatusActive,
 			IsDeleted: false,
 		}
@@ -516,7 +440,7 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 
 		user := &model.User{
 			UserID:    1,
-			Username:  "testuser",
+			Nickname:  "testuser",
 			Status:    model.UserStatusInactive,
 			IsDeleted: false,
 		}
@@ -537,7 +461,7 @@ func TestUserService_ValidateUserCredentials(t *testing.T) {
 
 		user := &model.User{
 			UserID:    1,
-			Username:  "testuser",
+			Nickname:  "testuser",
 			Status:    model.UserStatusActive,
 			IsDeleted: true,
 		}
@@ -564,7 +488,7 @@ func TestUserService_UpdatePassword(t *testing.T) {
 		newPasswordHash := "new_hashed_password"
 		user := &model.User{
 			UserID:       userID,
-			Username:     "testuser",
+			Nickname:     "testuser",
 			PasswordHash: "old_hashed_password",
 		}
 
@@ -598,85 +522,6 @@ func TestUserService_UpdatePassword(t *testing.T) {
 		// Assert
 		assert.Error(t, err)
 		assert.Equal(t, usererrors.ErrUserNotFound, err)
-
-		mockRepo.AssertExpectations(t)
-	})
-}
-
-func TestUserService_CheckUsernameAvailability(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("성공: username 사용 가능", func(t *testing.T) {
-		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		testLogger := logger.NewForTest()
-		service := NewUserService(mockRepo, testLogger)
-
-		username := "newuser"
-
-		mockRepo.On("ExistsByUsername", ctx, username).Return(false, nil)
-
-		// Act
-		err := service.CheckUsernameAvailability(ctx, username)
-
-		// Assert
-		require.NoError(t, err)
-
-		mockRepo.AssertExpectations(t)
-	})
-
-	t.Run("실패: 빈 username", func(t *testing.T) {
-		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		testLogger := logger.NewForTest()
-		service := NewUserService(mockRepo, testLogger)
-
-		// Act
-		err := service.CheckUsernameAvailability(ctx, "")
-
-		// Assert
-		assert.Error(t, err)
-		assert.Equal(t, ErrInvalidUserData, err)
-
-		mockRepo.AssertNotCalled(t, "ExistsByUsername")
-	})
-
-	t.Run("실패: username 이미 존재", func(t *testing.T) {
-		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		testLogger := logger.NewForTest()
-		service := NewUserService(mockRepo, testLogger)
-
-		username := "existinguser"
-
-		mockRepo.On("ExistsByUsername", ctx, username).Return(true, nil)
-
-		// Act
-		err := service.CheckUsernameAvailability(ctx, username)
-
-		// Assert
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "username already exists")
-
-		mockRepo.AssertExpectations(t)
-	})
-
-	t.Run("실패: repository 에러", func(t *testing.T) {
-		// Arrange
-		mockRepo := new(infrastructure.MockUserRepository)
-		testLogger := logger.NewForTest()
-		service := NewUserService(mockRepo, testLogger)
-
-		username := "testuser"
-
-		mockRepo.On("ExistsByUsername", ctx, username).Return(false, errors.New("database error"))
-
-		// Act
-		err := service.CheckUsernameAvailability(ctx, username)
-
-		// Assert
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "database error")
 
 		mockRepo.AssertExpectations(t)
 	})

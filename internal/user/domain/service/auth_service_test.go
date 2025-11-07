@@ -26,39 +26,36 @@ func TestAuthService_RegisterUser(t *testing.T) {
 		testLogger := logger.NewForTest()
 		service := NewAuthService(mockUserService, jwtUtil, passwordUtil, testLogger)
 
-		username := "testuser"
-		plainPassword := "password123"
 		email := "test@example.com"
-		name := "Test User"
+		plainPassword := "password123"
+		nickname := "testnick"
 		userID := uint(1)
 
 		// Mocking with expected password hash pattern
-		mockUserService.On("CheckUsernameAvailability", ctx, username).Return(nil)
 		mockUserService.On("CheckEmailAvailability", ctx, email).Return(nil)
-		mockUserService.On("CreateUser", ctx, username, email, mock.AnythingOfType("string"), &name).Return(&model.User{
+		mockUserService.On("CreateUser", ctx, email, mock.AnythingOfType("string"), nickname).Return(&model.User{
 			UserID:       userID,
-			Username:     username,
 			Email:        email,
-			Name:         &name,
+			Nickname:     nickname,
 			PasswordHash: "hashed",
 			Status:       model.UserStatusActive,
 		}, nil)
 
 		// Act
-		user, token, err := service.RegisterUser(ctx, username, plainPassword, email, &name)
+		user, token, err := service.RegisterUser(ctx, email, plainPassword, nickname)
 
 		// Assert
 		require.NoError(t, err)
 		assert.NotNil(t, user)
 		assert.Equal(t, userID, user.UserID)
-		assert.Equal(t, username, user.Username)
 		assert.Equal(t, email, user.Email)
+		assert.Equal(t, nickname, user.Nickname)
 		assert.NotEmpty(t, token)
 
 		mockUserService.AssertExpectations(t)
 	})
 
-	t.Run("실패: username 유효성 검증 실패", func(t *testing.T) {
+	t.Run("실패: nickname 유효성 검증 실패", func(t *testing.T) {
 		// Arrange
 		testLogger := logger.NewForTest()
 		service := NewAuthService(
@@ -69,16 +66,16 @@ func TestAuthService_RegisterUser(t *testing.T) {
 		)
 
 		// Act
-		user, token, err := service.RegisterUser(ctx, "", "password123", "test@example.com", nil)
+		user, token, err := service.RegisterUser(ctx, "test@example.com", "password123", "")
 
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		assert.Empty(t, token)
-		assert.Contains(t, err.Error(), "username is required")
+		assert.Contains(t, err.Error(), "nickname is required")
 	})
 
-	t.Run("실패: 짧은 username", func(t *testing.T) {
+	t.Run("실패: 짧은 nickname", func(t *testing.T) {
 		// Arrange
 		testLogger := logger.NewForTest()
 		service := NewAuthService(
@@ -89,13 +86,13 @@ func TestAuthService_RegisterUser(t *testing.T) {
 		)
 
 		// Act
-		user, token, err := service.RegisterUser(ctx, "ab", "password123", "test@example.com", nil)
+		user, token, err := service.RegisterUser(ctx, "test@example.com", "password123", "a")
 
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		assert.Empty(t, token)
-		assert.Contains(t, err.Error(), "username must be at least 3 characters long")
+		assert.Contains(t, err.Error(), "nickname must be at least 2 characters long")
 	})
 
 	t.Run("실패: 약한 비밀번호", func(t *testing.T) {
@@ -109,7 +106,7 @@ func TestAuthService_RegisterUser(t *testing.T) {
 		)
 
 		// Act
-		user, token, err := service.RegisterUser(ctx, "testuser", "pass", "test@example.com", nil)
+		user, token, err := service.RegisterUser(ctx, "test@example.com", "pass", "testnick")
 
 		// Assert
 		assert.Error(t, err)
@@ -129,39 +126,13 @@ func TestAuthService_RegisterUser(t *testing.T) {
 		)
 
 		// Act
-		user, token, err := service.RegisterUser(ctx, "testuser", "password123", "invalid-email", nil)
+		user, token, err := service.RegisterUser(ctx, "invalid-email", "password123", "testnick")
 
 		// Assert
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		assert.Empty(t, token)
 		assert.True(t, errors.Is(err, ErrInvalidEmail))
-	})
-
-	t.Run("실패: username 이미 존재", func(t *testing.T) {
-		// Arrange
-		mockUserService := new(MockUserService)
-		testLogger := logger.NewForTest()
-		service := NewAuthService(
-			mockUserService,
-			jwt.NewJWTUtil("test-secret"),
-			password.NewPasswordUtil(),
-			testLogger,
-		)
-
-		username := "existinguser"
-		mockUserService.On("CheckUsernameAvailability", ctx, username).Return(errors.New("username already exists"))
-
-		// Act
-		user, token, err := service.RegisterUser(ctx, username, "password123", "test@example.com", nil)
-
-		// Assert
-		assert.Error(t, err)
-		assert.Nil(t, user)
-		assert.Empty(t, token)
-		assert.Contains(t, err.Error(), "username already exists")
-
-		mockUserService.AssertExpectations(t)
 	})
 
 	t.Run("실패: email 이미 존재", func(t *testing.T) {
@@ -175,14 +146,11 @@ func TestAuthService_RegisterUser(t *testing.T) {
 			testLogger,
 		)
 
-		username := "testuser"
 		email := "existing@example.com"
-
-		mockUserService.On("CheckUsernameAvailability", ctx, username).Return(nil)
 		mockUserService.On("CheckEmailAvailability", ctx, email).Return(errors.New("email already exists"))
 
 		// Act
-		user, token, err := service.RegisterUser(ctx, username, "password123", email, nil)
+		user, token, err := service.RegisterUser(ctx, email, "password123", "testnick")
 
 		// Assert
 		assert.Error(t, err)
@@ -206,7 +174,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 		testLogger := logger.NewForTest()
 		service := NewAuthService(mockUserService, jwtUtil, passwordUtil, testLogger)
 
-		username := "testuser"
+		email := "test@example.com"
 		plainPassword := "password123"
 		// Hash the password for test
 		passwordHash, _ := passwordUtil.HashPassword(plainPassword)
@@ -214,17 +182,17 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 
 		expectedUser := &model.User{
 			UserID:       userID,
-			Username:     username,
-			Email:        "test@example.com",
+			Email:        email,
+			Nickname:     "testnick",
 			PasswordHash: passwordHash,
 			Status:       model.UserStatusActive,
 		}
 
-		mockUserService.On("GetUserByUsername", ctx, username).Return(expectedUser, nil)
+		mockUserService.On("GetUserByEmail", ctx, email).Return(expectedUser, nil)
 		mockUserService.On("ValidateUserCredentials", ctx, expectedUser).Return(nil)
 
 		// Act
-		user, token, err := service.AuthenticateUser(ctx, username, plainPassword)
+		user, token, err := service.AuthenticateUser(ctx, email, plainPassword)
 
 		// Assert
 		require.NoError(t, err)
@@ -235,7 +203,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 		mockUserService.AssertExpectations(t)
 	})
 
-	t.Run("실패: 빈 username", func(t *testing.T) {
+	t.Run("실패: 빈 email", func(t *testing.T) {
 		// Arrange
 		testLogger := logger.NewForTest()
 		service := NewAuthService(
@@ -252,7 +220,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		assert.Empty(t, token)
-		assert.Contains(t, err.Error(), "username is required")
+		assert.Contains(t, err.Error(), "email is required")
 	})
 
 	t.Run("실패: 빈 password", func(t *testing.T) {
@@ -266,7 +234,7 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 		)
 
 		// Act
-		user, token, err := service.AuthenticateUser(ctx, "testuser", "")
+		user, token, err := service.AuthenticateUser(ctx, "test@example.com", "")
 
 		// Assert
 		assert.Error(t, err)
@@ -286,11 +254,11 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 			testLogger,
 		)
 
-		username := "nonexistent"
-		mockUserService.On("GetUserByUsername", ctx, username).Return((*model.User)(nil), errors.New("user not found"))
+		email := "nonexistent@example.com"
+		mockUserService.On("GetUserByEmail", ctx, email).Return((*model.User)(nil), errors.New("user not found"))
 
 		// Act
-		user, token, err := service.AuthenticateUser(ctx, username, "password123")
+		user, token, err := service.AuthenticateUser(ctx, email, "password123")
 
 		// Assert
 		assert.Error(t, err)
@@ -312,18 +280,19 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 			testLogger,
 		)
 
-		username := "inactiveuser"
+		email := "inactive@example.com"
 		user := &model.User{
 			UserID:   1,
-			Username: username,
+			Email:    email,
+			Nickname: "inactive",
 			Status:   model.UserStatusInactive,
 		}
 
-		mockUserService.On("GetUserByUsername", ctx, username).Return(user, nil)
+		mockUserService.On("GetUserByEmail", ctx, email).Return(user, nil)
 		mockUserService.On("ValidateUserCredentials", ctx, user).Return(ErrUserNotActive)
 
 		// Act
-		resultUser, token, err := service.AuthenticateUser(ctx, username, "password123")
+		resultUser, token, err := service.AuthenticateUser(ctx, email, "password123")
 
 		// Assert
 		assert.Error(t, err)
@@ -346,23 +315,24 @@ func TestAuthService_AuthenticateUser(t *testing.T) {
 			testLogger,
 		)
 
-		username := "testuser"
+		email := "test@example.com"
 		correctPassword := "correct_password"
 		wrongPassword := "wrong_password"
 		passwordHash, _ := passwordUtil.HashPassword(correctPassword)
 
 		user := &model.User{
 			UserID:       1,
-			Username:     username,
+			Email:        email,
+			Nickname:     "testnick",
 			PasswordHash: passwordHash,
 			Status:       model.UserStatusActive,
 		}
 
-		mockUserService.On("GetUserByUsername", ctx, username).Return(user, nil)
+		mockUserService.On("GetUserByEmail", ctx, email).Return(user, nil)
 		mockUserService.On("ValidateUserCredentials", ctx, user).Return(nil)
 
 		// Act
-		resultUser, token, err := service.AuthenticateUser(ctx, username, wrongPassword)
+		resultUser, token, err := service.AuthenticateUser(ctx, email, wrongPassword)
 
 		// Assert
 		assert.Error(t, err)
@@ -379,50 +349,50 @@ func TestAuthService_ValidateRegistrationInput(t *testing.T) {
 	service := NewAuthService(nil, nil, nil, testLogger)
 
 	t.Run("성공: 유효한 입력", func(t *testing.T) {
-		err := service.ValidateRegistrationInput("testuser", "password123", "test@example.com")
+		err := service.ValidateRegistrationInput("test@example.com", "password123", "testnick")
 		assert.NoError(t, err)
 	})
 
-	t.Run("실패: 빈 username", func(t *testing.T) {
-		err := service.ValidateRegistrationInput("", "password123", "test@example.com")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "username is required")
-	})
-
-	t.Run("실패: 짧은 username", func(t *testing.T) {
-		err := service.ValidateRegistrationInput("ab", "password123", "test@example.com")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "username must be at least 3 characters long")
-	})
-
-	t.Run("실패: 빈 password", func(t *testing.T) {
-		err := service.ValidateRegistrationInput("testuser", "", "test@example.com")
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "password is required")
-	})
-
-	t.Run("실패: 짧은 password", func(t *testing.T) {
-		err := service.ValidateRegistrationInput("testuser", "pass", "test@example.com")
-		assert.Error(t, err)
-		assert.True(t, errors.Is(err, ErrWeakPassword))
-	})
-
 	t.Run("실패: 빈 email", func(t *testing.T) {
-		err := service.ValidateRegistrationInput("testuser", "password123", "")
+		err := service.ValidateRegistrationInput("", "password123", "testnick")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "email is required")
 	})
 
 	t.Run("실패: 잘못된 email 형식 - @ 없음", func(t *testing.T) {
-		err := service.ValidateRegistrationInput("testuser", "password123", "test.example.com")
+		err := service.ValidateRegistrationInput("test.example.com", "password123", "testnick")
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, ErrInvalidEmail))
 	})
 
 	t.Run("실패: 잘못된 email 형식 - . 없음", func(t *testing.T) {
-		err := service.ValidateRegistrationInput("testuser", "password123", "test@example")
+		err := service.ValidateRegistrationInput("test@example", "password123", "testnick")
 		assert.Error(t, err)
 		assert.True(t, errors.Is(err, ErrInvalidEmail))
+	})
+
+	t.Run("실패: 빈 password", func(t *testing.T) {
+		err := service.ValidateRegistrationInput("test@example.com", "", "testnick")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "password is required")
+	})
+
+	t.Run("실패: 짧은 password", func(t *testing.T) {
+		err := service.ValidateRegistrationInput("test@example.com", "pass", "testnick")
+		assert.Error(t, err)
+		assert.True(t, errors.Is(err, ErrWeakPassword))
+	})
+
+	t.Run("실패: 빈 nickname", func(t *testing.T) {
+		err := service.ValidateRegistrationInput("test@example.com", "password123", "")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "nickname is required")
+	})
+
+	t.Run("실패: 짧은 nickname", func(t *testing.T) {
+		err := service.ValidateRegistrationInput("test@example.com", "password123", "a")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "nickname must be at least 2 characters long")
 	})
 }
 
@@ -431,18 +401,18 @@ func TestAuthService_ValidateLoginInput(t *testing.T) {
 	service := NewAuthService(nil, nil, nil, testLogger)
 
 	t.Run("성공: 유효한 입력", func(t *testing.T) {
-		err := service.ValidateLoginInput("testuser", "password123")
+		err := service.ValidateLoginInput("test@example.com", "password123")
 		assert.NoError(t, err)
 	})
 
-	t.Run("실패: 빈 username", func(t *testing.T) {
+	t.Run("실패: 빈 email", func(t *testing.T) {
 		err := service.ValidateLoginInput("", "password123")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "username is required")
+		assert.Contains(t, err.Error(), "email is required")
 	})
 
 	t.Run("실패: 빈 password", func(t *testing.T) {
-		err := service.ValidateLoginInput("testuser", "")
+		err := service.ValidateLoginInput("test@example.com", "")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "password is required")
 	})
