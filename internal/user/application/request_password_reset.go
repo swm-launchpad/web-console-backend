@@ -50,7 +50,7 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, input Reques
 	)
 
 	var resetTokenStr string
-	var username string
+	var nickname string
 	var userEmail string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
@@ -80,7 +80,7 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, input Reques
 
 		// Store for email sending (outside transaction)
 		resetTokenStr = resetToken.Token
-		username = user.Username
+		nickname = user.Nickname
 		userEmail = user.Email
 
 		return nil
@@ -92,7 +92,7 @@ func (uc *RequestPasswordResetUseCase) Execute(ctx context.Context, input Reques
 	// Send password reset email (outside transaction)
 	// Only send if we have a token (i.e., user was found)
 	if resetTokenStr != "" {
-		if err := uc.emailService.SendPasswordResetEmail(ctx, userEmail, username, resetTokenStr); err != nil {
+		if err := uc.emailService.SendPasswordResetEmail(ctx, userEmail, nickname, resetTokenStr); err != nil {
 			uc.logger.Error(ctx, "failed to send password reset email",
 				zap.Error(err),
 				zap.String("email", userEmail),

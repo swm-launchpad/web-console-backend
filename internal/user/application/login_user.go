@@ -9,16 +9,15 @@ import (
 )
 
 type LoginUserInput struct {
-	Username string
+	Email    string
 	Password string
 }
 
 type LoginUserOutput struct {
 	UserID   uint
 	Token    string
-	Username string
 	Email    string
-	Name     string
+	Nickname string
 }
 
 type LoginUserUseCase struct {
@@ -35,15 +34,15 @@ func NewLoginUserUseCase(authService service.AuthService, log logger.Logger) *Lo
 
 func (uc *LoginUserUseCase) Execute(ctx context.Context, input LoginUserInput) (*LoginUserOutput, error) {
 	uc.logger.Info(ctx, "user login started",
-		zap.String("username", input.Username),
+		zap.String("email", input.Email),
 	)
 
 	// Authenticate user through AuthenticationService
-	user, token, err := uc.authService.AuthenticateUser(ctx, input.Username, input.Password)
+	user, token, err := uc.authService.AuthenticateUser(ctx, input.Email, input.Password)
 	if err != nil {
 		uc.logger.Error(ctx, "authentication failed",
 			zap.Error(err),
-			zap.String("username", input.Username),
+			zap.String("email", input.Email),
 		)
 		return nil, err
 	}
@@ -52,17 +51,13 @@ func (uc *LoginUserUseCase) Execute(ctx context.Context, input LoginUserInput) (
 	output := &LoginUserOutput{
 		UserID:   user.UserID,
 		Token:    token,
-		Username: user.Username,
 		Email:    user.Email,
-	}
-
-	if user.Name != nil {
-		output.Name = *user.Name
+		Nickname: user.Nickname,
 	}
 
 	uc.logger.Info(ctx, "user login completed",
 		zap.Uint("user_id", user.UserID),
-		zap.String("username", user.Username),
+		zap.String("email", user.Email),
 	)
 
 	return output, nil
