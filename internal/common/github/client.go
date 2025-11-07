@@ -349,8 +349,8 @@ func (c *Client) ListBranches(installationID int64, owner, repo string) ([]Branc
 		return nil, err
 	}
 
-	// Request to list branches
-	url := fmt.Sprintf("%s/repos/%s/%s/branches", githubAPIBaseURL, owner, repo)
+	// Request to list branches with per_page parameter (max 100)
+	url := fmt.Sprintf("%s/repos/%s/%s/branches?per_page=100", githubAPIBaseURL, owner, repo)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
