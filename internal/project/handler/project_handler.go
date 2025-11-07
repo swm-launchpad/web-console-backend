@@ -66,7 +66,7 @@ func NewProjectHandler(
 
 // CreateProjectRequest represents the request body for project creation
 type CreateProjectRequest struct {
-	Name         string  `json:"name" binding:"required,min=1,max=255"`
+	Name         string  `json:"name" binding:"required,min=1,max=32"`
 	Plan         *string `json:"plan,omitempty" binding:"omitempty,oneof=free eco pro"`
 	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=500,max=8000"`        // 0.5~8 cores, step 500m
 	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=512,max=16384"`    // 0.5~16GB, step 512Mi
@@ -305,7 +305,7 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 
 // UpdateProjectRequest represents the request body for project update
 type UpdateProjectRequest struct {
-	Name         *string `json:"name,omitempty" binding:"omitempty,min=1,max=255"`
+	Name         *string `json:"name,omitempty" binding:"omitempty,min=1,max=32"`
 	Plan         *string `json:"plan,omitempty" binding:"omitempty,oneof=free eco pro"`
 	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=500,max=8000"`        // 0.5~8 cores, step 500m
 	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=512,max=16384"`    // 0.5~16GB, step 512Mi

@@ -50,7 +50,7 @@ var commonErrorMap = map[error]ErrorMapping{
 	// These errors can occur when container handlers create volumes or interact with volume resources
 	projecterrors.ErrVolumeNotFound:          {StatusCode: http.StatusNotFound, Code: "VOLUME_NOT_FOUND", Message: "Volume not found"},
 	projecterrors.ErrVolumeNameRequired:      {StatusCode: http.StatusBadRequest, Code: "VOLUME_NAME_REQUIRED", Message: "Volume name is required"},
-	projecterrors.ErrInvalidVolumeName:       {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_NAME", Message: "Volume name must not exceed 255 characters"},
+	projecterrors.ErrInvalidVolumeName:       {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_NAME", Message: "Volume name must not exceed 32 characters"},
 	projecterrors.ErrInvalidVolumeID:         {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_ID", Message: "Invalid volume ID"},
 	projecterrors.ErrInvalidCapacity:         {StatusCode: http.StatusBadRequest, Code: "INVALID_CAPACITY", Message: "Invalid volume capacity"},
 	projecterrors.ErrVolumeCapacityTooSmall:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_CAPACITY_TOO_SMALL", Message: "Volume capacity must be at least 128Mi"},

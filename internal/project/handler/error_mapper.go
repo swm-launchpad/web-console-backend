@@ -66,7 +66,7 @@ var projectErrorMap = map[error]response.ErrorMapping{
 	projecterrors.ErrVolumeDiskLimitExceeded: {StatusCode: http.StatusBadRequest, Code: "VOLUME_DISK_LIMIT_EXCEEDED", Message: "Volume capacity exceeds project disk limit"},
 	projecterrors.ErrVolumeCapacityTooSmall:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_CAPACITY_TOO_SMALL", Message: "Volume capacity must be at least 128Mi"},
 	projecterrors.ErrVolumeCapacityExceeded:  {StatusCode: http.StatusBadRequest, Code: "VOLUME_CAPACITY_EXCEEDED", Message: "Volume capacity exceeds maximum allowed (2048Mi)"},
-	projecterrors.ErrInvalidVolumeName:       {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_NAME", Message: "Volume name must not exceed 255 characters"},
+	projecterrors.ErrInvalidVolumeName:       {StatusCode: http.StatusBadRequest, Code: "INVALID_VOLUME_NAME", Message: "Volume name must not exceed 32 characters"},
 	projecterrors.ErrMaxVolumesExceeded:      {StatusCode: http.StatusBadRequest, Code: "MAX_VOLUMES_EXCEEDED", Message: "Maximum number of volumes exceeded"},
 
 	// Infrastructure errors

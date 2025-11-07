@@ -1822,7 +1822,7 @@ func (h *ContainerHandler) ListVolumes(c *gin.Context) {
 
 // AddVolumeRequest represents the request body for adding a volume to a container
 type AddVolumeRequest struct {
-	Name      string `json:"name" binding:"required,min=1,max=255"`
+	Name      string `json:"name" binding:"required,min=1,max=32"`
 	Capacity  uint32 `json:"capacity" binding:"required,min=128,max=2048"`
 	MountPath string `json:"mount_path" binding:"required"`
 }
