@@ -27,10 +27,10 @@ var (
 
 // Validation errors - input validation and data integrity errors
 var (
-	ErrUsernameRequired = errors.New("username is required")
+	ErrNicknameRequired = errors.New("nickname is required")
 	ErrPasswordRequired = errors.New("password is required")
 	ErrEmailRequired    = errors.New("email is required")
-	ErrUsernameTooShort = errors.New("username must be at least 3 characters long")
+	ErrNicknameTooShort = errors.New("nickname must be at least 2 characters long")
 	ErrInvalidUserID    = errors.New("invalid user ID")
 	ErrPasswordEmpty    = errors.New("password cannot be empty")
 	ErrValidationFailed = errors.New("validation failed")
@@ -41,8 +41,7 @@ var (
 
 // Duplicate errors - errors for unique constraint violations
 var (
-	ErrUsernameExists = errors.New("username already exists")
-	ErrEmailExists    = errors.New("email already exists")
+	ErrEmailExists = errors.New("email already exists")
 )
 
 // Infrastructure errors - errors related to data persistence and external services
