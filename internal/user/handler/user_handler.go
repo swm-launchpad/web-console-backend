@@ -36,9 +36,8 @@ func NewUserHandler(
 // UserResponse represents the response for user profile
 type UserResponse struct {
 	UserID       uint   `json:"user_id"`
-	Username     string `json:"username"`
 	Email        string `json:"email"`
-	Name         string `json:"name,omitempty"`
+	Nickname     string `json:"nickname"`
 	Phone        string `json:"phone,omitempty"`
 	Organization string `json:"organization,omitempty"`
 	Status       string `json:"status"`
@@ -83,9 +82,8 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 
 	resp := UserResponse{
 		UserID:       output.UserID,
-		Username:     output.Username,
 		Email:        output.Email,
-		Name:         output.Name,
+		Nickname:     output.Nickname,
 		Phone:        output.Phone,
 		Organization: output.Organization,
 		Status:       output.Status,
@@ -145,9 +143,8 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 
 	resp := UserResponse{
 		UserID:       output.UserID,
-		Username:     output.Username,
 		Email:        output.Email,
-		Name:         output.Name,
+		Nickname:     output.Nickname,
 		Phone:        output.Phone,
 		Organization: output.Organization,
 		Status:       output.Status,
@@ -159,7 +156,7 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 
 // UpdateUserRequest represents the request for updating user profile
 type UpdateUserRequest struct {
-	Name         *string `json:"name"`
+	Nickname     *string `json:"nickname"`
 	Phone        *string `json:"phone"`
 	Organization *string `json:"organization"`
 }
@@ -193,7 +190,7 @@ func (h *UserHandler) UpdateCurrentUser(c *gin.Context) {
 
 	input := application.UpdateUserInput{
 		UserID:       userID.(uint),
-		Name:         req.Name,
+		Nickname:     req.Nickname,
 		Phone:        req.Phone,
 		Organization: req.Organization,
 	}
@@ -215,9 +212,8 @@ func (h *UserHandler) UpdateCurrentUser(c *gin.Context) {
 
 	resp := UserResponse{
 		UserID:       output.UserID,
-		Username:     output.Username,
 		Email:        output.Email,
-		Name:         output.Name,
+		Nickname:     output.Nickname,
 		Phone:        output.Phone,
 		Organization: output.Organization,
 		Status:       output.Status,

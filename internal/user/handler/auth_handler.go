@@ -29,10 +29,9 @@ func NewAuthHandler(
 
 // RegisterRequest represents the request body for user registration
 type RegisterRequest struct {
-	Username string `json:"username" binding:"required,min=3"`
-	Password string `json:"password" binding:"required,min=8"`
 	Email    string `json:"email" binding:"required,email"`
-	Name     string `json:"name"`
+	Password string `json:"password" binding:"required,min=8"`
+	Nickname string `json:"nickname" binding:"required,min=2"`
 }
 
 // RegisterResponse represents the response for user registration
@@ -64,10 +63,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	input := application.RegisterUserInput{
-		Username: req.Username,
-		Password: req.Password,
 		Email:    req.Email,
-		Name:     req.Name,
+		Password: req.Password,
+		Nickname: req.Nickname,
 	}
 
 	output, err := h.registerUseCase.Execute(ctx, input)
@@ -75,7 +73,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		h.logger.Error(ctx, "register use case failed",
 			zap.Error(err),
 			zap.String("handler", "Register"),
-			zap.String("username", req.Username),
+			zap.String("email", req.Email),
 		)
 		response.Error(c, err, mapUserError)
 		return
@@ -95,7 +93,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 // LoginRequest represents the request body for user login
 type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
 
@@ -103,9 +101,8 @@ type LoginRequest struct {
 type LoginResponse struct {
 	UserID   uint   `json:"user_id"`
 	Token    string `json:"token"`
-	Username string `json:"username"`
-	Email    string `json:"email,omitempty"`
-	Name     string `json:"name,omitempty"`
+	Email    string `json:"email"`
+	Nickname string `json:"nickname"`
 	Message  string `json:"message"`
 }
 
@@ -131,7 +128,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	input := application.LoginUserInput{
-		Username: req.Username,
+		Email:    req.Email,
 		Password: req.Password,
 	}
 
@@ -140,7 +137,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		h.logger.Error(ctx, "login use case failed",
 			zap.Error(err),
 			zap.String("handler", "Login"),
-			zap.String("username", req.Username),
+			zap.String("email", req.Email),
 		)
 		response.Error(c, err, mapUserError)
 		return
@@ -149,15 +146,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	h.logger.Info(ctx, "login handler completed successfully",
 		zap.String("handler", "Login"),
 		zap.Uint("user_id", output.UserID),
-		zap.String("username", output.Username),
+		zap.String("email", output.Email),
 	)
 
 	response.OK(c, LoginResponse{
 		UserID:   output.UserID,
 		Token:    output.Token,
-		Username: output.Username,
 		Email:    output.Email,
-		Name:     output.Name,
+		Nickname: output.Nickname,
 		Message:  "Login successful",
 	})
 }

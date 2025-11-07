@@ -45,12 +45,11 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		handler := NewAuthHandler(registerUseCase, nil, testLogger)
 
 		createdAt := time.Now()
-		name := "Test User"
+		nickname := "testnick"
 		user := &model.User{
 			UserID:    1,
-			Username:  "testuser",
 			Email:     "test@example.com",
-			Name:      &name,
+			Nickname:  nickname,
 			Status:    model.UserStatusPending,
 			CreatedAt: createdAt,
 		}
@@ -63,17 +62,17 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 			CreatedAt: time.Now(),
 		}
 
-		mockAuthService.On("RegisterUser", mock.Anything, "testuser", "password123", "test@example.com", &name).
+		mockAuthService.On("RegisterUser", mock.Anything, "test@example.com", "password123", nickname).
 			Return(user, "jwt_token", nil)
 		mockTokenService.On("CreateEmailVerificationToken", mock.Anything, uint(1)).
 			Return(verificationToken, nil)
-		mockEmailService.On("SendVerificationEmail", mock.Anything, "test@example.com", "testuser", verificationToken.Token).
+		mockEmailService.On("SendVerificationEmail", mock.Anything, "test@example.com", nickname, verificationToken.Token).
 			Return(nil)
 
 		router := gin.New()
 		router.POST("/auth/register", handler.Register)
 
-		body := `{"username":"testuser","password":"password123","email":"test@example.com","name":"Test User"}`
+		body := `{"email":"test@example.com","password":"password123","nickname":"testnick"}`
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest("POST", "/auth/register", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -95,97 +94,6 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		mockEmailService.AssertExpectations(t)
 	})
 
-	t.Run("성공: name 없이 등록", func(t *testing.T) {
-		mockAuthService := new(service.MockAuthService)
-		mockTokenService := new(service.MockTokenService)
-		mockEmailService := new(email.MockService)
-		testLogger := logger.NewForTest()
-		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
-		handler := NewAuthHandler(registerUseCase, nil, testLogger)
-
-		createdAt := time.Now()
-		user := &model.User{
-			UserID:    2,
-			Username:  "testuser2",
-			Email:     "test2@example.com",
-			Name:      nil,
-			Status:    model.UserStatusPending,
-			CreatedAt: createdAt,
-		}
-		verificationToken := &token.VerificationToken{
-			TokenID:   2,
-			UserID:    2,
-			Token:     "verification_token_456",
-			TokenType: token.TokenTypeEmailVerification,
-			ExpiresAt: time.Now().Add(24 * time.Hour),
-			CreatedAt: time.Now(),
-		}
-
-		mockAuthService.On("RegisterUser", mock.Anything, "testuser2", "password123", "test2@example.com", (*string)(nil)).
-			Return(user, "jwt_token", nil)
-		mockTokenService.On("CreateEmailVerificationToken", mock.Anything, uint(2)).
-			Return(verificationToken, nil)
-		mockEmailService.On("SendVerificationEmail", mock.Anything, "test2@example.com", "testuser2", verificationToken.Token).
-			Return(nil)
-
-		router := gin.New()
-		router.POST("/auth/register", handler.Register)
-
-		body := `{"username":"testuser2","password":"password123","email":"test2@example.com"}`
-		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/auth/register", strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusCreated, w.Code)
-
-		var response map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		require.NoError(t, err)
-		assert.True(t, response["success"].(bool))
-		data := response["data"].(map[string]interface{})
-		assert.Equal(t, float64(2), data["user_id"])
-		assert.Equal(t, "jwt_token", data["token"])
-
-		mockAuthService.AssertExpectations(t)
-		mockTokenService.AssertExpectations(t)
-		mockEmailService.AssertExpectations(t)
-	})
-
-	t.Run("실패: 중복된 username", func(t *testing.T) {
-		mockAuthService := new(service.MockAuthService)
-		mockTokenService := new(service.MockTokenService)
-		mockEmailService := new(email.MockService)
-		testLogger := logger.NewForTest()
-		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
-		handler := NewAuthHandler(registerUseCase, nil, testLogger)
-
-		name := "Test User"
-		mockAuthService.On("RegisterUser", mock.Anything, "existinguser", "password123", "test@example.com", &name).
-			Return((*model.User)(nil), "", usererrors.ErrUsernameExists)
-
-		router := gin.New()
-		router.POST("/auth/register", handler.Register)
-
-		body := `{"username":"existinguser","password":"password123","email":"test@example.com","name":"Test User"}`
-		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("POST", "/auth/register", strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusConflict, w.Code)
-
-		var response map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &response)
-		require.NoError(t, err)
-		assert.False(t, response["success"].(bool))
-		errorData := response["error"].(map[string]interface{})
-		assert.Equal(t, "USERNAME_EXISTS", errorData["code"])
-		assert.Contains(t, errorData["message"], "already exists")
-
-		mockAuthService.AssertExpectations(t)
-	})
-
 	t.Run("실패: 중복된 email", func(t *testing.T) {
 		mockAuthService := new(service.MockAuthService)
 		mockTokenService := new(service.MockTokenService)
@@ -194,14 +102,14 @@ func TestAuthHandler_Register_WithUseCase(t *testing.T) {
 		registerUseCase := application.NewRegisterUserUseCase(mockAuthService, mockTokenService, mockEmailService, txManager, testLogger)
 		handler := NewAuthHandler(registerUseCase, nil, testLogger)
 
-		name := "Test User"
-		mockAuthService.On("RegisterUser", mock.Anything, "testuser", "password123", "existing@example.com", &name).
+		nickname := "testnick"
+		mockAuthService.On("RegisterUser", mock.Anything, "existing@example.com", "password123", nickname).
 			Return((*model.User)(nil), "", usererrors.ErrEmailExists)
 
 		router := gin.New()
 		router.POST("/auth/register", handler.Register)
 
-		body := `{"username":"testuser","password":"password123","email":"existing@example.com","name":"Test User"}`
+		body := `{"email":"existing@example.com","password":"password123","nickname":"testnick"}`
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest("POST", "/auth/register", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -260,22 +168,21 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 		loginUseCase := application.NewLoginUserUseCase(mockAuthService, testLogger)
 		handler := NewAuthHandler(nil, loginUseCase, testLogger)
 
-		name := "Test User"
+		nickname := "testnick"
 		user := &model.User{
 			UserID:   1,
-			Username: "testuser",
 			Email:    "test@example.com",
-			Name:     &name,
+			Nickname: nickname,
 			Status:   model.UserStatusActive,
 		}
 
-		mockAuthService.On("AuthenticateUser", context.Background(), "testuser", "password123").
+		mockAuthService.On("AuthenticateUser", context.Background(), "test@example.com", "password123").
 			Return(user, "jwt_token", nil)
 
 		router := gin.New()
 		router.POST("/auth/login", handler.Login)
 
-		body := `{"username":"testuser","password":"password123"}`
+		body := `{"email":"test@example.com","password":"password123"}`
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest("POST", "/auth/login", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -290,9 +197,8 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 		data := response["data"].(map[string]interface{})
 		assert.Equal(t, float64(1), data["user_id"])
 		assert.Equal(t, "jwt_token", data["token"])
-		assert.Equal(t, "testuser", data["username"])
 		assert.Equal(t, "test@example.com", data["email"])
-		assert.Equal(t, "Test User", data["name"])
+		assert.Equal(t, nickname, data["nickname"])
 		assert.Equal(t, "Login successful", data["message"])
 
 		mockAuthService.AssertExpectations(t)
@@ -304,13 +210,13 @@ func TestAuthHandler_Login_WithUseCase(t *testing.T) {
 		loginUseCase := application.NewLoginUserUseCase(mockAuthService, testLogger)
 		handler := NewAuthHandler(nil, loginUseCase, testLogger)
 
-		mockAuthService.On("AuthenticateUser", context.Background(), "testuser", "wrongpassword").
+		mockAuthService.On("AuthenticateUser", context.Background(), "test@example.com", "wrongpassword").
 			Return((*model.User)(nil), "", service.ErrInvalidCredentials)
 
 		router := gin.New()
 		router.POST("/auth/login", handler.Login)
 
-		body := `{"username":"testuser","password":"wrongpassword"}`
+		body := `{"email":"test@example.com","password":"wrongpassword"}`
 		w := httptest.NewRecorder()
 		req, _ := http.NewRequest("POST", "/auth/login", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")

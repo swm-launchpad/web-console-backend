@@ -29,9 +29,8 @@ func stringPtr(s string) *string {
 // Response types for handler tests
 type GetCurrentUserResponse struct {
 	UserID       uint   `json:"user_id"`
-	Username     string `json:"username"`
 	Email        string `json:"email"`
-	Name         string `json:"name,omitempty"`
+	Nickname     string `json:"nickname"`
 	Phone        string `json:"phone,omitempty"`
 	Organization string `json:"organization,omitempty"`
 	Status       string `json:"status"`
@@ -40,9 +39,8 @@ type GetCurrentUserResponse struct {
 
 type GetUserByIDResponse struct {
 	UserID       uint   `json:"user_id"`
-	Username     string `json:"username"`
 	Email        string `json:"email"`
-	Name         string `json:"name,omitempty"`
+	Nickname     string `json:"nickname"`
 	Phone        string `json:"phone,omitempty"`
 	Organization string `json:"organization,omitempty"`
 	Status       string `json:"status"`
@@ -65,9 +63,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "currentuser",
+			Nickname:     "Current User",
 			Email:        "current@example.com",
-			Name:         stringPtr("Current User"),
 			Phone:        stringPtr("123-456-7890"),
 			Organization: stringPtr("Test Org"),
 			Status:       model.UserStatusActive,
@@ -100,9 +97,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		data := response["data"].(map[string]interface{})
 
 		assert.Equal(t, float64(userID), data["user_id"])
-		assert.Equal(t, "currentuser", data["username"])
 		assert.Equal(t, "current@example.com", data["email"])
-		assert.Equal(t, "Current User", data["name"])
+		assert.Equal(t, "Current User", data["nickname"])
 		assert.Equal(t, "123-456-7890", data["phone"])
 		assert.Equal(t, "Test Org", data["organization"])
 		assert.Equal(t, "active", data["status"])
@@ -201,9 +197,8 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "minimaluser",
+			Nickname:     "minimaluser",
 			Email:        "minimal@example.com",
-			Name:         nil,
 			Phone:        nil,
 			Organization: nil,
 			Status:       model.UserStatusPending,
@@ -236,10 +231,9 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		data := response["data"].(map[string]interface{})
 
 		assert.Equal(t, float64(userID), data["user_id"])
-		assert.Equal(t, "minimaluser", data["username"])
 		assert.Equal(t, "minimal@example.com", data["email"])
+		assert.Equal(t, "minimaluser", data["nickname"])
 		// Optional fields should be omitted when empty (due to json omitempty tag)
-		assert.Nil(t, data["name"])
 		assert.Nil(t, data["phone"])
 		assert.Nil(t, data["organization"])
 		assert.Equal(t, "pending", data["status"])
@@ -336,9 +330,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 
 		user := &model.User{
 			UserID:       userID,
-			Username:     "searchuser",
+			Nickname:     "Search User",
 			Email:        "search@example.com",
-			Name:         stringPtr("Search User"),
 			Phone:        stringPtr("987-654-3210"),
 			Organization: stringPtr("Search Corp"),
 			Status:       model.UserStatusActive,
@@ -368,9 +361,8 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		data := response["data"].(map[string]interface{})
 
 		assert.Equal(t, float64(userID), data["user_id"])
-		assert.Equal(t, "searchuser", data["username"])
 		assert.Equal(t, "search@example.com", data["email"])
-		assert.Equal(t, "Search User", data["name"])
+		assert.Equal(t, "Search User", data["nickname"])
 		assert.Equal(t, "987-654-3210", data["phone"])
 		assert.Equal(t, "Search Corp", data["organization"])
 		assert.Equal(t, "active", data["status"])

@@ -31,10 +31,10 @@ var userErrorMap = map[error]response.ErrorMapping{
 	usererrors.ErrTokenGenerationFailed: {StatusCode: http.StatusInternalServerError, Code: "TOKEN_GENERATION_FAILED", Message: "Failed to generate token"},
 
 	// Validation errors
-	usererrors.ErrUsernameRequired: {StatusCode: http.StatusBadRequest, Code: "USERNAME_REQUIRED", Message: "Username is required"},
+	usererrors.ErrNicknameRequired: {StatusCode: http.StatusBadRequest, Code: "NICKNAME_REQUIRED", Message: "Nickname is required"},
 	usererrors.ErrPasswordRequired: {StatusCode: http.StatusBadRequest, Code: "PASSWORD_REQUIRED", Message: "Password is required"},
 	usererrors.ErrEmailRequired:    {StatusCode: http.StatusBadRequest, Code: "EMAIL_REQUIRED", Message: "Email is required"},
-	usererrors.ErrUsernameTooShort: {StatusCode: http.StatusBadRequest, Code: "USERNAME_TOO_SHORT", Message: "Username must be at least 3 characters long"},
+	usererrors.ErrNicknameTooShort: {StatusCode: http.StatusBadRequest, Code: "NICKNAME_TOO_SHORT", Message: "Nickname must be at least 2 characters long"},
 	usererrors.ErrInvalidUserID:    {StatusCode: http.StatusBadRequest, Code: "INVALID_USER_ID", Message: "Invalid user ID"},
 	usererrors.ErrPasswordEmpty:    {StatusCode: http.StatusBadRequest, Code: "PASSWORD_EMPTY", Message: "Password cannot be empty"},
 	usererrors.ErrValidationFailed: {StatusCode: http.StatusBadRequest, Code: "VALIDATION_FAILED", Message: "Validation failed"},
@@ -43,8 +43,7 @@ var userErrorMap = map[error]response.ErrorMapping{
 	usererrors.ErrNoFieldsToUpdate: {StatusCode: http.StatusBadRequest, Code: "NO_FIELDS_TO_UPDATE", Message: "No fields to update"},
 
 	// Duplicate errors
-	usererrors.ErrUsernameExists: {StatusCode: http.StatusConflict, Code: "USERNAME_EXISTS", Message: "Username already exists"},
-	usererrors.ErrEmailExists:    {StatusCode: http.StatusConflict, Code: "EMAIL_EXISTS", Message: "Email already exists"},
+	usererrors.ErrEmailExists: {StatusCode: http.StatusConflict, Code: "EMAIL_EXISTS", Message: "Email already exists"},
 
 	// GitHub Installation errors
 	usererrors.ErrInstallationNotFound:     {StatusCode: http.StatusNotFound, Code: "INSTALLATION_NOT_FOUND", Message: "GitHub installation not found"},
