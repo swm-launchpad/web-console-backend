@@ -84,6 +84,7 @@ func TestDeployService_buildTektonRequest(t *testing.T) {
 	assert.Equal(t, "p2025011812000012345678", request.DeploymentConfigJSON.ServiceName) // Should use project slug, not hardcoded service name
 	assert.Equal(t, "test-namespace", request.DeploymentConfigJSON.Namespace)
 	assert.Equal(t, 180, request.DeploymentConfigJSON.StableWindow)
+	assert.Equal(t, "eco", request.DeploymentConfigJSON.Plan) // Should default to "eco" when plan is nil
 	assert.Len(t, request.DeploymentConfigJSON.Containers, 1)
 	assert.Equal(t, "app", request.DeploymentConfigJSON.Containers[0].Name)
 	assert.Empty(t, request.DeploymentConfigJSON.ConfigMaps) // ConfigMaps managed at project level (not yet implemented)
@@ -130,6 +131,7 @@ func TestDeployService_buildTektonRequest_WithVolumeMounts(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, request)
+	assert.Equal(t, "eco", request.DeploymentConfigJSON.Plan) // Should default to "eco" when plan is nil
 	assert.Len(t, request.DeploymentConfigJSON.Containers, 1)
 
 	// Verify volume mount was properly converted
@@ -143,6 +145,86 @@ func TestDeployService_buildTektonRequest_WithVolumeMounts(t *testing.T) {
 	assert.Len(t, request.DeploymentConfigJSON.Volumes, 1)
 	assert.Equal(t, "v2025011812000012345678", request.DeploymentConfigJSON.Volumes[0].Name)
 	assert.Equal(t, "1024Mi", *request.DeploymentConfigJSON.Volumes[0].Capacity)
+}
+
+func TestDeployService_buildTektonRequest_WithPlan(t *testing.T) {
+	// Arrange
+	service := &deployService{
+		deployNamespace:      "deploy-pipeline",
+		applicationNamespace: "test-namespace",
+		projectServiceName:   "test-service",
+	}
+
+	// Create project with Free plan
+	slug, _ := value.NewProjectSlug("p2025011812000012345678")
+	limits, _ := value.NewResourceLimits(500, 1024, 1024, 1000000)
+	now := time.Now()
+	freePlan := value.PlanFree
+	proj := projectmodel.ReconstructProject(
+		1,
+		"Free Project",
+		*slug,
+		value.ProjectStatusActive,
+		value.ProjectOperationStatusNothing,
+		nil,
+		&freePlan, // Set plan to free
+		*limits,
+		now,
+		now,
+		false,
+		nil,
+	)
+
+	containerConfig := &dto.ContainerDeploymentConfig{
+		Containers: []dto.ContainerInfo{
+			{
+				Name:            "app",
+				ImageName:       "957833999474.dkr.ecr.ap-northeast-2.amazonaws.com/nginx",
+				ImageTag:        "latest",
+				Port:            80,
+				HealthCheckType: "tcp",
+				CPULimit:        "500m",
+				MemoryRequest:   "512Mi",
+				MemoryLimit:     "1Gi",
+			},
+		},
+	}
+
+	volumes := []*volumemodel.Volume{}
+
+	// Act
+	request, err := service.buildTektonRequest(proj, containerConfig, volumes)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotNil(t, request)
+	assert.Equal(t, "free", request.DeploymentConfigJSON.Plan) // Should use project's plan
+	assert.Equal(t, "1", request.DeploymentConfigJSON.ProjectID)
+	assert.Equal(t, "p2025011812000012345678", request.DeploymentConfigJSON.ServiceName)
+	assert.Len(t, request.DeploymentConfigJSON.Containers, 1)
+
+	// Test with Pro plan
+	proPlan := value.PlanPro
+	proj2 := projectmodel.ReconstructProject(
+		2,
+		"Pro Project",
+		*slug,
+		value.ProjectStatusActive,
+		value.ProjectOperationStatusNothing,
+		nil,
+		&proPlan, // Set plan to pro
+		*limits,
+		now,
+		now,
+		false,
+		nil,
+	)
+
+	request2, err := service.buildTektonRequest(proj2, containerConfig, volumes)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, request2)
+	assert.Equal(t, "pro", request2.DeploymentConfigJSON.Plan) // Should use project's plan
 }
 
 func TestDeployService_buildTektonRequest_VolumeNotFound(t *testing.T) {

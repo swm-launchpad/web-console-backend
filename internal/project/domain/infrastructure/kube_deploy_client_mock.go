@@ -41,3 +41,11 @@ func (m *MockKubeClient) CheckApplicationPodsRunning(ctx context.Context, projec
 	args := m.Called(ctx, projectSlug)
 	return args.Bool(0), args.Error(1)
 }
+
+func (m *MockKubeClient) GetProjectPodStatus(ctx context.Context, projectID uint) (*dto.PodStatus, error) {
+	args := m.Called(ctx, projectID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*dto.PodStatus), args.Error(1)
+}

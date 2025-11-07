@@ -384,6 +384,7 @@ func InitializeApp() (*App, error) {
 		projectApp.NewDeployProjectUseCase,
 		projectApp.NewGetProjectStatusUseCase,
 		projectApp.NewRefreshProjectStatusUseCase,
+		projectApp.NewCheckProjectPodStatusUseCase,
 		projectApp.NewCreateProjectLogTokenUseCase,
 		projectApp.NewStreamProjectLogsUseCase,
 		projectApp.NewGetProjectLogHistoryUseCase,

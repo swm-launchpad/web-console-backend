@@ -29,7 +29,7 @@ import (
 // Kubernetes client to retrieve Pod logs.
 type kubeClient struct {
 	dynamicClient  dynamic.Interface
-	clientset      *kubernetes.Clientset
+	clientset      kubernetes.Interface
 	namespace      string
 	pipelineRunGVR schema.GroupVersionResource
 	taskRunGVR     schema.GroupVersionResource
@@ -647,4 +647,217 @@ func (k *kubeClient) CheckApplicationPodsRunning(ctx context.Context, projectSlu
 	)
 
 	return exists, nil
+}
+
+// calculatePodStatus computes kubectl-style status string for a pod.
+// This replicates the logic from kubectl's STATUS column.
+// Priority order (highest to lowest):
+// 1. Terminating (DeletionTimestamp set)
+// 2. Init container status (PodInitializing, or init container reasons)
+// 3. Container waiting reasons (ContainerCreating, CrashLoopBackOff, ImagePullBackOff, etc.)
+// 4. Container terminated reasons (Error, Completed, etc.)
+// 5. Pod phase (Pending, Running, Succeeded, Failed, Unknown)
+func calculatePodStatus(pod *corev1.Pod) (status string, reason string) {
+	// Priority 1: Check if pod is being terminated
+	if pod.DeletionTimestamp != nil {
+		return "Terminating", ""
+	}
+
+	// Priority 2: Check init container statuses
+	// If any init container is not terminated successfully, show its status
+	for i, initContainer := range pod.Status.InitContainerStatuses {
+		// Check if container is waiting
+		if initContainer.State.Waiting != nil && initContainer.State.Waiting.Reason != "" {
+			// Common init container waiting reasons
+			waitingReason := initContainer.State.Waiting.Reason
+			return waitingReason, waitingReason
+		}
+
+		// Check if container is terminated but not successful
+		if initContainer.State.Terminated != nil {
+			if initContainer.State.Terminated.ExitCode != 0 {
+				terminatedReason := initContainer.State.Terminated.Reason
+				if terminatedReason == "" {
+					terminatedReason = "Error"
+				}
+				return terminatedReason, terminatedReason
+			}
+		}
+
+		// Check if container is still running (shouldn't happen for init containers)
+		if initContainer.State.Running != nil {
+			// Still initializing
+			if i < len(pod.Status.InitContainerStatuses)-1 {
+				return "PodInitializing", "PodInitializing"
+			}
+		}
+
+		// If this init container completed successfully, check next one
+		// If it's the last init container and completed, fall through to main containers
+	}
+
+	// If all init containers completed but main containers haven't started yet
+	if len(pod.Status.InitContainerStatuses) > 0 {
+		allInitComplete := true
+		for _, initContainer := range pod.Status.InitContainerStatuses {
+			if initContainer.State.Terminated == nil || initContainer.State.Terminated.ExitCode != 0 {
+				allInitComplete = false
+				break
+			}
+		}
+		// If all init containers are done but no main container statuses yet
+		if allInitComplete && len(pod.Status.ContainerStatuses) == 0 {
+			return "PodInitializing", "PodInitializing"
+		}
+	}
+
+	// Priority 3 & 4: Check main container statuses
+	// Look for any container in Waiting or Terminated state with a reason
+	for _, container := range pod.Status.ContainerStatuses {
+		// Priority 3: Waiting state (ContainerCreating, CrashLoopBackOff, ImagePullBackOff, etc.)
+		if container.State.Waiting != nil && container.State.Waiting.Reason != "" {
+			waitingReason := container.State.Waiting.Reason
+			// Common waiting reasons to show
+			switch waitingReason {
+			case "ContainerCreating", "PodInitializing",
+				"CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull",
+				"CreateContainerError", "InvalidImageName", "CreateContainerConfigError":
+				return waitingReason, waitingReason
+			default:
+				// Return any other waiting reason as-is
+				return waitingReason, waitingReason
+			}
+		}
+
+		// Priority 4: Terminated state (Error, Completed, OOMKilled, etc.)
+		if container.State.Terminated != nil {
+			terminatedReason := container.State.Terminated.Reason
+			if terminatedReason == "" {
+				// Use exit code to determine reason
+				if container.State.Terminated.ExitCode == 0 {
+					terminatedReason = "Completed"
+				} else {
+					terminatedReason = "Error"
+				}
+			}
+			// Common terminated reasons
+			switch terminatedReason {
+			case "Completed", "Error", "OOMKilled", "ContainerCannotRun":
+				return terminatedReason, terminatedReason
+			default:
+				return terminatedReason, terminatedReason
+			}
+		}
+	}
+
+	// Priority 5: Fall back to pod phase
+	switch pod.Status.Phase {
+	case corev1.PodPending:
+		// If phase is Pending but no specific reason found, it's just pending
+		return "Pending", ""
+	case corev1.PodRunning:
+		// Pod is running
+		return "Running", ""
+	case corev1.PodSucceeded:
+		// Pod completed successfully
+		return "Completed", ""
+	case corev1.PodFailed:
+		// Pod failed
+		return "Error", ""
+	case corev1.PodUnknown:
+		return "Unknown", ""
+	default:
+		return "Unknown", ""
+	}
+}
+
+// GetProjectPodStatus retrieves the status of the application pod for a project
+func (k *kubeClient) GetProjectPodStatus(ctx context.Context, projectID uint) (*dto.PodStatus, error) {
+	// Get application namespace from environment
+	appNamespace := os.Getenv("KUBE_APPLICATION_NAMESPACE")
+	if appNamespace == "" {
+		appNamespace = "application"
+	}
+
+	k.logger.Info(ctx, "Getting project pod status",
+		zap.Uint("project_id", projectID),
+		zap.String("namespace", appNamespace),
+	)
+
+	// List pods with project-id label (no phase filter to get all pods)
+	pods, err := k.clientset.CoreV1().Pods(appNamespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("project-id=%d", projectID),
+	})
+
+	if err != nil {
+		k.logger.Error(ctx, "Failed to list project pods",
+			zap.Uint("project_id", projectID),
+			zap.String("namespace", appNamespace),
+			zap.Error(err),
+		)
+		return nil, projecterrors.ErrKubernetesUnavailable
+	}
+
+	// If no pods found, return exists=false
+	if len(pods.Items) == 0 {
+		k.logger.Info(ctx, "No pods found for project",
+			zap.Uint("project_id", projectID),
+			zap.String("namespace", appNamespace),
+		)
+		return &dto.PodStatus{
+			Exists:          false,
+			Phase:           "",
+			ReadyContainers: 0,
+			TotalContainers: 0,
+		}, nil
+	}
+
+	// If multiple pods exist (e.g., during rolling update or scale-up),
+	// select the most recently created pod (shortest runtime)
+	if len(pods.Items) > 1 {
+		sort.Slice(pods.Items, func(i, j int) bool {
+			// Sort by CreationTimestamp descending (most recent first)
+			return pods.Items[i].CreationTimestamp.After(pods.Items[j].CreationTimestamp.Time)
+		})
+		k.logger.Info(ctx, "Multiple pods found, selecting most recent",
+			zap.Uint("project_id", projectID),
+			zap.Int("pod_count", len(pods.Items)),
+			zap.String("selected_pod", pods.Items[0].Name),
+			zap.Time("creation_time", pods.Items[0].CreationTimestamp.Time),
+		)
+	}
+
+	pod := pods.Items[0]
+
+	// Count ready containers
+	readyContainers := 0
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.Ready {
+			readyContainers++
+		}
+	}
+
+	totalContainers := len(pod.Status.ContainerStatuses)
+
+	// Calculate kubectl-style status
+	status, reason := calculatePodStatus(&pod)
+
+	k.logger.Info(ctx, "Project pod status retrieved",
+		zap.Uint("project_id", projectID),
+		zap.String("namespace", appNamespace),
+		zap.String("status", status),
+		zap.String("phase", string(pod.Status.Phase)),
+		zap.String("reason", reason),
+		zap.Int("ready_containers", readyContainers),
+		zap.Int("total_containers", totalContainers),
+	)
+
+	return &dto.PodStatus{
+		Exists:          true,
+		Status:          status,
+		Phase:           string(pod.Status.Phase),
+		Reason:          reason,
+		ReadyContainers: readyContainers,
+		TotalContainers: totalContainers,
+	}, nil
 }
