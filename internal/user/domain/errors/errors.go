@@ -31,6 +31,7 @@ var (
 	ErrPasswordRequired = errors.New("password is required")
 	ErrEmailRequired    = errors.New("email is required")
 	ErrNicknameTooShort = errors.New("nickname must be at least 2 characters long")
+	ErrNicknameTooLong  = errors.New("nickname must not exceed 32 characters")
 	ErrInvalidUserID    = errors.New("invalid user ID")
 	ErrPasswordEmpty    = errors.New("password cannot be empty")
 	ErrValidationFailed = errors.New("validation failed")
