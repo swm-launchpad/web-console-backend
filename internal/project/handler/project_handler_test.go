@@ -65,9 +65,6 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		userID := uint(1)
 		projectName := "테스트 프로젝트"
 
-		// Mock expectations
-		mockProjectService.On("CountProjectsByUserID", ctx, userID).Return(0, nil)
-
 		slug, _ := value.NewProjectSlug("p2025011812000012345678")
 		project := createTestProject(uint(1), projectName, *slug, userID)
 
@@ -170,8 +167,6 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
-
-		mockProjectService.AssertNotCalled(t, "CountProjectsByUserID")
 	})
 
 	t.Run("실패: 프로젝트 한도 초과", func(t *testing.T) {
@@ -211,8 +206,14 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		userID := uint(1)
 		projectName := "테스트 프로젝트"
 
-		// Mock user already has 3 projects (limit reached)
-		mockProjectService.On("CountProjectsByUserID", ctx, userID).Return(3, nil)
+		// Mock CreateProject to return project limit exceeded error
+		cpuLimit := uint32(1000)
+		memoryLimit := uint32(2048)
+		diskLimit := uint32(2048)
+		trafficLimit := uint32(1048576)
+		expectedLimits, _ := value.NewResourceLimits(cpuLimit, memoryLimit, diskLimit, trafficLimit)
+		plan := value.PlanEco
+		mockProjectService.On("CreateProject", ctx, projectName, userID, *expectedLimits, &plan).Return(nil, projecterrors.ErrProjectLimitExceeded)
 
 		router := gin.New()
 		router.POST("/projects", func(c *gin.Context) {
