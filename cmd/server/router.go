@@ -242,10 +242,10 @@ func (r *Router) Setup() {
 			// Build logs
 			containers.POST("/:slug/build-log-token", r.buildLogHandler.CreateBuildLogToken)
 			containers.GET("/:slug/build-logs/history", r.buildLogHandler.GetBuildLogHistory)
-		}
 
-		// FQDN check endpoint (public - no auth required for checking availability)
-		v1.GET("/containers/check-fqdn", r.containerHandler.CheckFQDN)
+			// FQDN check endpoint (requires authentication)
+			containers.GET("/check-fqdn", r.containerHandler.CheckFQDN)
+		}
 
 		// Build log streaming WebSocket endpoint (public with token validation)
 		// Placed outside auth middleware to allow token-based authentication via query param
