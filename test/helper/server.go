@@ -106,7 +106,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	mockContainerSlugProvider.On("GetContainerSlugsByProjectID", mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
 	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 	projectQueries := projectSqlc.New(testDB.DB)
-	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc, projectQueries, testLogger)
+	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc, projectQueries, settingsSvc, testLogger)
 
 	// Container dependencies
 	containerRepo := containerInfra.NewContainerRepository(testDB.DB, testLogger)

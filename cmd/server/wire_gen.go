@@ -120,7 +120,7 @@ func InitializeApp() (*App, error) {
 	containerSlugProvider := infrastructure3.NewContainerSlugProvider(getContainerSlugsByProjectIDUseCase, logger)
 	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, tektonCleanupClient, containerSlugProvider, txManager, logger)
 	queries := provideProjectQueries(db)
-	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, queries, logger)
+	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, queries, settingsService, logger)
 	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
 	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService, settingsService, logger)
 	string2 := provideJWTSecret(configConfig)

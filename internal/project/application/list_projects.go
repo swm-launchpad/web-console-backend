@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	"github.com/swm-launchpad/web-console-backend/internal/common/settings"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 	"go.uber.org/zap"
@@ -38,19 +39,26 @@ type ProjectListItem struct {
 type ListProjectsOutput struct {
 	Projects []ProjectListItem `json:"projects"`
 	Total    int               `json:"total"`
+	Meta     *ListProjectsMeta `json:"meta,omitempty"`
+}
+
+type ListProjectsMeta struct {
+	MaxProjectsPerUser int `json:"max_projects_per_user"`
 }
 
 type ListProjectsUseCase struct {
-	projectService service.ProjectService
-	queries        *sqlc.Queries
-	logger         logger.Logger
+	projectService  service.ProjectService
+	queries         *sqlc.Queries
+	settingsService settings.SettingsService
+	logger          logger.Logger
 }
 
-func NewListProjectsUseCase(projectService service.ProjectService, queries *sqlc.Queries, log logger.Logger) *ListProjectsUseCase {
+func NewListProjectsUseCase(projectService service.ProjectService, queries *sqlc.Queries, settingsService settings.SettingsService, log logger.Logger) *ListProjectsUseCase {
 	return &ListProjectsUseCase{
-		projectService: projectService,
-		queries:        queries,
-		logger:         log,
+		projectService:  projectService,
+		queries:         queries,
+		settingsService: settingsService,
+		logger:          log,
 	}
 }
 
@@ -104,10 +112,26 @@ func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsIn
 		}
 	}
 
+	// Get max projects per user setting
+	maxProjectsPerUser := 3 // default value
+	if uc.settingsService != nil {
+		if maxProjects, err := uc.settingsService.GetMaxProjectsPerUser(); err == nil {
+			maxProjectsPerUser = maxProjects
+		} else {
+			uc.logger.Warn(ctx, "failed to get max_projects_per_user setting, using default",
+				zap.Error(err),
+				zap.Int("default_value", maxProjectsPerUser),
+			)
+		}
+	}
+
 	// Build output
 	output := &ListProjectsOutput{
 		Projects: make([]ProjectListItem, 0, len(projects)),
 		Total:    len(projects),
+		Meta: &ListProjectsMeta{
+			MaxProjectsPerUser: maxProjectsPerUser,
+		},
 	}
 
 	for _, project := range projects {
