@@ -111,23 +111,37 @@ func (uc *ListBranchesUseCase) Execute(ctx context.Context, input ListBranchesIn
 	// List branches using GitHub API
 	branches, err := uc.githubClient.ListBranches(input.InstallationID, input.Owner, input.Repo)
 	if err != nil {
-		// Check if the error is due to installation being revoked or unauthorized
-		if errors.Is(err, github.ErrInstallationNotFound) {
-			uc.logger.Error(ctx, "installation not found in GitHub, marking as revoked",
+		// Handle repository-level errors (do NOT mark installation as revoked)
+		if errors.Is(err, github.ErrRepositoryNotFound) {
+			uc.logger.Warn(ctx, "repository not found or not accessible",
+				zap.Error(err),
+				zap.Int64("installation_id", input.InstallationID),
+				zap.String("owner", input.Owner),
+				zap.String("repo", input.Repo),
+			)
+			return nil, usererrors.ErrRepositoryNotFound
+		}
+		if errors.Is(err, github.ErrRepositoryAccessDenied) {
+			uc.logger.Warn(ctx, "repository access denied (not granted to installation)",
+				zap.Error(err),
+				zap.Int64("installation_id", input.InstallationID),
+				zap.String("owner", input.Owner),
+				zap.String("repo", input.Repo),
+			)
+			return nil, usererrors.ErrRepositoryAccessDenied
+		}
+
+		// Handle installation-level errors (mark installation as revoked)
+		if errors.Is(err, github.ErrInstallationUnauthorized) {
+			uc.logger.Error(ctx, "installation token unauthorized, marking as revoked",
 				zap.Error(err),
 				zap.Int64("installation_id", input.InstallationID),
 			)
 			_ = uc.installationRepo.MarkAsRevoked(ctx, input.InstallationID)
 			return nil, usererrors.ErrInstallationRevoked
 		}
-		if errors.Is(err, github.ErrInstallationUnauthorized) {
-			uc.logger.Error(ctx, "installation unauthorized in GitHub, marking as revoked",
-				zap.Error(err),
-				zap.Int64("installation_id", input.InstallationID),
-			)
-			_ = uc.installationRepo.MarkAsRevoked(ctx, input.InstallationID)
-			return nil, usererrors.ErrInstallationUnauthorized
-		}
+
+		// Generic GitHub API failure
 		uc.logger.Error(ctx, "failed to list branches from GitHub API",
 			zap.Error(err),
 			zap.Uint("user_id", input.UserID),

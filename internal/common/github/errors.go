@@ -9,6 +9,8 @@ var (
 	ErrInvalidInstallationID    = errors.New("invalid installation ID")
 	ErrInstallationNotFound     = errors.New("GitHub installation not found (app may be uninstalled)")
 	ErrInstallationUnauthorized = errors.New("unauthorized to access GitHub installation")
+	ErrRepositoryNotFound       = errors.New("repository not found or not accessible")
+	ErrRepositoryAccessDenied   = errors.New("repository access denied (not granted to installation)")
 	ErrTokenExpired             = errors.New("token has expired")
 	ErrMissingAppID             = errors.New("GitHub App ID is required")
 	ErrMissingPrivateKey        = errors.New("GitHub App private key path is required")

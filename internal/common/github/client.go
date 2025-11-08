@@ -382,10 +382,16 @@ func (c *Client) ListBranches(installationID int64, owner, repo string) ([]Branc
 		// Handle specific error cases
 		switch resp.StatusCode {
 		case http.StatusNotFound:
-			// Installation not found or repository not accessible
-			return nil, fmt.Errorf("%w: status %d, body: %s", ErrInstallationNotFound, resp.StatusCode, string(body))
-		case http.StatusForbidden, http.StatusUnauthorized:
-			// Access forbidden - insufficient permissions
+			// 404 means repository not found, owner/repo typo, or repo deleted
+			// This is a repository-level error, not an installation-level error
+			return nil, fmt.Errorf("%w: status %d, body: %s", ErrRepositoryNotFound, resp.StatusCode, string(body))
+		case http.StatusForbidden:
+			// 403 means repository exists but not accessible (not granted to installation)
+			// This is a repository-level permission error
+			return nil, fmt.Errorf("%w: status %d, body: %s", ErrRepositoryAccessDenied, resp.StatusCode, string(body))
+		case http.StatusUnauthorized:
+			// 401 means installation token is invalid/revoked
+			// This is an installation-level error
 			return nil, fmt.Errorf("%w: status %d, body: %s", ErrInstallationUnauthorized, resp.StatusCode, string(body))
 		default:
 			// Generic error for other status codes
