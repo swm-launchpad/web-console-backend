@@ -2,9 +2,11 @@ package application
 
 import (
 	"context"
+	"strings"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 	"go.uber.org/zap"
 )
 
@@ -12,18 +14,25 @@ type ListProjectsInput struct {
 	UserID uint
 }
 
+type ProjectSummary struct {
+	ContainerCount int      `json:"container_count"`
+	DomainCount    int      `json:"domain_count"`
+	Domains        []string `json:"domains,omitempty"`
+}
+
 type ProjectListItem struct {
-	ProjectID    uint   `json:"project_id"`
-	Name         string `json:"name"`
-	Slug         string `json:"slug"`
-	Plan         string `json:"plan,omitempty"`
-	Status       string `json:"status"`
-	CPULimit     uint32 `json:"cpu_limit"`
-	MemoryLimit  uint32 `json:"memory_limit"`
-	DiskLimit    uint32 `json:"disk_limit"`
-	TrafficLimit uint32 `json:"traffic_limit"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
+	ProjectID    uint            `json:"project_id"`
+	Name         string          `json:"name"`
+	Slug         string          `json:"slug"`
+	Plan         string          `json:"plan,omitempty"`
+	Status       string          `json:"status"`
+	CPULimit     uint32          `json:"cpu_limit"`
+	MemoryLimit  uint32          `json:"memory_limit"`
+	DiskLimit    uint32          `json:"disk_limit"`
+	TrafficLimit uint32          `json:"traffic_limit"`
+	CreatedAt    string          `json:"created_at"`
+	UpdatedAt    string          `json:"updated_at"`
+	Summary      *ProjectSummary `json:"summary,omitempty"`
 }
 
 type ListProjectsOutput struct {
@@ -33,12 +42,14 @@ type ListProjectsOutput struct {
 
 type ListProjectsUseCase struct {
 	projectService service.ProjectService
+	queries        *sqlc.Queries
 	logger         logger.Logger
 }
 
-func NewListProjectsUseCase(projectService service.ProjectService, log logger.Logger) *ListProjectsUseCase {
+func NewListProjectsUseCase(projectService service.ProjectService, queries *sqlc.Queries, log logger.Logger) *ListProjectsUseCase {
 	return &ListProjectsUseCase{
 		projectService: projectService,
+		queries:        queries,
 		logger:         log,
 	}
 }
@@ -56,6 +67,41 @@ func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsIn
 			zap.Uint("user_id", input.UserID),
 		)
 		return nil, err
+	}
+
+	// Extract project IDs for summary query
+	projectIDs := make([]uint32, 0, len(projects))
+	for _, project := range projects {
+		projectIDs = append(projectIDs, uint32(project.ProjectID()))
+	}
+
+	// Get project summaries (container count, domain count, domains)
+	var summaryMap map[uint32]*ProjectSummary
+	if len(projectIDs) > 0 && uc.queries != nil {
+		summaries, err := uc.queries.GetProjectsSummary(ctx, projectIDs)
+		if err != nil {
+			uc.logger.Error(ctx, "failed to get projects summary",
+				zap.Error(err),
+				zap.Uint("user_id", input.UserID),
+			)
+			// Don't fail the entire request, just log the error
+			// Projects will be returned without summary
+		} else {
+			// Build summary map for fast lookup
+			summaryMap = make(map[uint32]*ProjectSummary, len(summaries))
+			for _, s := range summaries {
+				var domains []string
+				if s.Domains.Valid && s.Domains.String != "" {
+					domains = strings.Split(s.Domains.String, ",")
+				}
+
+				summaryMap[s.ProjectID] = &ProjectSummary{
+					ContainerCount: int(s.ContainerCount),
+					DomainCount:    int(s.DomainCount),
+					Domains:        domains,
+				}
+			}
+		}
 	}
 
 	// Build output
@@ -80,6 +126,13 @@ func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsIn
 
 		if plan, ok := project.Plan(); ok {
 			item.Plan = plan.String()
+		}
+
+		// Add summary if available
+		if summaryMap != nil {
+			if summary, ok := summaryMap[uint32(project.ProjectID())]; ok {
+				item.Summary = summary
+			}
 		}
 
 		output.Projects = append(output.Projects, item)

@@ -202,6 +202,11 @@ func provideDeployService(
 	)
 }
 
+// provideProjectQueries creates project sqlc queries
+func provideProjectQueries(db projectSqlc.DBTX) *projectSqlc.Queries {
+	return projectSqlc.New(db)
+}
+
 // provideGitHubClient creates a GitHub client from config
 // Returns nil if GitHub App credentials are not configured
 func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
@@ -354,6 +359,7 @@ func InitializeApp() (*App, error) {
 		projectRepo.NewVolumeRepository,
 		projectRepo.NewDeploymentRepository,
 		projectRepo.NewBuildHistoryRepository,
+		provideProjectQueries,
 		provideTektonDeployClient,
 		provideKubeDeployClient,
 		provideContainerClient,

@@ -20,7 +20,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 	t.Run("성공: 사용자의 프로젝트 목록 조회", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
-		uc := NewListProjectsUseCase(mockProjectService, testLogger)
+		uc := NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		userID := uint(1)
 		input := ListProjectsInput{
@@ -58,7 +58,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 	t.Run("성공: 빈 프로젝트 목록", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
-		uc := NewListProjectsUseCase(mockProjectService, testLogger)
+		uc := NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		userID := uint(1)
 		input := ListProjectsInput{
@@ -79,7 +79,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 	t.Run("성공: 단일 프로젝트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
-		uc := NewListProjectsUseCase(mockProjectService, testLogger)
+		uc := NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		userID := uint(1)
 		input := ListProjectsInput{
@@ -106,7 +106,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 	t.Run("성공: Plan이 있는 프로젝트", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
-		uc := NewListProjectsUseCase(mockProjectService, testLogger)
+		uc := NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		userID := uint(1)
 		input := ListProjectsInput{
@@ -136,7 +136,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 	t.Run("실패: 데이터베이스 에러", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
-		uc := NewListProjectsUseCase(mockProjectService, testLogger)
+		uc := NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		userID := uint(1)
 		input := ListProjectsInput{
@@ -157,7 +157,7 @@ func TestListProjectsUseCase_Execute(t *testing.T) {
 	t.Run("실패: 프로젝트 서비스 에러", func(t *testing.T) {
 		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
-		uc := NewListProjectsUseCase(mockProjectService, testLogger)
+		uc := NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		userID := uint(1)
 		input := ListProjectsInput{

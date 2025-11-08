@@ -44,7 +44,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)
@@ -135,7 +135,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)
@@ -185,7 +185,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)
@@ -269,7 +269,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)
@@ -338,7 +338,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		mockTektonCleanupClient := new(infrastructure.MockTektonCleanupClient)
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
-		listUseCase := application.NewListProjectsUseCase(mockProjectService, testLogger)
+		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)

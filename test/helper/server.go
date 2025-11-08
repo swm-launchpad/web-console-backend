@@ -26,6 +26,7 @@ import (
 	projectService "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
+	projectSqlc "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	userrepository "github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
@@ -104,7 +105,8 @@ func SetupTestServer(t *testing.T) *TestServer {
 	// Allow any container slug queries to return empty list
 	mockContainerSlugProvider.On("GetContainerSlugsByProjectID", mock.Anything, mock.Anything).Return([]string{}, nil).Maybe()
 	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
-	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc, testLogger)
+	projectQueries := projectSqlc.New(testDB.DB)
+	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc, projectQueries, testLogger)
 
 	// Container dependencies
 	containerRepo := containerInfra.NewContainerRepository(testDB.DB, testLogger)

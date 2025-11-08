@@ -34,6 +34,7 @@ import (
 	handler2 "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	infrastructure3 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -118,7 +119,8 @@ func InitializeApp() (*App, error) {
 	getContainerSlugsByProjectIDUseCase := application3.NewGetContainerSlugsByProjectIDUseCase(containerRepository, logger)
 	containerSlugProvider := infrastructure3.NewContainerSlugProvider(getContainerSlugsByProjectIDUseCase, logger)
 	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, tektonCleanupClient, containerSlugProvider, txManager, logger)
-	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, logger)
+	queries := provideProjectQueries(db)
+	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, queries, logger)
 	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
 	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService, settingsService, logger)
 	string2 := provideJWTSecret(configConfig)
@@ -365,6 +367,11 @@ func provideDeployService(
 		projectServiceName,
 		log,
 	)
+}
+
+// provideProjectQueries creates project sqlc queries
+func provideProjectQueries(db2 sqlc.DBTX) *sqlc.Queries {
+	return sqlc.New(db2)
 }
 
 // provideGitHubClient creates a GitHub client from config
