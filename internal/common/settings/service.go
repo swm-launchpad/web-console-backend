@@ -31,6 +31,9 @@ type SettingsService interface {
 	GetFreePlanDiskLimit() (int, error)
 	GetFreePlanMaxProjects() (int, error)
 
+	// Project count limits
+	GetMaxProjectsPerUser() (int, error)
+
 	// Beta tier limits
 	IsBetaTierEnabled() (bool, error)
 	GetBetaTierCPULimit() (int, error)
@@ -246,6 +249,12 @@ func (s *settingsService) GetFreePlanDiskLimit() (int, error) {
 
 func (s *settingsService) GetFreePlanMaxProjects() (int, error) {
 	return s.getInt("free_plan_max_projects")
+}
+
+// Project count limits
+
+func (s *settingsService) GetMaxProjectsPerUser() (int, error) {
+	return s.getInt("max_projects_per_user")
 }
 
 // Beta tier limits

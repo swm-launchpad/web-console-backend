@@ -81,7 +81,16 @@ func (s *projectService) CreateProject(ctx context.Context, name string, ownerID
 		selectedPlan = *plan
 	}
 
-	// Validate Free plan resources (must match fixed values)
+	// 1. Validate maximum projects per user (all plans) - check this first
+	if err := s.validationService.ValidateMaxProjectsPerUser(ctx, ownerID); err != nil {
+		s.logger.Error(ctx, "max projects per user validation failed",
+			zap.Uint("owner_id", ownerID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// 2. Validate Free plan resources (must match fixed values)
 	if err := s.validationService.ValidateFreeResources(selectedPlan, limits); err != nil {
 		s.logger.Error(ctx, "Free plan resources validation failed",
 			zap.String("plan", selectedPlan.String()),
@@ -90,7 +99,7 @@ func (s *projectService) CreateProject(ctx context.Context, name string, ownerID
 		return nil, err
 	}
 
-	// Validate free tier limits (beta period restrictions)
+	// 3. Validate free tier limits (beta period restrictions)
 	if err := s.validationService.ValidateFreeTierLimits(selectedPlan, limits); err != nil {
 		s.logger.Error(ctx, "free tier limits validation failed",
 			zap.String("plan", selectedPlan.String()),
@@ -99,7 +108,7 @@ func (s *projectService) CreateProject(ctx context.Context, name string, ownerID
 		return nil, err
 	}
 
-	// Validate Free plan project limit (1 per user)
+	// 4. Validate Free plan project limit (1 per user)
 	if err := s.validationService.ValidateFreePlanLimit(ctx, ownerID, selectedPlan); err != nil {
 		s.logger.Error(ctx, "Free plan limit validation failed",
 			zap.Uint("owner_id", ownerID),
