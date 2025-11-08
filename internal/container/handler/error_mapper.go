@@ -34,7 +34,7 @@ var containerErrorMap = map[error]response.ErrorMapping{
 
 	// Validation errors
 	containererrors.ErrNameRequired:        {StatusCode: http.StatusBadRequest, Code: "NAME_REQUIRED", Message: "Container name is required"},
-	containererrors.ErrNameTooLong:         {StatusCode: http.StatusBadRequest, Code: "NAME_TOO_LONG", Message: "Container name must not exceed 100 characters"},
+	containererrors.ErrNameTooLong:         {StatusCode: http.StatusBadRequest, Code: "NAME_TOO_LONG", Message: "Container name must not exceed 32 characters"},
 	containererrors.ErrSlugRequired:        {StatusCode: http.StatusBadRequest, Code: "SLUG_REQUIRED", Message: "Container slug is required"},
 	containererrors.ErrInvalidSlug:         {StatusCode: http.StatusBadRequest, Code: "INVALID_SLUG", Message: "Invalid container slug"},
 	containererrors.ErrSlugInvalidFormat:   {StatusCode: http.StatusBadRequest, Code: "SLUG_INVALID_FORMAT", Message: "Slug can only contain lowercase letters, numbers, and hyphens"},
