@@ -1,2 +1,2 @@
 -- Remove max_projects_per_user setting
-DELETE FROM settings WHERE key_name = 'max_projects_per_user';
+DELETE FROM SYSTEM_SETTINGS WHERE setting_key = 'max_projects_per_user';
