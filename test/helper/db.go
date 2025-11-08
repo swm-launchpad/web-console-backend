@@ -78,6 +78,12 @@ func SetupTestDB(t *testing.T) *TestDB {
 		t.Fatalf("Failed to seed test data: %v", err)
 	}
 
+	// Seed system settings
+	if err := SeedSystemSettings(testDB.DB); err != nil {
+		testDB.Cleanup()
+		t.Fatalf("Failed to seed system settings: %v", err)
+	}
+
 	return testDB
 }
 
