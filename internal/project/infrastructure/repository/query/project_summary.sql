@@ -1,0 +1,16 @@
+-- Project Summary Queries
+-- These queries aggregate container and domain information for project list view
+
+-- name: GetProjectsSummary :many
+SELECT
+    p.project_id,
+    COUNT(DISTINCT c.container_id) as container_count,
+    COUNT(DISTINCT CASE WHEN n.fqdn IS NOT NULL AND n.fqdn != '' THEN n.network_id END) as domain_count,
+    GROUP_CONCAT(DISTINCT CASE WHEN n.fqdn IS NOT NULL AND n.fqdn != '' THEN n.fqdn END ORDER BY n.fqdn SEPARATOR ',') as domains
+FROM PROJECTS p
+LEFT JOIN CONTAINERS c ON p.project_id = c.project_id AND c.is_deleted = FALSE
+LEFT JOIN NETWORKS n ON c.container_id = n.container_id
+WHERE p.project_id IN (sqlc.slice('project_ids'))
+AND p.is_deleted = FALSE
+GROUP BY p.project_id
+ORDER BY p.project_id;

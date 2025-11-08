@@ -43,7 +43,7 @@ func NewVolumeHandler(
 // AddVolumeRequest represents the request body for volume creation
 type AddVolumeRequest struct {
 	ProjectID uint   `json:"project_id" binding:"required"`
-	Name      string `json:"name" binding:"required,min=1,max=255"`        // Display name, allows up to 255 characters
+	Name      string `json:"name" binding:"required,min=1,max=32"`         // Display name, allows up to 32 characters
 	Capacity  uint32 `json:"capacity" binding:"required,min=128,max=2048"` // 128-2048 Mi
 }
 

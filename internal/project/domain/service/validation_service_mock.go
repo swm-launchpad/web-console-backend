@@ -8,9 +8,10 @@ import (
 
 // MockValidationService is a mock implementation of ValidationService for testing
 type MockValidationService struct {
-	ValidateFreeResourcesFunc  func(plan value.Plan, limits value.ResourceLimits) error
-	ValidateFreeTierLimitsFunc func(plan value.Plan, limits value.ResourceLimits) error
-	ValidateFreePlanLimitFunc  func(ctx context.Context, userID uint, plan value.Plan) error
+	ValidateFreeResourcesFunc      func(plan value.Plan, limits value.ResourceLimits) error
+	ValidateFreeTierLimitsFunc     func(plan value.Plan, limits value.ResourceLimits) error
+	ValidateFreePlanLimitFunc      func(ctx context.Context, userID uint, plan value.Plan) error
+	ValidateMaxProjectsPerUserFunc func(ctx context.Context, userID uint) error
 }
 
 // ValidateFreeResources mocks the ValidateFreeResources method
@@ -33,6 +34,14 @@ func (m *MockValidationService) ValidateFreeTierLimits(plan value.Plan, limits v
 func (m *MockValidationService) ValidateFreePlanLimit(ctx context.Context, userID uint, plan value.Plan) error {
 	if m.ValidateFreePlanLimitFunc != nil {
 		return m.ValidateFreePlanLimitFunc(ctx, userID, plan)
+	}
+	return nil
+}
+
+// ValidateMaxProjectsPerUser mocks the ValidateMaxProjectsPerUser method
+func (m *MockValidationService) ValidateMaxProjectsPerUser(ctx context.Context, userID uint) error {
+	if m.ValidateMaxProjectsPerUserFunc != nil {
+		return m.ValidateMaxProjectsPerUserFunc(ctx, userID)
 	}
 	return nil
 }

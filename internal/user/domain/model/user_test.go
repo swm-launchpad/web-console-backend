@@ -57,6 +57,29 @@ func TestNewUser(t *testing.T) {
 		assert.Nil(t, user)
 		assert.Equal(t, "nickname must be at least 2 characters long", err.Error())
 	})
+
+	t.Run("성공: nickname이 정확히 32자", func(t *testing.T) {
+		email := "test@example.com"
+		nickname := "12345678901234567890123456789012" // 32 characters
+
+		user, err := NewUser(email, nickname)
+
+		require.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Equal(t, nickname, user.Nickname)
+		assert.Equal(t, 32, len(user.Nickname))
+	})
+
+	t.Run("실패: nickname이 너무 김 (33자)", func(t *testing.T) {
+		email := "test@example.com"
+		nickname := "123456789012345678901234567890123" // 33 characters
+
+		user, err := NewUser(email, nickname)
+
+		assert.Error(t, err)
+		assert.Nil(t, user)
+		assert.Equal(t, "nickname must not exceed 32 characters", err.Error())
+	})
 }
 
 func TestUser_IsActive(t *testing.T) {

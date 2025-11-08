@@ -38,7 +38,7 @@ var (
 // Validation errors - input validation and data integrity errors
 var (
 	ErrNameRequired = errors.New("project name is required")
-	ErrNameTooLong  = errors.New("project name must not exceed 255 characters")
+	ErrNameTooLong  = errors.New("project name must not exceed 32 characters")
 	ErrSlugRequired = errors.New("project slug is required")
 	ErrInvalidSlug  = errors.New("invalid project slug")
 	// Deprecated: ErrSlugTooShort is unreachable with fixed 23-character slug format. Use ErrSlugInvalidLength instead.
@@ -90,7 +90,7 @@ var (
 var (
 	ErrVolumeNotFound         = errors.New("volume not found")
 	ErrVolumeNameRequired     = errors.New("volume name is required")
-	ErrInvalidVolumeName      = errors.New("volume name must not exceed 255 characters")
+	ErrInvalidVolumeName      = errors.New("volume name must not exceed 32 characters")
 	ErrInvalidVolumeID        = errors.New("invalid volume ID")
 	ErrInvalidCapacity        = errors.New("invalid volume capacity")
 	ErrVolumeCapacityTooSmall = errors.New("volume capacity must be at least 128Mi")

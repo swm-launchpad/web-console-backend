@@ -54,6 +54,9 @@ type Querier interface {
 	GetProjectUserRole(ctx context.Context, arg GetProjectUserRoleParams) (ProjectUserRole, error)
 	GetProjectUsersByProjectID(ctx context.Context, projectID uint32) ([]ProjectUser, error)
 	GetProjectUsersByProjectIDs(ctx context.Context, projectIds []uint32) ([]ProjectUser, error)
+	// Project Summary Queries
+	// These queries aggregate container and domain information for project list view
+	GetProjectsSummary(ctx context.Context, projectIds []uint32) ([]GetProjectsSummaryRow, error)
 	GetTotalCapacityByProjectID(ctx context.Context, projectID uint32) (interface{}, error)
 	GetVolumeByID(ctx context.Context, volumeID uint32) (Volume, error)
 	GetVolumeByName(ctx context.Context, arg GetVolumeByNameParams) (Volume, error)

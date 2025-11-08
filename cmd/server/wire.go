@@ -202,6 +202,11 @@ func provideDeployService(
 	)
 }
 
+// provideProjectQueries creates project sqlc queries
+func provideProjectQueries(db projectSqlc.DBTX) *projectSqlc.Queries {
+	return projectSqlc.New(db)
+}
+
 // provideGitHubClient creates a GitHub client from config
 // Returns nil if GitHub App credentials are not configured
 func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
@@ -219,6 +224,7 @@ func provideGitHubHandler(
 	getInstallationUseCase *application.GetGitHubInstallationUseCase,
 	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
 	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	listBranchesUseCase *application.ListBranchesUseCase,
 	startInstallationUseCase *application.StartInstallationUseCase,
 	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	cfg *config.Config,
@@ -230,6 +236,7 @@ func provideGitHubHandler(
 		getInstallationUseCase,
 		generateTokenUseCase,
 		listRepositoriesUseCase,
+		listBranchesUseCase,
 		startInstallationUseCase,
 		installationCallbackUseCase,
 		cfg.Frontend.URL,
@@ -343,6 +350,7 @@ func InitializeApp() (*App, error) {
 		application.NewGetGitHubInstallationUseCase,
 		application.NewGenerateInstallationTokenUseCase,
 		application.NewListRepositoriesUseCase,
+		application.NewListBranchesUseCase,
 		application.NewStartInstallationUseCase,
 		application.NewInstallationCallbackUseCase,
 
@@ -351,6 +359,7 @@ func InitializeApp() (*App, error) {
 		projectRepo.NewVolumeRepository,
 		projectRepo.NewDeploymentRepository,
 		projectRepo.NewBuildHistoryRepository,
+		provideProjectQueries,
 		provideTektonDeployClient,
 		provideKubeDeployClient,
 		provideContainerClient,
@@ -433,6 +442,7 @@ func InitializeApp() (*App, error) {
 		containerApp.NewStreamBuildLogsUseCase,
 		containerApp.NewGetBuildLogHistoryUseCase,
 		containerApp.NewGetContainerSlugsByProjectIDUseCase,
+		containerApp.NewCheckFQDNUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,

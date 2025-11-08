@@ -34,6 +34,7 @@ import (
 	handler2 "github.com/swm-launchpad/web-console-backend/internal/project/handler"
 	infrastructure3 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
+	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -92,10 +93,11 @@ func InitializeApp() (*App, error) {
 	getGitHubInstallationUseCase := application.NewGetGitHubInstallationUseCase(gitHubInstallationRepository, logger)
 	generateInstallationTokenUseCase := application.NewGenerateInstallationTokenUseCase(gitHubInstallationRepository, client, txManager, logger)
 	listRepositoriesUseCase := application.NewListRepositoriesUseCase(gitHubInstallationRepository, client, logger)
+	listBranchesUseCase := application.NewListBranchesUseCase(gitHubInstallationRepository, client, logger)
 	oAuthStateRepository := infrastructure.NewOAuthStateRepository(db, logger)
 	startInstallationUseCase := application.NewStartInstallationUseCase(configConfig, oAuthStateRepository, logger)
 	installationCallbackUseCase := application.NewInstallationCallbackUseCase(configConfig, client, gitHubInstallationRepository, oAuthStateRepository, txManager, logger)
-	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, startInstallationUseCase, installationCallbackUseCase, configConfig, logger)
+	gitHubHandler := provideGitHubHandler(connectGitHubUseCase, disconnectGitHubUseCase, getGitHubInstallationUseCase, generateInstallationTokenUseCase, listRepositoriesUseCase, listBranchesUseCase, startInstallationUseCase, installationCallbackUseCase, configConfig, logger)
 	projectRepository := repository.NewProjectRepository(db, logger)
 	slugService := service2.NewSlugService(projectRepository, logger)
 	settingsRepository := settings.NewSettingsRepository(db)
@@ -117,7 +119,8 @@ func InitializeApp() (*App, error) {
 	getContainerSlugsByProjectIDUseCase := application3.NewGetContainerSlugsByProjectIDUseCase(containerRepository, logger)
 	containerSlugProvider := infrastructure3.NewContainerSlugProvider(getContainerSlugsByProjectIDUseCase, logger)
 	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, tektonCleanupClient, containerSlugProvider, txManager, logger)
-	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, logger)
+	queries := provideProjectQueries(db)
+	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, queries, settingsService, logger)
 	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
 	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, permissionService, projectService, settingsService, logger)
 	string2 := provideJWTSecret(configConfig)
@@ -188,7 +191,8 @@ func InitializeApp() (*App, error) {
 	deleteBuildVarUseCase := application3.NewDeleteBuildVarUseCase(containerRepository, servicePermissionService, txManager, logger)
 	addMountUseCase := application3.NewAddMountUseCase(containerRepository, servicePermissionService, volumeService, txManager, logger)
 	deleteMountUseCase := application3.NewDeleteMountUseCase(containerRepository, servicePermissionService, txManager, logger)
-	containerHandler := handler3.NewContainerHandler(createContainerUseCase, getContainerUseCase, updateContainerUseCase, deleteContainerUseCase, listContainersUseCase, addEnvVarUseCase, updateEnvVarUseCase, deleteEnvVarUseCase, addNetworkUseCase, deleteNetworkUseCase, addSecretUseCase, updateSecretUseCase, deleteSecretUseCase, addBuildVarUseCase, updateBuildVarUseCase, deleteBuildVarUseCase, addMountUseCase, deleteMountUseCase, projectService, volumeService, containerService, servicePermissionService, logger)
+	checkFQDNUseCase := application3.NewCheckFQDNUseCase(containerRepository, logger)
+	containerHandler := handler3.NewContainerHandler(createContainerUseCase, getContainerUseCase, updateContainerUseCase, deleteContainerUseCase, listContainersUseCase, addEnvVarUseCase, updateEnvVarUseCase, deleteEnvVarUseCase, addNetworkUseCase, deleteNetworkUseCase, addSecretUseCase, updateSecretUseCase, deleteSecretUseCase, addBuildVarUseCase, updateBuildVarUseCase, deleteBuildVarUseCase, addMountUseCase, deleteMountUseCase, checkFQDNUseCase, projectService, volumeService, containerService, servicePermissionService, logger)
 	getTemplatesUseCase := application3.NewGetTemplatesUseCase(templateRepository, logger)
 	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository, logger)
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase, logger)
@@ -365,6 +369,11 @@ func provideDeployService(
 	)
 }
 
+// provideProjectQueries creates project sqlc queries
+func provideProjectQueries(db2 sqlc.DBTX) *sqlc.Queries {
+	return sqlc.New(db2)
+}
+
 // provideGitHubClient creates a GitHub client from config
 // Returns nil if GitHub App credentials are not configured
 func provideGitHubClient(cfg *config.Config) (*github.Client, error) {
@@ -382,6 +391,7 @@ func provideGitHubHandler(
 	getInstallationUseCase *application.GetGitHubInstallationUseCase,
 	generateTokenUseCase *application.GenerateInstallationTokenUseCase,
 	listRepositoriesUseCase *application.ListRepositoriesUseCase,
+	listBranchesUseCase *application.ListBranchesUseCase,
 	startInstallationUseCase *application.StartInstallationUseCase,
 	installationCallbackUseCase *application.InstallationCallbackUseCase,
 	cfg *config.Config,
@@ -393,6 +403,7 @@ func provideGitHubHandler(
 		getInstallationUseCase,
 		generateTokenUseCase,
 		listRepositoriesUseCase,
+		listBranchesUseCase,
 		startInstallationUseCase,
 		installationCallbackUseCase,
 		cfg.Frontend.URL,

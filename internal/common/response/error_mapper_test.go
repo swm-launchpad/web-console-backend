@@ -111,7 +111,7 @@ func TestMapCommonError(t *testing.T) {
 			wantFound:      true,
 			wantStatusCode: http.StatusBadRequest,
 			wantCode:       "INVALID_VOLUME_NAME",
-			wantMessage:    "Volume name must not exceed 255 characters",
+			wantMessage:    "Volume name must not exceed 32 characters",
 		},
 		{
 			name:           "ErrInvalidVolumeID",

@@ -35,8 +35,8 @@ func NewVolume(projectID uint, name string, capacity uint32) (*Volume, error) {
 	if name == "" {
 		return nil, projecterrors.ErrVolumeNameRequired
 	}
-	// Name is for display purposes, allow up to 255 characters with any printable characters
-	if len(name) > 255 {
+	// Name is for display purposes, allow up to 32 characters with any printable characters
+	if len(name) > 32 {
 		return nil, projecterrors.ErrInvalidVolumeName
 	}
 	if capacity < MinVolumeCapacity {

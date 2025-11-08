@@ -19,6 +19,9 @@ type ValidationService interface {
 
 	// ValidateFreePlanLimit validates that user doesn't exceed Free plan project limit (1 per user)
 	ValidateFreePlanLimit(ctx context.Context, userID uint, plan value.Plan) error
+
+	// ValidateMaxProjectsPerUser validates that user doesn't exceed maximum project limit (all plans)
+	ValidateMaxProjectsPerUser(ctx context.Context, userID uint) error
 }
 
 // validationService is the concrete implementation of ValidationService
@@ -145,6 +148,36 @@ func (s *validationService) ValidateFreePlanLimit(ctx context.Context, userID ui
 
 	if freeCount >= maxProjects {
 		return projecterrors.ErrFreePlanLimitExceeded
+	}
+
+	return nil
+}
+
+// ValidateMaxProjectsPerUser validates that user doesn't exceed maximum project limit (all plans)
+// Maximum project limit is retrieved from database settings
+func (s *validationService) ValidateMaxProjectsPerUser(ctx context.Context, userID uint) error {
+	// Get max projects per user from database
+	maxProjects, err := s.settingsService.GetMaxProjectsPerUser()
+	if err != nil {
+		return err
+	}
+
+	// Count existing active projects for this user
+	projects, err := s.projectRepo.FindByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// Count active projects (all plans)
+	activeCount := 0
+	for _, project := range projects {
+		if project.Status() == value.ProjectStatusActive {
+			activeCount++
+		}
+	}
+
+	if activeCount >= maxProjects {
+		return projecterrors.ErrProjectLimitExceeded
 	}
 
 	return nil

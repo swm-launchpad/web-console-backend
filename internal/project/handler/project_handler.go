@@ -17,7 +17,6 @@ import (
 
 // Project policy constants
 const (
-	MaxProjectsPerUser         = 3             // Maximum number of projects per user (not Free plan limit)
 	DefaultCPULimit     uint32 = 500           // 0.5 core (500 millicores) - matches API_SPECIFICATION.md:116
 	DefaultMemoryLimit  uint32 = 1024          // 1GB (1024 Mi)
 	DefaultDiskLimit    uint32 = 2048          // 2GB (2048 Mi) - matches API_SPECIFICATION.md:118
@@ -66,7 +65,7 @@ func NewProjectHandler(
 
 // CreateProjectRequest represents the request body for project creation
 type CreateProjectRequest struct {
-	Name         string  `json:"name" binding:"required,min=1,max=255"`
+	Name         string  `json:"name" binding:"required,min=1,max=32"`
 	Plan         *string `json:"plan,omitempty" binding:"omitempty,oneof=free eco pro"`
 	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=500,max=8000"`        // 0.5~8 cores, step 500m
 	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=512,max=16384"`    // 0.5~16GB, step 512Mi
@@ -100,28 +99,6 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		response.Error(c, projecterrors.ErrValidationFailed, mapProjectError, response.WithDetails(map[string]any{
 			"message": "Invalid request format: " + err.Error(),
 		}))
-		return
-	}
-
-	// Check project limit per user
-	projectCount, err := h.projectService.CountProjectsByUserID(c.Request.Context(), userID.(uint))
-	if err != nil {
-		h.logger.Error(ctx, "failed to count user projects",
-			zap.Error(err),
-			zap.String("handler", "CreateProject"),
-			zap.Uint("user_id", userID.(uint)),
-		)
-		response.Error(c, err, mapProjectError)
-		return
-	}
-	if projectCount >= MaxProjectsPerUser {
-		h.logger.Warn(ctx, "project limit exceeded",
-			zap.String("handler", "CreateProject"),
-			zap.Uint("user_id", userID.(uint)),
-			zap.Int("current_count", projectCount),
-			zap.Int("max_allowed", MaxProjectsPerUser),
-		)
-		response.Error(c, projecterrors.ErrProjectLimitExceeded, mapProjectError)
 		return
 	}
 
@@ -305,7 +282,7 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 
 // UpdateProjectRequest represents the request body for project update
 type UpdateProjectRequest struct {
-	Name         *string `json:"name,omitempty" binding:"omitempty,min=1,max=255"`
+	Name         *string `json:"name,omitempty" binding:"omitempty,min=1,max=32"`
 	Plan         *string `json:"plan,omitempty" binding:"omitempty,oneof=free eco pro"`
 	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=500,max=8000"`        // 0.5~8 cores, step 500m
 	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=512,max=16384"`    // 0.5~16GB, step 512Mi

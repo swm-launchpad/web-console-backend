@@ -40,6 +40,9 @@ func NewUser(email, nickname string) (*User, error) {
 	if len(nickname) < 2 {
 		return nil, usererrors.ErrNicknameTooShort
 	}
+	if len(nickname) > 32 {
+		return nil, usererrors.ErrNicknameTooLong
+	}
 
 	now := time.Now()
 	return &User{

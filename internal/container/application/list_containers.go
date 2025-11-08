@@ -14,19 +14,29 @@ type ListContainersInput struct {
 	UserID    uint
 }
 
+type NetworkItem struct {
+	NetworkID    uint    `json:"network_id"`
+	InternalPort uint16  `json:"internal_port"`
+	ExternalPort *uint16 `json:"external_port,omitempty"`
+	ExternalIP   *string `json:"external_ip,omitempty"`
+	FQDN         *string `json:"fqdn,omitempty"`
+	NetworkType  string  `json:"network_type"`
+}
+
 type ContainerListItem struct {
-	ContainerID          uint    `json:"container_id"`
-	ProjectID            uint    `json:"project_id"`
-	Name                 string  `json:"name"`
-	Slug                 string  `json:"slug"`
-	FQDN                 string  `json:"fqdn,omitempty"`
-	GitURL               string  `json:"git_url"`
-	GitBranch            string  `json:"git_branch"`
-	GitHubInstallationID *int64  `json:"github_installation_id,omitempty"`
-	CPULimit             *uint32 `json:"cpu_limit,omitempty"`    // Millicores (1000 = 1 CPU core)
-	MemoryLimit          *uint32 `json:"memory_limit,omitempty"` // Mi (Mebibytes)
-	CreatedAt            string  `json:"created_at"`
-	UpdatedAt            string  `json:"updated_at,omitempty"`
+	ContainerID          uint          `json:"container_id"`
+	ProjectID            uint          `json:"project_id"`
+	Name                 string        `json:"name"`
+	Slug                 string        `json:"slug"`
+	FQDN                 string        `json:"fqdn,omitempty"`
+	Networks             []NetworkItem `json:"networks,omitempty"`
+	GitURL               string        `json:"git_url"`
+	GitBranch            string        `json:"git_branch"`
+	GitHubInstallationID *int64        `json:"github_installation_id,omitempty"`
+	CPULimit             *uint32       `json:"cpu_limit,omitempty"`    // Millicores (1000 = 1 CPU core)
+	MemoryLimit          *uint32       `json:"memory_limit,omitempty"` // Mi (Mebibytes)
+	CreatedAt            string        `json:"created_at"`
+	UpdatedAt            string        `json:"updated_at,omitempty"`
 }
 
 type ListContainersOutput struct {
@@ -91,11 +101,38 @@ func (uc *ListContainersUseCase) Execute(ctx context.Context, input ListContaine
 	// Build output
 	items := make([]ContainerListItem, 0, len(containers))
 	for _, container := range containers {
+		// Convert networks to NetworkItem DTOs
+		networkItems := make([]NetworkItem, 0, len(container.Networks()))
+		var primaryFQDN string
+		for _, network := range container.Networks() {
+			networkItem := NetworkItem{
+				NetworkID:    network.NetworkID(),
+				NetworkType:  string(network.NetworkType()),
+				ExternalPort: network.ExternalPort(),
+				ExternalIP:   network.ExternalIP(),
+				FQDN:         network.FQDN(),
+			}
+
+			// InternalPort is required, so dereference safely
+			if network.InternalPort() != nil {
+				networkItem.InternalPort = *network.InternalPort()
+			}
+
+			networkItems = append(networkItems, networkItem)
+
+			// Use first available FQDN as primary FQDN
+			if primaryFQDN == "" && network.FQDN() != nil && *network.FQDN() != "" {
+				primaryFQDN = *network.FQDN()
+			}
+		}
+
 		item := ContainerListItem{
 			ContainerID:          container.ContainerID(),
 			ProjectID:            container.ProjectID(),
 			Name:                 container.Name(),
 			Slug:                 container.Slug().String(),
+			FQDN:                 primaryFQDN,
+			Networks:             networkItems,
 			GitURL:               container.GitConfig().RepositoryURL(),
 			GitBranch:            container.GitConfig().Branch(),
 			GitHubInstallationID: container.GitHubInstallationID(),
