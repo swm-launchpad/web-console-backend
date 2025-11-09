@@ -94,10 +94,10 @@ type Querier interface {
 	ListContainers(ctx context.Context, arg ListContainersParams) ([]Container, error)
 	ListContainersByProjectID(ctx context.Context, projectID uint32) ([]Container, error)
 	// Soft delete a specific network by ID
-	// Preserves FQDN ownership for the project
+	// Clear FQDN to allow reuse while preserving ownership tracking
 	SoftDeleteNetworkByID(ctx context.Context, arg SoftDeleteNetworkByIDParams) (sql.Result, error)
 	// Soft delete all networks when a container is deleted
-	// This preserves FQDN ownership tracking even after container deletion
+	// Clear FQDN to allow reuse while preserving ownership tracking
 	SoftDeleteNetworksByContainerID(ctx context.Context, arg SoftDeleteNetworksByContainerIDParams) (sql.Result, error)
 	UpdateBuildVar(ctx context.Context, arg UpdateBuildVarParams) (sql.Result, error)
 	UpdateContainer(ctx context.Context, arg UpdateContainerParams) (sql.Result, error)

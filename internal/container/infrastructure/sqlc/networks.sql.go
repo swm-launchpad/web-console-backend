@@ -339,7 +339,8 @@ func (q *Queries) GetNetworksByContainerID(ctx context.Context, containerID uint
 const softDeleteNetworkByID = `-- name: SoftDeleteNetworkByID :execresult
 UPDATE NETWORKS SET
     is_deleted = TRUE,
-    deleted_at = ?
+    deleted_at = ?,
+    fqdn = NULL
 WHERE network_id = ?
   AND is_deleted = 0
 `
@@ -350,7 +351,7 @@ type SoftDeleteNetworkByIDParams struct {
 }
 
 // Soft delete a specific network by ID
-// Preserves FQDN ownership for the project
+// Clear FQDN to allow reuse while preserving ownership tracking
 func (q *Queries) SoftDeleteNetworkByID(ctx context.Context, arg SoftDeleteNetworkByIDParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, softDeleteNetworkByID, arg.DeletedAt, arg.NetworkID)
 }
@@ -358,7 +359,8 @@ func (q *Queries) SoftDeleteNetworkByID(ctx context.Context, arg SoftDeleteNetwo
 const softDeleteNetworksByContainerID = `-- name: SoftDeleteNetworksByContainerID :execresult
 UPDATE NETWORKS SET
     is_deleted = TRUE,
-    deleted_at = ?
+    deleted_at = ?,
+    fqdn = NULL
 WHERE container_id = ?
   AND is_deleted = 0
 `
@@ -369,7 +371,7 @@ type SoftDeleteNetworksByContainerIDParams struct {
 }
 
 // Soft delete all networks when a container is deleted
-// This preserves FQDN ownership tracking even after container deletion
+// Clear FQDN to allow reuse while preserving ownership tracking
 func (q *Queries) SoftDeleteNetworksByContainerID(ctx context.Context, arg SoftDeleteNetworksByContainerIDParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, softDeleteNetworksByContainerID, arg.DeletedAt, arg.ContainerID)
 }

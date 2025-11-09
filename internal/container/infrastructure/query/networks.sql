@@ -135,18 +135,20 @@ FOR UPDATE;
 
 -- name: SoftDeleteNetworksByContainerID :execresult
 -- Soft delete all networks when a container is deleted
--- This preserves FQDN ownership tracking even after container deletion
+-- Clear FQDN to allow reuse while preserving ownership tracking
 UPDATE NETWORKS SET
     is_deleted = TRUE,
-    deleted_at = ?
+    deleted_at = ?,
+    fqdn = NULL
 WHERE container_id = ?
   AND is_deleted = 0;
 
 -- name: SoftDeleteNetworkByID :execresult
 -- Soft delete a specific network by ID
--- Preserves FQDN ownership for the project
+-- Clear FQDN to allow reuse while preserving ownership tracking
 UPDATE NETWORKS SET
     is_deleted = TRUE,
-    deleted_at = ?
+    deleted_at = ?,
+    fqdn = NULL
 WHERE network_id = ?
   AND is_deleted = 0;
