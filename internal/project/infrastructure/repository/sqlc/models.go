@@ -569,7 +569,6 @@ type Container struct {
 	ContainerID            uint32          `json:"container_id"`
 	ProjectID              uint32          `json:"project_id"`
 	TemplateID             sql.NullInt32   `json:"template_id"`
-	Name                   string          `json:"name"`
 	Slug                   string          `json:"slug"`
 	StableWindow           sql.NullInt32   `json:"stable_window"`
 	TemplateConfig         json.RawMessage `json:"template_config"`
@@ -590,6 +589,7 @@ type Container struct {
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
 	DeletedAt         sql.NullTime   `json:"deleted_at"`
 	IsDeleted         bool           `json:"is_deleted"`
+	Name              string         `json:"name"`
 }
 
 type Deployment struct {
@@ -660,7 +660,6 @@ type OauthState struct {
 
 type Project struct {
 	ProjectID uint32         `json:"project_id"`
-	Name      string         `json:"name"`
 	Slug      string         `json:"slug"`
 	Status    ProjectsStatus `json:"status"`
 	// Current operation status of the project
@@ -676,6 +675,7 @@ type Project struct {
 	UpdatedAt          sql.NullTime   `json:"updated_at"`
 	DeletedAt          sql.NullTime   `json:"deleted_at"`
 	IsDeleted          bool           `json:"is_deleted"`
+	Name               string         `json:"name"`
 }
 
 type ProjectUser struct {
@@ -732,7 +732,8 @@ type User struct {
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
 	DeletedAt         sql.NullTime   `json:"deleted_at"`
 	IsDeleted         bool           `json:"is_deleted"`
-	Nickname          string         `json:"nickname"`
+	// User nickname (display name), max 32 characters
+	Nickname string `json:"nickname"`
 }
 
 type VerificationToken struct {
@@ -748,9 +749,9 @@ type VerificationToken struct {
 type Volume struct {
 	VolumeID  uint32         `json:"volume_id"`
 	ProjectID uint32         `json:"project_id"`
-	Name      string         `json:"name"`
 	Slug      sql.NullString `json:"slug"`
 	Capacity  uint32         `json:"capacity"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt sql.NullTime   `json:"updated_at"`
+	Name      string         `json:"name"`
 }
