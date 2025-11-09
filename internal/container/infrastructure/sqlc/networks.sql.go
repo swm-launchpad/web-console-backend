@@ -11,14 +11,53 @@ import (
 	"time"
 )
 
-const checkFQDNExists = `-- name: CheckFQDNExists :one
+const checkFQDNExistsInOtherProject = `-- name: CheckFQDNExistsInOtherProject :one
 SELECT COUNT(*) > 0 as fqdn_exists
-FROM NETWORKS
-WHERE fqdn = ?
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE n.fqdn = ?
+  AND c.project_id != ?
+  AND c.is_deleted = 0
+FOR UPDATE
 `
 
-func (q *Queries) CheckFQDNExists(ctx context.Context, fqdn sql.NullString) (bool, error) {
-	row := q.db.QueryRowContext(ctx, checkFQDNExists, fqdn)
+type CheckFQDNExistsInOtherProjectParams struct {
+	Fqdn      sql.NullString `json:"fqdn"`
+	ProjectID uint32         `json:"project_id"`
+}
+
+// Check if FQDN is used by another project (for AddNetwork)
+// FQDN ownership is project-scoped: once a project uses a FQDN, it's reserved for that project
+// Checks both active and deleted networks to preserve FQDN ownership
+func (q *Queries) CheckFQDNExistsInOtherProject(ctx context.Context, arg CheckFQDNExistsInOtherProjectParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkFQDNExistsInOtherProject, arg.Fqdn, arg.ProjectID)
+	var fqdn_exists bool
+	err := row.Scan(&fqdn_exists)
+	return fqdn_exists, err
+}
+
+const checkFQDNExistsInOtherProjectExcludingSelf = `-- name: CheckFQDNExistsInOtherProjectExcludingSelf :one
+SELECT COUNT(*) > 0 as fqdn_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE n.fqdn = ?
+  AND n.network_id != ?
+  AND c.project_id != ?
+  AND c.is_deleted = 0
+FOR UPDATE
+`
+
+type CheckFQDNExistsInOtherProjectExcludingSelfParams struct {
+	Fqdn      sql.NullString `json:"fqdn"`
+	NetworkID uint32         `json:"network_id"`
+	ProjectID uint32         `json:"project_id"`
+}
+
+// Check if FQDN is used by another project, excluding self (for UpdateNetwork)
+// Allows updating a network's FQDN to the same value or reusing FQDN within same project
+// Checks both active and deleted networks to preserve FQDN ownership
+func (q *Queries) CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, arg CheckFQDNExistsInOtherProjectExcludingSelfParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkFQDNExistsInOtherProjectExcludingSelf, arg.Fqdn, arg.NetworkID, arg.ProjectID)
 	var fqdn_exists bool
 	err := row.Scan(&fqdn_exists)
 	return fqdn_exists, err
@@ -30,6 +69,7 @@ FROM NETWORKS n
 INNER JOIN CONTAINERS c ON n.container_id = c.container_id
 WHERE c.project_id = ?
   AND n.internal_port = ?
+  AND n.is_deleted = 0
   AND c.is_deleted = 0
 FOR UPDATE
 `
@@ -41,6 +81,33 @@ type CheckInternalPortExistsInProjectParams struct {
 
 func (q *Queries) CheckInternalPortExistsInProject(ctx context.Context, arg CheckInternalPortExistsInProjectParams) (bool, error) {
 	row := q.db.QueryRowContext(ctx, checkInternalPortExistsInProject, arg.ProjectID, arg.InternalPort)
+	var port_exists bool
+	err := row.Scan(&port_exists)
+	return port_exists, err
+}
+
+const checkInternalPortExistsInProjectExcludingSelf = `-- name: CheckInternalPortExistsInProjectExcludingSelf :one
+SELECT COUNT(*) > 0 as port_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE c.project_id = ?
+  AND n.internal_port = ?
+  AND n.network_id != ?
+  AND n.is_deleted = 0
+  AND c.is_deleted = 0
+FOR UPDATE
+`
+
+type CheckInternalPortExistsInProjectExcludingSelfParams struct {
+	ProjectID    uint32        `json:"project_id"`
+	InternalPort sql.NullInt32 `json:"internal_port"`
+	NetworkID    uint32        `json:"network_id"`
+}
+
+// Check if internal port exists in project, excluding self (for UpdateNetwork)
+// Internal ports must be unique within a project (containers share pod network interface)
+func (q *Queries) CheckInternalPortExistsInProjectExcludingSelf(ctx context.Context, arg CheckInternalPortExistsInProjectExcludingSelfParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkInternalPortExistsInProjectExcludingSelf, arg.ProjectID, arg.InternalPort, arg.NetworkID)
 	var port_exists bool
 	err := row.Scan(&port_exists)
 	return port_exists, err
@@ -91,12 +158,19 @@ func (q *Queries) CreateNetwork(ctx context.Context, arg CreateNetworkParams) (s
 }
 
 const deleteNetwork = `-- name: DeleteNetwork :execresult
-DELETE FROM NETWORKS
+UPDATE NETWORKS SET
+    is_deleted = TRUE,
+    deleted_at = ?
 WHERE network_id = ?
 `
 
-func (q *Queries) DeleteNetwork(ctx context.Context, networkID uint32) (sql.Result, error) {
-	return q.db.ExecContext(ctx, deleteNetwork, networkID)
+type DeleteNetworkParams struct {
+	DeletedAt sql.NullTime `json:"deleted_at"`
+	NetworkID uint32       `json:"network_id"`
+}
+
+func (q *Queries) DeleteNetwork(ctx context.Context, arg DeleteNetworkParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteNetwork, arg.DeletedAt, arg.NetworkID)
 }
 
 const deleteNetworksByContainerID = `-- name: DeleteNetworksByContainerID :execresult
@@ -109,7 +183,7 @@ func (q *Queries) DeleteNetworksByContainerID(ctx context.Context, containerID u
 }
 
 const getNetworkByID = `-- name: GetNetworkByID :one
-SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at
+SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at, is_deleted, deleted_at
 FROM NETWORKS
 WHERE network_id = ?
 `
@@ -127,14 +201,17 @@ func (q *Queries) GetNetworkByID(ctx context.Context, networkID uint32) (Network
 		&i.Type,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsDeleted,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getNetworksByContainerID = `-- name: GetNetworksByContainerID :many
-SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at
+SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at, is_deleted, deleted_at
 FROM NETWORKS
 WHERE container_id = ?
+  AND is_deleted = 0
 ORDER BY internal_port ASC
 `
 
@@ -157,6 +234,8 @@ func (q *Queries) GetNetworksByContainerID(ctx context.Context, containerID uint
 			&i.Type,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IsDeleted,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -169,6 +248,44 @@ func (q *Queries) GetNetworksByContainerID(ctx context.Context, containerID uint
 		return nil, err
 	}
 	return items, nil
+}
+
+const softDeleteNetworkByID = `-- name: SoftDeleteNetworkByID :execresult
+UPDATE NETWORKS SET
+    is_deleted = TRUE,
+    deleted_at = ?
+WHERE network_id = ?
+  AND is_deleted = 0
+`
+
+type SoftDeleteNetworkByIDParams struct {
+	DeletedAt sql.NullTime `json:"deleted_at"`
+	NetworkID uint32       `json:"network_id"`
+}
+
+// Soft delete a specific network by ID
+// Preserves FQDN ownership for the project
+func (q *Queries) SoftDeleteNetworkByID(ctx context.Context, arg SoftDeleteNetworkByIDParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, softDeleteNetworkByID, arg.DeletedAt, arg.NetworkID)
+}
+
+const softDeleteNetworksByContainerID = `-- name: SoftDeleteNetworksByContainerID :execresult
+UPDATE NETWORKS SET
+    is_deleted = TRUE,
+    deleted_at = ?
+WHERE container_id = ?
+  AND is_deleted = 0
+`
+
+type SoftDeleteNetworksByContainerIDParams struct {
+	DeletedAt   sql.NullTime `json:"deleted_at"`
+	ContainerID uint32       `json:"container_id"`
+}
+
+// Soft delete all networks when a container is deleted
+// This preserves FQDN ownership tracking even after container deletion
+func (q *Queries) SoftDeleteNetworksByContainerID(ctx context.Context, arg SoftDeleteNetworksByContainerIDParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, softDeleteNetworksByContainerID, arg.DeletedAt, arg.ContainerID)
 }
 
 const updateNetwork = `-- name: UpdateNetwork :execresult
