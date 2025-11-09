@@ -35,6 +35,7 @@ var userErrorMap = map[error]response.ErrorMapping{
 	usererrors.ErrPasswordRequired: {StatusCode: http.StatusBadRequest, Code: "PASSWORD_REQUIRED", Message: "Password is required"},
 	usererrors.ErrEmailRequired:    {StatusCode: http.StatusBadRequest, Code: "EMAIL_REQUIRED", Message: "Email is required"},
 	usererrors.ErrNicknameTooShort: {StatusCode: http.StatusBadRequest, Code: "NICKNAME_TOO_SHORT", Message: "Nickname must be at least 2 characters long"},
+	usererrors.ErrNicknameTooLong:  {StatusCode: http.StatusBadRequest, Code: "NICKNAME_TOO_LONG", Message: "Nickname must not exceed 32 characters"},
 	usererrors.ErrInvalidUserID:    {StatusCode: http.StatusBadRequest, Code: "INVALID_USER_ID", Message: "Invalid user ID"},
 	usererrors.ErrPasswordEmpty:    {StatusCode: http.StatusBadRequest, Code: "PASSWORD_EMPTY", Message: "Password cannot be empty"},
 	usererrors.ErrValidationFailed: {StatusCode: http.StatusBadRequest, Code: "VALIDATION_FAILED", Message: "Validation failed"},
@@ -57,6 +58,8 @@ var userErrorMap = map[error]response.ErrorMapping{
 	usererrors.ErrGitHubAPIFailed:          {StatusCode: http.StatusBadGateway, Code: "GITHUB_API_FAILED", Message: "GitHub API request failed"},
 	usererrors.ErrInvalidState:             {StatusCode: http.StatusBadRequest, Code: "INVALID_STATE", Message: "Invalid state parameter"},
 	usererrors.ErrGitHubNotConfigured:      {StatusCode: http.StatusServiceUnavailable, Code: "GITHUB_NOT_CONFIGURED", Message: "GitHub integration is not configured on this server"},
+	usererrors.ErrRepositoryNotFound:       {StatusCode: http.StatusNotFound, Code: "REPOSITORY_NOT_FOUND", Message: "Repository not found or not accessible"},
+	usererrors.ErrRepositoryAccessDenied:   {StatusCode: http.StatusForbidden, Code: "REPOSITORY_ACCESS_DENIED", Message: "Repository access denied"},
 }
 
 // mapUserError provides error mapping for user domain
