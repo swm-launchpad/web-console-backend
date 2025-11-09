@@ -212,6 +212,25 @@ func (n *Network) SetFQDN(fqdn *string) error {
 	return nil
 }
 
+// SetInternalPort sets the internal port with validation
+func (n *Network) SetInternalPort(port *uint16) error {
+	if port == nil {
+		return containererrors.ErrInvalidPort
+	}
+	if *port < MinPort || *port > MaxPort {
+		return containererrors.ErrInvalidPort
+	}
+	n.internalPort = port
+	n.updatedAt = time.Now()
+	return nil
+}
+
+// SetNetworkType sets the network type
+func (n *Network) SetNetworkType(netType value.NetworkType) {
+	n.networkType = netType
+	n.updatedAt = time.Now()
+}
+
 // Equals checks if two Networks have the same internal port
 func (n *Network) Equals(other *Network) bool {
 	if other == nil {
