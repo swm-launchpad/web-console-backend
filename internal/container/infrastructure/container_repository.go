@@ -1185,6 +1185,25 @@ func (r *containerRepository) CheckInternalPortExistsInProject(ctx context.Conte
 	return result, nil
 }
 
+// CheckFQDNExists checks if an FQDN is used anywhere in the system
+func (r *containerRepository) CheckFQDNExists(ctx context.Context, fqdn string) (bool, error) {
+	r.logger.Debug(ctx, "checking FQDN existence",
+		zap.String("fqdn", fqdn),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckFQDNExists(ctx, sql.NullString{String: fqdn, Valid: true})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check FQDN existence",
+			zap.String("fqdn", fqdn),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
 // CheckFQDNExistsInOtherProject checks if FQDN is used by another project
 func (r *containerRepository) CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
 	r.logger.Debug(ctx, "checking FQDN existence in other project",

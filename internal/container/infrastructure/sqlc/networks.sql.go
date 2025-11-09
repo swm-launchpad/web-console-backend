@@ -11,6 +11,25 @@ import (
 	"time"
 )
 
+const checkFQDNExists = `-- name: CheckFQDNExists :one
+SELECT COUNT(*) > 0 as fqdn_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE n.fqdn = ?
+  AND n.is_deleted = 0
+  AND c.is_deleted = 0
+FOR UPDATE
+`
+
+// Check if FQDN is used anywhere in the system
+// Simple availability check across all projects
+func (q *Queries) CheckFQDNExists(ctx context.Context, fqdn sql.NullString) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkFQDNExists, fqdn)
+	var fqdn_exists bool
+	err := row.Scan(&fqdn_exists)
+	return fqdn_exists, err
+}
+
 const checkFQDNExistsInOtherProject = `-- name: CheckFQDNExistsInOtherProject :one
 SELECT COUNT(*) > 0 as fqdn_exists
 FROM NETWORKS n

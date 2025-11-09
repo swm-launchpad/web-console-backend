@@ -10,6 +10,9 @@ import (
 )
 
 type Querier interface {
+	// Check if FQDN is used anywhere in the system
+	// Simple availability check across all projects
+	CheckFQDNExists(ctx context.Context, fqdn sql.NullString) (bool, error)
 	// Check if FQDN is used by another project (for AddNetwork)
 	// FQDN ownership is project-scoped: once a project uses a FQDN, it's reserved for that project
 	// Checks both active and deleted networks to preserve FQDN ownership

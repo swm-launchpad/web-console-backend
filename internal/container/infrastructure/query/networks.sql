@@ -49,6 +49,17 @@ WHERE c.project_id = ?
   AND c.is_deleted = 0
 FOR UPDATE;
 
+-- name: CheckFQDNExists :one
+-- Check if FQDN is used anywhere in the system
+-- Simple availability check across all projects
+SELECT COUNT(*) > 0 as fqdn_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE n.fqdn = ?
+  AND n.is_deleted = 0
+  AND c.is_deleted = 0
+FOR UPDATE;
+
 -- name: CheckFQDNExistsInOtherProject :one
 -- Check if FQDN is used by another project (for AddNetwork)
 -- FQDN ownership is project-scoped: once a project uses a FQDN, it's reserved for that project

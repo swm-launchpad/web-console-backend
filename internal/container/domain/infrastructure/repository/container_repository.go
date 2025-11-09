@@ -70,6 +70,11 @@ type ContainerRepository interface {
 	// Used for validating network port uniqueness within a project (K8s pod shares network interface)
 	CheckInternalPortExistsInProject(ctx context.Context, projectID uint, internalPort uint16) (bool, error)
 
+	// CheckFQDNExists checks if an FQDN is used anywhere in the system
+	// Returns true if the FQDN exists in any non-deleted network
+	// Used for simple FQDN availability check across all projects
+	CheckFQDNExists(ctx context.Context, fqdn string) (bool, error)
+
 	// CheckFQDNExistsInOtherProject checks if FQDN is used by another project
 	// Returns true if the FQDN exists in any project OTHER than the specified one
 	// Only checks non-deleted networks and containers
