@@ -25,6 +25,7 @@ type ContainerHandler struct {
 	updateEnvVarUC    *application.UpdateEnvVarUseCase
 	deleteEnvVarUC    *application.DeleteEnvVarUseCase
 	addNetworkUC      *application.AddNetworkUseCase
+	updateNetworkUC   *application.UpdateNetworkUseCase
 	deleteNetworkUC   *application.DeleteNetworkUseCase
 	addSecretUC       *application.AddSecretUseCase
 	updateSecretUC    *application.UpdateSecretUseCase
@@ -61,6 +62,7 @@ func NewContainerHandler(
 	updateEnvVarUC *application.UpdateEnvVarUseCase,
 	deleteEnvVarUC *application.DeleteEnvVarUseCase,
 	addNetworkUC *application.AddNetworkUseCase,
+	updateNetworkUC *application.UpdateNetworkUseCase,
 	deleteNetworkUC *application.DeleteNetworkUseCase,
 	addSecretUC *application.AddSecretUseCase,
 	updateSecretUC *application.UpdateSecretUseCase,
@@ -87,6 +89,7 @@ func NewContainerHandler(
 		updateEnvVarUC:    updateEnvVarUC,
 		deleteEnvVarUC:    deleteEnvVarUC,
 		addNetworkUC:      addNetworkUC,
+		updateNetworkUC:   updateNetworkUC,
 		deleteNetworkUC:   deleteNetworkUC,
 		addSecretUC:       addSecretUC,
 		updateSecretUC:    updateSecretUC,
@@ -993,6 +996,104 @@ func (h *ContainerHandler) DeleteNetwork(c *gin.Context) {
 		zap.Uint("user_id", userID.(uint)),
 		zap.Uint("container_id", container.ContainerID()),
 		zap.Uint16("internal_port", uint16(port)),
+	)
+
+	response.OK(c, output)
+}
+
+// UpdateNetworkRequest represents the request body for updating a network
+type UpdateNetworkRequest struct {
+	InternalPort *uint16 `json:"internal_port,omitempty"`
+	NetworkType  string  `json:"network_type,omitempty"`
+	FQDN         *string `json:"fqdn,omitempty"`
+}
+
+// UpdateNetwork handles updating a network port mapping
+func (h *ContainerHandler) UpdateNetwork(c *gin.Context) {
+	ctx := c.Request.Context()
+	containerSlug := c.Param("slug")
+	networkIDStr := c.Param("network_id")
+
+	h.logger.Info(ctx, "update network handler started",
+		zap.String("handler", "UpdateNetwork"),
+		zap.String("container_slug", containerSlug),
+		zap.String("network_id", networkIDStr),
+	)
+
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "UpdateNetwork"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	// Parse network ID
+	networkID, err := strconv.ParseUint(networkIDStr, 10, 32)
+	if err != nil {
+		h.logger.Warn(ctx, "invalid network ID parameter",
+			zap.Error(err),
+			zap.String("handler", "UpdateNetwork"),
+			zap.String("network_id_str", networkIDStr),
+		)
+		response.Error(c, containererrors.ErrValidationFailed, mapContainerError)
+		return
+	}
+
+	// Get container by slug
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "UpdateNetwork"),
+			zap.String("container_slug", containerSlug),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Bind request
+	var req UpdateNetworkRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Warn(ctx, "request validation failed",
+			zap.Error(err),
+			zap.String("handler", "UpdateNetwork"),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, containererrors.ErrValidationFailed, mapContainerError)
+		return
+	}
+
+	// Execute use case
+	input := application.UpdateNetworkInput{
+		ContainerID:  container.ContainerID(),
+		UserID:       userID.(uint),
+		NetworkID:    uint(networkID),
+		InternalPort: req.InternalPort,
+		NetworkType:  req.NetworkType,
+		FQDN:         req.FQDN,
+	}
+
+	output, err := h.updateNetworkUC.Execute(c.Request.Context(), input)
+	if err != nil {
+		h.logger.Error(ctx, "update network use case failed",
+			zap.Error(err),
+			zap.String("handler", "UpdateNetwork"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("container_id", container.ContainerID()),
+			zap.Uint64("network_id", networkID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	h.logger.Info(ctx, "update network handler completed",
+		zap.String("handler", "UpdateNetwork"),
+		zap.Uint("user_id", userID.(uint)),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.Uint("network_id", output.NetworkID),
 	)
 
 	response.OK(c, output)
