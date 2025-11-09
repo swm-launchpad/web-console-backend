@@ -175,7 +175,9 @@ var containerErrorMap = map[error]response.ErrorMapping{
 	// FQDN and domain errors
 	containererrors.ErrInvalidFQDN:   {StatusCode: http.StatusBadRequest, Code: "INVALID_FQDN", Message: "Invalid fully qualified domain name"},
 	containererrors.ErrFQDNTooLong:   {StatusCode: http.StatusBadRequest, Code: "FQDN_TOO_LONG", Message: "FQDN is too long"},
+	containererrors.ErrFQDNTooShort:  {StatusCode: http.StatusBadRequest, Code: "FQDN_TOO_SHORT", Message: "Subdomain must be at least 4 characters"},
 	containererrors.ErrDuplicateFQDN: {StatusCode: http.StatusConflict, Code: "DUPLICATE_FQDN", Message: "FQDN already exists"},
+	containererrors.ErrReservedFQDN:  {StatusCode: http.StatusBadRequest, Code: "RESERVED_FQDN", Message: "Subdomain is reserved for system use"},
 
 	// Stable window errors
 	containererrors.ErrInvalidStableWindow: {StatusCode: http.StatusBadRequest, Code: "INVALID_STABLE_WINDOW", Message: "Invalid stable window"},
