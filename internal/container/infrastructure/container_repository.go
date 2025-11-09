@@ -324,6 +324,8 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 		} else {
 			// Existing network - UPDATE
 			updateParams := sqlc.UpdateNetworkParams{
+				InternalPort: uint16PtrToNullInt32(network.InternalPort()),
+				Type:         sqlc.NetworksType(network.NetworkType().String()),
 				ExternalPort: uint16PtrToNullInt32(network.ExternalPort()),
 				ExternalIp:   stringPtrToNullString(network.ExternalIP()),
 				Fqdn:         stringPtrToNullString(network.FQDN()),

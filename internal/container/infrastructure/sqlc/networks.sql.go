@@ -309,6 +309,8 @@ func (q *Queries) SoftDeleteNetworksByContainerID(ctx context.Context, arg SoftD
 
 const updateNetwork = `-- name: UpdateNetwork :execresult
 UPDATE NETWORKS SET
+    internal_port = ?,
+    type = ?,
     external_port = ?,
     external_ip = ?,
     fqdn = ?,
@@ -317,6 +319,8 @@ WHERE network_id = ?
 `
 
 type UpdateNetworkParams struct {
+	InternalPort sql.NullInt32  `json:"internal_port"`
+	Type         NetworksType   `json:"type"`
 	ExternalPort sql.NullInt32  `json:"external_port"`
 	ExternalIp   sql.NullString `json:"external_ip"`
 	Fqdn         sql.NullString `json:"fqdn"`
@@ -326,6 +330,8 @@ type UpdateNetworkParams struct {
 
 func (q *Queries) UpdateNetwork(ctx context.Context, arg UpdateNetworkParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateNetwork,
+		arg.InternalPort,
+		arg.Type,
 		arg.ExternalPort,
 		arg.ExternalIp,
 		arg.Fqdn,

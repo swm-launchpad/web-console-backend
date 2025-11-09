@@ -20,6 +20,8 @@ WHERE network_id = ?;
 
 -- name: UpdateNetwork :execresult
 UPDATE NETWORKS SET
+    internal_port = ?,
+    type = ?,
     external_port = ?,
     external_ip = ?,
     fqdn = ?,
