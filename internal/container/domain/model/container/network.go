@@ -40,6 +40,7 @@ var reservedSubdomains = map[string]bool{
 	"loki":         true,
 	"api":          true,
 	"www":          true,
+	"docs":         true,
 }
 
 const (
