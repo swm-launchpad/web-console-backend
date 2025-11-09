@@ -87,6 +87,20 @@ type ContainerRepository interface {
 	// Used for UpdateNetwork to allow updating a network's FQDN or reusing within same project
 	CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error)
 
+	// CheckFQDNExistsForProject checks FQDN with proper business rules
+	// Returns true if FQDN exists in:
+	// 1. Same project (any active network, regardless of container state) - prevents duplicates
+	// 2. Other projects (only if container is active) - maintains ownership
+	// Allows reuse when:
+	// - Same project soft-deleted network (deployment time same, no conflict)
+	// - Other project soft-deleted container (ownership released)
+	// Used for AddNetwork and CreateContainer
+	CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error)
+
+	// CheckFQDNExistsForProjectExcludingSelf same as CheckFQDNExistsForProject but excludes self
+	// Used for UpdateNetwork to allow updating network's own FQDN
+	CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error)
+
 	// CheckInternalPortExistsInProjectExcludingSelf checks internal port with self-exclusion
 	// Returns true if the internal port exists in the project, excluding the specified network
 	// Used for UpdateNetwork to allow updating a network's internal port

@@ -266,11 +266,11 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 				}
 
 				// Validate FQDN uniqueness if provided
-				// FQDN ownership is project-scoped: check if used by OTHER projects
+				// Check project-scoped FQDN ownership with soft-delete consideration
 				if networkInput.FQDN != nil && *networkInput.FQDN != "" {
-					fqdnExists, err := uc.containerRepo.CheckFQDNExistsInOtherProject(txCtx, *networkInput.FQDN, input.ProjectID)
+					fqdnExists, err := uc.containerRepo.CheckFQDNExistsForProject(txCtx, *networkInput.FQDN, input.ProjectID)
 					if err != nil {
-						uc.logger.Error(ctx, "failed to check FQDN existence in other project",
+						uc.logger.Error(ctx, "failed to check FQDN existence for project",
 							zap.Error(err),
 							zap.String("fqdn", *networkInput.FQDN),
 							zap.Uint("project_id", input.ProjectID),
@@ -278,7 +278,7 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 						return err
 					}
 					if fqdnExists {
-						uc.logger.Warn(ctx, "FQDN already exists in another project",
+						uc.logger.Warn(ctx, "FQDN already exists (duplicate in project or owned by active container in other project)",
 							zap.String("fqdn", *networkInput.FQDN),
 							zap.Uint("project_id", input.ProjectID),
 						)

@@ -30,6 +30,73 @@ func (q *Queries) CheckFQDNExists(ctx context.Context, fqdn sql.NullString) (boo
 	return fqdn_exists, err
 }
 
+const checkFQDNExistsForProject = `-- name: CheckFQDNExistsForProject :one
+SELECT COUNT(*) > 0 as fqdn_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE n.fqdn = ?
+  AND n.is_deleted = 0
+  AND (
+    c.project_id = ?
+    OR (c.project_id != ? AND c.is_deleted = 0)
+  )
+FOR UPDATE
+`
+
+type CheckFQDNExistsForProjectParams struct {
+	Fqdn        sql.NullString `json:"fqdn"`
+	ProjectID   uint32         `json:"project_id"`
+	ProjectID_2 uint32         `json:"project_id_2"`
+}
+
+// Check FQDN with proper business rules for AddNetwork/CreateContainer
+// Returns true if FQDN exists in:
+// 1. Same project (any active network, regardless of container state)
+// 2. Other projects (only if container is active - maintains ownership)
+// Allows reuse when:
+// - Same project soft-deleted network (deployment time same, no conflict)
+// - Other project soft-deleted container (ownership released)
+func (q *Queries) CheckFQDNExistsForProject(ctx context.Context, arg CheckFQDNExistsForProjectParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkFQDNExistsForProject, arg.Fqdn, arg.ProjectID, arg.ProjectID_2)
+	var fqdn_exists bool
+	err := row.Scan(&fqdn_exists)
+	return fqdn_exists, err
+}
+
+const checkFQDNExistsForProjectExcludingSelf = `-- name: CheckFQDNExistsForProjectExcludingSelf :one
+SELECT COUNT(*) > 0 as fqdn_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE n.fqdn = ?
+  AND n.network_id != ?
+  AND n.is_deleted = 0
+  AND (
+    c.project_id = ?
+    OR (c.project_id != ? AND c.is_deleted = 0)
+  )
+FOR UPDATE
+`
+
+type CheckFQDNExistsForProjectExcludingSelfParams struct {
+	Fqdn        sql.NullString `json:"fqdn"`
+	NetworkID   uint32         `json:"network_id"`
+	ProjectID   uint32         `json:"project_id"`
+	ProjectID_2 uint32         `json:"project_id_2"`
+}
+
+// Same as CheckFQDNExistsForProject but excludes self (for UpdateNetwork)
+func (q *Queries) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, arg CheckFQDNExistsForProjectExcludingSelfParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, checkFQDNExistsForProjectExcludingSelf,
+		arg.Fqdn,
+		arg.NetworkID,
+		arg.ProjectID,
+		arg.ProjectID_2,
+	)
+	var fqdn_exists bool
+	err := row.Scan(&fqdn_exists)
+	return fqdn_exists, err
+}
+
 const checkFQDNExistsInOtherProject = `-- name: CheckFQDNExistsInOtherProject :one
 SELECT COUNT(*) > 0 as fqdn_exists
 FROM NETWORKS n

@@ -1257,6 +1257,59 @@ func (r *containerRepository) CheckFQDNExistsInOtherProjectExcludingSelf(ctx con
 	return result, nil
 }
 
+// CheckFQDNExistsForProject checks FQDN with proper business rules
+func (r *containerRepository) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	r.logger.Debug(ctx, "checking FQDN existence for project with business rules",
+		zap.String("fqdn", fqdn),
+		zap.Uint("project_id", projectID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckFQDNExistsForProject(ctx, sqlc.CheckFQDNExistsForProjectParams{
+		Fqdn:        sql.NullString{String: fqdn, Valid: true},
+		ProjectID:   uint32(projectID),
+		ProjectID_2: uint32(projectID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check FQDN existence for project",
+			zap.String("fqdn", fqdn),
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
+// CheckFQDNExistsForProjectExcludingSelf checks FQDN with business rules, excluding self
+func (r *containerRepository) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	r.logger.Debug(ctx, "checking FQDN existence for project excluding self",
+		zap.String("fqdn", fqdn),
+		zap.Uint("network_id", networkID),
+		zap.Uint("project_id", projectID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckFQDNExistsForProjectExcludingSelf(ctx, sqlc.CheckFQDNExistsForProjectExcludingSelfParams{
+		Fqdn:        sql.NullString{String: fqdn, Valid: true},
+		NetworkID:   uint32(networkID),
+		ProjectID:   uint32(projectID),
+		ProjectID_2: uint32(projectID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check FQDN existence for project excluding self",
+			zap.String("fqdn", fqdn),
+			zap.Uint("network_id", networkID),
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
 // CheckInternalPortExistsInProjectExcludingSelf checks if internal port exists in project, excluding self
 func (r *containerRepository) CheckInternalPortExistsInProjectExcludingSelf(ctx context.Context, projectID uint, internalPort uint16, networkID uint) (bool, error) {
 	r.logger.Debug(ctx, "checking internal port existence in project excluding self",

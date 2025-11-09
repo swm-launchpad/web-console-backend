@@ -13,6 +13,16 @@ type Querier interface {
 	// Check if FQDN is used anywhere in the system
 	// Simple availability check across all projects
 	CheckFQDNExists(ctx context.Context, fqdn sql.NullString) (bool, error)
+	// Check FQDN with proper business rules for AddNetwork/CreateContainer
+	// Returns true if FQDN exists in:
+	// 1. Same project (any active network, regardless of container state)
+	// 2. Other projects (only if container is active - maintains ownership)
+	// Allows reuse when:
+	// - Same project soft-deleted network (deployment time same, no conflict)
+	// - Other project soft-deleted container (ownership released)
+	CheckFQDNExistsForProject(ctx context.Context, arg CheckFQDNExistsForProjectParams) (bool, error)
+	// Same as CheckFQDNExistsForProject but excludes self (for UpdateNetwork)
+	CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, arg CheckFQDNExistsForProjectExcludingSelfParams) (bool, error)
 	// Check if FQDN is used by another project (for AddNetwork)
 	// FQDN ownership is project-scoped: once a project uses a FQDN, it's reserved for that project
 	// Checks both active and deleted networks to preserve FQDN ownership

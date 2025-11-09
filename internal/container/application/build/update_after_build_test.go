@@ -89,6 +89,12 @@ func (m *mockUpdateContainerRepo) CheckFQDNExistsInOtherProject(ctx context.Cont
 func (m *mockUpdateContainerRepo) CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
 	return false, nil
 }
+func (m *mockUpdateContainerRepo) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	return false, nil
+}
+func (m *mockUpdateContainerRepo) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	return false, nil
+}
 func (m *mockUpdateContainerRepo) CheckInternalPortExistsInProjectExcludingSelf(ctx context.Context, projectID uint, internalPort uint16, networkID uint) (bool, error) {
 	return false, nil
 }

@@ -50,7 +50,7 @@ func TestUpdateNetworkUseCase_Execute_Success(t *testing.T) {
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
 	mockRepo.On("CheckInternalPortExistsInProjectExcludingSelf", ctx, projectID, newPort, networkID).Return(false, nil)
-	mockRepo.On("CheckFQDNExistsInOtherProjectExcludingSelf", ctx, newFQDN, networkID, projectID).Return(false, nil)
+	mockRepo.On("CheckFQDNExistsForProjectExcludingSelf", ctx, newFQDN, networkID, projectID).Return(false, nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
@@ -106,7 +106,7 @@ func TestUpdateNetworkUseCase_Execute_PartialUpdate(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
-	mockRepo.On("CheckFQDNExistsInOtherProjectExcludingSelf", ctx, newFQDN, networkID, projectID).Return(false, nil)
+	mockRepo.On("CheckFQDNExistsForProjectExcludingSelf", ctx, newFQDN, networkID, projectID).Return(false, nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
@@ -276,7 +276,7 @@ func TestUpdateNetworkUseCase_Execute_DuplicateFQDN(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
-	mockRepo.On("CheckFQDNExistsInOtherProjectExcludingSelf", ctx, duplicateFQDN, networkID, projectID).Return(true, nil)
+	mockRepo.On("CheckFQDNExistsForProjectExcludingSelf", ctx, duplicateFQDN, networkID, projectID).Return(true, nil)
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
 		Return(nil)

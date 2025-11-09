@@ -138,3 +138,13 @@ func (m *MockContainerRepository) SoftDeleteNetworksByContainerID(ctx context.Co
 	args := m.Called(ctx, containerID)
 	return args.Error(0)
 }
+
+func (m *MockContainerRepository) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	args := m.Called(ctx, fqdn, projectID)
+	return args.Bool(0), args.Error(1)
+}
+
+func (m *MockContainerRepository) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	args := m.Called(ctx, fqdn, networkID, projectID)
+	return args.Bool(0), args.Error(1)
+}

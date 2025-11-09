@@ -87,6 +87,39 @@ WHERE n.fqdn = ?
   AND c.is_deleted = 0
 FOR UPDATE;
 
+-- name: CheckFQDNExistsForProject :one
+-- Check FQDN with proper business rules for AddNetwork/CreateContainer
+-- Returns true if FQDN exists in:
+-- 1. Same project (any active network, regardless of container state)
+-- 2. Other projects (only if container is active - maintains ownership)
+-- Allows reuse when:
+-- - Same project soft-deleted network (deployment time same, no conflict)
+-- - Other project soft-deleted container (ownership released)
+SELECT COUNT(*) > 0 as fqdn_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE n.fqdn = ?
+  AND n.is_deleted = 0
+  AND (
+    c.project_id = ?
+    OR (c.project_id != ? AND c.is_deleted = 0)
+  )
+FOR UPDATE;
+
+-- name: CheckFQDNExistsForProjectExcludingSelf :one
+-- Same as CheckFQDNExistsForProject but excludes self (for UpdateNetwork)
+SELECT COUNT(*) > 0 as fqdn_exists
+FROM NETWORKS n
+INNER JOIN CONTAINERS c ON n.container_id = c.container_id
+WHERE n.fqdn = ?
+  AND n.network_id != ?
+  AND n.is_deleted = 0
+  AND (
+    c.project_id = ?
+    OR (c.project_id != ? AND c.is_deleted = 0)
+  )
+FOR UPDATE;
+
 -- name: CheckInternalPortExistsInProjectExcludingSelf :one
 -- Check if internal port exists in project, excluding self (for UpdateNetwork)
 -- Internal ports must be unique within a project (containers share pod network interface)

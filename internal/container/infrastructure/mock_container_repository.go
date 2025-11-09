@@ -200,3 +200,15 @@ func (m *MockContainerRepository) UpdateNetwork(ctx context.Context, network *mo
 	args := m.Called(ctx, network)
 	return args.Error(0)
 }
+
+// CheckFQDNExistsForProject mocks the CheckFQDNExistsForProject method
+func (m *MockContainerRepository) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	args := m.Called(ctx, fqdn, projectID)
+	return args.Bool(0), args.Error(1)
+}
+
+// CheckFQDNExistsForProjectExcludingSelf mocks the CheckFQDNExistsForProjectExcludingSelf method
+func (m *MockContainerRepository) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	args := m.Called(ctx, fqdn, networkID, projectID)
+	return args.Bool(0), args.Error(1)
+}
