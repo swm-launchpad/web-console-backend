@@ -70,9 +70,27 @@ type ContainerRepository interface {
 	// Used for validating network port uniqueness within a project (K8s pod shares network interface)
 	CheckInternalPortExistsInProject(ctx context.Context, projectID uint, internalPort uint16) (bool, error)
 
-	// CheckFQDNExists checks if an FQDN is already used by any network in the system
-	// Used for validating FQDN global uniqueness
-	CheckFQDNExists(ctx context.Context, fqdn string) (bool, error)
+	// CheckFQDNExistsInOtherProject checks if FQDN is used by another project
+	// Returns true if the FQDN exists in any project OTHER than the specified one
+	// Only checks non-deleted networks and containers
+	// Used for AddNetwork to enforce project-scoped FQDN ownership
+	CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error)
+
+	// CheckFQDNExistsInOtherProjectExcludingSelf checks FQDN with self-exclusion
+	// Returns true if the FQDN exists in any project OTHER than the specified one,
+	// excluding the network with the given network_id
+	// Used for UpdateNetwork to allow updating a network's FQDN or reusing within same project
+	CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error)
+
+	// CheckInternalPortExistsInProjectExcludingSelf checks internal port with self-exclusion
+	// Returns true if the internal port exists in the project, excluding the specified network
+	// Used for UpdateNetwork to allow updating a network's internal port
+	CheckInternalPortExistsInProjectExcludingSelf(ctx context.Context, projectID uint, internalPort uint16, networkID uint) (bool, error)
+
+	// SoftDeleteNetworksByContainerID soft deletes all networks for a container
+	// Used when a container is deleted to cascade soft delete to networks
+	// Preserves FQDN ownership tracking even after container deletion
+	SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error
 
 	// FindAllSlugsByProjectIDIncludingDeleted retrieves all container slugs for a project
 	// INCLUDING soft-deleted containers. Used for cleanup operations that need to remove
