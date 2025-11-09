@@ -295,9 +295,9 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 	}
 
 	// Process domain networks: INSERT new or UPDATE existing
-	// Use index-based iteration to modify the original network objects
+	// Use pointer to modify the original network objects in the slice
 	for i := range networks {
-		network := networks[i]
+		network := &networks[i]
 		if network.NetworkID() == 0 {
 			// New network - INSERT
 			netParams := sqlc.CreateNetworkParams{
