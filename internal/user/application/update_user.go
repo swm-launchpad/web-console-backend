@@ -70,6 +70,9 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 		if len(*input.Nickname) < 2 {
 			return nil, usererrors.ErrNicknameTooShort
 		}
+		if len(*input.Nickname) > 32 {
+			return nil, usererrors.ErrNicknameTooLong
+		}
 		user.Nickname = *input.Nickname
 		updated = true
 	}

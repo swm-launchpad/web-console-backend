@@ -137,3 +137,78 @@ func (m *MockContainerRepository) FindAllSlugsByProjectIDIncludingDeleted(ctx co
 	}
 	return args.Get(0).([]string), args.Error(1)
 }
+
+// CheckFQDNExistsInOtherProject mocks the CheckFQDNExistsInOtherProject method
+func (m *MockContainerRepository) CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	args := m.Called(ctx, fqdn, projectID)
+	return args.Bool(0), args.Error(1)
+}
+
+// CheckFQDNExistsInOtherProjectExcludingSelf mocks the CheckFQDNExistsInOtherProjectExcludingSelf method
+func (m *MockContainerRepository) CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	args := m.Called(ctx, fqdn, networkID, projectID)
+	return args.Bool(0), args.Error(1)
+}
+
+// CheckInternalPortExistsInProjectExcludingSelf mocks the CheckInternalPortExistsInProjectExcludingSelf method
+func (m *MockContainerRepository) CheckInternalPortExistsInProjectExcludingSelf(ctx context.Context, projectID uint, internalPort uint16, networkID uint) (bool, error) {
+	args := m.Called(ctx, projectID, internalPort, networkID)
+	return args.Bool(0), args.Error(1)
+}
+
+// SoftDeleteNetworksByContainerID mocks the SoftDeleteNetworksByContainerID method
+func (m *MockContainerRepository) SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error {
+	args := m.Called(ctx, containerID)
+	return args.Error(0)
+}
+
+// BeginTx mocks the BeginTx method
+func (m *MockContainerRepository) BeginTx(ctx context.Context) (context.Context, interface{}, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(context.Context), args.Get(1), args.Error(2)
+}
+
+// Commit mocks the Commit method
+func (m *MockContainerRepository) Commit(ctx context.Context, tx interface{}) error {
+	args := m.Called(ctx, tx)
+	return args.Error(0)
+}
+
+// Rollback mocks the Rollback method
+func (m *MockContainerRepository) Rollback(ctx context.Context, tx interface{}) error {
+	args := m.Called(ctx, tx)
+	return args.Error(0)
+}
+
+// HasProjectPermission mocks the HasProjectPermission method
+func (m *MockContainerRepository) HasProjectPermission(ctx context.Context, userID uint, containerID uint) (bool, error) {
+	args := m.Called(ctx, userID, containerID)
+	return args.Bool(0), args.Error(1)
+}
+
+// GetContainerByID mocks the GetContainerByID method
+func (m *MockContainerRepository) GetContainerByID(ctx context.Context, containerID uint) (*model.Container, error) {
+	args := m.Called(ctx, containerID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Container), args.Error(1)
+}
+
+// UpdateNetwork mocks the UpdateNetwork method
+func (m *MockContainerRepository) UpdateNetwork(ctx context.Context, network *model.Network) error {
+	args := m.Called(ctx, network)
+	return args.Error(0)
+}
+
+// CheckFQDNExistsForProject mocks the CheckFQDNExistsForProject method
+func (m *MockContainerRepository) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	args := m.Called(ctx, fqdn, projectID)
+	return args.Bool(0), args.Error(1)
+}
+
+// CheckFQDNExistsForProjectExcludingSelf mocks the CheckFQDNExistsForProjectExcludingSelf method
+func (m *MockContainerRepository) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	args := m.Called(ctx, fqdn, networkID, projectID)
+	return args.Bool(0), args.Error(1)
+}

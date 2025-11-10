@@ -210,7 +210,9 @@ var (
 var (
 	ErrInvalidFQDN   = errors.New("invalid fully qualified domain name")
 	ErrFQDNTooLong   = errors.New("FQDN is too long")
+	ErrFQDNTooShort  = errors.New("subdomain must be at least 4 characters")
 	ErrDuplicateFQDN = errors.New("FQDN already exists")
+	ErrReservedFQDN  = errors.New("subdomain is reserved for system use")
 )
 
 // Stable window errors

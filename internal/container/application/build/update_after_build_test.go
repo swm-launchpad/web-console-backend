@@ -83,6 +83,24 @@ func (m *mockUpdateContainerRepo) FindAllSlugsByProjectIDIncludingDeleted(ctx co
 func (m *mockUpdateContainerRepo) CheckFQDNExists(ctx context.Context, fqdn string) (bool, error) {
 	return false, nil
 }
+func (m *mockUpdateContainerRepo) CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	return false, nil
+}
+func (m *mockUpdateContainerRepo) CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	return false, nil
+}
+func (m *mockUpdateContainerRepo) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	return false, nil
+}
+func (m *mockUpdateContainerRepo) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	return false, nil
+}
+func (m *mockUpdateContainerRepo) CheckInternalPortExistsInProjectExcludingSelf(ctx context.Context, projectID uint, internalPort uint16, networkID uint) (bool, error) {
+	return false, nil
+}
+func (m *mockUpdateContainerRepo) SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error {
+	return nil
+}
 
 type mockUpdateTxManager struct {
 	runInTxFunc func(ctx context.Context, fn func(ctx context.Context) error) error

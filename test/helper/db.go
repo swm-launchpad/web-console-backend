@@ -97,6 +97,7 @@ func (tdb *TestDB) Migrate() error {
 		"000004_update_name_length_to_32.up.sql",
 		"000005_add_max_projects_per_user_setting.up.sql",
 		"000006_update_nickname_length.up.sql",
+		"000007_add_networks_soft_delete.up.sql",
 	}
 
 	for _, migration := range migrations {

@@ -113,6 +113,22 @@ func createMockNetwork(networkID, containerID uint, containerPort uint16, protoc
 	return network
 }
 
+// createMockNetworkWithFQDN creates a mock network with FQDN
+func createMockNetworkWithFQDN(networkID, containerID uint, internalPort, externalPort *uint16, networkType value.NetworkType, fqdn *string) *model.Network {
+	network := model.ReconstructNetwork(
+		networkID,
+		containerID,
+		internalPort,
+		externalPort,
+		networkType,
+		nil,
+		fqdn,
+		time.Now(),
+		time.Now(),
+	)
+	return network
+}
+
 // createMockSecret creates a mock secret
 func createMockSecret(secretID, containerID uint, key, value string) *model.Secret {
 	secret := model.ReconstructSecret(secretID, containerID, key, value, time.Now(), time.Now())

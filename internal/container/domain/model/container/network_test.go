@@ -369,3 +369,117 @@ func TestReconstructNetwork(t *testing.T) {
 	assert.Equal(t, &externalIP, network.ExternalIP())
 	assert.Equal(t, &fqdn, network.FQDN())
 }
+
+func TestNewNetwork_ReservedFQDN(t *testing.T) {
+	containerID := uint(1)
+	internalPort := uint16(8080)
+	networkType, _ := value.NewNetworkType("http")
+
+	reservedSubdomains := []string{
+		"api.launchpad.kr",
+		"www.launchpad.kr",
+		"tekton.launchpad.kr",
+		"tekton-api.launchpad.kr",
+		"kube-api.launchpad.kr",
+		"registry.launchpad.kr",
+		"grafana.launchpad.kr",
+		"vm.launchpad.kr",
+		"vmalert.launchpad.kr",
+		"alertmanager.launchpad.kr",
+		"loki.launchpad.kr",
+	}
+
+	for _, fqdn := range reservedSubdomains {
+		t.Run(fqdn, func(t *testing.T) {
+			network, err := NewNetwork(containerID, &internalPort, nil, networkType, nil, &fqdn)
+			assert.ErrorIs(t, err, containererrors.ErrReservedFQDN)
+			assert.Nil(t, network)
+		})
+	}
+}
+
+func TestNewNetwork_FQDNTooShort(t *testing.T) {
+	containerID := uint(1)
+	internalPort := uint16(8080)
+	networkType, _ := value.NewNetworkType("http")
+
+	t.Run("3 characters subdomain", func(t *testing.T) {
+		fqdn := "app.launchpad.kr" // "app" is 3 characters
+		network, err := NewNetwork(containerID, &internalPort, nil, networkType, nil, &fqdn)
+		assert.ErrorIs(t, err, containererrors.ErrFQDNTooShort)
+		assert.Nil(t, network)
+	})
+
+	t.Run("2 characters subdomain", func(t *testing.T) {
+		fqdn := "my.launchpad.kr" // "my" is 2 characters
+		network, err := NewNetwork(containerID, &internalPort, nil, networkType, nil, &fqdn)
+		assert.ErrorIs(t, err, containererrors.ErrFQDNTooShort)
+		assert.Nil(t, network)
+	})
+
+	t.Run("1 character subdomain", func(t *testing.T) {
+		fqdn := "a.launchpad.kr" // "a" is 1 character
+		network, err := NewNetwork(containerID, &internalPort, nil, networkType, nil, &fqdn)
+		assert.ErrorIs(t, err, containererrors.ErrFQDNTooShort)
+		assert.Nil(t, network)
+	})
+}
+
+func TestNewNetwork_FQDNBoundary(t *testing.T) {
+	containerID := uint(1)
+	internalPort := uint16(8080)
+	networkType, _ := value.NewNetworkType("http")
+
+	t.Run("Exactly 3 characters - should fail", func(t *testing.T) {
+		fqdn := "dev.launchpad.kr" // "dev" is exactly 3 characters
+		network, err := NewNetwork(containerID, &internalPort, nil, networkType, nil, &fqdn)
+		assert.ErrorIs(t, err, containererrors.ErrFQDNTooShort)
+		assert.Nil(t, network)
+	})
+
+	t.Run("Exactly 4 characters - should succeed", func(t *testing.T) {
+		fqdn := "test.launchpad.kr" // "test" is exactly 4 characters
+		network, err := NewNetwork(containerID, &internalPort, nil, networkType, nil, &fqdn)
+		require.NoError(t, err)
+		assert.NotNil(t, network)
+		assert.Equal(t, &fqdn, network.FQDN())
+	})
+
+	t.Run("5 characters - should succeed", func(t *testing.T) {
+		fqdn := "myapp.launchpad.kr" // "myapp" is 5 characters
+		network, err := NewNetwork(containerID, &internalPort, nil, networkType, nil, &fqdn)
+		require.NoError(t, err)
+		assert.NotNil(t, network)
+		assert.Equal(t, &fqdn, network.FQDN())
+	})
+}
+
+func TestSetFQDN_ReservedFQDN(t *testing.T) {
+	containerID := uint(1)
+	internalPort := uint16(8080)
+	networkType, _ := value.NewNetworkType("http")
+	validFQDN := "myapp.launchpad.kr"
+
+	network, _ := NewNetwork(containerID, &internalPort, nil, networkType, nil, &validFQDN)
+
+	reservedFQDN := "api.launchpad.kr"
+	err := network.SetFQDN(&reservedFQDN)
+
+	assert.ErrorIs(t, err, containererrors.ErrReservedFQDN)
+	assert.Equal(t, &validFQDN, network.FQDN()) // FQDN should not change
+}
+
+func TestSetFQDN_FQDNTooShort(t *testing.T) {
+	containerID := uint(1)
+	internalPort := uint16(8080)
+	networkType, _ := value.NewNetworkType("http")
+	validFQDN := "myapp.launchpad.kr"
+
+	network, _ := NewNetwork(containerID, &internalPort, nil, networkType, nil, &validFQDN)
+
+	shortFQDN := "app.launchpad.kr" // "app" is 3 characters
+	err := network.SetFQDN(&shortFQDN)
+
+	assert.ErrorIs(t, err, containererrors.ErrFQDNTooShort)
+	assert.Equal(t, &validFQDN, network.FQDN()) // FQDN should not change
+}

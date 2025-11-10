@@ -423,6 +423,7 @@ func InitializeApp() (*App, error) {
 		containerApp.NewUpdateEnvVarUseCase,
 		containerApp.NewDeleteEnvVarUseCase,
 		containerApp.NewAddNetworkUseCase,
+		containerApp.NewUpdateNetworkUseCase,
 		containerApp.NewDeleteNetworkUseCase,
 		containerApp.NewAddSecretUseCase,
 		containerApp.NewUpdateSecretUseCase,

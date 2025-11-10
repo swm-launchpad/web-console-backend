@@ -70,9 +70,46 @@ type ContainerRepository interface {
 	// Used for validating network port uniqueness within a project (K8s pod shares network interface)
 	CheckInternalPortExistsInProject(ctx context.Context, projectID uint, internalPort uint16) (bool, error)
 
-	// CheckFQDNExists checks if an FQDN is already used by any network in the system
-	// Used for validating FQDN global uniqueness
+	// CheckFQDNExists checks if an FQDN is used anywhere in the system
+	// Returns true if the FQDN exists in any non-deleted network
+	// Used for simple FQDN availability check across all projects
 	CheckFQDNExists(ctx context.Context, fqdn string) (bool, error)
+
+	// CheckFQDNExistsInOtherProject checks if FQDN is used by another project
+	// Returns true if the FQDN exists in any project OTHER than the specified one
+	// Only checks non-deleted networks and containers
+	// Used for AddNetwork to enforce project-scoped FQDN ownership
+	CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error)
+
+	// CheckFQDNExistsInOtherProjectExcludingSelf checks FQDN with self-exclusion
+	// Returns true if the FQDN exists in any project OTHER than the specified one,
+	// excluding the network with the given network_id
+	// Used for UpdateNetwork to allow updating a network's FQDN or reusing within same project
+	CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error)
+
+	// CheckFQDNExistsForProject checks FQDN with proper business rules
+	// Returns true if FQDN exists in:
+	// 1. Same project (any active network, regardless of container state) - prevents duplicates
+	// 2. Other projects (only if container is active) - maintains ownership
+	// Allows reuse when:
+	// - Same project soft-deleted network (deployment time same, no conflict)
+	// - Other project soft-deleted container (ownership released)
+	// Used for AddNetwork and CreateContainer
+	CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error)
+
+	// CheckFQDNExistsForProjectExcludingSelf same as CheckFQDNExistsForProject but excludes self
+	// Used for UpdateNetwork to allow updating network's own FQDN
+	CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error)
+
+	// CheckInternalPortExistsInProjectExcludingSelf checks internal port with self-exclusion
+	// Returns true if the internal port exists in the project, excluding the specified network
+	// Used for UpdateNetwork to allow updating a network's internal port
+	CheckInternalPortExistsInProjectExcludingSelf(ctx context.Context, projectID uint, internalPort uint16, networkID uint) (bool, error)
+
+	// SoftDeleteNetworksByContainerID soft deletes all networks for a container
+	// Used when a container is deleted to cascade soft delete to networks
+	// Preserves FQDN ownership tracking even after container deletion
+	SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error
 
 	// FindAllSlugsByProjectIDIncludingDeleted retrieves all container slugs for a project
 	// INCLUDING soft-deleted containers. Used for cleanup operations that need to remove

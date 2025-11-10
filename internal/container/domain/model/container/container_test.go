@@ -30,6 +30,7 @@ func TestNewContainer_Success(t *testing.T) {
 	resourceLimits := defaultResourceLimits()
 
 	container, err := NewContainer(projectID, name, slug, gitConfig, resourceLimits, nil, nil, nil)
+	container.SetContainerID(1)
 
 	require.NoError(t, err)
 	assert.NotNil(t, container)
@@ -620,4 +621,180 @@ func TestContainer_CrossTypeKeyValidation_AllThreeTypes(t *testing.T) {
 
 	_, err = container.AddBuildVar("ENV_VAR", "value")
 	assert.ErrorIs(t, err, containererrors.ErrDuplicateKeyAcrossTypes)
+}
+
+// TestContainer_UpdateNetwork_Success tests successful network update
+func TestContainer_UpdateNetwork_Success(t *testing.T) {
+	// Setup container with a network
+	projectID := uint(1)
+	name := "Test Container"
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	gitConfig := defaultGitConfig()
+	resourceLimits := defaultResourceLimits()
+
+	container, err := NewContainer(projectID, name, slug, gitConfig, resourceLimits, nil, nil, nil)
+	require.NoError(t, err)
+	container.SetContainerID(1) // Required for network creation
+
+	// Add initial network
+	port := uint16(8080)
+	netType, _ := value.NewNetworkType("http")
+	fqdn := "original.launchpad.kr"
+	network, err := container.AddNetwork(&port, nil, netType, nil, &fqdn)
+	require.NoError(t, err)
+	networkID := network.NetworkID()
+
+	// Update network
+	newPort := uint16(9090)
+	newNetType, _ := value.NewNetworkType("tcp")
+	newFQDN := "updated.launchpad.kr"
+
+	updatedNetwork, err := container.UpdateNetwork(networkID, &newPort, newNetType, &newFQDN)
+
+	// Verify
+	assert.NoError(t, err)
+	assert.NotNil(t, updatedNetwork)
+	assert.Equal(t, networkID, updatedNetwork.NetworkID())
+	assert.Equal(t, newPort, *updatedNetwork.InternalPort())
+	assert.Equal(t, "tcp", updatedNetwork.NetworkType().String())
+	assert.Equal(t, newFQDN, *updatedNetwork.FQDN())
+}
+
+// TestContainer_UpdateNetwork_PartialUpdate tests updating only some fields
+func TestContainer_UpdateNetwork_PartialUpdate(t *testing.T) {
+	// Setup
+	projectID := uint(1)
+	name := "Test Container"
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	gitConfig := defaultGitConfig()
+	resourceLimits := defaultResourceLimits()
+
+	container, err := NewContainer(projectID, name, slug, gitConfig, resourceLimits, nil, nil, nil)
+	container.SetContainerID(1)
+	require.NoError(t, err)
+
+	// Add network
+	port := uint16(8080)
+	netType, _ := value.NewNetworkType("http")
+	fqdn := "original.launchpad.kr"
+	network, err := container.AddNetwork(&port, nil, netType, nil, &fqdn)
+	require.NoError(t, err)
+	networkID := network.NetworkID()
+
+	// Update only FQDN
+	newFQDN := "updated.launchpad.kr"
+	updatedNetwork, err := container.UpdateNetwork(networkID, nil, "", &newFQDN)
+
+	// Verify - port and type unchanged
+	assert.NoError(t, err)
+	assert.Equal(t, port, *updatedNetwork.InternalPort())
+	assert.Equal(t, "http", updatedNetwork.NetworkType().String())
+	assert.Equal(t, newFQDN, *updatedNetwork.FQDN())
+}
+
+// TestContainer_UpdateNetwork_NotFound tests updating non-existent network
+func TestContainer_UpdateNetwork_NotFound(t *testing.T) {
+	// Setup
+	projectID := uint(1)
+	name := "Test Container"
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	gitConfig := defaultGitConfig()
+	resourceLimits := defaultResourceLimits()
+
+	container, err := NewContainer(projectID, name, slug, gitConfig, resourceLimits, nil, nil, nil)
+	container.SetContainerID(1)
+	require.NoError(t, err)
+
+	// Try to update non-existent network
+	nonExistentID := uint(99999)
+	newPort := uint16(9090)
+
+	_, err = container.UpdateNetwork(nonExistentID, &newPort, "", nil)
+
+	assert.ErrorIs(t, err, containererrors.ErrNetworkNotFound)
+}
+
+// TestContainer_UpdateNetwork_InvalidPort tests updating with invalid port
+func TestContainer_UpdateNetwork_InvalidPort(t *testing.T) {
+	// Setup
+	projectID := uint(1)
+	name := "Test Container"
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	gitConfig := defaultGitConfig()
+	resourceLimits := defaultResourceLimits()
+
+	container, err := NewContainer(projectID, name, slug, gitConfig, resourceLimits, nil, nil, nil)
+	container.SetContainerID(1)
+	require.NoError(t, err)
+
+	// Add network
+	port := uint16(8080)
+	netType, _ := value.NewNetworkType("http")
+	network, err := container.AddNetwork(&port, nil, netType, nil, nil)
+	require.NoError(t, err)
+	networkID := network.NetworkID()
+
+	// Try to update with invalid port
+	invalidPort := uint16(0)
+	_, err = container.UpdateNetwork(networkID, &invalidPort, "", nil)
+
+	assert.ErrorIs(t, err, containererrors.ErrInvalidPort)
+}
+
+// TestContainer_UpdateNetwork_InvalidFQDN tests updating with invalid FQDN
+func TestContainer_UpdateNetwork_InvalidFQDN(t *testing.T) {
+	// Setup
+	projectID := uint(1)
+	name := "Test Container"
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	gitConfig := defaultGitConfig()
+	resourceLimits := defaultResourceLimits()
+
+	container, err := NewContainer(projectID, name, slug, gitConfig, resourceLimits, nil, nil, nil)
+	container.SetContainerID(1)
+	require.NoError(t, err)
+
+	// Add network
+	port := uint16(8080)
+	netType, _ := value.NewNetworkType("http")
+	network, err := container.AddNetwork(&port, nil, netType, nil, nil)
+	require.NoError(t, err)
+	networkID := network.NetworkID()
+
+	// Try to update with reserved subdomain
+	reservedFQDN := "api.launchpad.kr"
+	_, err = container.UpdateNetwork(networkID, nil, "", &reservedFQDN)
+
+	assert.ErrorIs(t, err, containererrors.ErrReservedFQDN)
+}
+
+// TestContainer_UpdateNetwork_DeletedContainer tests updating in deleted container
+func TestContainer_UpdateNetwork_DeletedContainer(t *testing.T) {
+	// Setup
+	projectID := uint(1)
+	name := "Test Container"
+	slug, _ := value.NewContainerSlug("c2025011812000055555555")
+	gitConfig := defaultGitConfig()
+	resourceLimits := defaultResourceLimits()
+
+	container, err := NewContainer(projectID, name, slug, gitConfig, resourceLimits, nil, nil, nil)
+	container.SetContainerID(1)
+	require.NoError(t, err)
+
+	// Add network
+	port := uint16(8080)
+	netType, _ := value.NewNetworkType("http")
+	network, err := container.AddNetwork(&port, nil, netType, nil, nil)
+	require.NoError(t, err)
+	networkID := network.NetworkID()
+
+	// Soft delete container
+	err = container.SoftDelete()
+	require.NoError(t, err)
+
+	// Try to update network
+	newPort := uint16(9090)
+	_, err = container.UpdateNetwork(networkID, &newPort, "", nil)
+
+	assert.ErrorIs(t, err, containererrors.ErrContainerNotActive)
 }

@@ -75,7 +75,17 @@ func (uc *DeleteContainerUseCase) Execute(ctx context.Context, input DeleteConta
 			return err
 		}
 
-		// Soft delete container first
+		// Soft delete all networks before deleting container
+		// This preserves FQDN ownership tracking even after container deletion
+		if err := uc.containerRepo.SoftDeleteNetworksByContainerID(txCtx, input.ContainerID); err != nil {
+			uc.logger.Error(ctx, "failed to soft delete networks",
+				zap.Error(err),
+				zap.Uint("container_id", input.ContainerID),
+			)
+			return err
+		}
+
+		// Soft delete container
 		if err := container.SoftDelete(); err != nil {
 			uc.logger.Error(ctx, "failed to soft delete container",
 				zap.Error(err),

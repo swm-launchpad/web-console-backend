@@ -127,6 +127,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	updateEnvVarUseCase := containerApp.NewUpdateEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	deleteEnvVarUseCase := containerApp.NewDeleteEnvVarUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	addNetworkUseCase := containerApp.NewAddNetworkUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
+	updateNetworkUseCase := containerApp.NewUpdateNetworkUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	deleteNetworkUseCase := containerApp.NewDeleteNetworkUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	addSecretUseCase := containerApp.NewAddSecretUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	updateSecretUseCase := containerApp.NewUpdateSecretUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
@@ -167,6 +168,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 		updateEnvVarUseCase,
 		deleteEnvVarUseCase,
 		addNetworkUseCase,
+		updateNetworkUseCase,
 		deleteNetworkUseCase,
 		addSecretUseCase,
 		updateSecretUseCase,

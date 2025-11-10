@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"time"
 
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
@@ -25,6 +26,66 @@ const (
 	MinPort = 1
 	MaxPort = 65535
 )
+
+// Reserved subdomains that cannot be used by users
+var reservedSubdomains = map[string]bool{
+	"tekton":       true,
+	"tekton-api":   true,
+	"kube-api":     true,
+	"registry":     true,
+	"grafana":      true,
+	"vm":           true,
+	"vmalert":      true,
+	"alertmanager": true,
+	"loki":         true,
+	"api":          true,
+	"www":          true,
+	"docs":         true,
+}
+
+const (
+	minSubdomainLength = 4 // Subdomains must be at least 4 characters
+	launchpadDomain    = ".launchpad.kr"
+)
+
+// extractSubdomain extracts the subdomain from a FQDN
+// e.g., "myapp.launchpad.kr" -> "myapp"
+func extractSubdomain(fqdn string) string {
+	if !strings.HasSuffix(fqdn, launchpadDomain) {
+		return fqdn
+	}
+	return strings.TrimSuffix(fqdn, launchpadDomain)
+}
+
+// isReservedSubdomain checks if a subdomain is reserved
+func isReservedSubdomain(subdomain string) bool {
+	return reservedSubdomains[strings.ToLower(subdomain)]
+}
+
+// validateFQDN validates the FQDN against business rules
+func validateFQDN(fqdn string) error {
+	if fqdn == "" {
+		return containererrors.ErrInvalidFQDN
+	}
+	if len(fqdn) > 255 {
+		return containererrors.ErrFQDNTooLong
+	}
+
+	// Extract subdomain and validate
+	subdomain := extractSubdomain(fqdn)
+
+	// Check if subdomain is reserved first (more specific error message)
+	if isReservedSubdomain(subdomain) {
+		return containererrors.ErrReservedFQDN
+	}
+
+	// Check minimum length (must be at least 4 characters)
+	if len(subdomain) < minSubdomainLength {
+		return containererrors.ErrFQDNTooShort
+	}
+
+	return nil
+}
 
 // NewNetwork creates a new Network entity with validation
 func NewNetwork(containerID uint, internalPort, externalPort *uint16, networkType value.NetworkType, externalIP *string, fqdn *string) (*Network, error) {
@@ -61,11 +122,8 @@ func NewNetwork(containerID uint, internalPort, externalPort *uint16, networkTyp
 
 	// Validate FQDN if provided
 	if fqdn != nil {
-		if *fqdn == "" {
-			return nil, containererrors.ErrInvalidFQDN
-		}
-		if len(*fqdn) > 255 {
-			return nil, containererrors.ErrFQDNTooLong
+		if err := validateFQDN(*fqdn); err != nil {
+			return nil, err
 		}
 	}
 
@@ -146,16 +204,32 @@ func (n *Network) SetExternalIP(ip *string) {
 func (n *Network) SetFQDN(fqdn *string) error {
 	// Validate FQDN if provided
 	if fqdn != nil {
-		if *fqdn == "" {
-			return containererrors.ErrInvalidFQDN
-		}
-		if len(*fqdn) > 255 {
-			return containererrors.ErrFQDNTooLong
+		if err := validateFQDN(*fqdn); err != nil {
+			return err
 		}
 	}
 	n.fqdn = fqdn
 	n.updatedAt = time.Now()
 	return nil
+}
+
+// SetInternalPort sets the internal port with validation
+func (n *Network) SetInternalPort(port *uint16) error {
+	if port == nil {
+		return containererrors.ErrInvalidPort
+	}
+	if *port < MinPort || *port > MaxPort {
+		return containererrors.ErrInvalidPort
+	}
+	n.internalPort = port
+	n.updatedAt = time.Now()
+	return nil
+}
+
+// SetNetworkType sets the network type
+func (n *Network) SetNetworkType(netType value.NetworkType) {
+	n.networkType = netType
+	n.updatedAt = time.Now()
 }
 
 // Equals checks if two Networks have the same internal port

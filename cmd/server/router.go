@@ -220,6 +220,7 @@ func (r *Router) Setup() {
 			// Networks
 			containers.GET("/:slug/networks", r.containerHandler.ListNetworks)
 			containers.POST("/:slug/networks", r.containerHandler.AddNetwork)
+			containers.PUT("/:slug/networks/:network_id", r.containerHandler.UpdateNetwork)
 			containers.DELETE("/:slug/networks/:port", r.containerHandler.DeleteNetwork)
 
 			// Secrets

@@ -341,6 +341,49 @@ func (c *Container) AddNetwork(internalPort, externalPort *uint16, networkType v
 	return network, nil
 }
 
+// UpdateNetwork updates an existing network in the container
+// Returns the updated network or an error
+func (c *Container) UpdateNetwork(networkID uint, newInternalPort *uint16, newNetworkType value.NetworkType, newFQDN *string) (*Network, error) {
+	if c.isDeleted {
+		return nil, containererrors.ErrContainerNotActive
+	}
+
+	// Find network by ID
+	var targetNetwork *Network
+	for i := range c.networks {
+		if c.networks[i].NetworkID() == networkID {
+			targetNetwork = &c.networks[i]
+			break
+		}
+	}
+
+	if targetNetwork == nil {
+		return nil, containererrors.ErrNetworkNotFound
+	}
+
+	// Update internal port if provided
+	if newInternalPort != nil {
+		if err := targetNetwork.SetInternalPort(newInternalPort); err != nil {
+			return nil, err
+		}
+	}
+
+	// Update network type if provided
+	if newNetworkType != "" {
+		targetNetwork.SetNetworkType(newNetworkType)
+	}
+
+	// Update FQDN if provided
+	if newFQDN != nil {
+		if err := targetNetwork.SetFQDN(newFQDN); err != nil {
+			return nil, err
+		}
+	}
+
+	c.updatedAt = time.Now()
+	return targetNetwork, nil
+}
+
 // DeleteNetwork removes a network port mapping by network ID
 func (c *Container) DeleteNetwork(networkID uint) error {
 	if c.isDeleted {

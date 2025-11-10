@@ -272,30 +272,91 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 		}
 	}
 
-	// Sync networks
-	if _, err := qtx.DeleteNetworksByContainerID(ctx, uint32(container.ContainerID())); err != nil {
+	// Sync networks (maintain soft-delete for FQDN ownership tracking)
+	// Get existing networks from database
+	existingNets, err := qtx.GetNetworksByContainerID(ctx, uint32(container.ContainerID()))
+	if err != nil {
 		return containererrors.ErrDatabaseOperation
 	}
 
-	for _, network := range container.Networks() {
-		netParams := sqlc.CreateNetworkParams{
-			ContainerID:  uint32(container.ContainerID()),
-			InternalPort: uint16PtrToNullInt32(network.InternalPort()),
-			ExternalPort: uint16PtrToNullInt32(network.ExternalPort()),
-			ExternalIp:   stringPtrToNullString(network.ExternalIP()),
-			Fqdn:         stringPtrToNullString(network.FQDN()),
-			Type:         sqlc.NetworksType(network.NetworkType().String()),
-			CreatedAt:    network.CreatedAt(),
-			UpdatedAt:    timeToNullTime(network.UpdatedAt()),
+	// Create map of existing networks by network_id
+	existingNetMap := make(map[uint]sqlc.Network)
+	for _, net := range existingNets {
+		existingNetMap[uint(net.NetworkID)] = net
+	}
+
+	// Create map of domain networks by network_id
+	domainNetMap := make(map[uint]*model.Network)
+	networks := container.Networks()
+	for i := range networks {
+		if networks[i].NetworkID() != 0 {
+			domainNetMap[networks[i].NetworkID()] = &networks[i]
 		}
-		if _, err := qtx.CreateNetwork(ctx, netParams); err != nil {
-			// Check for FQDN duplicate key error
-			if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
-				if strings.Contains(mysqlErr.Message, "uk_networks_fqdn") {
-					return containererrors.ErrDuplicateFQDN
-				}
+	}
+
+	// Process domain networks: INSERT new or UPDATE existing
+	// Use pointer to modify the original network objects in the slice
+	for i := range networks {
+		network := &networks[i]
+		if network.NetworkID() == 0 {
+			// New network - INSERT
+			netParams := sqlc.CreateNetworkParams{
+				ContainerID:  uint32(container.ContainerID()),
+				InternalPort: uint16PtrToNullInt32(network.InternalPort()),
+				ExternalPort: uint16PtrToNullInt32(network.ExternalPort()),
+				ExternalIp:   stringPtrToNullString(network.ExternalIP()),
+				Fqdn:         stringPtrToNullString(network.FQDN()),
+				Type:         sqlc.NetworksType(network.NetworkType().String()),
+				CreatedAt:    network.CreatedAt(),
+				UpdatedAt:    timeToNullTime(network.UpdatedAt()),
 			}
-			return containererrors.ErrDatabaseOperation
+			result, err := qtx.CreateNetwork(ctx, netParams)
+			if err != nil {
+				// Check for FQDN duplicate key error
+				if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
+					if strings.Contains(mysqlErr.Message, "uk_networks_fqdn") {
+						return containererrors.ErrDuplicateFQDN
+					}
+				}
+				return containererrors.ErrDatabaseOperation
+			}
+			// Set the generated network_id on the original object
+			id, _ := result.LastInsertId()
+			network.SetNetworkID(uint(id))
+		} else {
+			// Existing network - UPDATE
+			updateParams := sqlc.UpdateNetworkParams{
+				InternalPort: uint16PtrToNullInt32(network.InternalPort()),
+				Type:         sqlc.NetworksType(network.NetworkType().String()),
+				ExternalPort: uint16PtrToNullInt32(network.ExternalPort()),
+				ExternalIp:   stringPtrToNullString(network.ExternalIP()),
+				Fqdn:         stringPtrToNullString(network.FQDN()),
+				UpdatedAt:    timeToNullTime(network.UpdatedAt()),
+				NetworkID:    uint32(network.NetworkID()),
+			}
+			if _, err := qtx.UpdateNetwork(ctx, updateParams); err != nil {
+				// Check for FQDN duplicate key error
+				if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
+					if strings.Contains(mysqlErr.Message, "uk_networks_fqdn") {
+						return containererrors.ErrDuplicateFQDN
+					}
+				}
+				return containererrors.ErrDatabaseOperation
+			}
+		}
+	}
+
+	// Soft-delete networks that exist in DB but not in domain
+	for networkID := range existingNetMap {
+		if _, exists := domainNetMap[networkID]; !exists {
+			// This network was removed - soft delete it
+			softDelParams := sqlc.SoftDeleteNetworkByIDParams{
+				DeletedAt: sql.NullTime{Time: time.Now(), Valid: true},
+				NetworkID: uint32(networkID),
+			}
+			if _, err := qtx.SoftDeleteNetworkByID(ctx, softDelParams); err != nil {
+				return containererrors.ErrDatabaseOperation
+			}
 		}
 	}
 
@@ -1128,7 +1189,7 @@ func (r *containerRepository) CheckInternalPortExistsInProject(ctx context.Conte
 	return result, nil
 }
 
-// CheckFQDNExists checks if an FQDN is already used by any network in the system
+// CheckFQDNExists checks if an FQDN is used anywhere in the system
 func (r *containerRepository) CheckFQDNExists(ctx context.Context, fqdn string) (bool, error) {
 	r.logger.Debug(ctx, "checking FQDN existence",
 		zap.String("fqdn", fqdn),
@@ -1145,6 +1206,159 @@ func (r *containerRepository) CheckFQDNExists(ctx context.Context, fqdn string) 
 	}
 
 	return result, nil
+}
+
+// CheckFQDNExistsInOtherProject checks if FQDN is used by another project
+func (r *containerRepository) CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	r.logger.Debug(ctx, "checking FQDN existence in other project",
+		zap.String("fqdn", fqdn),
+		zap.Uint("exclude_project_id", projectID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckFQDNExistsInOtherProject(ctx, sqlc.CheckFQDNExistsInOtherProjectParams{
+		Fqdn:      sql.NullString{String: fqdn, Valid: true},
+		ProjectID: uint32(projectID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check FQDN existence in other project",
+			zap.String("fqdn", fqdn),
+			zap.Uint("exclude_project_id", projectID),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
+// CheckFQDNExistsInOtherProjectExcludingSelf checks if FQDN is used by another project, excluding self
+func (r *containerRepository) CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	r.logger.Debug(ctx, "checking FQDN existence in other project excluding self",
+		zap.String("fqdn", fqdn),
+		zap.Uint("network_id", networkID),
+		zap.Uint("exclude_project_id", projectID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckFQDNExistsInOtherProjectExcludingSelf(ctx, sqlc.CheckFQDNExistsInOtherProjectExcludingSelfParams{
+		Fqdn:      sql.NullString{String: fqdn, Valid: true},
+		NetworkID: uint32(networkID),
+		ProjectID: uint32(projectID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check FQDN existence in other project excluding self",
+			zap.String("fqdn", fqdn),
+			zap.Uint("network_id", networkID),
+			zap.Uint("exclude_project_id", projectID),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
+// CheckFQDNExistsForProject checks FQDN with proper business rules
+func (r *containerRepository) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
+	r.logger.Debug(ctx, "checking FQDN existence for project with business rules",
+		zap.String("fqdn", fqdn),
+		zap.Uint("project_id", projectID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckFQDNExistsForProject(ctx, sqlc.CheckFQDNExistsForProjectParams{
+		Fqdn:        sql.NullString{String: fqdn, Valid: true},
+		ProjectID:   uint32(projectID),
+		ProjectID_2: uint32(projectID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check FQDN existence for project",
+			zap.String("fqdn", fqdn),
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
+// CheckFQDNExistsForProjectExcludingSelf checks FQDN with business rules, excluding self
+func (r *containerRepository) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
+	r.logger.Debug(ctx, "checking FQDN existence for project excluding self",
+		zap.String("fqdn", fqdn),
+		zap.Uint("network_id", networkID),
+		zap.Uint("project_id", projectID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckFQDNExistsForProjectExcludingSelf(ctx, sqlc.CheckFQDNExistsForProjectExcludingSelfParams{
+		Fqdn:        sql.NullString{String: fqdn, Valid: true},
+		NetworkID:   uint32(networkID),
+		ProjectID:   uint32(projectID),
+		ProjectID_2: uint32(projectID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check FQDN existence for project excluding self",
+			zap.String("fqdn", fqdn),
+			zap.Uint("network_id", networkID),
+			zap.Uint("project_id", projectID),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
+// CheckInternalPortExistsInProjectExcludingSelf checks if internal port exists in project, excluding self
+func (r *containerRepository) CheckInternalPortExistsInProjectExcludingSelf(ctx context.Context, projectID uint, internalPort uint16, networkID uint) (bool, error) {
+	r.logger.Debug(ctx, "checking internal port existence in project excluding self",
+		zap.Uint("project_id", projectID),
+		zap.Uint16("internal_port", internalPort),
+		zap.Uint("network_id", networkID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.CheckInternalPortExistsInProjectExcludingSelf(ctx, sqlc.CheckInternalPortExistsInProjectExcludingSelfParams{
+		ProjectID:    uint32(projectID),
+		InternalPort: sql.NullInt32{Int32: int32(internalPort), Valid: true},
+		NetworkID:    uint32(networkID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check internal port existence in project excluding self",
+			zap.Uint("project_id", projectID),
+			zap.Uint16("internal_port", internalPort),
+			zap.Uint("network_id", networkID),
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
+}
+
+// SoftDeleteNetworksByContainerID soft deletes all networks for a container
+func (r *containerRepository) SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error {
+	r.logger.Debug(ctx, "soft deleting networks by container ID",
+		zap.Uint("container_id", containerID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	_, err := qtx.SoftDeleteNetworksByContainerID(ctx, sqlc.SoftDeleteNetworksByContainerIDParams{
+		DeletedAt:   sql.NullTime{Time: time.Now(), Valid: true},
+		ContainerID: uint32(containerID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to soft delete networks by container ID",
+			zap.Uint("container_id", containerID),
+			zap.Error(err),
+		)
+		return containererrors.ErrDatabaseOperation
+	}
+
+	return nil
 }
 
 // FindAllSlugsByProjectIDIncludingDeleted retrieves all container slugs for a project including soft-deleted containers

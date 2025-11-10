@@ -34,6 +34,7 @@ func TestDeleteContainerUseCase_Execute_Success(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
+	mockRepo.On("SoftDeleteNetworksByContainerID", ctx, containerID).Return(nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).Return(nil)
 
@@ -136,6 +137,7 @@ func TestDeleteContainerUseCase_Execute_WithVolumes_Success(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
+	mockRepo.On("SoftDeleteNetworksByContainerID", ctx, containerID).Return(nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 
 	// Expect DeleteVolume to be called for each mount
@@ -181,6 +183,7 @@ func TestDeleteContainerUseCase_Execute_WithVolumes_PartialFailure(t *testing.T)
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
+	mockRepo.On("SoftDeleteNetworksByContainerID", ctx, containerID).Return(nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 
 	// First volume delete succeeds, second fails

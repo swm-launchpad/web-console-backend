@@ -12,41 +12,38 @@ import (
 	"go.uber.org/zap"
 )
 
-type AddNetworkInput struct {
+type UpdateNetworkInput struct {
 	ContainerID  uint
 	UserID       uint
+	NetworkID    uint
 	InternalPort *uint16
-	ExternalPort *uint16
 	NetworkType  string
-	ExternalIP   *string
 	FQDN         *string
 }
 
-type AddNetworkOutput struct {
+type UpdateNetworkOutput struct {
 	ContainerID  uint    `json:"container_id"`
 	NetworkID    uint    `json:"network_id"`
 	InternalPort *uint16 `json:"internal_port,omitempty"`
-	ExternalPort *uint16 `json:"external_port,omitempty"`
 	NetworkType  string  `json:"network_type"`
-	ExternalIP   *string `json:"external_ip,omitempty"`
 	FQDN         *string `json:"fqdn,omitempty"`
-	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
 }
 
-type AddNetworkUseCase struct {
+type UpdateNetworkUseCase struct {
 	containerRepo repository.ContainerRepository
 	permissionSvc service.PermissionService
 	txManager     db.TxManager
 	logger        logger.Logger
 }
 
-func NewAddNetworkUseCase(
+func NewUpdateNetworkUseCase(
 	containerRepo repository.ContainerRepository,
 	permissionSvc service.PermissionService,
 	txManager db.TxManager,
 	log logger.Logger,
-) *AddNetworkUseCase {
-	return &AddNetworkUseCase{
+) *UpdateNetworkUseCase {
+	return &UpdateNetworkUseCase{
 		containerRepo: containerRepo,
 		permissionSvc: permissionSvc,
 		txManager:     txManager,
@@ -54,18 +51,18 @@ func NewAddNetworkUseCase(
 	}
 }
 
-func (uc *AddNetworkUseCase) Execute(ctx context.Context, input AddNetworkInput) (*AddNetworkOutput, error) {
-	uc.logger.Info(ctx, "add network started",
+func (uc *UpdateNetworkUseCase) Execute(ctx context.Context, input UpdateNetworkInput) (*UpdateNetworkOutput, error) {
+	uc.logger.Info(ctx, "update network started",
 		zap.Uint("container_id", input.ContainerID),
 		zap.Uint("user_id", input.UserID),
-		zap.String("network_type", input.NetworkType),
+		zap.Uint("network_id", input.NetworkID),
 	)
 
 	var networkID uint
-	var internalPort, externalPort *uint16
+	var internalPort *uint16
 	var networkType string
-	var externalIP, fqdn *string
-	var createdAt string
+	var fqdn *string
+	var updatedAt string
 
 	err := uc.txManager.RunInTx(ctx, func(txCtx context.Context) error {
 		// Check permission
@@ -88,19 +85,20 @@ func (uc *AddNetworkUseCase) Execute(ctx context.Context, input AddNetworkInput)
 			return err
 		}
 
-		// Validate internal port uniqueness in project if internal port is provided
-		// Containers in same project share K8s pod network interface
+		// Validate internal port uniqueness in project if internal port is provided and being changed
 		if input.InternalPort != nil {
-			portExists, err := uc.containerRepo.CheckInternalPortExistsInProject(
+			portExists, err := uc.containerRepo.CheckInternalPortExistsInProjectExcludingSelf(
 				txCtx,
 				container.ProjectID(),
 				*input.InternalPort,
+				input.NetworkID,
 			)
 			if err != nil {
-				uc.logger.Error(ctx, "failed to check internal port existence",
+				uc.logger.Error(ctx, "failed to check internal port existence excluding self",
 					zap.Error(err),
 					zap.Uint("project_id", container.ProjectID()),
 					zap.Uint16("internal_port", *input.InternalPort),
+					zap.Uint("network_id", input.NetworkID),
 				)
 				return err
 			}
@@ -114,13 +112,15 @@ func (uc *AddNetworkUseCase) Execute(ctx context.Context, input AddNetworkInput)
 		}
 
 		// Validate FQDN uniqueness if FQDN is provided
-		// Check project-scoped FQDN ownership with soft-delete consideration
+		// Check project-scoped FQDN ownership with soft-delete consideration (excluding self)
 		if input.FQDN != nil && *input.FQDN != "" {
-			fqdnExists, err := uc.containerRepo.CheckFQDNExistsForProject(txCtx, *input.FQDN, container.ProjectID())
+			fqdnExists, err := uc.containerRepo.CheckFQDNExistsForProjectExcludingSelf(
+				txCtx, *input.FQDN, input.NetworkID, container.ProjectID())
 			if err != nil {
-				uc.logger.Error(ctx, "failed to check FQDN existence for project",
+				uc.logger.Error(ctx, "failed to check FQDN existence for project excluding self",
 					zap.Error(err),
 					zap.String("fqdn", *input.FQDN),
+					zap.Uint("network_id", input.NetworkID),
 					zap.Uint("project_id", container.ProjectID()),
 				)
 				return err
@@ -134,22 +134,26 @@ func (uc *AddNetworkUseCase) Execute(ctx context.Context, input AddNetworkInput)
 			}
 		}
 
-		// Create network type value object
-		netType, err := value.NewNetworkType(input.NetworkType)
-		if err != nil {
-			uc.logger.Error(ctx, "failed to create network type",
-				zap.Error(err),
-				zap.String("network_type", input.NetworkType),
-			)
-			return err
+		// Create network type value object if provided
+		var netType value.NetworkType
+		if input.NetworkType != "" {
+			netType, err = value.NewNetworkType(input.NetworkType)
+			if err != nil {
+				uc.logger.Error(ctx, "failed to create network type",
+					zap.Error(err),
+					zap.String("network_type", input.NetworkType),
+				)
+				return err
+			}
 		}
 
-		// Add network
-		network, err := container.AddNetwork(input.InternalPort, input.ExternalPort, netType, input.ExternalIP, input.FQDN)
+		// Update network
+		network, err := container.UpdateNetwork(input.NetworkID, input.InternalPort, netType, input.FQDN)
 		if err != nil {
-			uc.logger.Error(ctx, "failed to add network",
+			uc.logger.Error(ctx, "failed to update network",
 				zap.Error(err),
 				zap.Uint("container_id", input.ContainerID),
+				zap.Uint("network_id", input.NetworkID),
 			)
 			return err
 		}
@@ -166,11 +170,9 @@ func (uc *AddNetworkUseCase) Execute(ctx context.Context, input AddNetworkInput)
 		// Extract values
 		networkID = network.NetworkID()
 		internalPort = network.InternalPort()
-		externalPort = network.ExternalPort()
 		networkType = network.NetworkType().String()
-		externalIP = network.ExternalIP()
 		fqdn = network.FQDN()
-		createdAt = network.CreatedAt().Format("2006-01-02T15:04:05Z")
+		updatedAt = network.UpdatedAt().Format("2006-01-02T15:04:05Z")
 
 		return nil
 	})
@@ -179,20 +181,18 @@ func (uc *AddNetworkUseCase) Execute(ctx context.Context, input AddNetworkInput)
 		return nil, err
 	}
 
-	uc.logger.Info(ctx, "add network completed",
+	uc.logger.Info(ctx, "update network completed",
 		zap.Uint("container_id", input.ContainerID),
 		zap.Uint("network_id", networkID),
 		zap.String("network_type", networkType),
 	)
 
-	return &AddNetworkOutput{
+	return &UpdateNetworkOutput{
 		ContainerID:  input.ContainerID,
 		NetworkID:    networkID,
 		InternalPort: internalPort,
-		ExternalPort: externalPort,
 		NetworkType:  networkType,
-		ExternalIP:   externalIP,
 		FQDN:         fqdn,
-		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
 	}, nil
 }
