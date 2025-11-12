@@ -1,7 +1,5 @@
--- Web Console Database Schema - Initial Schema Rollback
--- Version: 1.0.0
--- Description: Drop all tables in reverse dependency order (respecting FK constraints)
--- Note: PROJECTS has circular FK with DEPLOYMENTS, so we disable FK checks temporarily
+-- Rollback consolidated schema - Drop all tables
+-- Version: 2.0.0
 
 SET FOREIGN_KEY_CHECKS = 0;
 

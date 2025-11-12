@@ -7,7 +7,8 @@ import (
 
 // SeedTemplates inserts template data for testing
 func SeedTemplates(db *sql.DB) error {
-	// Template data extracted from migration 000019
+	// Template data for testing purposes
+	// Note: Production templates are managed in swm-launchpad/container-go-template repository
 	templates := []struct {
 		id     int
 		name   string
@@ -412,8 +413,8 @@ func SeedSystemSettings(db *sql.DB) error {
 		{"pro_plan_runtime_price_per_minute", "0", "float", "pricing", "Pro plan runtime price per minute (KRW)", false},
 
 		// Eco plan resource pricing
-		{"eco_cpu_price_per_core_per_minute", "30", "float", "pricing", "Eco CPU pricing per core per minute (KRW)", true},
-		{"eco_memory_price_per_gb_per_minute", "15", "float", "pricing", "Eco memory pricing per GB per minute (KRW)", true},
+		{"eco_cpu_price_per_core_per_minute", "2.2", "float", "pricing", "Eco CPU pricing per core per minute (KRW)", true},
+		{"eco_memory_price_per_gb_per_minute", "1.1", "float", "pricing", "Eco memory pricing per GB per minute (KRW)", true},
 		{"eco_disk_price_per_gb_per_month", "1000", "int", "pricing", "Eco disk pricing per GB per month (KRW)", true},
 
 		// Pro plan resource pricing
@@ -433,7 +434,7 @@ func SeedSystemSettings(db *sql.DB) error {
 		{"beta_tier_memory_limit", "2048", "int", "beta", "Beta tier maximum memory limit (Mi)", true},
 		{"beta_tier_disk_limit", "3072", "int", "beta", "Beta tier maximum disk limit (Mi)", true},
 
-		// Note: max_projects_per_user is now managed by migration 000005_add_max_projects_per_user_setting.up.sql
+		// Note: max_projects_per_user is now managed in the consolidated 000001_initial_schema.up.sql
 	}
 
 	// Prepare the insert statement
