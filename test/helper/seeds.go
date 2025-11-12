@@ -433,7 +433,7 @@ func SeedSystemSettings(db *sql.DB) error {
 		{"beta_tier_memory_limit", "2048", "int", "beta", "Beta tier maximum memory limit (Mi)", true},
 		{"beta_tier_disk_limit", "3072", "int", "beta", "Beta tier maximum disk limit (Mi)", true},
 
-		// Note: max_projects_per_user is now managed by migration 000005_add_max_projects_per_user_setting.up.sql
+		// Note: max_projects_per_user is now managed in the consolidated 000001_initial_schema.up.sql
 	}
 
 	// Prepare the insert statement
