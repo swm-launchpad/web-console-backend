@@ -7,7 +7,8 @@ import (
 
 // SeedTemplates inserts template data for testing
 func SeedTemplates(db *sql.DB) error {
-	// Template data extracted from migration 000019
+	// Template data for testing purposes
+	// Note: Production templates are managed in swm-launchpad/container-go-template repository
 	templates := []struct {
 		id     int
 		name   string
