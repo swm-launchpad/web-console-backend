@@ -188,6 +188,20 @@ var containerErrorMap = map[error]response.ErrorMapping{
 	containererrors.ErrNegativeBuildTime:     {StatusCode: http.StatusBadRequest, Code: "NEGATIVE_BUILD_TIME", Message: "Build time cannot be negative"},
 	containererrors.ErrNegativeBuildCount:    {StatusCode: http.StatusBadRequest, Code: "NEGATIVE_BUILD_COUNT", Message: "Build count cannot be negative"},
 	containererrors.ErrInvalidUptime:         {StatusCode: http.StatusBadRequest, Code: "INVALID_UPTIME", Message: "Uptime must be between 0 and 100"},
+
+	// NodePort errors
+	containererrors.ErrNodePortNotSupported:       {StatusCode: http.StatusBadRequest, Code: "NODEPORT_NOT_SUPPORTED", Message: "NodePort only supports TCP networks"},
+	containererrors.ErrNodePortAlreadyExists:      {StatusCode: http.StatusConflict, Code: "NODEPORT_ALREADY_EXISTS", Message: "NodePort already exists for this container"},
+	containererrors.ErrNodePortNotFound:           {StatusCode: http.StatusNotFound, Code: "NODEPORT_NOT_FOUND", Message: "NodePort service not found"},
+	containererrors.ErrNodePortCreating:           {StatusCode: http.StatusConflict, Code: "NODEPORT_CREATING", Message: "NodePort is being created"},
+	containererrors.ErrNodePortAlreadyActive:      {StatusCode: http.StatusConflict, Code: "NODEPORT_ALREADY_ACTIVE", Message: "NodePort is already active"},
+	containererrors.ErrTektonUnavailable:          {StatusCode: http.StatusServiceUnavailable, Code: "TEKTON_UNAVAILABLE", Message: "Tekton service unavailable"},
+	containererrors.ErrTektonPipelineFailed:       {StatusCode: http.StatusInternalServerError, Code: "TEKTON_PIPELINE_FAILED", Message: "Tekton pipeline execution failed"},
+	containererrors.ErrTektonPipelineTimeout:      {StatusCode: http.StatusGatewayTimeout, Code: "TEKTON_PIPELINE_TIMEOUT", Message: "Tekton pipeline execution timeout"},
+	containererrors.ErrKubernetesUnavailable:      {StatusCode: http.StatusServiceUnavailable, Code: "KUBERNETES_UNAVAILABLE", Message: "Kubernetes service unavailable"},
+	containererrors.ErrInvalidRequest:             {StatusCode: http.StatusBadRequest, Code: "INVALID_REQUEST", Message: "Invalid request"},
+	containererrors.ErrNoTCPNetwork:               {StatusCode: http.StatusBadRequest, Code: "NO_TCP_NETWORK", Message: "Container has no TCP network configured"},
+	containererrors.ErrMultipleNetworksNotAllowed: {StatusCode: http.StatusBadRequest, Code: "MULTIPLE_NETWORKS_NOT_ALLOWED", Message: "Container has multiple networks, cannot determine target port"},
 }
 
 // mapContainerError provides error mapping for container domain

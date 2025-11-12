@@ -193,7 +193,13 @@ func InitializeApp() (*App, error) {
 	addMountUseCase := application3.NewAddMountUseCase(containerRepository, servicePermissionService, volumeService, txManager, logger)
 	deleteMountUseCase := application3.NewDeleteMountUseCase(containerRepository, servicePermissionService, txManager, logger)
 	checkFQDNUseCase := application3.NewCheckFQDNUseCase(containerRepository, logger)
-	containerHandler := handler3.NewContainerHandler(createContainerUseCase, getContainerUseCase, updateContainerUseCase, deleteContainerUseCase, listContainersUseCase, addEnvVarUseCase, updateEnvVarUseCase, deleteEnvVarUseCase, addNetworkUseCase, updateNetworkUseCase, deleteNetworkUseCase, addSecretUseCase, updateSecretUseCase, deleteSecretUseCase, addBuildVarUseCase, updateBuildVarUseCase, deleteBuildVarUseCase, addMountUseCase, deleteMountUseCase, checkFQDNUseCase, projectService, volumeService, containerService, servicePermissionService, logger)
+	tektonNodePortClient, err := provideTektonNodePortClient(logger)
+	if err != nil {
+		return nil, err
+	}
+	createNodePortUseCase := application3.NewCreateNodePortUseCase(containerRepository, projectRepository, servicePermissionService, tektonNodePortClient, logger)
+	getNodePortUseCase := application3.NewGetNodePortUseCase(containerRepository, projectRepository, servicePermissionService, tektonNodePortClient, logger)
+	containerHandler := handler3.NewContainerHandler(createContainerUseCase, getContainerUseCase, updateContainerUseCase, deleteContainerUseCase, listContainersUseCase, addEnvVarUseCase, updateEnvVarUseCase, deleteEnvVarUseCase, addNetworkUseCase, updateNetworkUseCase, deleteNetworkUseCase, addSecretUseCase, updateSecretUseCase, deleteSecretUseCase, addBuildVarUseCase, updateBuildVarUseCase, deleteBuildVarUseCase, addMountUseCase, deleteMountUseCase, checkFQDNUseCase, createNodePortUseCase, getNodePortUseCase, projectService, volumeService, containerService, servicePermissionService, logger)
 	getTemplatesUseCase := application3.NewGetTemplatesUseCase(templateRepository, logger)
 	getTemplateUseCase := application3.NewGetTemplateUseCase(templateRepository, logger)
 	templateHandler := handler3.NewTemplateHandler(getTemplatesUseCase, getTemplateUseCase, logger)
@@ -317,6 +323,11 @@ func provideKubeBuildClient(log logger.Logger) (infrastructure4.KubeBuildClient,
 // provideTektonBuildClient creates a Tekton build client from environment variables
 func provideTektonBuildClient(log logger.Logger) (infrastructure4.TektonBuildClient, error) {
 	return infrastructure3.NewTektonBuildClient(log)
+}
+
+// provideTektonNodePortClient creates a Tekton NodePort client from environment variables
+func provideTektonNodePortClient(log logger.Logger) (infrastructure5.TektonNodePortClient, error) {
+	return infrastructure2.NewTektonNodePortClient(log)
 }
 
 // provideTektonCleanupClient creates a Tekton cleanup client from environment variables
