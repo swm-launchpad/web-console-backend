@@ -649,6 +649,10 @@ type Network struct {
 	UpdatedAt    sql.NullTime   `json:"updated_at"`
 	IsDeleted    bool           `json:"is_deleted"`
 	DeletedAt    sql.NullTime   `json:"deleted_at"`
+	// Tekton PipelineRun name for NodePort tracking
+	TektonEventID sql.NullString `json:"tekton_event_id"`
+	// NodePort expiration timestamp
+	ExpiresAt sql.NullTime `json:"expires_at"`
 }
 
 type OauthState struct {

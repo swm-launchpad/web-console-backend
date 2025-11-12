@@ -103,6 +103,10 @@ type Querier interface {
 	UpdateContainer(ctx context.Context, arg UpdateContainerParams) (sql.Result, error)
 	UpdateEnvVar(ctx context.Context, arg UpdateEnvVarParams) (sql.Result, error)
 	UpdateNetwork(ctx context.Context, arg UpdateNetworkParams) (sql.Result, error)
+	// Update NodePort result fields when PipelineRun completes
+	UpdateNetworkNodePortResult(ctx context.Context, arg UpdateNetworkNodePortResultParams) error
+	// Update Tekton PipelineRun name and clear NodePort fields when starting new creation
+	UpdateNetworkTektonEventID(ctx context.Context, arg UpdateNetworkTektonEventIDParams) error
 	UpdateSecret(ctx context.Context, arg UpdateSecretParams) (sql.Result, error)
 }
 
