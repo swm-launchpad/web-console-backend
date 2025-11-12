@@ -228,3 +228,19 @@ var (
 	ErrNegativeBuildCount    = errors.New("build count cannot be negative")
 	ErrInvalidUptime         = errors.New("uptime must be between 0 and 100")
 )
+
+// NodePort errors - temporary NodePort service errors
+var (
+	ErrNodePortNotSupported       = errors.New("nodeport only supports TCP networks")
+	ErrNodePortAlreadyExists      = errors.New("nodeport already exists for this container")
+	ErrNodePortNotFound           = errors.New("nodeport service not found")
+	ErrNodePortCreating           = errors.New("nodeport is being created")
+	ErrNodePortAlreadyActive      = errors.New("nodeport is already active")
+	ErrTektonUnavailable          = errors.New("tekton service unavailable")
+	ErrTektonPipelineFailed       = errors.New("tekton pipeline execution failed")
+	ErrTektonPipelineTimeout      = errors.New("tekton pipeline execution timeout")
+	ErrKubernetesUnavailable      = errors.New("kubernetes service unavailable")
+	ErrInvalidRequest             = errors.New("invalid request")
+	ErrNoTCPNetwork               = errors.New("container has no TCP network configured")
+	ErrMultipleNetworksNotAllowed = errors.New("container has multiple networks, cannot determine target port")
+)
