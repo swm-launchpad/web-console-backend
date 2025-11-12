@@ -30,10 +30,12 @@ const (
 
 // Eco plan resource pricing (per minute, in KRW)
 // DEPRECATED: Use SettingsService methods (GetEcoCPUPricePerCorePerMinute, etc.)
+// These constants are kept for backward compatibility and fallback only
+// Updated to match current pricing policy (LP-484)
 // Formula: (additional_resource / unit) * pricePerMinute * runtimeMinutes
 const (
-	EcoCPUPricePerCorePerMinute  = 30.0 // 30 KRW per 1 core (1000m) per minute
-	EcoMemoryPricePerGBPerMinute = 15.0 // 15 KRW per 1GB (1024Mi) per minute
+	EcoCPUPricePerCorePerMinute  = 2.2  // 2.2 KRW per 1 core (1000m) per minute
+	EcoMemoryPricePerGBPerMinute = 1.1  // 1.1 KRW per 1GB (1024Mi) per minute
 	EcoDiskPricePerGBPerMonth    = 1000 // 1000 KRW per 1GB (1024Mi) per month (fixed, not per minute)
 )
 

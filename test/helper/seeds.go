@@ -412,8 +412,8 @@ func SeedSystemSettings(db *sql.DB) error {
 		{"pro_plan_runtime_price_per_minute", "0", "float", "pricing", "Pro plan runtime price per minute (KRW)", false},
 
 		// Eco plan resource pricing
-		{"eco_cpu_price_per_core_per_minute", "30", "float", "pricing", "Eco CPU pricing per core per minute (KRW)", true},
-		{"eco_memory_price_per_gb_per_minute", "15", "float", "pricing", "Eco memory pricing per GB per minute (KRW)", true},
+		{"eco_cpu_price_per_core_per_minute", "2.2", "float", "pricing", "Eco CPU pricing per core per minute (KRW)", true},
+		{"eco_memory_price_per_gb_per_minute", "1.1", "float", "pricing", "Eco memory pricing per GB per minute (KRW)", true},
 		{"eco_disk_price_per_gb_per_month", "1000", "int", "pricing", "Eco disk pricing per GB per month (KRW)", true},
 
 		// Pro plan resource pricing
