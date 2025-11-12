@@ -223,6 +223,10 @@ func (r *Router) Setup() {
 			containers.PUT("/:slug/networks/:network_id", r.containerHandler.UpdateNetwork)
 			containers.DELETE("/:slug/networks/:port", r.containerHandler.DeleteNetwork)
 
+			// NodePort (temporary TCP port exposure)
+			containers.POST("/:slug/networks/tcp/nodeport", r.containerHandler.CreateNodePort)
+			containers.GET("/:slug/networks/tcp/nodeport", r.containerHandler.GetNodePort)
+
 			// Secrets
 			containers.GET("/:slug/secrets", r.containerHandler.ListSecrets)
 			containers.POST("/:slug/secrets", r.containerHandler.AddSecret)

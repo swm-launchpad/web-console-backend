@@ -269,7 +269,7 @@ func (q *Queries) DeleteNetworksByContainerID(ctx context.Context, containerID u
 }
 
 const getNetworkByID = `-- name: GetNetworkByID :one
-SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at, is_deleted, deleted_at
+SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at, is_deleted, deleted_at, tekton_event_id, expires_at
 FROM NETWORKS
 WHERE network_id = ?
 `
@@ -289,12 +289,14 @@ func (q *Queries) GetNetworkByID(ctx context.Context, networkID uint32) (Network
 		&i.UpdatedAt,
 		&i.IsDeleted,
 		&i.DeletedAt,
+		&i.TektonEventID,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
 
 const getNetworksByContainerID = `-- name: GetNetworksByContainerID :many
-SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at, is_deleted, deleted_at
+SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at, is_deleted, deleted_at, tekton_event_id, expires_at
 FROM NETWORKS
 WHERE container_id = ?
   AND is_deleted = 0
@@ -322,6 +324,8 @@ func (q *Queries) GetNetworksByContainerID(ctx context.Context, containerID uint
 			&i.UpdatedAt,
 			&i.IsDeleted,
 			&i.DeletedAt,
+			&i.TektonEventID,
+			&i.ExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -407,4 +411,52 @@ func (q *Queries) UpdateNetwork(ctx context.Context, arg UpdateNetworkParams) (s
 		arg.UpdatedAt,
 		arg.NetworkID,
 	)
+}
+
+const updateNetworkNodePortResult = `-- name: UpdateNetworkNodePortResult :exec
+UPDATE NETWORKS SET
+    external_ip = ?,
+    external_port = ?,
+    expires_at = ?,
+    updated_at = NOW()
+WHERE network_id = ?
+`
+
+type UpdateNetworkNodePortResultParams struct {
+	ExternalIp   sql.NullString `json:"external_ip"`
+	ExternalPort sql.NullInt32  `json:"external_port"`
+	ExpiresAt    sql.NullTime   `json:"expires_at"`
+	NetworkID    uint32         `json:"network_id"`
+}
+
+// Update NodePort result fields when PipelineRun completes
+func (q *Queries) UpdateNetworkNodePortResult(ctx context.Context, arg UpdateNetworkNodePortResultParams) error {
+	_, err := q.db.ExecContext(ctx, updateNetworkNodePortResult,
+		arg.ExternalIp,
+		arg.ExternalPort,
+		arg.ExpiresAt,
+		arg.NetworkID,
+	)
+	return err
+}
+
+const updateNetworkTektonEventID = `-- name: UpdateNetworkTektonEventID :exec
+UPDATE NETWORKS SET
+    tekton_event_id = ?,
+    external_ip = NULL,
+    external_port = NULL,
+    expires_at = NULL,
+    updated_at = NOW()
+WHERE network_id = ?
+`
+
+type UpdateNetworkTektonEventIDParams struct {
+	TektonEventID sql.NullString `json:"tekton_event_id"`
+	NetworkID     uint32         `json:"network_id"`
+}
+
+// Update Tekton PipelineRun name and clear NodePort fields when starting new creation
+func (q *Queries) UpdateNetworkTektonEventID(ctx context.Context, arg UpdateNetworkTektonEventIDParams) error {
+	_, err := q.db.ExecContext(ctx, updateNetworkTektonEventID, arg.TektonEventID, arg.NetworkID)
+	return err
 }

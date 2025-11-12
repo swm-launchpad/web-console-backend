@@ -11,15 +11,17 @@ import (
 // Network represents a network port mapping within the Container aggregate
 // This is an entity within the Container aggregate
 type Network struct {
-	networkID    uint
-	containerID  uint
-	externalIP   *string
-	externalPort *uint16
-	internalPort *uint16
-	fqdn         *string
-	networkType  value.NetworkType
-	createdAt    time.Time
-	updatedAt    time.Time
+	networkID     uint
+	containerID   uint
+	externalIP    *string
+	externalPort  *uint16
+	internalPort  *uint16
+	fqdn          *string
+	networkType   value.NetworkType
+	tektonEventID *string
+	expiresAt     *time.Time
+	createdAt     time.Time
+	updatedAt     time.Time
 }
 
 const (
@@ -189,6 +191,16 @@ func (n *Network) UpdatedAt() time.Time {
 	return n.updatedAt
 }
 
+// TektonEventID returns the Tekton PipelineRun name for NodePort tracking (may be nil)
+func (n *Network) TektonEventID() *string {
+	return n.tektonEventID
+}
+
+// ExpiresAt returns the NodePort expiration timestamp (may be nil)
+func (n *Network) ExpiresAt() *time.Time {
+	return n.expiresAt
+}
+
 // SetNetworkID sets the network ID (used by repository after persistence)
 func (n *Network) SetNetworkID(id uint) {
 	n.networkID = id
@@ -286,6 +298,26 @@ func (n *Network) UpdateExternalIP(newIP *string) error {
 	return nil
 }
 
+// SetTektonEventID sets the Tekton PipelineRun name for NodePort tracking
+func (n *Network) SetTektonEventID(eventID *string) {
+	n.tektonEventID = eventID
+	n.updatedAt = time.Now()
+}
+
+// SetExpiresAt sets the NodePort expiration timestamp
+func (n *Network) SetExpiresAt(expiresAt *time.Time) {
+	n.expiresAt = expiresAt
+	n.updatedAt = time.Now()
+}
+
+// ClearNodePortInfo clears NodePort-related fields (used when starting new NodePort creation)
+func (n *Network) ClearNodePortInfo() {
+	n.externalIP = nil
+	n.externalPort = nil
+	n.expiresAt = nil
+	n.updatedAt = time.Now()
+}
+
 // ReconstructNetwork reconstructs a network from persistence
 // This is used when loading a network from the database
 func ReconstructNetwork(
@@ -296,18 +328,22 @@ func ReconstructNetwork(
 	networkType value.NetworkType,
 	externalIP *string,
 	fqdn *string,
+	tektonEventID *string,
+	expiresAt *time.Time,
 	createdAt time.Time,
 	updatedAt time.Time,
 ) *Network {
 	return &Network{
-		networkID:    networkID,
-		containerID:  containerID,
-		internalPort: internalPort,
-		externalPort: externalPort,
-		networkType:  networkType,
-		externalIP:   externalIP,
-		fqdn:         fqdn,
-		createdAt:    createdAt,
-		updatedAt:    updatedAt,
+		networkID:     networkID,
+		containerID:   containerID,
+		internalPort:  internalPort,
+		externalPort:  externalPort,
+		networkType:   networkType,
+		externalIP:    externalIP,
+		fqdn:          fqdn,
+		tektonEventID: tektonEventID,
+		expiresAt:     expiresAt,
+		createdAt:     createdAt,
+		updatedAt:     updatedAt,
 	}
 }

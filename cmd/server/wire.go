@@ -150,6 +150,11 @@ func provideTektonBuildClient(log logger.Logger) (projectDomainInfra.TektonBuild
 	return projectInfra.NewTektonBuildClient(log)
 }
 
+// provideTektonNodePortClient creates a Tekton NodePort client from environment variables
+func provideTektonNodePortClient(log logger.Logger) (containerDomainInfra.TektonNodePortClient, error) {
+	return containerInfra.NewTektonNodePortClient(log)
+}
+
 // provideTektonCleanupClient creates a Tekton cleanup client from environment variables
 func provideTektonCleanupClient(log logger.Logger) (projectDomainInfra.TektonCleanupClient, error) {
 	return projectInfra.NewTektonCleanupClient(log)
@@ -405,6 +410,7 @@ func InitializeApp() (*App, error) {
 		containerInfra.NewContainerRepository,
 		containerInfra.NewTemplateRepository,
 		provideLokiClient,
+		provideTektonNodePortClient,
 
 		// Container domain services
 		containerService.NewSlugService,
@@ -444,6 +450,8 @@ func InitializeApp() (*App, error) {
 		containerApp.NewGetBuildLogHistoryUseCase,
 		containerApp.NewGetContainerSlugsByProjectIDUseCase,
 		containerApp.NewCheckFQDNUseCase,
+		containerApp.NewCreateNodePortUseCase,
+		containerApp.NewGetNodePortUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,

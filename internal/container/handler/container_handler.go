@@ -36,6 +36,8 @@ type ContainerHandler struct {
 	addMountUC        *application.AddMountUseCase
 	deleteMountUC     *application.DeleteMountUseCase
 	checkFQDNUC       *application.CheckFQDNUseCase
+	createNodePortUC  *application.CreateNodePortUseCase
+	getNodePortUC     *application.GetNodePortUseCase
 	projectService    projectservice.ProjectService
 	volumeService     projectservice.VolumeService
 	containerService  containerservice.ContainerService
@@ -73,6 +75,8 @@ func NewContainerHandler(
 	addMountUC *application.AddMountUseCase,
 	deleteMountUC *application.DeleteMountUseCase,
 	checkFQDNUC *application.CheckFQDNUseCase,
+	createNodePortUC *application.CreateNodePortUseCase,
+	getNodePortUC *application.GetNodePortUseCase,
 	projectService projectservice.ProjectService,
 	volumeService projectservice.VolumeService,
 	containerService containerservice.ContainerService,
@@ -100,6 +104,8 @@ func NewContainerHandler(
 		addMountUC:        addMountUC,
 		deleteMountUC:     deleteMountUC,
 		checkFQDNUC:       checkFQDNUC,
+		createNodePortUC:  createNodePortUC,
+		getNodePortUC:     getNodePortUC,
 		projectService:    projectService,
 		volumeService:     volumeService,
 		containerService:  containerService,
@@ -2172,6 +2178,118 @@ func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
 		zap.String("handler", "CheckFQDN"),
 		zap.String("fqdn", fqdn),
 		zap.Bool("exists", output.Exists),
+	)
+
+	response.OK(c, output)
+}
+
+// CreateNodePort handles creating a temporary NodePort for TCP network
+func (h *ContainerHandler) CreateNodePort(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	h.logger.Info(ctx, "create nodeport handler started",
+		zap.String("handler", "CreateNodePort"),
+	)
+
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Error(ctx, "user ID not found in context",
+			zap.String("handler", "CreateNodePort"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	// Get container by slug
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "CreateNodePort"),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Execute use case
+	input := application.CreateNodePortInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+
+	output, err := h.createNodePortUC.Execute(c.Request.Context(), input)
+	if err != nil {
+		h.logger.Error(ctx, "failed to create nodeport",
+			zap.Error(err),
+			zap.String("handler", "CreateNodePort"),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	h.logger.Info(ctx, "create nodeport handler completed",
+		zap.String("handler", "CreateNodePort"),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.String("status", output.Status),
+	)
+
+	response.Accepted(c, output)
+}
+
+// GetNodePort handles retrieving NodePort status and connection info
+func (h *ContainerHandler) GetNodePort(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	h.logger.Info(ctx, "get nodeport handler started",
+		zap.String("handler", "GetNodePort"),
+	)
+
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Error(ctx, "user ID not found in context",
+			zap.String("handler", "GetNodePort"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
+	// Get container by slug
+	container, err := h.getContainerBySlug(c)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get container by slug",
+			zap.Error(err),
+			zap.String("handler", "GetNodePort"),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Execute use case
+	input := application.GetNodePortInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+
+	output, err := h.getNodePortUC.Execute(c.Request.Context(), input)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get nodeport",
+			zap.Error(err),
+			zap.String("handler", "GetNodePort"),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	h.logger.Info(ctx, "get nodeport handler completed",
+		zap.String("handler", "GetNodePort"),
+		zap.Uint("container_id", container.ContainerID()),
+		zap.String("host", output.Host),
+		zap.Int("port", output.Port),
+		zap.String("status", output.Status),
 	)
 
 	response.OK(c, output)

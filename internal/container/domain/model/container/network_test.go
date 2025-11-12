@@ -358,7 +358,7 @@ func TestReconstructNetwork(t *testing.T) {
 	externalIP := "0.0.0.0"
 	fqdn := "test.example.com"
 
-	network := ReconstructNetwork(networkID, containerID, &internalPort, &externalPort, networkType, &externalIP, &fqdn, time.Now(), time.Now())
+	network := ReconstructNetwork(networkID, containerID, &internalPort, &externalPort, networkType, &externalIP, &fqdn, nil, nil, time.Now(), time.Now())
 
 	assert.NotNil(t, network)
 	assert.Equal(t, networkID, network.NetworkID())

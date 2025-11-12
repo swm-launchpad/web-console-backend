@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
@@ -211,4 +212,16 @@ func (m *MockContainerRepository) CheckFQDNExistsForProject(ctx context.Context,
 func (m *MockContainerRepository) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
 	args := m.Called(ctx, fqdn, networkID, projectID)
 	return args.Bool(0), args.Error(1)
+}
+
+// UpdateNetworkTektonEventID mocks the UpdateNetworkTektonEventID method
+func (m *MockContainerRepository) UpdateNetworkTektonEventID(ctx context.Context, networkID uint, tektonEventID string) error {
+	args := m.Called(ctx, networkID, tektonEventID)
+	return args.Error(0)
+}
+
+// UpdateNetworkNodePortResult mocks the UpdateNetworkNodePortResult method
+func (m *MockContainerRepository) UpdateNetworkNodePortResult(ctx context.Context, networkID uint, externalIP string, externalPort uint16, expiresAt time.Time) error {
+	args := m.Called(ctx, networkID, externalIP, externalPort, expiresAt)
+	return args.Error(0)
 }

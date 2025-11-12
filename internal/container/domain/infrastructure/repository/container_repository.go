@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 )
@@ -115,4 +116,12 @@ type ContainerRepository interface {
 	// INCLUDING soft-deleted containers. Used for cleanup operations that need to remove
 	// all resources including those from deleted containers.
 	FindAllSlugsByProjectIDIncludingDeleted(ctx context.Context, projectID uint) ([]string, error)
+
+	// UpdateNetworkTektonEventID updates the Tekton PipelineRun name for a network
+	// and clears external_ip, external_port, expires_at (used when starting new NodePort creation)
+	UpdateNetworkTektonEventID(ctx context.Context, networkID uint, tektonEventID string) error
+
+	// UpdateNetworkNodePortResult updates the NodePort result fields (external_ip, external_port, expires_at)
+	// Used when PipelineRun completes and NodePort information becomes available
+	UpdateNetworkNodePortResult(ctx context.Context, networkID uint, externalIP string, externalPort uint16, expiresAt time.Time) error
 }

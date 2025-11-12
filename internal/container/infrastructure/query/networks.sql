@@ -152,3 +152,22 @@ UPDATE NETWORKS SET
     fqdn = NULL
 WHERE network_id = ?
   AND is_deleted = 0;
+
+-- name: UpdateNetworkTektonEventID :exec
+-- Update Tekton PipelineRun name and clear NodePort fields when starting new creation
+UPDATE NETWORKS SET
+    tekton_event_id = ?,
+    external_ip = NULL,
+    external_port = NULL,
+    expires_at = NULL,
+    updated_at = NOW()
+WHERE network_id = ?;
+
+-- name: UpdateNetworkNodePortResult :exec
+-- Update NodePort result fields when PipelineRun completes
+UPDATE NETWORKS SET
+    external_ip = ?,
+    external_port = ?,
+    expires_at = ?,
+    updated_at = NOW()
+WHERE network_id = ?;

@@ -10,6 +10,8 @@ sql:
       - "../../../migration/000005_add_max_projects_per_user_setting.up.sql"
       - "../../../migration/000006_update_nickname_length.up.sql"
       - "../../../migration/000007_add_networks_soft_delete.up.sql"
+      - "../../../migration/000008_fix_fqdn_soft_delete.up.sql"
+      - "../../../migration/000009_add_nodeport_fields.up.sql"
     gen:
       go:
         package: "sqlc"

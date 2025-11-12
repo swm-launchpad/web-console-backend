@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -99,6 +100,12 @@ func (m *mockUpdateContainerRepo) CheckInternalPortExistsInProjectExcludingSelf(
 	return false, nil
 }
 func (m *mockUpdateContainerRepo) SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error {
+	return nil
+}
+func (m *mockUpdateContainerRepo) UpdateNetworkTektonEventID(ctx context.Context, networkID uint, tektonEventID string) error {
+	return nil
+}
+func (m *mockUpdateContainerRepo) UpdateNetworkNodePortResult(ctx context.Context, networkID uint, externalIP string, externalPort uint16, expiresAt time.Time) error {
 	return nil
 }
 

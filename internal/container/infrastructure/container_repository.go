@@ -1092,6 +1092,17 @@ func (r *containerRepository) toDomainNetwork(sqlcNetwork sqlc.Network) (*model.
 		return nil, containererrors.ErrDatabaseOperation
 	}
 
+	// Convert tektonEventID and expiresAt from sqlc types
+	var tektonEventID *string
+	if sqlcNetwork.TektonEventID.Valid {
+		tektonEventID = &sqlcNetwork.TektonEventID.String
+	}
+
+	var expiresAt *time.Time
+	if sqlcNetwork.ExpiresAt.Valid {
+		expiresAt = &sqlcNetwork.ExpiresAt.Time
+	}
+
 	network := model.ReconstructNetwork(
 		uint(sqlcNetwork.NetworkID),
 		uint(sqlcNetwork.ContainerID),
@@ -1100,6 +1111,8 @@ func (r *containerRepository) toDomainNetwork(sqlcNetwork sqlc.Network) (*model.
 		networkType,
 		externalIP,
 		fqdn,
+		tektonEventID,
+		expiresAt,
 		sqlcNetwork.CreatedAt,
 		fromNullTimeOrZero(sqlcNetwork.UpdatedAt),
 	)
@@ -1378,4 +1391,56 @@ func (r *containerRepository) FindAllSlugsByProjectIDIncludingDeleted(ctx contex
 	}
 
 	return slugs, nil
+}
+
+// UpdateNetworkTektonEventID updates the Tekton PipelineRun name for a network
+// and clears external_ip, external_port, expires_at (used when starting new NodePort creation)
+func (r *containerRepository) UpdateNetworkTektonEventID(ctx context.Context, networkID uint, tektonEventID string) error {
+	r.logger.Debug(ctx, "updating network tekton event ID",
+		zap.Uint("network_id", networkID),
+		zap.String("tekton_event_id", tektonEventID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	err := qtx.UpdateNetworkTektonEventID(ctx, sqlc.UpdateNetworkTektonEventIDParams{
+		NetworkID:     uint32(networkID),
+		TektonEventID: sql.NullString{String: tektonEventID, Valid: true},
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to update network tekton event ID",
+			zap.Uint("network_id", networkID),
+			zap.Error(err),
+		)
+		return containererrors.ErrDatabaseOperation
+	}
+
+	return nil
+}
+
+// UpdateNetworkNodePortResult updates the NodePort result fields (external_ip, external_port, expires_at)
+// Used when PipelineRun completes and NodePort information becomes available
+func (r *containerRepository) UpdateNetworkNodePortResult(ctx context.Context, networkID uint, externalIP string, externalPort uint16, expiresAt time.Time) error {
+	r.logger.Debug(ctx, "updating network nodeport result",
+		zap.Uint("network_id", networkID),
+		zap.String("external_ip", externalIP),
+		zap.Uint16("external_port", externalPort),
+		zap.Time("expires_at", expiresAt),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	err := qtx.UpdateNetworkNodePortResult(ctx, sqlc.UpdateNetworkNodePortResultParams{
+		NetworkID:    uint32(networkID),
+		ExternalIp:   sql.NullString{String: externalIP, Valid: true},
+		ExternalPort: sql.NullInt32{Int32: int32(externalPort), Valid: true},
+		ExpiresAt:    sql.NullTime{Time: expiresAt, Valid: true},
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to update network nodeport result",
+			zap.Uint("network_id", networkID),
+			zap.Error(err),
+		)
+		return containererrors.ErrDatabaseOperation
+	}
+
+	return nil
 }
