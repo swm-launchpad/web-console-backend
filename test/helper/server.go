@@ -179,6 +179,8 @@ func SetupTestServer(t *testing.T) *TestServer {
 		addMountUseCase,
 		deleteMountUseCase,
 		checkFQDNUseCase,
+		nil, // createNodePortUseCase - not needed for tests
+		nil, // getNodePortUseCase - not needed for tests
 		projectSvc,
 		volumeSvc,
 		containerSvc,

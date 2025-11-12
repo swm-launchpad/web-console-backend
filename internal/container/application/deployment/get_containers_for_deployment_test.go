@@ -235,7 +235,7 @@ func createContainerWithAllFields(containerID, projectID uint) *model.Container 
 	// Add network
 	networkType, _ := value.NewNetworkType("tcp")
 	internalPort := uint16(8080)
-	network := model.ReconstructNetwork(1, containerID, &internalPort, nil, networkType, nil, nil, time.Now(), time.Now())
+	network := model.ReconstructNetwork(1, containerID, &internalPort, nil, networkType, nil, nil, nil, nil, time.Now(), time.Now())
 	_ = c.AddNetworkDirect(network)
 
 	// Add mount
@@ -322,6 +322,8 @@ func createContainerWithNetworkOptionalFields(containerID, projectID uint) *mode
 		networkType,
 		&externalIP,
 		&fqdn,
+		nil,
+		nil,
 		time.Now(),
 		time.Now(),
 	)

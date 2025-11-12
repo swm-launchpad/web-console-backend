@@ -107,6 +107,8 @@ func createMockNetwork(networkID, containerID uint, containerPort uint16, protoc
 		networkType,
 		nil,
 		nil,
+		nil, // tektonEventID
+		nil, // expiresAt
 		time.Now(),
 		time.Now(),
 	)
@@ -123,6 +125,8 @@ func createMockNetworkWithFQDN(networkID, containerID uint, internalPort, extern
 		networkType,
 		nil,
 		fqdn,
+		nil, // tektonEventID
+		nil, // expiresAt
 		time.Now(),
 		time.Now(),
 	)
