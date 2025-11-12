@@ -1,6 +1,6 @@
--- Web Console Database Schema - Initial Schema
--- Version: 1.0.0
--- Description: Initial database schema for container management platform
+-- Web Console Database Schema - Consolidated Schema
+-- Version: 2.0.0
+-- Description: Consolidated database schema incorporating all migrations (000001-000010)
 -- Note: Template data is managed in a separate repository
 
 -- Drop tables in reverse dependency order (respecting FK constraints)
@@ -31,13 +31,12 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- Core Tables
 -- ============================================================================
 
--- Users table
+-- Users table (000003: removed username, name→nickname; 000006: nickname VARCHAR(32))
 CREATE TABLE `USERS` (
     `user_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `username` VARCHAR(100) NOT NULL,
     `password_hash` VARCHAR(255) NOT NULL,
     `password_updated_at` TIMESTAMP NULL DEFAULT NULL,
-    `name` VARCHAR(100) NULL,
+    `nickname` VARCHAR(32) NOT NULL COMMENT 'User nickname (display name), max 32 characters',
     `email` VARCHAR(255) NOT NULL,
     `phone` VARCHAR(20) NULL,
     `status` ENUM('active', 'inactive', 'suspended', 'pending') NOT NULL DEFAULT 'pending',
@@ -47,16 +46,14 @@ CREATE TABLE `USERS` (
     `deleted_at` TIMESTAMP NULL DEFAULT NULL,
     `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (`user_id`),
-    UNIQUE KEY `uk_users_username` (`username`),
     UNIQUE KEY `uk_users_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=1000;
 
--- Projects table
+-- Projects table (000002: removed fqdn; 000004: name VARCHAR(32))
 CREATE TABLE `PROJECTS` (
     `project_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    `name` VARCHAR(255) NOT NULL,
+    `name` VARCHAR(32) NOT NULL,
     `slug` VARCHAR(23) NOT NULL,
-    `fqdn` VARCHAR(255) NULL,
     `status` ENUM('active', 'inactive', 'suspended', 'pending') NOT NULL DEFAULT 'pending',
     `project_operation_status` ENUM('nothing', 'building', 'deploying') NOT NULL DEFAULT 'nothing'
         COMMENT 'Current operation status of the project',
@@ -87,11 +84,11 @@ CREATE TABLE `TEMPLATES` (
     PRIMARY KEY (`template_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=1000;
 
--- Volumes table
+-- Volumes table (000004: name VARCHAR(32))
 CREATE TABLE `VOLUMES` (
     `volume_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `project_id` INT UNSIGNED NOT NULL,
-    `name` VARCHAR(255) NOT NULL,
+    `name` VARCHAR(32) NOT NULL,
     `slug` VARCHAR(23) NULL,
     `capacity` INT UNSIGNED NOT NULL,
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -124,12 +121,12 @@ CREATE TABLE `GITHUB_INSTALLATIONS` (
         REFERENCES `USERS` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Containers table
+-- Containers table (000004: name VARCHAR(32))
 CREATE TABLE `CONTAINERS` (
     `container_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `project_id` INT UNSIGNED NOT NULL,
     `template_id` INT UNSIGNED NULL,
-    `name` VARCHAR(255) NOT NULL,
+    `name` VARCHAR(32) NOT NULL,
     `slug` VARCHAR(23) NOT NULL,
     `stable_window` INT UNSIGNED NULL,
     `template_config` JSON NULL,
@@ -206,22 +203,28 @@ CREATE TABLE `SECRETS` (
         REFERENCES `CONTAINERS` (`container_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=1000;
 
--- Networks table
+-- Networks table (000002: added UNIQUE fqdn; 000007: added soft delete; 000009: added tekton fields)
 CREATE TABLE `NETWORKS` (
     `network_id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `container_id` INT UNSIGNED NOT NULL,
-    `external_ip` VARCHAR(45) NULL,
     `fqdn` VARCHAR(255) NULL,
+    `external_ip` VARCHAR(45) NULL,
     `external_port` SMALLINT UNSIGNED NULL,
     `internal_port` SMALLINT UNSIGNED NULL,
     `type` ENUM('tcp', 'udp', 'http') NOT NULL DEFAULT 'tcp',
+    `tekton_event_id` VARCHAR(255) NULL COMMENT 'Tekton PipelineRun name for NodePort tracking',
+    `expires_at` TIMESTAMP NULL COMMENT 'NodePort expiration timestamp',
     `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+    `is_deleted` BOOLEAN NOT NULL DEFAULT FALSE,
+    `deleted_at` TIMESTAMP NULL DEFAULT NULL,
     PRIMARY KEY (`network_id`),
+    UNIQUE KEY `uk_networks_fqdn` (`fqdn`),
     INDEX `idx_networks_container_id` (`container_id`),
+    INDEX `idx_networks_is_deleted` (`is_deleted`),
     CONSTRAINT `fk_networks_container` FOREIGN KEY (`container_id`)
         REFERENCES `CONTAINERS` (`container_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=1000;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=1000 COMMENT = 'Container network configurations with soft delete support for FQDN ownership tracking';
 
 -- Deployments table
 CREATE TABLE `DEPLOYMENTS` (
@@ -372,6 +375,7 @@ ON DELETE SET NULL;
 
 -- ============================================================================
 -- Insert initial system settings (pricing and limits)
+-- (000010: updated eco pricing; 000005: added max_projects_per_user)
 -- ============================================================================
 
 INSERT INTO `SYSTEM_SETTINGS` (`setting_key`, `setting_value`, `value_type`, `category`, `description`, `is_editable`) VALUES
@@ -388,9 +392,9 @@ INSERT INTO `SYSTEM_SETTINGS` (`setting_key`, `setting_value`, `value_type`, `ca
 ('pro_plan_free_minutes', '-1', 'int', 'pricing', 'Pro plan free runtime minutes per month (-1 = unlimited)', FALSE),
 ('pro_plan_runtime_price_per_minute', '0', 'float', 'pricing', 'Pro plan runtime price per minute (KRW)', FALSE),
 
--- Eco plan resource pricing (per minute, KRW)
-('eco_cpu_price_per_core_per_minute', '30', 'float', 'pricing', 'Eco CPU pricing per core per minute (KRW)', TRUE),
-('eco_memory_price_per_gb_per_minute', '15', 'float', 'pricing', 'Eco memory pricing per GB per minute (KRW)', TRUE),
+-- Eco plan resource pricing (per minute, KRW) - 000010: updated prices
+('eco_cpu_price_per_core_per_minute', '2.2', 'float', 'pricing', 'Eco CPU pricing per core per minute (KRW)', TRUE),
+('eco_memory_price_per_gb_per_minute', '1.1', 'float', 'pricing', 'Eco memory pricing per GB per minute (KRW)', TRUE),
 ('eco_disk_price_per_gb_per_month', '1000', 'int', 'pricing', 'Eco disk pricing per GB per month (KRW)', TRUE),
 
 -- Pro plan resource pricing (per month, KRW)
@@ -403,6 +407,9 @@ INSERT INTO `SYSTEM_SETTINGS` (`setting_key`, `setting_value`, `value_type`, `ca
 ('free_plan_memory_limit', '1024', 'int', 'limits', 'Free plan fixed memory limit (Mi)', FALSE),
 ('free_plan_disk_limit', '1024', 'int', 'limits', 'Free plan fixed disk limit (Mi)', FALSE),
 ('free_plan_max_projects', '1', 'int', 'limits', 'Maximum projects per user for Free plan', TRUE),
+
+-- Project limits (000005)
+('max_projects_per_user', '3', 'int', 'limits', 'Maximum projects per user (all plans)', TRUE),
 
 -- Beta tier limits
 ('beta_tier_enabled', 'true', 'boolean', 'beta', 'Enable beta tier resource restrictions', TRUE),
