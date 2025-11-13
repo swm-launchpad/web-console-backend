@@ -91,6 +91,11 @@ func ConvertToDeployConfig(
 					imageTag = commitHash
 				}
 			}
+		} else {
+			// Build result not found - use "latest" as fallback instead of "pending"
+			if imageTag == "pending" {
+				imageTag = "latest"
+			}
 		}
 
 		// Note: Networks are included in unified config but not in ContainerInfo DTO
