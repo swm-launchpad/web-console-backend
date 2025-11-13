@@ -406,6 +406,7 @@ func InitializeApp() (*App, error) {
 		projectApp.NewGetVolumesUseCase,
 		projectApp.NewRemoveVolumeUseCase,
 		projectApp.NewCheckProjectNameUseCase,
+		projectApp.NewCheckVolumeNameUseCase,
 
 		// Container infrastructure
 		containerInfra.NewContainerRepository,

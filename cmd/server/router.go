@@ -187,6 +187,9 @@ func (r *Router) Setup() {
 			projects.POST("/:slug/application-logs/token", r.projectLogHandler.CreateProjectLogToken)
 			projects.GET("/:slug/application-logs/history", r.projectLogHandler.GetProjectLogHistory)
 
+			// Volume routes under project
+			projects.GET("/:slug/volumes/check-name", r.volumeHandler.CheckVolumeName)
+
 			// Project name check endpoint
 			projects.GET("/check-name", r.projectHandler.CheckProjectName)
 		}

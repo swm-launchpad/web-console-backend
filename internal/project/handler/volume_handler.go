@@ -14,29 +14,35 @@ import (
 )
 
 type VolumeHandler struct {
-	addVolumeUseCase    *application.AddVolumeUseCase
-	getVolumesUseCase   *application.GetVolumesUseCase
-	removeVolumeUseCase *application.RemoveVolumeUseCase
-	permissionService   service.PermissionService
-	volumeService       service.VolumeService
-	logger              logger.Logger
+	addVolumeUseCase       *application.AddVolumeUseCase
+	getVolumesUseCase      *application.GetVolumesUseCase
+	removeVolumeUseCase    *application.RemoveVolumeUseCase
+	checkVolumeNameUseCase *application.CheckVolumeNameUseCase
+	permissionService      service.PermissionService
+	volumeService          service.VolumeService
+	projectService         service.ProjectService
+	logger                 logger.Logger
 }
 
 func NewVolumeHandler(
 	addVolumeUseCase *application.AddVolumeUseCase,
 	getVolumesUseCase *application.GetVolumesUseCase,
 	removeVolumeUseCase *application.RemoveVolumeUseCase,
+	checkVolumeNameUseCase *application.CheckVolumeNameUseCase,
 	permissionService service.PermissionService,
 	volumeService service.VolumeService,
+	projectService service.ProjectService,
 	log logger.Logger,
 ) *VolumeHandler {
 	return &VolumeHandler{
-		addVolumeUseCase:    addVolumeUseCase,
-		getVolumesUseCase:   getVolumesUseCase,
-		removeVolumeUseCase: removeVolumeUseCase,
-		permissionService:   permissionService,
-		volumeService:       volumeService,
-		logger:              log,
+		addVolumeUseCase:       addVolumeUseCase,
+		getVolumesUseCase:      getVolumesUseCase,
+		removeVolumeUseCase:    removeVolumeUseCase,
+		checkVolumeNameUseCase: checkVolumeNameUseCase,
+		permissionService:      permissionService,
+		volumeService:          volumeService,
+		projectService:         projectService,
+		logger:                 log,
 	}
 }
 
@@ -263,6 +269,69 @@ func (h *VolumeHandler) RemoveVolume(c *gin.Context) {
 		zap.Uint("user_id", userID.(uint)),
 		zap.Uint("volume_id", volume.VolumeID()),
 		zap.String("slug", slug),
+	)
+
+	response.OK(c, output)
+}
+
+// CheckVolumeName handles checking if a volume name already exists in a project
+// GET /api/v1/projects/:slug/volumes/check-name?name=xxx
+func (h *VolumeHandler) CheckVolumeName(c *gin.Context) {
+	ctx := c.Request.Context()
+	projectSlug := c.Param("slug")
+	name := c.Query("name")
+
+	h.logger.Debug(ctx, "check volume name handler started",
+		zap.String("handler", "CheckVolumeName"),
+		zap.String("project_slug", projectSlug),
+		zap.String("name", name),
+	)
+
+	if name == "" {
+		h.logger.Warn(ctx, "missing name parameter",
+			zap.String("handler", "CheckVolumeName"),
+			zap.String("project_slug", projectSlug),
+		)
+		response.Error(c, projecterrors.ErrMissingField, mapProjectError)
+		return
+	}
+
+	// Get project by slug to get project_id
+	project, err := h.projectService.GetProjectBySlug(ctx, projectSlug)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get project by slug",
+			zap.Error(err),
+			zap.String("handler", "CheckVolumeName"),
+			zap.String("project_slug", projectSlug),
+		)
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	input := application.CheckVolumeNameInput{
+		ProjectID: project.ProjectID(),
+		Name:      name,
+	}
+
+	output, err := h.checkVolumeNameUseCase.Execute(ctx, input)
+	if err != nil {
+		h.logger.Error(ctx, "failed to check volume name",
+			zap.Error(err),
+			zap.String("handler", "CheckVolumeName"),
+			zap.String("project_slug", projectSlug),
+			zap.String("name", name),
+			zap.Uint("project_id", project.ProjectID()),
+		)
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	h.logger.Debug(ctx, "check volume name handler completed",
+		zap.String("handler", "CheckVolumeName"),
+		zap.String("project_slug", projectSlug),
+		zap.String("name", name),
+		zap.Uint("project_id", project.ProjectID()),
+		zap.Bool("exists", output.Exists),
 	)
 
 	response.OK(c, output)
