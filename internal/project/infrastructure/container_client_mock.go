@@ -335,7 +335,7 @@ func (m *MockContainerClient) getMultiContainerUnifiedConfig() *dto.UnifiedConta
 				BuildVars:            map[string]string{},
 				GitHubInstallationID: nil,
 				ImageName:            "c2025011812000022222222",
-				ImageTag:             "pending",
+				ImageTag:             "latest",
 				CPULimit:             nil,
 				MemoryLimit:          nil,
 				EnvVars:              map[string]string{"MYSQL_DATABASE": "mydb", "MYSQL_ROOT_PASSWORD": "rootpass"},

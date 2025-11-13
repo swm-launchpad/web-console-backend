@@ -91,12 +91,9 @@ func ConvertToDeployConfig(
 					imageTag = commitHash
 				}
 			}
-		} else {
-			// Build result not found - use "latest" as fallback instead of "pending"
-			if imageTag == "pending" {
-				imageTag = "latest"
-			}
 		}
+		// If build result not found, use imageTag from unified config
+		// (either commit hash from previous build or "latest" for first-time builds)
 
 		// Note: Networks are included in unified config but not in ContainerInfo DTO
 		// Network information (domain, port) is extracted separately

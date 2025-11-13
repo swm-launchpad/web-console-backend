@@ -85,13 +85,13 @@ func (c *containerClient) GetContainerConfig(ctx context.Context, projectID uint
 				imageTag = commitHash
 			}
 		} else {
-			// First-time build: use placeholder tag
-			// This will be updated from BuildResult.LatestCommitHash before deployment
-			imageTag = "pending"
-			c.logger.Info(ctx, "container client using placeholder image tag for first build",
+			// First-time build: use latest tag
+			// This will be updated from BuildResult.LatestCommitHash if GitHub build succeeds
+			imageTag = "latest"
+			c.logger.Info(ctx, "container client using latest image tag for first build",
 				zap.Uint("project_id", projectID),
 				zap.String("container_name", container.Name),
-				zap.String("placeholder_tag", imageTag),
+				zap.String("image_tag", imageTag),
 			)
 		}
 
@@ -324,13 +324,13 @@ func (c *containerClient) GetContainerConfigs(ctx context.Context, projectID uin
 				imageTag = commitHash
 			}
 		} else {
-			// First-time build: use placeholder tag
-			// This will be updated from BuildResult.LatestCommitHash before deployment
-			imageTag = "pending"
-			c.logger.Info(ctx, "container client using placeholder image tag for first build (unified)",
+			// First-time build: use latest tag
+			// This will be updated from BuildResult.LatestCommitHash if GitHub build succeeds
+			imageTag = "latest"
+			c.logger.Info(ctx, "container client using latest image tag for first build (unified)",
 				zap.Uint("project_id", projectID),
 				zap.String("container_name", container.Name),
-				zap.String("placeholder_tag", imageTag),
+				zap.String("image_tag", imageTag),
 			)
 		}
 
@@ -495,9 +495,9 @@ func (c *containerClient) GetUnifiedContainerConfig(ctx context.Context, project
 				imageTag = commitHash
 			}
 		} else {
-			// First-time build: use placeholder
-			imageTag = "pending"
-			c.logger.Info(ctx, "using placeholder image tag for first build",
+			// First-time build: use latest tag
+			imageTag = "latest"
+			c.logger.Info(ctx, "using latest image tag for first build",
 				zap.Uint("project_id", projectID),
 				zap.String("container_name", build.Name),
 			)
