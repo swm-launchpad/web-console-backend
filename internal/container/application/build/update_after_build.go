@@ -111,11 +111,15 @@ func (uc *UpdateContainerAfterBuildUseCase) Execute(
 		// Skipped builds (should_build=false) keep the existing commit hash
 		if input.BuildStatus == "success" {
 			// Update commit hash only if not empty
-			// Empty hash can occur with pipeline bugs
+			// Empty hash occurs for containers without GitHub URL (e.g., MySQL)
+			// In this case, use "latest" tag for consistency with Tekton's image_tag
 			if input.CommitHash != "" {
 				currentContainer.SetLastBuiltCommitHash(&input.CommitHash)
 			} else {
-				uc.logger.Warn(txCtx, "Build returned empty commit hash, keeping previous value",
+				// GitHub URL이 없는 컨테이너는 "latest" 태그 사용
+				latest := "latest"
+				currentContainer.SetLastBuiltCommitHash(&latest)
+				uc.logger.Info(txCtx, "Build returned empty commit hash, using 'latest' tag",
 					zap.Uint("container_id", input.ContainerID),
 				)
 			}

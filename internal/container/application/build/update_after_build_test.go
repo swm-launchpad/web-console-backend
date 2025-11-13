@@ -370,7 +370,7 @@ func TestUpdateContainerAfterBuildUseCase_Execute_EmptyCommitHash(t *testing.T) 
 	input := UpdateContainerAfterBuildInput{
 		ContainerID: 10,
 		BuildStatus: "success",
-		CommitHash:  "", // Empty commit hash
+		CommitHash:  "", // Empty commit hash (for containers without GitHub URL)
 		SnapshotBefore: &BuildParametersSnapshot{
 			GitRepositoryURL: "https://github.com/test/repo",
 			GitBranch:        "main",
@@ -388,8 +388,8 @@ func TestUpdateContainerAfterBuildUseCase_Execute_EmptyCommitHash(t *testing.T) 
 	assert.True(t, wasUpdated, "container should be updated even with empty commit hash")
 	require.NotNil(t, savedContainer)
 	assert.False(t, savedContainer.NeedsBuild())
-	// Previous commit hash should be preserved
-	assert.Equal(t, previousHash, *savedContainer.LastBuiltGitCommitHash())
+	// Empty commit hash should be replaced with "latest" tag
+	assert.Equal(t, "latest", *savedContainer.LastBuiltGitCommitHash())
 }
 
 func TestUpdateContainerAfterBuildUseCase_Execute_RepositoryError(t *testing.T) {
