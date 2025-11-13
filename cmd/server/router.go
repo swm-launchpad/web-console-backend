@@ -181,10 +181,14 @@ func (r *Router) Setup() {
 			// Container routes under project (RESTful)
 			projects.POST("/:slug/containers", r.containerHandler.CreateContainer)
 			projects.GET("/:slug/containers", r.containerHandler.ListContainers)
+			projects.GET("/:slug/containers/check-name", r.containerHandler.CheckContainerName)
 
 			// Application logs (runtime logs)
 			projects.POST("/:slug/application-logs/token", r.projectLogHandler.CreateProjectLogToken)
 			projects.GET("/:slug/application-logs/history", r.projectLogHandler.GetProjectLogHistory)
+
+			// Project name check endpoint
+			projects.GET("/check-name", r.projectHandler.CheckProjectName)
 		}
 
 		// Volume routes (protected)

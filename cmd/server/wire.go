@@ -405,6 +405,7 @@ func InitializeApp() (*App, error) {
 		projectApp.NewAddVolumeUseCase,
 		projectApp.NewGetVolumesUseCase,
 		projectApp.NewRemoveVolumeUseCase,
+		projectApp.NewCheckProjectNameUseCase,
 
 		// Container infrastructure
 		containerInfra.NewContainerRepository,
@@ -450,6 +451,7 @@ func InitializeApp() (*App, error) {
 		containerApp.NewGetBuildLogHistoryUseCase,
 		containerApp.NewGetContainerSlugsByProjectIDUseCase,
 		containerApp.NewCheckFQDNUseCase,
+		containerApp.NewCheckContainerNameUseCase,
 		containerApp.NewCreateNodePortUseCase,
 		containerApp.NewGetNodePortUseCase,
 
