@@ -2145,10 +2145,12 @@ func (h *ContainerHandler) DeleteVolume(c *gin.Context) {
 func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
 	ctx := c.Request.Context()
 	fqdn := c.Query("fqdn")
+	projectIDStr := c.Query("project_id")
 
 	h.logger.Debug(ctx, "check FQDN handler started",
 		zap.String("handler", "CheckFQDN"),
 		zap.String("fqdn", fqdn),
+		zap.String("project_id", projectIDStr),
 	)
 
 	if fqdn == "" {
@@ -2163,12 +2165,29 @@ func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
 		FQDN: fqdn,
 	}
 
+	// Parse optional project_id parameter
+	if projectIDStr != "" {
+		projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
+		if err != nil {
+			h.logger.Warn(ctx, "invalid project_id parameter",
+				zap.String("handler", "CheckFQDN"),
+				zap.String("project_id", projectIDStr),
+				zap.Error(err),
+			)
+			response.Error(c, containererrors.ErrInvalidInput, mapContainerError)
+			return
+		}
+		projectIDUint32 := uint32(projectID)
+		input.ProjectID = &projectIDUint32
+	}
+
 	output, err := h.checkFQDNUC.Execute(ctx, input)
 	if err != nil {
 		h.logger.Error(ctx, "failed to check FQDN",
 			zap.Error(err),
 			zap.String("handler", "CheckFQDN"),
 			zap.String("fqdn", fqdn),
+			zap.Uint32p("project_id", input.ProjectID),
 		)
 		response.Error(c, err, mapContainerError)
 		return
@@ -2177,6 +2196,7 @@ func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
 	h.logger.Debug(ctx, "check FQDN handler completed",
 		zap.String("handler", "CheckFQDN"),
 		zap.String("fqdn", fqdn),
+		zap.Uint32p("project_id", input.ProjectID),
 		zap.Bool("exists", output.Exists),
 	)
 
