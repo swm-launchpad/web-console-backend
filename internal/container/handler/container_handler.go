@@ -33,10 +33,11 @@ type ContainerHandler struct {
 	addBuildVarUC     *application.AddBuildVarUseCase
 	updateBuildVarUC  *application.UpdateBuildVarUseCase
 	deleteBuildVarUC  *application.DeleteBuildVarUseCase
-	addMountUC        *application.AddMountUseCase
-	deleteMountUC     *application.DeleteMountUseCase
-	checkFQDNUC       *application.CheckFQDNUseCase
-	createNodePortUC  *application.CreateNodePortUseCase
+	addMountUC            *application.AddMountUseCase
+	deleteMountUC         *application.DeleteMountUseCase
+	checkFQDNUC           *application.CheckFQDNUseCase
+	checkContainerNameUC  *application.CheckContainerNameUseCase
+	createNodePortUC      *application.CreateNodePortUseCase
 	getNodePortUC     *application.GetNodePortUseCase
 	projectService    projectservice.ProjectService
 	volumeService     projectservice.VolumeService
@@ -75,6 +76,7 @@ func NewContainerHandler(
 	addMountUC *application.AddMountUseCase,
 	deleteMountUC *application.DeleteMountUseCase,
 	checkFQDNUC *application.CheckFQDNUseCase,
+	checkContainerNameUC *application.CheckContainerNameUseCase,
 	createNodePortUC *application.CreateNodePortUseCase,
 	getNodePortUC *application.GetNodePortUseCase,
 	projectService projectservice.ProjectService,
@@ -101,11 +103,12 @@ func NewContainerHandler(
 		addBuildVarUC:     addBuildVarUC,
 		updateBuildVarUC:  updateBuildVarUC,
 		deleteBuildVarUC:  deleteBuildVarUC,
-		addMountUC:        addMountUC,
-		deleteMountUC:     deleteMountUC,
-		checkFQDNUC:       checkFQDNUC,
-		createNodePortUC:  createNodePortUC,
-		getNodePortUC:     getNodePortUC,
+		addMountUC:           addMountUC,
+		deleteMountUC:        deleteMountUC,
+		checkFQDNUC:          checkFQDNUC,
+		checkContainerNameUC: checkContainerNameUC,
+		createNodePortUC:     createNodePortUC,
+		getNodePortUC:        getNodePortUC,
 		projectService:    projectService,
 		volumeService:     volumeService,
 		containerService:  containerService,
@@ -2197,6 +2200,67 @@ func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
 		zap.String("handler", "CheckFQDN"),
 		zap.String("fqdn", fqdn),
 		zap.Uint32p("project_id", input.ProjectID),
+		zap.Bool("exists", output.Exists),
+	)
+
+	response.OK(c, output)
+}
+
+// CheckContainerName handles checking if a container name is already in use within a project
+func (h *ContainerHandler) CheckContainerName(c *gin.Context) {
+	ctx := c.Request.Context()
+	projectSlug := c.Param("slug")
+	name := c.Query("name")
+
+	h.logger.Debug(ctx, "check container name handler started",
+		zap.String("handler", "CheckContainerName"),
+		zap.String("project_slug", projectSlug),
+		zap.String("name", name),
+	)
+
+	if projectSlug == "" || name == "" {
+		h.logger.Warn(ctx, "missing required parameters",
+			zap.String("handler", "CheckContainerName"),
+			zap.String("project_slug", projectSlug),
+			zap.String("name", name),
+		)
+		response.Error(c, containererrors.ErrMissingField, mapContainerError)
+		return
+	}
+
+	// Get project by slug to get project_id
+	project, err := h.projectService.GetProjectBySlug(ctx, projectSlug)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get project by slug",
+			zap.Error(err),
+			zap.String("handler", "CheckContainerName"),
+			zap.String("project_slug", projectSlug),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	input := application.CheckContainerNameInput{
+		ProjectID: project.ProjectID(),
+		Name:      name,
+	}
+
+	output, err := h.checkContainerNameUC.Execute(ctx, input)
+	if err != nil {
+		h.logger.Error(ctx, "failed to check container name",
+			zap.Error(err),
+			zap.String("handler", "CheckContainerName"),
+			zap.Uint("project_id", project.ProjectID()),
+			zap.String("name", name),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	h.logger.Debug(ctx, "check container name handler completed",
+		zap.String("handler", "CheckContainerName"),
+		zap.Uint("project_id", project.ProjectID()),
+		zap.String("name", name),
 		zap.Bool("exists", output.Exists),
 	)
 
