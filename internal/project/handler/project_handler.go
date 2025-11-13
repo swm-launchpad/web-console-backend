@@ -25,16 +25,17 @@ const (
 )
 
 type ProjectHandler struct {
-	createProjectUseCase    *application.CreateProjectUseCase
-	getProjectUseCase       *application.GetProjectUseCase
-	getProjectBySlugUseCase *application.GetProjectBySlugUseCase
-	updateProjectUseCase    *application.UpdateProjectUseCase
-	deleteProjectUseCase    *application.DeleteProjectUseCase
-	listProjectsUseCase     *application.ListProjectsUseCase
-	permissionService       service.PermissionService
-	projectService          service.ProjectService
-	settingsService         settings.SettingsService
-	logger                  logger.Logger
+	createProjectUseCase     *application.CreateProjectUseCase
+	getProjectUseCase        *application.GetProjectUseCase
+	getProjectBySlugUseCase  *application.GetProjectBySlugUseCase
+	updateProjectUseCase     *application.UpdateProjectUseCase
+	deleteProjectUseCase     *application.DeleteProjectUseCase
+	listProjectsUseCase      *application.ListProjectsUseCase
+	checkProjectNameUseCase  *application.CheckProjectNameUseCase
+	permissionService        service.PermissionService
+	projectService           service.ProjectService
+	settingsService          settings.SettingsService
+	logger                   logger.Logger
 }
 
 func NewProjectHandler(
@@ -44,6 +45,7 @@ func NewProjectHandler(
 	updateProjectUseCase *application.UpdateProjectUseCase,
 	deleteProjectUseCase *application.DeleteProjectUseCase,
 	listProjectsUseCase *application.ListProjectsUseCase,
+	checkProjectNameUseCase *application.CheckProjectNameUseCase,
 	permissionService service.PermissionService,
 	projectService service.ProjectService,
 	settingsService settings.SettingsService,
@@ -56,6 +58,7 @@ func NewProjectHandler(
 		updateProjectUseCase:    updateProjectUseCase,
 		deleteProjectUseCase:    deleteProjectUseCase,
 		listProjectsUseCase:     listProjectsUseCase,
+		checkProjectNameUseCase: checkProjectNameUseCase,
 		permissionService:       permissionService,
 		projectService:          projectService,
 		settingsService:         settingsService,
@@ -531,6 +534,70 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 		zap.String("handler", "ListProjects"),
 		zap.Uint("user_id", userID),
 		zap.Int("project_count", len(output.Projects)),
+	)
+
+	response.OK(c, output)
+}
+
+// CheckProjectName handles checking if a project name already exists for the user
+func (h *ProjectHandler) CheckProjectName(c *gin.Context) {
+	ctx := c.Request.Context()
+	name := c.Query("name")
+
+	h.logger.Debug(ctx, "check project name handler started",
+		zap.String("handler", "CheckProjectName"),
+		zap.String("name", name),
+	)
+
+	// Get user ID from context (set by auth middleware)
+	userIDInterface, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "CheckProjectName"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapProjectError)
+		return
+	}
+
+	userID, ok := userIDInterface.(uint)
+	if !ok {
+		h.logger.Error(ctx, "invalid user ID type",
+			zap.String("handler", "CheckProjectName"),
+		)
+		response.Error(c, projecterrors.ErrInternal, mapProjectError)
+		return
+	}
+
+	if name == "" {
+		h.logger.Warn(ctx, "missing name parameter",
+			zap.String("handler", "CheckProjectName"),
+		)
+		response.Error(c, projecterrors.ErrMissingField, mapProjectError)
+		return
+	}
+
+	input := application.CheckProjectNameInput{
+		Name:   name,
+		UserID: userID,
+	}
+
+	output, err := h.checkProjectNameUseCase.Execute(ctx, input)
+	if err != nil {
+		h.logger.Error(ctx, "failed to check project name",
+			zap.Error(err),
+			zap.String("handler", "CheckProjectName"),
+			zap.String("name", name),
+			zap.Uint("user_id", userID),
+		)
+		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	h.logger.Debug(ctx, "check project name handler completed",
+		zap.String("handler", "CheckProjectName"),
+		zap.String("name", name),
+		zap.Uint("user_id", userID),
+		zap.Bool("exists", output.Exists),
 	)
 
 	response.OK(c, output)
