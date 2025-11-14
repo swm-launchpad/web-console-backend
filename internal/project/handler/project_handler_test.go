@@ -18,6 +18,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	volumemodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
@@ -45,6 +46,8 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, nil, testLogger)
+		mockProjectRepository := new(repository.MockProjectRepository)
+		checkProjectNameUseCase := application.NewCheckProjectNameUseCase(mockProjectRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)
@@ -56,6 +59,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
+			checkProjectNameUseCase,
 			mockPermissionService,
 			mockProjectService,
 			settingsService,
@@ -136,6 +140,8 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, nil, testLogger)
+		mockProjectRepository := new(repository.MockProjectRepository)
+		checkProjectNameUseCase := application.NewCheckProjectNameUseCase(mockProjectRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)
@@ -147,6 +153,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
+			checkProjectNameUseCase,
 			mockPermissionService,
 			mockProjectService,
 			settingsService,
@@ -186,6 +193,8 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, nil, testLogger)
+		mockProjectRepository := new(repository.MockProjectRepository)
+		checkProjectNameUseCase := application.NewCheckProjectNameUseCase(mockProjectRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)
@@ -197,6 +206,7 @@ func TestProjectHandler_CreateProject(t *testing.T) {
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
+			checkProjectNameUseCase,
 			mockPermissionService,
 			mockProjectService,
 			settingsService,
@@ -270,6 +280,8 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, nil, testLogger)
+		mockProjectRepository := new(repository.MockProjectRepository)
+		checkProjectNameUseCase := application.NewCheckProjectNameUseCase(mockProjectRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)
@@ -281,6 +293,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
+			checkProjectNameUseCase,
 			mockPermissionService,
 			mockProjectService,
 			settingsService,
@@ -339,6 +352,8 @@ func TestProjectHandler_GetProject(t *testing.T) {
 		mockContainerSlugProvider := new(infrastructure.MockContainerSlugProvider)
 		deleteUseCase := application.NewDeleteProjectUseCase(mockProjectService, mockVolumeService, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 		listUseCase := application.NewListProjectsUseCase(mockProjectService, nil, nil, testLogger)
+		mockProjectRepository := new(repository.MockProjectRepository)
+		checkProjectNameUseCase := application.NewCheckProjectNameUseCase(mockProjectRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		// Settings service not needed for Pro plan test (only used for Free plan)
@@ -350,6 +365,7 @@ func TestProjectHandler_GetProject(t *testing.T) {
 			updateUseCase,
 			deleteUseCase,
 			listUseCase,
+			checkProjectNameUseCase,
 			mockPermissionService,
 			mockProjectService,
 			settingsService,

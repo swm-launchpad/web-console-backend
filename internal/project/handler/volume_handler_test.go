@@ -18,6 +18,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	"github.com/swm-launchpad/web-console-backend/internal/project/application"
 	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	volumemodel "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/volume"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 )
@@ -33,18 +34,23 @@ func TestVolumeHandler_AddVolume(t *testing.T) {
 		txManager := db.NewStubTxManager()
 
 		// Create real use cases with mocked dependencies
+		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		addVolumeUseCase := application.NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 		getVolumesUseCase := application.NewGetVolumesUseCase(mockVolumeService, testLogger)
 		removeVolumeUseCase := application.NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
+		mockVolumeRepository := new(repository.MockVolumeRepository)
+		checkVolumeNameUseCase := application.NewCheckVolumeNameUseCase(mockVolumeRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewVolumeHandler(
 			addVolumeUseCase,
 			getVolumesUseCase,
 			removeVolumeUseCase,
+			checkVolumeNameUseCase,
 			mockPermissionService,
 			mockVolumeService,
+			mockProjectService,
 			mockLogger,
 		)
 
@@ -101,18 +107,23 @@ func TestVolumeHandler_AddVolume(t *testing.T) {
 		txManager := db.NewStubTxManager()
 
 		// Create real use cases with mocked dependencies
+		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		addVolumeUseCase := application.NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 		getVolumesUseCase := application.NewGetVolumesUseCase(mockVolumeService, testLogger)
 		removeVolumeUseCase := application.NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
+		mockVolumeRepository := new(repository.MockVolumeRepository)
+		checkVolumeNameUseCase := application.NewCheckVolumeNameUseCase(mockVolumeRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewVolumeHandler(
 			addVolumeUseCase,
 			getVolumesUseCase,
 			removeVolumeUseCase,
+			checkVolumeNameUseCase,
 			mockPermissionService,
 			mockVolumeService,
+			mockProjectService,
 			mockLogger,
 		)
 
@@ -143,18 +154,23 @@ func TestVolumeHandler_AddVolume(t *testing.T) {
 		txManager := db.NewStubTxManager()
 
 		// Create real use cases with mocked dependencies
+		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		addVolumeUseCase := application.NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 		getVolumesUseCase := application.NewGetVolumesUseCase(mockVolumeService, testLogger)
 		removeVolumeUseCase := application.NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
+		mockVolumeRepository := new(repository.MockVolumeRepository)
+		checkVolumeNameUseCase := application.NewCheckVolumeNameUseCase(mockVolumeRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewVolumeHandler(
 			addVolumeUseCase,
 			getVolumesUseCase,
 			removeVolumeUseCase,
+			checkVolumeNameUseCase,
 			mockPermissionService,
 			mockVolumeService,
+			mockProjectService,
 			mockLogger,
 		)
 
@@ -201,18 +217,23 @@ func TestVolumeHandler_GetVolumes(t *testing.T) {
 		txManager := db.NewStubTxManager()
 
 		// Create real use cases with mocked dependencies
+		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		addVolumeUseCase := application.NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 		getVolumesUseCase := application.NewGetVolumesUseCase(mockVolumeService, testLogger)
 		removeVolumeUseCase := application.NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
+		mockVolumeRepository := new(repository.MockVolumeRepository)
+		checkVolumeNameUseCase := application.NewCheckVolumeNameUseCase(mockVolumeRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewVolumeHandler(
 			addVolumeUseCase,
 			getVolumesUseCase,
 			removeVolumeUseCase,
+			checkVolumeNameUseCase,
 			mockPermissionService,
 			mockVolumeService,
+			mockProjectService,
 			mockLogger,
 		)
 
@@ -262,18 +283,23 @@ func TestVolumeHandler_GetVolumes(t *testing.T) {
 		txManager := db.NewStubTxManager()
 
 		// Create real use cases with mocked dependencies
+		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		addVolumeUseCase := application.NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 		getVolumesUseCase := application.NewGetVolumesUseCase(mockVolumeService, testLogger)
 		removeVolumeUseCase := application.NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
+		mockVolumeRepository := new(repository.MockVolumeRepository)
+		checkVolumeNameUseCase := application.NewCheckVolumeNameUseCase(mockVolumeRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewVolumeHandler(
 			addVolumeUseCase,
 			getVolumesUseCase,
 			removeVolumeUseCase,
+			checkVolumeNameUseCase,
 			mockPermissionService,
 			mockVolumeService,
+			mockProjectService,
 			mockLogger,
 		)
 
@@ -312,18 +338,23 @@ func TestVolumeHandler_RemoveVolume(t *testing.T) {
 		txManager := db.NewStubTxManager()
 
 		// Create real use cases with mocked dependencies
+		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		addVolumeUseCase := application.NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 		getVolumesUseCase := application.NewGetVolumesUseCase(mockVolumeService, testLogger)
 		removeVolumeUseCase := application.NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
+		mockVolumeRepository := new(repository.MockVolumeRepository)
+		checkVolumeNameUseCase := application.NewCheckVolumeNameUseCase(mockVolumeRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewVolumeHandler(
 			addVolumeUseCase,
 			getVolumesUseCase,
 			removeVolumeUseCase,
+			checkVolumeNameUseCase,
 			mockPermissionService,
 			mockVolumeService,
+			mockProjectService,
 			mockLogger,
 		)
 
@@ -371,18 +402,23 @@ func TestVolumeHandler_RemoveVolume(t *testing.T) {
 		txManager := db.NewStubTxManager()
 
 		// Create real use cases with mocked dependencies
+		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		addVolumeUseCase := application.NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 		getVolumesUseCase := application.NewGetVolumesUseCase(mockVolumeService, testLogger)
 		removeVolumeUseCase := application.NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
+		mockVolumeRepository := new(repository.MockVolumeRepository)
+		checkVolumeNameUseCase := application.NewCheckVolumeNameUseCase(mockVolumeRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewVolumeHandler(
 			addVolumeUseCase,
 			getVolumesUseCase,
 			removeVolumeUseCase,
+			checkVolumeNameUseCase,
 			mockPermissionService,
 			mockVolumeService,
+			mockProjectService,
 			mockLogger,
 		)
 
@@ -407,18 +443,23 @@ func TestVolumeHandler_RemoveVolume(t *testing.T) {
 		txManager := db.NewStubTxManager()
 
 		// Create real use cases with mocked dependencies
+		mockProjectService := new(service.MockProjectService)
 		testLogger := logger.NewForTest()
 		addVolumeUseCase := application.NewAddVolumeUseCase(mockVolumeService, txManager, testLogger)
 		getVolumesUseCase := application.NewGetVolumesUseCase(mockVolumeService, testLogger)
 		removeVolumeUseCase := application.NewRemoveVolumeUseCase(mockVolumeService, txManager, testLogger)
+		mockVolumeRepository := new(repository.MockVolumeRepository)
+		checkVolumeNameUseCase := application.NewCheckVolumeNameUseCase(mockVolumeRepository, testLogger)
 
 		mockLogger, _ := logger.New(logger.Config{Level: "info", Format: "json"})
 		handler := NewVolumeHandler(
 			addVolumeUseCase,
 			getVolumesUseCase,
 			removeVolumeUseCase,
+			checkVolumeNameUseCase,
 			mockPermissionService,
 			mockVolumeService,
+			mockProjectService,
 			mockLogger,
 		)
 

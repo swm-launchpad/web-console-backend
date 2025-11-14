@@ -9,7 +9,8 @@ import (
 )
 
 type CheckFQDNInput struct {
-	FQDN string
+	FQDN      string
+	ProjectID *uint32 // Optional: if provided, check with project scope
 }
 
 type CheckFQDNOutput struct {
@@ -31,19 +32,32 @@ func NewCheckFQDNUseCase(containerRepo repository.ContainerRepository, log logge
 func (uc *CheckFQDNUseCase) Execute(ctx context.Context, input CheckFQDNInput) (*CheckFQDNOutput, error) {
 	uc.logger.Debug(ctx, "check FQDN started",
 		zap.String("fqdn", input.FQDN),
+		zap.Uint32p("project_id", input.ProjectID),
 	)
 
-	exists, err := uc.containerRepo.CheckFQDNExists(ctx, input.FQDN)
+	var exists bool
+	var err error
+
+	// If ProjectID is provided, use project-scoped check (stricter validation)
+	if input.ProjectID != nil {
+		exists, err = uc.containerRepo.CheckFQDNExistsForProject(ctx, input.FQDN, uint(*input.ProjectID))
+	} else {
+		// Fallback to global check for backward compatibility
+		exists, err = uc.containerRepo.CheckFQDNExists(ctx, input.FQDN)
+	}
+
 	if err != nil {
 		uc.logger.Error(ctx, "failed to check FQDN",
 			zap.Error(err),
 			zap.String("fqdn", input.FQDN),
+			zap.Uint32p("project_id", input.ProjectID),
 		)
 		return nil, err
 	}
 
 	uc.logger.Debug(ctx, "check FQDN completed",
 		zap.String("fqdn", input.FQDN),
+		zap.Uint32p("project_id", input.ProjectID),
 		zap.Bool("exists", exists),
 	)
 

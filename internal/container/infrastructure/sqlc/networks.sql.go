@@ -269,7 +269,7 @@ func (q *Queries) DeleteNetworksByContainerID(ctx context.Context, containerID u
 }
 
 const getNetworkByID = `-- name: GetNetworkByID :one
-SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at, is_deleted, deleted_at, tekton_event_id, expires_at
+SELECT network_id, container_id, fqdn, external_ip, external_port, internal_port, type, tekton_event_id, expires_at, created_at, updated_at, is_deleted, deleted_at
 FROM NETWORKS
 WHERE network_id = ?
 `
@@ -280,23 +280,23 @@ func (q *Queries) GetNetworkByID(ctx context.Context, networkID uint32) (Network
 	err := row.Scan(
 		&i.NetworkID,
 		&i.ContainerID,
-		&i.ExternalIp,
 		&i.Fqdn,
+		&i.ExternalIp,
 		&i.ExternalPort,
 		&i.InternalPort,
 		&i.Type,
+		&i.TektonEventID,
+		&i.ExpiresAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.IsDeleted,
 		&i.DeletedAt,
-		&i.TektonEventID,
-		&i.ExpiresAt,
 	)
 	return i, err
 }
 
 const getNetworksByContainerID = `-- name: GetNetworksByContainerID :many
-SELECT network_id, container_id, external_ip, fqdn, external_port, internal_port, type, created_at, updated_at, is_deleted, deleted_at, tekton_event_id, expires_at
+SELECT network_id, container_id, fqdn, external_ip, external_port, internal_port, type, tekton_event_id, expires_at, created_at, updated_at, is_deleted, deleted_at
 FROM NETWORKS
 WHERE container_id = ?
   AND is_deleted = 0
@@ -315,17 +315,17 @@ func (q *Queries) GetNetworksByContainerID(ctx context.Context, containerID uint
 		if err := rows.Scan(
 			&i.NetworkID,
 			&i.ContainerID,
-			&i.ExternalIp,
 			&i.Fqdn,
+			&i.ExternalIp,
 			&i.ExternalPort,
 			&i.InternalPort,
 			&i.Type,
+			&i.TektonEventID,
+			&i.ExpiresAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.IsDeleted,
 			&i.DeletedAt,
-			&i.TektonEventID,
-			&i.ExpiresAt,
 		); err != nil {
 			return nil, err
 		}
