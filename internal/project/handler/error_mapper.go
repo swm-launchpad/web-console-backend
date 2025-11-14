@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/response"
@@ -102,6 +103,13 @@ func mapProjectError(err error) (response.ErrorMapping, bool) {
 		return response.ErrorMapping{}, false
 	}
 
-	mapping, found := projectErrorMap[err]
-	return mapping, found
+	// Iterate through error map and use errors.Is for comparison
+	// This supports wrapped errors (e.g., fmt.Errorf("context: %w", err))
+	for domainErr, mapping := range projectErrorMap {
+		if errors.Is(err, domainErr) {
+			return mapping, true
+		}
+	}
+
+	return response.ErrorMapping{}, false
 }
