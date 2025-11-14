@@ -13,6 +13,8 @@ type TemplateOption struct {
 	Options     []string `json:"options,omitempty"`
 	Default     string   `json:"default,omitempty"`
 	Description string   `json:"description,omitempty"`
+	AllowCustom *bool    `json:"allow_custom,omitempty"` // Allow "Custom Input" option for select type
+	CustomLabel *string  `json:"custom_label,omitempty"` // Label for custom option
 }
 
 // TemplateEnv represents an environment variable definition
