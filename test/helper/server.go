@@ -107,6 +107,13 @@ func SetupTestServer(t *testing.T) *TestServer {
 	deleteProjectUseCase := projectApp.NewDeleteProjectUseCase(projectSvc, volumeSvc, mockTektonCleanupClient, mockContainerSlugProvider, txManager, testLogger)
 	projectQueries := projectSqlc.New(testDB.DB)
 	listProjectsUseCase := projectApp.NewListProjectsUseCase(projectSvc, projectQueries, settingsSvc, testLogger)
+	checkProjectNameUseCase := projectApp.NewCheckProjectNameUseCase(projectRepository, testLogger)
+
+	// Volume UseCases
+	addVolumeUseCase := projectApp.NewAddVolumeUseCase(volumeSvc, txManager, testLogger)
+	getVolumesUseCase := projectApp.NewGetVolumesUseCase(volumeSvc, testLogger)
+	removeVolumeUseCase := projectApp.NewRemoveVolumeUseCase(volumeSvc, txManager, testLogger)
+	checkVolumeNameUseCase := projectApp.NewCheckVolumeNameUseCase(volumeRepo, testLogger)
 
 	// Container dependencies
 	containerRepo := containerInfra.NewContainerRepository(testDB.DB, testLogger)
@@ -138,6 +145,16 @@ func SetupTestServer(t *testing.T) *TestServer {
 	addMountUseCase := containerApp.NewAddMountUseCase(containerRepo, containerPermissionSvc, volumeSvc, txManager, testLogger)
 	deleteMountUseCase := containerApp.NewDeleteMountUseCase(containerRepo, containerPermissionSvc, txManager, testLogger)
 	checkFQDNUseCase := containerApp.NewCheckFQDNUseCase(containerRepo, testLogger)
+	checkContainerNameUseCase := containerApp.NewCheckContainerNameUseCase(containerRepo, testLogger)
+
+	// Mock TektonNodePortClient for NodePort use cases
+	mockTektonNodePortClient := new(containerInfra.MockTektonNodePortClient)
+	// Allow any NodePort operations to succeed
+	mockTektonNodePortClient.On("CreateNodePort", mock.Anything, mock.Anything, mock.Anything).Return(uint16(30000), nil).Maybe()
+	mockTektonNodePortClient.On("GetNodePort", mock.Anything, mock.Anything).Return(uint16(30000), nil).Maybe()
+
+	createNodePortUseCase := containerApp.NewCreateNodePortUseCase(containerRepo, projectRepository, containerPermissionSvc, mockTektonNodePortClient, testLogger)
+	getNodePortUseCase := containerApp.NewGetNodePortUseCase(containerRepo, projectRepository, containerPermissionSvc, mockTektonNodePortClient, testLogger)
 
 	// Template UseCases
 	getTemplatesUseCase := containerApp.NewGetTemplatesUseCase(templateRepo, testLogger)
@@ -153,11 +170,24 @@ func SetupTestServer(t *testing.T) *TestServer {
 		updateProjectUseCase,
 		deleteProjectUseCase,
 		listProjectsUseCase,
+		checkProjectNameUseCase,
 		permissionSvc,
 		projectSvc,
 		settingsSvc,
 		testLogger,
 	)
+	volumeHandler := projectHTTP.NewVolumeHandler(
+		addVolumeUseCase,
+		getVolumesUseCase,
+		removeVolumeUseCase,
+		checkVolumeNameUseCase,
+		permissionSvc,
+		volumeSvc,
+		projectSvc,
+		testLogger,
+	)
+	_ = volumeHandler // Volume endpoints are handled via container handler for now
+
 	containerHandler := containerHTTP.NewContainerHandler(
 		createContainerUseCase,
 		getContainerUseCase,
@@ -179,8 +209,9 @@ func SetupTestServer(t *testing.T) *TestServer {
 		addMountUseCase,
 		deleteMountUseCase,
 		checkFQDNUseCase,
-		nil, // createNodePortUseCase - not needed for tests
-		nil, // getNodePortUseCase - not needed for tests
+		checkContainerNameUseCase,
+		createNodePortUseCase,
+		getNodePortUseCase,
 		projectSvc,
 		volumeSvc,
 		containerSvc,
