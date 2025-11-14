@@ -250,13 +250,11 @@ func TestLoginUserUseCase_Execute(t *testing.T) {
 		}
 
 		// Different user with various status
-		phone := "010-1234-5678"
 		org := "Test Org"
 		expectedUser := &model.User{
 			UserID:       3,
 			Email:        "test@example.com",
 			Nickname:     "testnick3",
-			Phone:        &phone,
 			Organization: &org,
 			Status:       model.UserStatusActive,
 		}
