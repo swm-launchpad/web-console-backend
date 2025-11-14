@@ -11,39 +11,40 @@ import (
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	containerservice "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
+	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	projectservice "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	"go.uber.org/zap"
 )
 
 type ContainerHandler struct {
-	createContainerUC *application.CreateContainerUseCase
-	getContainerUC    *application.GetContainerUseCase
-	updateContainerUC *application.UpdateContainerUseCase
-	deleteContainerUC *application.DeleteContainerUseCase
-	listContainersUC  *application.ListContainersUseCase
-	addEnvVarUC       *application.AddEnvVarUseCase
-	updateEnvVarUC    *application.UpdateEnvVarUseCase
-	deleteEnvVarUC    *application.DeleteEnvVarUseCase
-	addNetworkUC      *application.AddNetworkUseCase
-	updateNetworkUC   *application.UpdateNetworkUseCase
-	deleteNetworkUC   *application.DeleteNetworkUseCase
-	addSecretUC       *application.AddSecretUseCase
-	updateSecretUC    *application.UpdateSecretUseCase
-	deleteSecretUC    *application.DeleteSecretUseCase
-	addBuildVarUC     *application.AddBuildVarUseCase
-	updateBuildVarUC  *application.UpdateBuildVarUseCase
-	deleteBuildVarUC  *application.DeleteBuildVarUseCase
-	addMountUC            *application.AddMountUseCase
-	deleteMountUC         *application.DeleteMountUseCase
-	checkFQDNUC           *application.CheckFQDNUseCase
-	checkContainerNameUC  *application.CheckContainerNameUseCase
-	createNodePortUC      *application.CreateNodePortUseCase
-	getNodePortUC     *application.GetNodePortUseCase
-	projectService    projectservice.ProjectService
-	volumeService     projectservice.VolumeService
-	containerService  containerservice.ContainerService
-	permissionSvc     containerservice.PermissionService
-	logger            logger.Logger
+	createContainerUC    *application.CreateContainerUseCase
+	getContainerUC       *application.GetContainerUseCase
+	updateContainerUC    *application.UpdateContainerUseCase
+	deleteContainerUC    *application.DeleteContainerUseCase
+	listContainersUC     *application.ListContainersUseCase
+	addEnvVarUC          *application.AddEnvVarUseCase
+	updateEnvVarUC       *application.UpdateEnvVarUseCase
+	deleteEnvVarUC       *application.DeleteEnvVarUseCase
+	addNetworkUC         *application.AddNetworkUseCase
+	updateNetworkUC      *application.UpdateNetworkUseCase
+	deleteNetworkUC      *application.DeleteNetworkUseCase
+	addSecretUC          *application.AddSecretUseCase
+	updateSecretUC       *application.UpdateSecretUseCase
+	deleteSecretUC       *application.DeleteSecretUseCase
+	addBuildVarUC        *application.AddBuildVarUseCase
+	updateBuildVarUC     *application.UpdateBuildVarUseCase
+	deleteBuildVarUC     *application.DeleteBuildVarUseCase
+	addMountUC           *application.AddMountUseCase
+	deleteMountUC        *application.DeleteMountUseCase
+	checkFQDNUC          *application.CheckFQDNUseCase
+	checkContainerNameUC *application.CheckContainerNameUseCase
+	createNodePortUC     *application.CreateNodePortUseCase
+	getNodePortUC        *application.GetNodePortUseCase
+	projectService       projectservice.ProjectService
+	volumeService        projectservice.VolumeService
+	containerService     containerservice.ContainerService
+	permissionSvc        containerservice.PermissionService
+	logger               logger.Logger
 }
 
 // Helper method to get container by slug
@@ -86,34 +87,34 @@ func NewContainerHandler(
 	log logger.Logger,
 ) *ContainerHandler {
 	return &ContainerHandler{
-		createContainerUC: createContainerUC,
-		getContainerUC:    getContainerUC,
-		updateContainerUC: updateContainerUC,
-		deleteContainerUC: deleteContainerUC,
-		listContainersUC:  listContainersUC,
-		addEnvVarUC:       addEnvVarUC,
-		updateEnvVarUC:    updateEnvVarUC,
-		deleteEnvVarUC:    deleteEnvVarUC,
-		addNetworkUC:      addNetworkUC,
-		updateNetworkUC:   updateNetworkUC,
-		deleteNetworkUC:   deleteNetworkUC,
-		addSecretUC:       addSecretUC,
-		updateSecretUC:    updateSecretUC,
-		deleteSecretUC:    deleteSecretUC,
-		addBuildVarUC:     addBuildVarUC,
-		updateBuildVarUC:  updateBuildVarUC,
-		deleteBuildVarUC:  deleteBuildVarUC,
+		createContainerUC:    createContainerUC,
+		getContainerUC:       getContainerUC,
+		updateContainerUC:    updateContainerUC,
+		deleteContainerUC:    deleteContainerUC,
+		listContainersUC:     listContainersUC,
+		addEnvVarUC:          addEnvVarUC,
+		updateEnvVarUC:       updateEnvVarUC,
+		deleteEnvVarUC:       deleteEnvVarUC,
+		addNetworkUC:         addNetworkUC,
+		updateNetworkUC:      updateNetworkUC,
+		deleteNetworkUC:      deleteNetworkUC,
+		addSecretUC:          addSecretUC,
+		updateSecretUC:       updateSecretUC,
+		deleteSecretUC:       deleteSecretUC,
+		addBuildVarUC:        addBuildVarUC,
+		updateBuildVarUC:     updateBuildVarUC,
+		deleteBuildVarUC:     deleteBuildVarUC,
 		addMountUC:           addMountUC,
 		deleteMountUC:        deleteMountUC,
 		checkFQDNUC:          checkFQDNUC,
 		checkContainerNameUC: checkContainerNameUC,
 		createNodePortUC:     createNodePortUC,
 		getNodePortUC:        getNodePortUC,
-		projectService:    projectService,
-		volumeService:     volumeService,
-		containerService:  containerService,
-		permissionSvc:     permissionSvc,
-		logger:            log,
+		projectService:       projectService,
+		volumeService:        volumeService,
+		containerService:     containerService,
+		permissionSvc:        permissionSvc,
+		logger:               log,
 	}
 }
 
@@ -2177,7 +2178,7 @@ func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
 				zap.String("project_id", projectIDStr),
 				zap.Error(err),
 			)
-			response.Error(c, containererrors.ErrInvalidInput, mapContainerError)
+			response.Error(c, containererrors.ErrInvalidProjectID, mapContainerError)
 			return
 		}
 		projectIDUint32 := uint32(projectID)
@@ -2228,6 +2229,16 @@ func (h *ContainerHandler) CheckContainerName(c *gin.Context) {
 		return
 	}
 
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "CheckContainerName"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapContainerError)
+		return
+	}
+
 	// Get project by slug to get project_id
 	project, err := h.projectService.GetProjectBySlug(ctx, projectSlug)
 	if err != nil {
@@ -2237,6 +2248,18 @@ func (h *ContainerHandler) CheckContainerName(c *gin.Context) {
 			zap.String("project_slug", projectSlug),
 		)
 		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	// Check if user has permission to create containers in this project
+	if err := h.permissionSvc.CanUserCreateContainer(ctx, userID.(uint), project.ProjectID()); err != nil {
+		h.logger.Warn(ctx, "user does not have permission to create containers in project",
+			zap.Error(err),
+			zap.String("handler", "CheckContainerName"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("project_id", project.ProjectID()),
+		)
+		response.Error(c, projecterrors.ErrPermissionDenied, mapContainerError)
 		return
 	}
 

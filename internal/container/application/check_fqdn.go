@@ -40,7 +40,7 @@ func (uc *CheckFQDNUseCase) Execute(ctx context.Context, input CheckFQDNInput) (
 
 	// If ProjectID is provided, use project-scoped check (stricter validation)
 	if input.ProjectID != nil {
-		exists, err = uc.containerRepo.CheckFQDNExistsForProject(ctx, input.FQDN, *input.ProjectID)
+		exists, err = uc.containerRepo.CheckFQDNExistsForProject(ctx, input.FQDN, uint(*input.ProjectID))
 	} else {
 		// Fallback to global check for backward compatibility
 		exists, err = uc.containerRepo.CheckFQDNExists(ctx, input.FQDN)
