@@ -58,10 +58,17 @@ type DefaultVolume struct {
 	MountPath  string `json:"mount_path"`
 }
 
-// DefaultResources represents default resource limits
+// DefaultResources represents default resource configuration
 type DefaultResources struct {
-	CPULimit    *uint32 `json:"cpu_limit,omitempty"`
-	MemoryLimit *uint32 `json:"memory_limit,omitempty"`
+	DefaultCPU           *uint32 `json:"default_cpu,omitempty"`            // UI 초기값
+	DefaultMemory        *uint32 `json:"default_memory,omitempty"`         // UI 초기값
+	MinRecommendedMemory *uint32 `json:"min_recommended_memory,omitempty"` // 경고 기준
+}
+
+// PortGuide represents port configuration guidance for user-configurable templates
+type PortGuide struct {
+	DefaultPort int    `json:"default_port,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // TemplateConfig represents the JSON configuration of a template
@@ -80,6 +87,7 @@ type TemplateConfig struct {
 	DefaultEnv       []DefaultEnv      `json:"default_env,omitempty"`
 	DefaultVolumes   []DefaultVolume   `json:"default_volumes,omitempty"`
 	DefaultResources *DefaultResources `json:"default_resources,omitempty"`
+	PortGuide        *PortGuide        `json:"port_guide,omitempty"`
 }
 
 // NewTemplateConfig creates a new TemplateConfig from JSON string
