@@ -35,13 +35,12 @@ func NewUserHandler(
 
 // UserResponse represents the response for user profile
 type UserResponse struct {
-	UserID       uint   `json:"user_id"`
-	Email        string `json:"email"`
-	Nickname     string `json:"nickname"`
-	Phone        string `json:"phone,omitempty"`
-	Organization string `json:"organization,omitempty"`
-	Status       string `json:"status"`
-	CreatedAt    string `json:"created_at"`
+	UserID       uint    `json:"user_id"`
+	Email        string  `json:"email"`
+	Nickname     string  `json:"nickname"`
+	Organization *string `json:"organization,omitempty"`
+	Status       string  `json:"status"`
+	CreatedAt    string  `json:"created_at,omitempty"`
 }
 
 // GetCurrentUser handles fetching the current authenticated user's profile
@@ -84,7 +83,6 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		UserID:       output.UserID,
 		Email:        output.Email,
 		Nickname:     output.Nickname,
-		Phone:        output.Phone,
 		Organization: output.Organization,
 		Status:       output.Status,
 		CreatedAt:    output.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -145,7 +143,6 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 		UserID:       output.UserID,
 		Email:        output.Email,
 		Nickname:     output.Nickname,
-		Phone:        output.Phone,
 		Organization: output.Organization,
 		Status:       output.Status,
 		CreatedAt:    output.CreatedAt.Format("2006-01-02T15:04:05Z"),
@@ -157,7 +154,6 @@ func (h *UserHandler) GetUserByID(c *gin.Context) {
 // UpdateUserRequest represents the request for updating user profile
 type UpdateUserRequest struct {
 	Nickname     *string `json:"nickname"`
-	Phone        *string `json:"phone"`
 	Organization *string `json:"organization"`
 }
 
@@ -191,7 +187,6 @@ func (h *UserHandler) UpdateCurrentUser(c *gin.Context) {
 	input := application.UpdateUserInput{
 		UserID:       userID.(uint),
 		Nickname:     req.Nickname,
-		Phone:        req.Phone,
 		Organization: req.Organization,
 	}
 
@@ -214,7 +209,6 @@ func (h *UserHandler) UpdateCurrentUser(c *gin.Context) {
 		UserID:       output.UserID,
 		Email:        output.Email,
 		Nickname:     output.Nickname,
-		Phone:        output.Phone,
 		Organization: output.Organization,
 		Status:       output.Status,
 	}
