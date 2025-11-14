@@ -8,7 +8,7 @@ import (
 type TemplateOption struct {
 	Name        string   `json:"name"`
 	Label       string   `json:"label"`
-	Type        string   `json:"type"` // select, text, number, password
+	Type        string   `json:"type"`               // select, text, number, password
 	Category    string   `json:"category,omitempty"` // required, optional, advanced
 	Options     []string `json:"options,omitempty"`
 	Default     string   `json:"default,omitempty"`
