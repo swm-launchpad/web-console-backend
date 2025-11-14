@@ -16,9 +16,12 @@ type ListProjectsInput struct {
 }
 
 type ProjectSummary struct {
-	ContainerCount int      `json:"container_count"`
-	DomainCount    int      `json:"domain_count"`
-	Domains        []string `json:"domains,omitempty"`
+	ContainerCount  int      `json:"container_count"`
+	DomainCount     int      `json:"domain_count"`
+	Domains         []string `json:"domains,omitempty"`
+	TotalCPUUsed    uint32   `json:"total_cpu_used"`
+	TotalMemoryUsed uint32   `json:"total_memory_used"`
+	TotalDiskUsed   uint32   `json:"total_disk_used"`
 }
 
 type ProjectListItem struct {
@@ -103,10 +106,24 @@ func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsIn
 					domains = strings.Split(s.Domains.String, ",")
 				}
 
+			// Convert interface{} to uint32 for resource fields
+			var totalCPU, totalMemory, totalDisk uint32
+			if v, ok := s.TotalCpuUsed.(int64); ok {
+				totalCPU = uint32(v)
+			}
+			if v, ok := s.TotalMemoryUsed.(int64); ok {
+				totalMemory = uint32(v)
+			}
+			if v, ok := s.TotalDiskUsed.(int64); ok {
+				totalDisk = uint32(v)
+			}
 				summaryMap[s.ProjectID] = &ProjectSummary{
-					ContainerCount: int(s.ContainerCount),
-					DomainCount:    int(s.DomainCount),
-					Domains:        domains,
+					ContainerCount:  int(s.ContainerCount),
+					DomainCount:     int(s.DomainCount),
+					Domains:         domains,
+				TotalCPUUsed:    totalCPU,
+				TotalMemoryUsed: totalMemory,
+				TotalDiskUsed:   totalDisk,
 				}
 			}
 		}

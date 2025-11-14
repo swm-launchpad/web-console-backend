@@ -17,7 +17,15 @@ SELECT
     p.project_id,
     COUNT(DISTINCT c.container_id) as container_count,
     COUNT(DISTINCT CASE WHEN n.fqdn IS NOT NULL AND n.fqdn != '' THEN n.network_id END) as domain_count,
-    GROUP_CONCAT(DISTINCT CASE WHEN n.fqdn IS NOT NULL AND n.fqdn != '' THEN n.fqdn END ORDER BY n.fqdn SEPARATOR ',') as domains
+    GROUP_CONCAT(DISTINCT CASE WHEN n.fqdn IS NOT NULL AND n.fqdn != '' THEN n.fqdn END ORDER BY n.fqdn SEPARATOR ',') as domains,
+    COALESCE(SUM(CASE WHEN c.container_id IS NOT NULL THEN c.cpu_limit ELSE 0 END), 0) as total_cpu_used,
+    COALESCE(SUM(CASE WHEN c.container_id IS NOT NULL THEN c.memory_limit ELSE 0 END), 0) as total_memory_used,
+    COALESCE(
+        (SELECT SUM(v.capacity)
+         FROM VOLUMES v
+         WHERE v.project_id = p.project_id AND v.deleted_at IS NULL),
+        0
+    ) as total_disk_used
 FROM PROJECTS p
 LEFT JOIN CONTAINERS c ON p.project_id = c.project_id AND c.is_deleted = FALSE
 LEFT JOIN NETWORKS n ON c.container_id = n.container_id AND n.is_deleted = FALSE
@@ -28,10 +36,13 @@ ORDER BY p.project_id
 `
 
 type GetProjectsSummaryRow struct {
-	ProjectID      uint32         `json:"project_id"`
-	ContainerCount int64          `json:"container_count"`
-	DomainCount    int64          `json:"domain_count"`
-	Domains        sql.NullString `json:"domains"`
+	ProjectID       uint32         `json:"project_id"`
+	ContainerCount  int64          `json:"container_count"`
+	DomainCount     int64          `json:"domain_count"`
+	Domains         sql.NullString `json:"domains"`
+	TotalCpuUsed    interface{}    `json:"total_cpu_used"`
+	TotalMemoryUsed interface{}    `json:"total_memory_used"`
+	TotalDiskUsed   interface{}    `json:"total_disk_used"`
 }
 
 // Project Summary Queries
@@ -60,6 +71,9 @@ func (q *Queries) GetProjectsSummary(ctx context.Context, projectIds []uint32) (
 			&i.ContainerCount,
 			&i.DomainCount,
 			&i.Domains,
+			&i.TotalCpuUsed,
+			&i.TotalMemoryUsed,
+			&i.TotalDiskUsed,
 		); err != nil {
 			return nil, err
 		}
