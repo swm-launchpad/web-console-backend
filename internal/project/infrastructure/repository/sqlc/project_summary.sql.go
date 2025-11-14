@@ -23,7 +23,7 @@ SELECT
     COALESCE(
         (SELECT SUM(v.capacity)
          FROM VOLUMES v
-         WHERE v.project_id = p.project_id AND v.deleted_at IS NULL),
+         WHERE v.project_id = p.project_id),
         0
     ) as total_disk_used
 FROM PROJECTS p
