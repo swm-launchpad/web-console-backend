@@ -907,7 +907,7 @@ func (r *containerRepository) loadEnvVars(container *model.Container, sqlcEnvVar
 			return err
 		}
 		if err := container.AddEnvVarDirect(envVar); err != nil {
-			r.logger.Error(nil, "failed to add env var",
+			r.logger.Error(context.Background(), "failed to add env var",
 				zap.Error(err),
 				zap.Uint("container_id", container.ContainerID()),
 				zap.String("key", envVar.Key()),
@@ -925,7 +925,7 @@ func (r *containerRepository) loadNetworks(container *model.Container, sqlcNetwo
 			return err
 		}
 		if err := container.AddNetworkDirect(network); err != nil {
-			r.logger.Error(nil, "failed to add network",
+			r.logger.Error(context.Background(), "failed to add network",
 				zap.Error(err),
 				zap.Uint("container_id", container.ContainerID()),
 				zap.Uint32("network_id", sqlcNetwork.NetworkID),
@@ -943,7 +943,7 @@ func (r *containerRepository) loadSecrets(container *model.Container, sqlcSecret
 			return err
 		}
 		if err := container.AddSecretDirect(secret); err != nil {
-			r.logger.Error(nil, "failed to add secret",
+			r.logger.Error(context.Background(), "failed to add secret",
 				zap.Error(err),
 				zap.Uint("container_id", container.ContainerID()),
 				zap.String("key", secret.Key()),
@@ -961,7 +961,7 @@ func (r *containerRepository) loadBuildVars(container *model.Container, sqlcBuil
 			return err
 		}
 		if err := container.AddBuildVarDirect(buildVar); err != nil {
-			r.logger.Error(nil, "failed to add build var",
+			r.logger.Error(context.Background(), "failed to add build var",
 				zap.Error(err),
 				zap.Uint("container_id", container.ContainerID()),
 				zap.String("key", buildVar.Key()),
@@ -979,7 +979,7 @@ func (r *containerRepository) loadMounts(container *model.Container, sqlcMounts 
 			return err
 		}
 		if err := container.AddMountDirect(mount); err != nil {
-			r.logger.Error(nil, "failed to add mount",
+			r.logger.Error(context.Background(), "failed to add mount",
 				zap.Error(err),
 				zap.Uint("container_id", container.ContainerID()),
 				zap.Uint32("volume_id", sqlcMount.VolumeID),
@@ -1002,7 +1002,7 @@ func (r *containerRepository) queriesWithContext(ctx context.Context) *sqlc.Quer
 func (r *containerRepository) toDomainContainer(sqlcContainer sqlc.Container) (*model.Container, error) {
 	slug, err := value.NewContainerSlug(sqlcContainer.Slug)
 	if err != nil {
-		r.logger.Error(nil, "failed to create container slug",
+		r.logger.Error(context.Background(), "failed to create container slug",
 			zap.Error(err),
 			zap.Uint32("container_id", sqlcContainer.ContainerID),
 			zap.String("slug", sqlcContainer.Slug),
@@ -1014,7 +1014,7 @@ func (r *containerRepository) toDomainContainer(sqlcContainer sqlc.Container) (*
 	var templateConfig map[string]interface{}
 	if len(sqlcContainer.TemplateConfig) > 0 && string(sqlcContainer.TemplateConfig) != "null" {
 		if err := json.Unmarshal(sqlcContainer.TemplateConfig, &templateConfig); err != nil {
-			r.logger.Error(nil, "failed to unmarshal template config",
+			r.logger.Error(context.Background(), "failed to unmarshal template config",
 				zap.Error(err),
 				zap.Uint32("container_id", sqlcContainer.ContainerID),
 				zap.String("template_config", string(sqlcContainer.TemplateConfig)),
@@ -1036,7 +1036,7 @@ func (r *containerRepository) toDomainContainer(sqlcContainer sqlc.Container) (*
 
 	gitConfig, err := value.NewGitConfig(gitURL, gitBranch, gitDirPath)
 	if err != nil {
-		r.logger.Error(nil, "failed to create git config",
+		r.logger.Error(context.Background(), "failed to create git config",
 			zap.Error(err),
 			zap.Uint32("container_id", sqlcContainer.ContainerID),
 			zap.String("git_url", gitURL),
@@ -1051,7 +1051,7 @@ func (r *containerRepository) toDomainContainer(sqlcContainer sqlc.Container) (*
 		nullInt32ToUint32Ptr(sqlcContainer.MemoryLimit),
 	)
 	if err != nil {
-		r.logger.Error(nil, "failed to create resource limits",
+		r.logger.Error(context.Background(), "failed to create resource limits",
 			zap.Error(err),
 			zap.Uint32("container_id", sqlcContainer.ContainerID),
 		)
