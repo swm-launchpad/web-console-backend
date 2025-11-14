@@ -2259,7 +2259,7 @@ func (h *ContainerHandler) CheckContainerName(c *gin.Context) {
 			zap.Uint("user_id", userID.(uint)),
 			zap.Uint("project_id", project.ProjectID()),
 		)
-		response.Error(c, projecterrors.ErrPermissionDenied, mapContainerError)
+		response.Error(c, containererrors.ErrPermissionDenied, mapContainerError)
 		return
 	}
 
