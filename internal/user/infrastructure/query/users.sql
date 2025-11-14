@@ -8,7 +8,7 @@ INSERT INTO USERS (
 -- name: GetUserByID :one
 SELECT
     user_id, password_hash, password_updated_at,
-    nickname, email, phone, organization,
+    nickname, email, organization,
     status, is_deleted, deleted_at, created_at, updated_at
 FROM USERS
 WHERE user_id = ? AND is_deleted = FALSE;
@@ -16,7 +16,7 @@ WHERE user_id = ? AND is_deleted = FALSE;
 -- name: GetUserByEmail :one
 SELECT
     user_id, password_hash, password_updated_at,
-    nickname, email, phone, organization,
+    nickname, email, organization,
     status, is_deleted, deleted_at, created_at, updated_at
 FROM USERS
 WHERE email = ? AND is_deleted = FALSE;
