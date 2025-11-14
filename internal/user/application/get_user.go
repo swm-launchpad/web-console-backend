@@ -17,8 +17,7 @@ type GetUserOutput struct {
 	UserID       uint
 	Email        string
 	Nickname     string
-	Phone        string
-	Organization string
+	Organization *string
 	Status       string
 	CreatedAt    time.Time
 }
@@ -52,19 +51,12 @@ func (uc *GetUserUseCase) Execute(ctx context.Context, input GetUserInput) (*Get
 
 	// Map domain model to output
 	output := &GetUserOutput{
-		UserID:    user.UserID,
-		Email:     user.Email,
-		Nickname:  user.Nickname,
-		Status:    string(user.Status),
-		CreatedAt: user.CreatedAt,
-	}
-
-	// Map optional fields
-	if user.Phone != nil {
-		output.Phone = *user.Phone
-	}
-	if user.Organization != nil {
-		output.Organization = *user.Organization
+		UserID:       user.UserID,
+		Email:        user.Email,
+		Nickname:     user.Nickname,
+		Organization: user.Organization,
+		Status:       string(user.Status),
+		CreatedAt:    user.CreatedAt,
 	}
 
 	uc.logger.Info(ctx, "get user completed",
