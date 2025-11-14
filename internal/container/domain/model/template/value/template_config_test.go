@@ -52,8 +52,9 @@ func TestNewTemplateConfig_ValidJSON(t *testing.T) {
 			}
 		],
 		"default_resources": {
-			"cpu_limit": 500,
-			"memory_limit": 512
+			"default_cpu": 500,
+			"default_memory": 512,
+			"min_recommended_memory": 512
 		}
 	}`
 
@@ -72,8 +73,9 @@ func TestNewTemplateConfig_ValidJSON(t *testing.T) {
 	assert.Len(t, config.TemplatePorts, 1)
 	assert.Equal(t, uint16(3000), config.TemplatePorts[0].InternalPort)
 	assert.NotNil(t, config.DefaultResources)
-	assert.Equal(t, uint32(500), *config.DefaultResources.CPULimit)
-	assert.Equal(t, uint32(512), *config.DefaultResources.MemoryLimit)
+	assert.Equal(t, uint32(500), *config.DefaultResources.DefaultCPU)
+	assert.Equal(t, uint32(512), *config.DefaultResources.DefaultMemory)
+	assert.Equal(t, uint32(512), *config.DefaultResources.MinRecommendedMemory)
 }
 
 func TestNewTemplateConfig_InvalidJSON(t *testing.T) {
@@ -83,8 +85,9 @@ func TestNewTemplateConfig_InvalidJSON(t *testing.T) {
 }
 
 func TestTemplateConfig_ToJSON(t *testing.T) {
-	cpuLimit := uint32(500)
-	memLimit := uint32(512)
+	defaultCPU := uint32(500)
+	defaultMemory := uint32(512)
+	minRecommendedMemory := uint32(512)
 
 	config := &TemplateConfig{
 		Description:  "Test template",
@@ -94,8 +97,9 @@ func TestTemplateConfig_ToJSON(t *testing.T) {
 		RequiresGit:  true,
 		Version:      "1.0",
 		DefaultResources: &DefaultResources{
-			CPULimit:    &cpuLimit,
-			MemoryLimit: &memLimit,
+			DefaultCPU:           &defaultCPU,
+			DefaultMemory:        &defaultMemory,
+			MinRecommendedMemory: &minRecommendedMemory,
 		},
 	}
 
