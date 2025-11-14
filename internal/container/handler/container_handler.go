@@ -11,7 +11,6 @@ import (
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	containerservice "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
-	projecterrors "github.com/swm-launchpad/web-console-backend/internal/project/domain/errors"
 	projectservice "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	"go.uber.org/zap"
 )
