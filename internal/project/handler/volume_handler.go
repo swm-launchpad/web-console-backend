@@ -296,6 +296,16 @@ func (h *VolumeHandler) CheckVolumeName(c *gin.Context) {
 		return
 	}
 
+	// Get user ID from context
+	userID, exists := c.Get(auth.ContextKeyUserID)
+	if !exists {
+		h.logger.Warn(ctx, "user not authenticated",
+			zap.String("handler", "CheckVolumeName"),
+		)
+		response.Error(c, auth.ErrUnauthorized, mapProjectError)
+		return
+	}
+
 	// Get project by slug to get project_id
 	project, err := h.projectService.GetProjectBySlug(ctx, projectSlug)
 	if err != nil {
@@ -305,6 +315,18 @@ func (h *VolumeHandler) CheckVolumeName(c *gin.Context) {
 			zap.String("project_slug", projectSlug),
 		)
 		response.Error(c, err, mapProjectError)
+		return
+	}
+
+	// Check if user has permission to access this project
+	if err := h.permissionService.CanUserAccessProject(ctx, userID.(uint), project.ProjectID()); err != nil {
+		h.logger.Warn(ctx, "user does not have permission to access project",
+			zap.Error(err),
+			zap.String("handler", "CheckVolumeName"),
+			zap.Uint("user_id", userID.(uint)),
+			zap.Uint("project_id", project.ProjectID()),
+		)
+		response.Error(c, projecterrors.ErrPermissionDenied, mapProjectError)
 		return
 	}
 
