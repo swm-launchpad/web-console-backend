@@ -56,7 +56,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, email, output.Email)
 		assert.Equal(t, name, output.Nickname)
-		assert.Equal(t, organization, output.Organization)
+		assert.Equal(t, &organization, output.Organization)
 		assert.Equal(t, "active", output.Status)
 		assert.Equal(t, now, output.CreatedAt)
 
@@ -306,7 +306,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, email, output.Email)
 		assert.Equal(t, name, output.Nickname)
-		assert.Equal(t, organization, output.Organization)
+		assert.Equal(t, &organization, output.Organization)
 		assert.Equal(t, "active", output.Status)
 
 		mockService.AssertExpectations(t)

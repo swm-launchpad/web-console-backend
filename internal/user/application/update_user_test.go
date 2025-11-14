@@ -55,7 +55,7 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, "test@example.com", output.Email)
 		assert.Equal(t, name, output.Nickname)
-		assert.Equal(t, organization, output.Organization)
+		assert.Equal(t, &organization, output.Organization)
 		assert.Equal(t, string(model.UserStatusActive), output.Status)
 
 		mockUserService.AssertExpectations(t)
