@@ -6,11 +6,13 @@ import (
 
 // TemplateOption represents a user-configurable option for the template
 type TemplateOption struct {
-	Name    string   `json:"name"`
-	Label   string   `json:"label"`
-	Type    string   `json:"type"` // select, text, number, boolean
-	Options []string `json:"options,omitempty"`
-	Default string   `json:"default,omitempty"`
+	Name        string   `json:"name"`
+	Label       string   `json:"label"`
+	Type        string   `json:"type"` // select, text, number, password
+	Category    string   `json:"category,omitempty"` // required, optional, advanced
+	Options     []string `json:"options,omitempty"`
+	Default     string   `json:"default,omitempty"`
+	Description string   `json:"description,omitempty"`
 }
 
 // TemplateEnv represents an environment variable definition
