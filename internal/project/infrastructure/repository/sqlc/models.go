@@ -569,6 +569,7 @@ type Container struct {
 	ContainerID            uint32          `json:"container_id"`
 	ProjectID              uint32          `json:"project_id"`
 	TemplateID             sql.NullInt32   `json:"template_id"`
+	Name                   string          `json:"name"`
 	Slug                   string          `json:"slug"`
 	StableWindow           sql.NullInt32   `json:"stable_window"`
 	TemplateConfig         json.RawMessage `json:"template_config"`
@@ -589,7 +590,6 @@ type Container struct {
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
 	DeletedAt         sql.NullTime   `json:"deleted_at"`
 	IsDeleted         bool           `json:"is_deleted"`
-	Name              string         `json:"name"`
 }
 
 type Deployment struct {
@@ -637,16 +637,23 @@ type Mount struct {
 	UpdatedAt   sql.NullTime `json:"updated_at"`
 }
 
+// Container network configurations with soft delete support for FQDN ownership tracking
 type Network struct {
 	NetworkID    uint32         `json:"network_id"`
 	ContainerID  uint32         `json:"container_id"`
-	ExternalIp   sql.NullString `json:"external_ip"`
 	Fqdn         sql.NullString `json:"fqdn"`
+	ExternalIp   sql.NullString `json:"external_ip"`
 	ExternalPort sql.NullInt16  `json:"external_port"`
 	InternalPort sql.NullInt16  `json:"internal_port"`
 	Type         NetworksType   `json:"type"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    sql.NullTime   `json:"updated_at"`
+	// Tekton PipelineRun name for NodePort tracking
+	TektonEventID sql.NullString `json:"tekton_event_id"`
+	// NodePort expiration timestamp
+	ExpiresAt sql.NullTime `json:"expires_at"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt sql.NullTime `json:"updated_at"`
+	IsDeleted bool         `json:"is_deleted"`
+	DeletedAt sql.NullTime `json:"deleted_at"`
 }
 
 type OauthState struct {
@@ -660,6 +667,7 @@ type OauthState struct {
 
 type Project struct {
 	ProjectID uint32         `json:"project_id"`
+	Name      string         `json:"name"`
 	Slug      string         `json:"slug"`
 	Status    ProjectsStatus `json:"status"`
 	// Current operation status of the project
@@ -675,7 +683,6 @@ type Project struct {
 	UpdatedAt          sql.NullTime   `json:"updated_at"`
 	DeletedAt          sql.NullTime   `json:"deleted_at"`
 	IsDeleted          bool           `json:"is_deleted"`
-	Name               string         `json:"name"`
 }
 
 type ProjectUser struct {
@@ -721,19 +728,19 @@ type Template struct {
 }
 
 type User struct {
-	UserID            uint32         `json:"user_id"`
-	PasswordHash      string         `json:"password_hash"`
-	PasswordUpdatedAt sql.NullTime   `json:"password_updated_at"`
-	Email             string         `json:"email"`
-	Phone             sql.NullString `json:"phone"`
-	Status            UsersStatus    `json:"status"`
-	Organization      sql.NullString `json:"organization"`
-	CreatedAt         time.Time      `json:"created_at"`
-	UpdatedAt         sql.NullTime   `json:"updated_at"`
-	DeletedAt         sql.NullTime   `json:"deleted_at"`
-	IsDeleted         bool           `json:"is_deleted"`
+	UserID            uint32       `json:"user_id"`
+	PasswordHash      string       `json:"password_hash"`
+	PasswordUpdatedAt sql.NullTime `json:"password_updated_at"`
 	// User nickname (display name), max 32 characters
-	Nickname string `json:"nickname"`
+	Nickname     string         `json:"nickname"`
+	Email        string         `json:"email"`
+	Phone        sql.NullString `json:"phone"`
+	Status       UsersStatus    `json:"status"`
+	Organization sql.NullString `json:"organization"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    sql.NullTime   `json:"updated_at"`
+	DeletedAt    sql.NullTime   `json:"deleted_at"`
+	IsDeleted    bool           `json:"is_deleted"`
 }
 
 type VerificationToken struct {
@@ -749,9 +756,9 @@ type VerificationToken struct {
 type Volume struct {
 	VolumeID  uint32         `json:"volume_id"`
 	ProjectID uint32         `json:"project_id"`
+	Name      string         `json:"name"`
 	Slug      sql.NullString `json:"slug"`
 	Capacity  uint32         `json:"capacity"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt sql.NullTime   `json:"updated_at"`
-	Name      string         `json:"name"`
 }
