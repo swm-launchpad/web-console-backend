@@ -44,18 +44,18 @@ type CreateContainerInput struct {
 }
 
 type CreateContainerOutput struct {
-	ContainerID  uint   `json:"container_id"`
-	ProjectID    uint   `json:"project_id"`
-	TemplateID   uint   `json:"template_id,omitempty"`
-	Name         string `json:"name"`
-	Slug       string `json:"slug"`
-	GitURL     string `json:"git_url"`
-	GitBranch  string `json:"git_branch"`
-	GitSubpath string `json:"git_subpath,omitempty"`
-	CPULimit   uint32 `json:"cpu_limit"`
-	MemoryLimit  uint32 `json:"memory_limit"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at,omitempty"`
+	ContainerID uint   `json:"container_id"`
+	ProjectID   uint   `json:"project_id"`
+	TemplateID  uint   `json:"template_id,omitempty"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	GitURL      string `json:"git_url"`
+	GitBranch   string `json:"git_branch"`
+	GitSubpath  string `json:"git_subpath,omitempty"`
+	CPULimit    uint32 `json:"cpu_limit"`
+	MemoryLimit uint32 `json:"memory_limit"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
 }
 
 type CreateContainerUseCase struct {
