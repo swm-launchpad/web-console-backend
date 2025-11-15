@@ -82,28 +82,30 @@ func (p Plan) HasFixedResources() bool {
 // GetDefaultCPULimit returns the default CPU limit for the plan
 // DEPRECATED: Not used. Handler uses hardcoded constants, ProjectService validates against DB settings.
 func (p Plan) GetDefaultCPULimit() uint32 {
-	if p == PlanFree {
-		return FreePlanCPULimit
-	}
-	return DefaultCPULimit
+	// All plans now have 1 core (1000m) as default
+	return DefaultCPULimit // 1000
 }
 
 // GetDefaultMemoryLimit returns the default memory limit for the plan
 // DEPRECATED: Not used. Handler uses hardcoded constants, ProjectService validates against DB settings.
 func (p Plan) GetDefaultMemoryLimit() uint32 {
-	if p == PlanFree {
-		return FreePlanMemoryLimit
-	}
-	return DefaultMemoryLimit
+	// All plans now have 2GB (2048Mi) as default
+	return DefaultMemoryLimit // 2048
 }
 
 // GetDefaultDiskLimit returns the default disk limit for the plan
 // DEPRECATED: Not used. Handler uses hardcoded constants, ProjectService validates against DB settings.
 func (p Plan) GetDefaultDiskLimit() uint32 {
-	if p == PlanFree {
-		return FreePlanDiskLimit
+	switch p {
+	case PlanFree:
+		return 1024 // 1GB
+	case PlanEco:
+		return 2048 // 2GB
+	case PlanPro:
+		return 10240 // 10GB
+	default:
+		return DefaultDiskLimit
 	}
-	return DefaultDiskLimit
 }
 
 // GetBasePrice returns the monthly base price for the plan (in KRW)

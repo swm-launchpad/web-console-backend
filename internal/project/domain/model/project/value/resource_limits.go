@@ -37,11 +37,12 @@ const (
 	GiBToMi   = 1024        // 1 GiB = 1024 Mi
 )
 
-// Default resource allocation for Eco and Pro plans (base included resources)
+// Default resource allocation for all plans (base included resources)
+// Note: Pro plan has higher disk allocation (10GB) defined in handler
 const (
 	DefaultCPULimit    = 1000 // 1 core (1000 millicores)
-	DefaultMemoryLimit = 1024 // 1GB (1024 Mi)
-	DefaultDiskLimit   = 1024 // 1GB (1024 Mi)
+	DefaultMemoryLimit = 2048 // 2GB (2048 Mi)
+	DefaultDiskLimit   = 1024 // 1GB (1024 Mi) - Free plan, Eco uses 2GB, Pro uses 10GB
 )
 
 // System-wide absolute resource limits for security and resource management
