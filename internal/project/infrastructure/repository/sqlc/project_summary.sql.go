@@ -18,8 +18,18 @@ SELECT
     COUNT(DISTINCT c.container_id) as container_count,
     COUNT(DISTINCT CASE WHEN n.fqdn IS NOT NULL AND n.fqdn != '' THEN n.network_id END) as domain_count,
     GROUP_CONCAT(DISTINCT CASE WHEN n.fqdn IS NOT NULL AND n.fqdn != '' THEN n.fqdn END ORDER BY n.fqdn SEPARATOR ',') as domains,
-    COALESCE(SUM(CASE WHEN c.container_id IS NOT NULL THEN c.cpu_limit ELSE 0 END), 0) as total_cpu_used,
-    COALESCE(SUM(CASE WHEN c.container_id IS NOT NULL THEN c.memory_limit ELSE 0 END), 0) as total_memory_used,
+    COALESCE(
+        (SELECT SUM(c2.cpu_limit)
+         FROM CONTAINERS c2
+         WHERE c2.project_id = p.project_id AND c2.is_deleted = FALSE),
+        0
+    ) as total_cpu_used,
+    COALESCE(
+        (SELECT SUM(c2.memory_limit)
+         FROM CONTAINERS c2
+         WHERE c2.project_id = p.project_id AND c2.is_deleted = FALSE),
+        0
+    ) as total_memory_used,
     COALESCE(
         (SELECT SUM(v.capacity)
          FROM VOLUMES v
