@@ -34,7 +34,7 @@ type CreateContainerInput struct {
 	Name                 string
 	GitURL               string
 	GitBranch            string
-	GitDirectory         *string
+	GitSubpath           *string
 	GitHubInstallationID *int64 // Optional: for private repositories
 	CPULimit             uint32
 	MemoryLimit          uint32
@@ -48,11 +48,11 @@ type CreateContainerOutput struct {
 	ProjectID    uint   `json:"project_id"`
 	TemplateID   uint   `json:"template_id,omitempty"`
 	Name         string `json:"name"`
-	Slug         string `json:"slug"`
-	GitURL       string `json:"git_url"`
-	GitBranch    string `json:"git_branch"`
-	GitDirectory string `json:"git_directory,omitempty"`
-	CPULimit     uint32 `json:"cpu_limit"`
+	Slug       string `json:"slug"`
+	GitURL     string `json:"git_url"`
+	GitBranch  string `json:"git_branch"`
+	GitSubpath string `json:"git_subpath,omitempty"`
+	CPULimit   uint32 `json:"cpu_limit"`
 	MemoryLimit  uint32 `json:"memory_limit"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at,omitempty"`
@@ -148,7 +148,7 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 		}
 
 		// Create Git configuration
-		gitConfig, err := value.NewGitConfig(input.GitURL, input.GitBranch, input.GitDirectory)
+		gitConfig, err := value.NewGitConfig(input.GitURL, input.GitBranch, input.GitSubpath)
 		if err != nil {
 			uc.logger.Error(ctx, "failed to create git config",
 				zap.Error(err),
@@ -488,7 +488,7 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 	}
 
 	if gitDirectory != nil {
-		output.GitDirectory = *gitDirectory
+		output.GitSubpath = *gitDirectory
 	}
 
 	return output, nil

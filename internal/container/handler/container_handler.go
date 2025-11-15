@@ -253,7 +253,7 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 		Name:                 req.Name,
 		GitURL:               req.GitURL,
 		GitBranch:            req.GitBranch,
-		GitDirectory:         gitDirectory,
+		GitSubpath:           gitDirectory,
 		GitHubInstallationID: req.GitHubInstallationID,
 		CPULimit:             cpuLimit,
 		MemoryLimit:          memoryLimit,
@@ -371,7 +371,8 @@ type UpdateContainerRequest struct {
 	UnsetGitHubInstallationID bool                   `json:"unset_github_installation_id,omitempty"`
 	GitURL                    *string                `json:"git_url,omitempty"`
 	GitBranch                 *string                `json:"git_branch,omitempty"`
-	GitDirectory              *string                `json:"git_directory,omitempty"`
+	GitDirectory              *string                `json:"git_directory,omitempty"` // Deprecated: use GitSubpath instead
+	GitSubpath                *string                `json:"git_subpath,omitempty"`
 	CPULimit                  *uint32                `json:"cpu_limit,omitempty"`
 	MemoryLimit               *uint32                `json:"memory_limit,omitempty"`
 	TemplateID                *uint                  `json:"template_id,omitempty"`
@@ -435,6 +436,12 @@ func (h *ContainerHandler) UpdateContainer(c *gin.Context) {
 	}
 	// If neither flag is set, don't update (keep existing value)
 
+	// GitSubpath is the same as GitDirectory (backward compatibility)
+	gitSubpath := req.GitSubpath
+	if req.GitSubpath == nil && req.GitDirectory != nil {
+		gitSubpath = req.GitDirectory
+	}
+
 	input := application.UpdateContainerInput{
 		ContainerID:                containerID,
 		UserID:                     userID.(uint),
@@ -444,7 +451,7 @@ func (h *ContainerHandler) UpdateContainer(c *gin.Context) {
 		UpdateGitHubInstallationID: updateGitHubInstallation,
 		GitURL:                     req.GitURL,
 		GitBranch:                  req.GitBranch,
-		GitDirectory:               req.GitDirectory,
+		GitSubpath:                 gitSubpath,
 		CPULimit:                   req.CPULimit,
 		MemoryLimit:                req.MemoryLimit,
 		TemplateID:                 req.TemplateID,

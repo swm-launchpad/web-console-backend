@@ -56,7 +56,7 @@ type GetContainerOutput struct {
 	TemplateConfig       map[string]interface{} `json:"template_config,omitempty"`
 	GitURL               string                 `json:"git_url"`
 	GitBranch            string                 `json:"git_branch"`
-	GitDirectory         string                 `json:"git_directory,omitempty"`
+	GitSubpath           string                 `json:"git_subpath,omitempty"`
 	GitHubInstallationID *int64                 `json:"github_installation_id,omitempty"`
 	GitCommitHash        string                 `json:"git_commit_hash,omitempty"`
 	LastBuiltCommit      string                 `json:"last_built_commit,omitempty"`
@@ -149,7 +149,7 @@ func (uc *GetContainerUseCase) Execute(ctx context.Context, input GetContainerIn
 	}
 
 	if gitDir := container.GitConfig().DirectoryPath(); gitDir != nil {
-		output.GitDirectory = *gitDir
+		output.GitSubpath = *gitDir
 	}
 
 	if installationID := container.GitHubInstallationID(); installationID != nil {
