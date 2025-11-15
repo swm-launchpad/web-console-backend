@@ -92,6 +92,8 @@ func (tdb *TestDB) Migrate() error {
 	// Apply consolidated schema migration
 	migrations := []string{
 		"000001_initial_schema.up.sql",
+		"000002_update_pricing_and_resources.up.sql",
+		"000003_remove_fqdn_unique_constraint.up.sql",
 	}
 
 	for _, migration := range migrations {
