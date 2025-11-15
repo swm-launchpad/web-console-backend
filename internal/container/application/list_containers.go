@@ -32,6 +32,7 @@ type ContainerListItem struct {
 	Networks             []NetworkItem `json:"networks,omitempty"`
 	GitURL               string        `json:"git_url"`
 	GitBranch            string        `json:"git_branch"`
+	GitSubpath           string        `json:"git_subpath,omitempty"`
 	GitHubInstallationID *int64        `json:"github_installation_id,omitempty"`
 	CPULimit             *uint32       `json:"cpu_limit,omitempty"`    // Millicores (1000 = 1 CPU core)
 	MemoryLimit          *uint32       `json:"memory_limit,omitempty"` // Mi (Mebibytes)
@@ -139,6 +140,10 @@ func (uc *ListContainersUseCase) Execute(ctx context.Context, input ListContaine
 			CPULimit:             container.ResourceLimits().CPULimit(),
 			MemoryLimit:          container.ResourceLimits().MemoryLimit(),
 			CreatedAt:            container.CreatedAt().Format("2006-01-02T15:04:05Z"),
+		}
+
+		if gitDir := container.GitConfig().DirectoryPath(); gitDir != nil {
+			item.GitSubpath = *gitDir
 		}
 
 		if !container.UpdatedAt().IsZero() {
