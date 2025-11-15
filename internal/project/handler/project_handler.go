@@ -80,7 +80,7 @@ type CreateProjectRequest struct {
 	Plan         *string `json:"plan,omitempty" binding:"omitempty,oneof=free eco pro"`
 	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=500,max=8000"`        // 0.5~8 cores, step 500m
 	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=512,max=16384"`    // 0.5~16GB, step 512Mi
-	DiskLimit    *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=1024,max=3072"`      // 1~3GB, step 512Mi
+	DiskLimit    *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=1024,max=32768"`     // 1~32GB, step 512Mi
 	TrafficLimit *uint32 `json:"traffic_limit,omitempty" binding:"omitempty,min=128,max=1048576"` // Maintained for compatibility
 }
 
@@ -305,7 +305,7 @@ type UpdateProjectRequest struct {
 	Plan         *string `json:"plan,omitempty" binding:"omitempty,oneof=free eco pro"`
 	CPULimit     *uint32 `json:"cpu_limit,omitempty" binding:"omitempty,min=500,max=8000"`        // 0.5~8 cores, step 500m
 	MemoryLimit  *uint32 `json:"memory_limit,omitempty" binding:"omitempty,min=512,max=16384"`    // 0.5~16GB, step 512Mi
-	DiskLimit    *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=1024,max=3072"`      // 1~3GB, step 512Mi
+	DiskLimit    *uint32 `json:"disk_limit,omitempty" binding:"omitempty,min=1024,max=32768"`     // 1~32GB, step 512Mi
 	TrafficLimit *uint32 `json:"traffic_limit,omitempty" binding:"omitempty,min=128,max=1048576"` // Maintained for compatibility
 }
 
