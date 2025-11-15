@@ -76,18 +76,6 @@ type ContainerRepository interface {
 	// Used for simple FQDN availability check across all projects
 	CheckFQDNExists(ctx context.Context, fqdn string) (bool, error)
 
-	// CheckFQDNExistsInOtherProject checks if FQDN is used by another project
-	// Returns true if the FQDN exists in any project OTHER than the specified one
-	// Only checks non-deleted networks and containers
-	// Used for AddNetwork to enforce project-scoped FQDN ownership
-	CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error)
-
-	// CheckFQDNExistsInOtherProjectExcludingSelf checks FQDN with self-exclusion
-	// Returns true if the FQDN exists in any project OTHER than the specified one,
-	// excluding the network with the given network_id
-	// Used for UpdateNetwork to allow updating a network's FQDN or reusing within same project
-	CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error)
-
 	// CheckFQDNExistsForProject checks FQDN with proper business rules
 	// Returns true if FQDN exists in:
 	// 1. Same project (any active network, regardless of container state) - prevents duplicates

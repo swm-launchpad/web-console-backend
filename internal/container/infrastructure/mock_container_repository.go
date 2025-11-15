@@ -139,18 +139,6 @@ func (m *MockContainerRepository) FindAllSlugsByProjectIDIncludingDeleted(ctx co
 	return args.Get(0).([]string), args.Error(1)
 }
 
-// CheckFQDNExistsInOtherProject mocks the CheckFQDNExistsInOtherProject method
-func (m *MockContainerRepository) CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
-	args := m.Called(ctx, fqdn, projectID)
-	return args.Bool(0), args.Error(1)
-}
-
-// CheckFQDNExistsInOtherProjectExcludingSelf mocks the CheckFQDNExistsInOtherProjectExcludingSelf method
-func (m *MockContainerRepository) CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
-	args := m.Called(ctx, fqdn, networkID, projectID)
-	return args.Bool(0), args.Error(1)
-}
-
 // CheckInternalPortExistsInProjectExcludingSelf mocks the CheckInternalPortExistsInProjectExcludingSelf method
 func (m *MockContainerRepository) CheckInternalPortExistsInProjectExcludingSelf(ctx context.Context, projectID uint, internalPort uint16, networkID uint) (bool, error) {
 	args := m.Called(ctx, projectID, internalPort, networkID)

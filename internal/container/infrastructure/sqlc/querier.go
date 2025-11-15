@@ -26,14 +26,6 @@ type Querier interface {
 	// Same as CheckFQDNExistsForProject but excludes self (for UpdateNetwork)
 	// Allows updating a network's FQDN to the same value
 	CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, arg CheckFQDNExistsForProjectExcludingSelfParams) (bool, error)
-	// Check if FQDN is used by another project (for AddNetwork)
-	// FQDN ownership is project-scoped: once a project uses a FQDN, it's reserved for that project
-	// Checks both active and deleted networks to preserve FQDN ownership
-	CheckFQDNExistsInOtherProject(ctx context.Context, arg CheckFQDNExistsInOtherProjectParams) (bool, error)
-	// Check if FQDN is used by another project, excluding self (for UpdateNetwork)
-	// Allows updating a network's FQDN to the same value or reusing FQDN within same project
-	// Checks both active and deleted networks to preserve FQDN ownership
-	CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, arg CheckFQDNExistsInOtherProjectExcludingSelfParams) (bool, error)
 	CheckInternalPortExistsInProject(ctx context.Context, arg CheckInternalPortExistsInProjectParams) (bool, error)
 	// Check if internal port exists in project, excluding self (for UpdateNetwork)
 	// Internal ports must be unique within a project (containers share pod network interface)

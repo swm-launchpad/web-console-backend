@@ -100,58 +100,6 @@ func (q *Queries) CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, ar
 	return fqdn_exists, err
 }
 
-const checkFQDNExistsInOtherProject = `-- name: CheckFQDNExistsInOtherProject :one
-SELECT COUNT(*) > 0 as fqdn_exists
-FROM NETWORKS n
-INNER JOIN CONTAINERS c ON n.container_id = c.container_id
-WHERE n.fqdn = ?
-  AND c.project_id != ?
-  AND c.is_deleted = 0
-FOR UPDATE
-`
-
-type CheckFQDNExistsInOtherProjectParams struct {
-	Fqdn      sql.NullString `json:"fqdn"`
-	ProjectID uint32         `json:"project_id"`
-}
-
-// Check if FQDN is used by another project (for AddNetwork)
-// FQDN ownership is project-scoped: once a project uses a FQDN, it's reserved for that project
-// Checks both active and deleted networks to preserve FQDN ownership
-func (q *Queries) CheckFQDNExistsInOtherProject(ctx context.Context, arg CheckFQDNExistsInOtherProjectParams) (bool, error) {
-	row := q.db.QueryRowContext(ctx, checkFQDNExistsInOtherProject, arg.Fqdn, arg.ProjectID)
-	var fqdn_exists bool
-	err := row.Scan(&fqdn_exists)
-	return fqdn_exists, err
-}
-
-const checkFQDNExistsInOtherProjectExcludingSelf = `-- name: CheckFQDNExistsInOtherProjectExcludingSelf :one
-SELECT COUNT(*) > 0 as fqdn_exists
-FROM NETWORKS n
-INNER JOIN CONTAINERS c ON n.container_id = c.container_id
-WHERE n.fqdn = ?
-  AND n.network_id != ?
-  AND c.project_id != ?
-  AND c.is_deleted = 0
-FOR UPDATE
-`
-
-type CheckFQDNExistsInOtherProjectExcludingSelfParams struct {
-	Fqdn      sql.NullString `json:"fqdn"`
-	NetworkID uint32         `json:"network_id"`
-	ProjectID uint32         `json:"project_id"`
-}
-
-// Check if FQDN is used by another project, excluding self (for UpdateNetwork)
-// Allows updating a network's FQDN to the same value or reusing FQDN within same project
-// Checks both active and deleted networks to preserve FQDN ownership
-func (q *Queries) CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, arg CheckFQDNExistsInOtherProjectExcludingSelfParams) (bool, error) {
-	row := q.db.QueryRowContext(ctx, checkFQDNExistsInOtherProjectExcludingSelf, arg.Fqdn, arg.NetworkID, arg.ProjectID)
-	var fqdn_exists bool
-	err := row.Scan(&fqdn_exists)
-	return fqdn_exists, err
-}
-
 const checkInternalPortExistsInProject = `-- name: CheckInternalPortExistsInProject :one
 SELECT COUNT(*) > 0 as port_exists
 FROM NETWORKS n
