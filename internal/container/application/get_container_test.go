@@ -174,7 +174,7 @@ func TestGetContainerUseCase_Execute_WithOptionalFields(t *testing.T) {
 	assert.NotNil(t, output)
 	require.Len(t, output.Networks, 1)
 	assert.Equal(t, fqdn, output.Networks[0].FQDN)
-	assert.Equal(t, gitDir, output.GitDirectory)
+	assert.Equal(t, gitDir, output.GitSubpath)
 	assert.Equal(t, stableWindow, output.StableWindow)
 	assert.Equal(t, templateConfig, output.TemplateConfig)
 

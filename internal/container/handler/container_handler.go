@@ -253,7 +253,7 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 		Name:                 req.Name,
 		GitURL:               req.GitURL,
 		GitBranch:            req.GitBranch,
-		GitDirectory:         gitDirectory,
+		GitSubpath:           gitDirectory,
 		GitHubInstallationID: req.GitHubInstallationID,
 		CPULimit:             cpuLimit,
 		MemoryLimit:          memoryLimit,
@@ -371,7 +371,8 @@ type UpdateContainerRequest struct {
 	UnsetGitHubInstallationID bool                   `json:"unset_github_installation_id,omitempty"`
 	GitURL                    *string                `json:"git_url,omitempty"`
 	GitBranch                 *string                `json:"git_branch,omitempty"`
-	GitDirectory              *string                `json:"git_directory,omitempty"`
+	GitDirectory              *string                `json:"git_directory,omitempty"` // Deprecated: use GitSubpath instead
+	GitSubpath                *string                `json:"git_subpath,omitempty"`
 	CPULimit                  *uint32                `json:"cpu_limit,omitempty"`
 	MemoryLimit               *uint32                `json:"memory_limit,omitempty"`
 	TemplateID                *uint                  `json:"template_id,omitempty"`
@@ -435,6 +436,12 @@ func (h *ContainerHandler) UpdateContainer(c *gin.Context) {
 	}
 	// If neither flag is set, don't update (keep existing value)
 
+	// GitSubpath is the same as GitDirectory (backward compatibility)
+	gitSubpath := req.GitSubpath
+	if req.GitSubpath == nil && req.GitDirectory != nil {
+		gitSubpath = req.GitDirectory
+	}
+
 	input := application.UpdateContainerInput{
 		ContainerID:                containerID,
 		UserID:                     userID.(uint),
@@ -444,7 +451,7 @@ func (h *ContainerHandler) UpdateContainer(c *gin.Context) {
 		UpdateGitHubInstallationID: updateGitHubInstallation,
 		GitURL:                     req.GitURL,
 		GitBranch:                  req.GitBranch,
-		GitDirectory:               req.GitDirectory,
+		GitSubpath:                 gitSubpath,
 		CPULimit:                   req.CPULimit,
 		MemoryLimit:                req.MemoryLimit,
 		TemplateID:                 req.TemplateID,
@@ -470,14 +477,22 @@ func (h *ContainerHandler) UpdateContainer(c *gin.Context) {
 		zap.String("container_slug", output.Slug),
 	)
 
-	resp := ContainerResponse{
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
 		ContainerID: output.ContainerID,
-		Name:        output.Name,
-		Slug:        output.Slug,
-		UpdatedAt:   output.UpdatedAt,
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", output.ContainerID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
 	}
 
-	response.OK(c, resp)
+	response.OK(c, fullContainer)
 }
 
 // DeleteContainer handles deleting a container
@@ -678,7 +693,22 @@ func (h *ContainerHandler) AddEnvVar(c *gin.Context) {
 		zap.String("key", req.Key),
 	)
 
-	response.Created(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: output.ContainerID,
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", output.ContainerID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.Created(c, fullContainer)
 }
 
 // UpdateEnvVarRequest represents the request body for updating an environment variable
@@ -763,7 +793,22 @@ func (h *ContainerHandler) UpdateEnvVar(c *gin.Context) {
 		zap.String("key", envVarKey),
 	)
 
-	response.OK(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: output.ContainerID,
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", output.ContainerID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, fullContainer)
 }
 
 // DeleteEnvVar handles deleting an environment variable from a container
@@ -814,7 +859,7 @@ func (h *ContainerHandler) DeleteEnvVar(c *gin.Context) {
 		Key:         key,
 	}
 
-	output, err := h.deleteEnvVarUC.Execute(c.Request.Context(), input)
+	_, err = h.deleteEnvVarUC.Execute(c.Request.Context(), input)
 	if err != nil {
 		h.logger.Error(ctx, "delete env var use case failed",
 			zap.Error(err),
@@ -832,7 +877,22 @@ func (h *ContainerHandler) DeleteEnvVar(c *gin.Context) {
 		zap.String("key", key),
 	)
 
-	response.OK(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, fullContainer)
 }
 
 // AddNetworkRequest represents the request body for adding a network port mapping
@@ -923,7 +983,22 @@ func (h *ContainerHandler) AddNetwork(c *gin.Context) {
 	}
 	h.logger.Info(ctx, "add network handler completed", infoFields...)
 
-	response.Created(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: output.ContainerID,
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", output.ContainerID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.Created(c, fullContainer)
 }
 
 // DeleteNetwork handles deleting a network port mapping from a container
@@ -987,7 +1062,7 @@ func (h *ContainerHandler) DeleteNetwork(c *gin.Context) {
 		InternalPort: uint16(port),
 	}
 
-	output, err := h.deleteNetworkUC.Execute(c.Request.Context(), input)
+	_, err = h.deleteNetworkUC.Execute(c.Request.Context(), input)
 	if err != nil {
 		h.logger.Error(ctx, "delete network use case failed",
 			zap.Error(err),
@@ -1007,7 +1082,22 @@ func (h *ContainerHandler) DeleteNetwork(c *gin.Context) {
 		zap.Uint16("internal_port", uint16(port)),
 	)
 
-	response.OK(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, fullContainer)
 }
 
 // UpdateNetworkRequest represents the request body for updating a network
@@ -1105,7 +1195,22 @@ func (h *ContainerHandler) UpdateNetwork(c *gin.Context) {
 		zap.Uint("network_id", output.NetworkID),
 	)
 
-	response.OK(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: output.ContainerID,
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", output.ContainerID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, fullContainer)
 }
 
 // ListNetworks handles fetching all network port mappings for a container
@@ -1302,7 +1407,22 @@ func (h *ContainerHandler) AddSecret(c *gin.Context) {
 		zap.String("key", req.Key),
 	)
 
-	response.Created(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: output.ContainerID,
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", output.ContainerID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.Created(c, fullContainer)
 }
 
 // UpdateSecretRequest represents the request body for updating a secret
@@ -1392,7 +1512,22 @@ func (h *ContainerHandler) UpdateSecret(c *gin.Context) {
 		zap.String("key", key),
 	)
 
-	response.OK(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: output.ContainerID,
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", output.ContainerID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, fullContainer)
 }
 
 // DeleteSecret handles deleting a secret from a container
@@ -1444,7 +1579,7 @@ func (h *ContainerHandler) DeleteSecret(c *gin.Context) {
 		Key:         key,
 	}
 
-	output, err := h.deleteSecretUC.Execute(c.Request.Context(), input)
+	_, err = h.deleteSecretUC.Execute(c.Request.Context(), input)
 	if err != nil {
 		h.logger.Error(ctx, "delete secret use case failed",
 			zap.Error(err),
@@ -1464,7 +1599,22 @@ func (h *ContainerHandler) DeleteSecret(c *gin.Context) {
 		zap.String("key", key),
 	)
 
-	response.OK(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, fullContainer)
 }
 
 // ListSecrets handles fetching all secrets for a container
@@ -1665,7 +1815,22 @@ func (h *ContainerHandler) AddBuildVar(c *gin.Context) {
 		zap.String("key", req.Key),
 	)
 
-	response.Created(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: output.ContainerID,
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", output.ContainerID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.Created(c, fullContainer)
 }
 
 // UpdateBuildVarRequest represents the request body for updating a build variable
@@ -1755,7 +1920,22 @@ func (h *ContainerHandler) UpdateBuildVar(c *gin.Context) {
 		zap.String("key", buildVarKey),
 	)
 
-	response.OK(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: output.ContainerID,
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", output.ContainerID),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, fullContainer)
 }
 
 // DeleteBuildVar handles deleting a build variable from a container
@@ -1807,7 +1987,7 @@ func (h *ContainerHandler) DeleteBuildVar(c *gin.Context) {
 		Key:         key,
 	}
 
-	output, err := h.deleteBuildVarUC.Execute(c.Request.Context(), input)
+	_, err = h.deleteBuildVarUC.Execute(c.Request.Context(), input)
 	if err != nil {
 		h.logger.Error(ctx, "delete build var use case failed",
 			zap.Error(err),
@@ -1827,7 +2007,22 @@ func (h *ContainerHandler) DeleteBuildVar(c *gin.Context) {
 		zap.String("key", key),
 	)
 
-	response.OK(c, output)
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, fullContainer)
 }
 
 // ====================
@@ -2014,7 +2209,7 @@ func (h *ContainerHandler) AddVolume(c *gin.Context) {
 		MountPath:   req.MountPath,
 	}
 
-	mountOutput, err := h.addMountUC.Execute(c.Request.Context(), mountInput)
+	_, err = h.addMountUC.Execute(c.Request.Context(), mountInput)
 	if err != nil {
 		h.logger.Error(ctx, "failed to mount volume",
 			zap.Error(err),
@@ -2043,16 +2238,22 @@ func (h *ContainerHandler) AddVolume(c *gin.Context) {
 		zap.String("mount_path", req.MountPath),
 	)
 
-	volumeResp := VolumeResponse{
-		VolumeID:  volume.VolumeID(),
-		Name:      volume.Name(),
-		Slug:      volume.Slug().String(),
-		Capacity:  volume.Capacity(),
-		MountPath: mountOutput.MountPath,
-		CreatedAt: mountOutput.CreatedAt,
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
 	}
 
-	response.Created(c, volumeResp)
+	response.Created(c, fullContainer)
 }
 
 // DeleteVolume handles deleting a volume from a container
@@ -2139,9 +2340,22 @@ func (h *ContainerHandler) DeleteVolume(c *gin.Context) {
 		zap.Uint64("volume_id", volumeID),
 	)
 
-	response.OK(c, map[string]interface{}{
-		"message": "volume deleted successfully",
-	})
+	// Get full container details to return complete information
+	getInput := application.GetContainerInput{
+		ContainerID: container.ContainerID(),
+		UserID:      userID.(uint),
+	}
+	fullContainer, err := h.getContainerUC.Execute(ctx, getInput)
+	if err != nil {
+		h.logger.Error(ctx, "failed to get updated container details",
+			zap.Error(err),
+			zap.Uint("container_id", container.ContainerID()),
+		)
+		response.Error(c, err, mapContainerError)
+		return
+	}
+
+	response.OK(c, fullContainer)
 }
 
 // CheckFQDN handles checking if an FQDN is already in use

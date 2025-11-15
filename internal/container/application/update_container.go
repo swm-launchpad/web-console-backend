@@ -20,7 +20,7 @@ type UpdateContainerInput struct {
 	StableWindow               *uint32
 	GitURL                     *string
 	GitBranch                  *string
-	GitDirectory               *string
+	GitSubpath                 *string
 	GitHubInstallationID       *int64
 	UpdateGitHubInstallationID bool // Flag to indicate whether to update GitHubInstallationID
 	CPULimit                   *uint32
@@ -156,7 +156,7 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 		}
 
 		// Update git config if provided
-		if input.GitURL != nil || input.GitBranch != nil || input.GitDirectory != nil {
+		if input.GitURL != nil || input.GitBranch != nil || input.GitSubpath != nil {
 			gitURL := container.GitConfig().RepositoryURL()
 			gitBranch := container.GitConfig().Branch()
 			gitDir := container.GitConfig().DirectoryPath()
@@ -167,8 +167,8 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 			if input.GitBranch != nil {
 				gitBranch = *input.GitBranch
 			}
-			if input.GitDirectory != nil {
-				gitDir = input.GitDirectory
+			if input.GitSubpath != nil {
+				gitDir = input.GitSubpath
 			}
 
 			gitConfig, err := value.NewGitConfig(gitURL, gitBranch, gitDir)
