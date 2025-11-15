@@ -15,11 +15,19 @@ import (
 	"go.uber.org/zap"
 )
 
-// Project policy constants
+// Project policy constants - Plan-specific defaults
 const (
-	DefaultCPULimit     uint32 = 500           // 0.5 core (500 millicores) - matches API_SPECIFICATION.md:116
-	DefaultMemoryLimit  uint32 = 1024          // 1GB (1024 Mi)
-	DefaultDiskLimit    uint32 = 2048          // 2GB (2048 Mi) - matches API_SPECIFICATION.md:118
+	// Eco plan defaults
+	EcoCPULimit    uint32 = 1000 // 1 core (1000 millicores)
+	EcoMemoryLimit uint32 = 2048 // 2GB (2048 Mi)
+	EcoDiskLimit   uint32 = 2048 // 2GB (2048 Mi)
+
+	// Pro plan defaults
+	ProCPULimit    uint32 = 1000  // 1 core (1000 millicores)
+	ProMemoryLimit uint32 = 2048  // 2GB (2048 Mi)
+	ProDiskLimit   uint32 = 10240 // 10GB (10240 Mi)
+
+	// Common defaults
 	DefaultTrafficLimit uint32 = 1048576       // 1TB (1048576 Mi) - maintained for compatibility
 	DefaultPlan                = value.PlanEco // Default plan for new projects
 )
@@ -168,18 +176,26 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		diskLimit = uint32(freeDisk)
 		trafficLimit = DefaultTrafficLimit
 	} else {
-		// For non-Free plans, use defaults or client input
-		cpuLimit = DefaultCPULimit
+		// For non-Free plans, use plan-specific defaults or client input
+		if *plan == value.PlanPro {
+			// Pro plan defaults
+			cpuLimit = ProCPULimit       // 1 core
+			memoryLimit = ProMemoryLimit // 2GB
+			diskLimit = ProDiskLimit     // 10GB
+		} else {
+			// Eco plan defaults (fallback for other plans)
+			cpuLimit = EcoCPULimit       // 1 core
+			memoryLimit = EcoMemoryLimit // 2GB
+			diskLimit = EcoDiskLimit     // 2GB
+		}
+
+		// Allow client override
 		if req.CPULimit != nil {
 			cpuLimit = *req.CPULimit
 		}
-
-		memoryLimit = DefaultMemoryLimit
 		if req.MemoryLimit != nil {
 			memoryLimit = *req.MemoryLimit
 		}
-
-		diskLimit = DefaultDiskLimit
 		if req.DiskLimit != nil {
 			diskLimit = *req.DiskLimit
 		}
