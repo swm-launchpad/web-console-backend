@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
@@ -16,9 +17,12 @@ type ListProjectsInput struct {
 }
 
 type ProjectSummary struct {
-	ContainerCount int      `json:"container_count"`
-	DomainCount    int      `json:"domain_count"`
-	Domains        []string `json:"domains,omitempty"`
+	ContainerCount  int      `json:"container_count"`
+	DomainCount     int      `json:"domain_count"`
+	Domains         []string `json:"domains,omitempty"`
+	TotalCPUUsed    uint32   `json:"total_cpu_used"`
+	TotalMemoryUsed uint32   `json:"total_memory_used"`
+	TotalDiskUsed   uint32   `json:"total_disk_used"`
 }
 
 type ProjectListItem struct {
@@ -103,10 +107,62 @@ func (uc *ListProjectsUseCase) Execute(ctx context.Context, input ListProjectsIn
 					domains = strings.Split(s.Domains.String, ",")
 				}
 
+				// Convert interface{} to uint32 for resource fields
+				var totalCPU, totalMemory, totalDisk uint32
+
+				// Try multiple type assertions for MySQL numeric types
+				switch v := s.TotalCpuUsed.(type) {
+				case int64:
+					totalCPU = uint32(v)
+				case uint64:
+					totalCPU = uint32(v)
+				case int32:
+					totalCPU = uint32(v)
+				case uint32:
+					totalCPU = v
+				case []byte:
+					// MySQL DECIMAL can be returned as []byte
+					if val, err := strconv.ParseUint(string(v), 10, 32); err == nil {
+						totalCPU = uint32(val)
+					}
+				}
+
+				switch v := s.TotalMemoryUsed.(type) {
+				case int64:
+					totalMemory = uint32(v)
+				case uint64:
+					totalMemory = uint32(v)
+				case int32:
+					totalMemory = uint32(v)
+				case uint32:
+					totalMemory = v
+				case []byte:
+					if val, err := strconv.ParseUint(string(v), 10, 32); err == nil {
+						totalMemory = uint32(val)
+					}
+				}
+
+				switch v := s.TotalDiskUsed.(type) {
+				case int64:
+					totalDisk = uint32(v)
+				case uint64:
+					totalDisk = uint32(v)
+				case int32:
+					totalDisk = uint32(v)
+				case uint32:
+					totalDisk = v
+				case []byte:
+					if val, err := strconv.ParseUint(string(v), 10, 32); err == nil {
+						totalDisk = uint32(val)
+					}
+				}
 				summaryMap[s.ProjectID] = &ProjectSummary{
-					ContainerCount: int(s.ContainerCount),
-					DomainCount:    int(s.DomainCount),
-					Domains:        domains,
+					ContainerCount:  int(s.ContainerCount),
+					DomainCount:     int(s.DomainCount),
+					Domains:         domains,
+					TotalCPUUsed:    totalCPU,
+					TotalMemoryUsed: totalMemory,
+					TotalDiskUsed:   totalDisk,
 				}
 			}
 		}

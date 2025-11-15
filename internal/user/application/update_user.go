@@ -12,7 +12,6 @@ import (
 type UpdateUserInput struct {
 	UserID       uint
 	Nickname     *string
-	Phone        *string
 	Organization *string
 }
 
@@ -20,8 +19,7 @@ type UpdateUserOutput struct {
 	UserID       uint
 	Email        string
 	Nickname     string
-	Phone        string
-	Organization string
+	Organization *string
 	Status       string
 }
 
@@ -76,10 +74,6 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 		user.Nickname = *input.Nickname
 		updated = true
 	}
-	if input.Phone != nil {
-		user.Phone = input.Phone
-		updated = true
-	}
 	if input.Organization != nil {
 		user.Organization = input.Organization
 		updated = true
@@ -103,17 +97,11 @@ func (uc *UpdateUserUseCase) Execute(ctx context.Context, input UpdateUserInput)
 
 	// Map to output
 	output := &UpdateUserOutput{
-		UserID:   user.UserID,
-		Email:    user.Email,
-		Nickname: user.Nickname,
-		Status:   string(user.Status),
-	}
-
-	if user.Phone != nil {
-		output.Phone = *user.Phone
-	}
-	if user.Organization != nil {
-		output.Organization = *user.Organization
+		UserID:       user.UserID,
+		Email:        user.Email,
+		Nickname:     user.Nickname,
+		Organization: user.Organization,
+		Status:       string(user.Status),
 	}
 
 	uc.logger.Info(ctx, "update user completed",

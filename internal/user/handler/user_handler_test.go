@@ -65,7 +65,6 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 			UserID:       userID,
 			Nickname:     "Current User",
 			Email:        "current@example.com",
-			Phone:        stringPtr("123-456-7890"),
 			Organization: stringPtr("Test Org"),
 			Status:       model.UserStatusActive,
 			CreatedAt:    createdAt,
@@ -99,7 +98,6 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 		assert.Equal(t, float64(userID), data["user_id"])
 		assert.Equal(t, "current@example.com", data["email"])
 		assert.Equal(t, "Current User", data["nickname"])
-		assert.Equal(t, "123-456-7890", data["phone"])
 		assert.Equal(t, "Test Org", data["organization"])
 		assert.Equal(t, "active", data["status"])
 		assert.Equal(t, createdAt.Format("2006-01-02T15:04:05Z"), data["created_at"])
@@ -199,7 +197,6 @@ func TestUserHandler_GetCurrentUser_WithUseCase(t *testing.T) {
 			UserID:       userID,
 			Nickname:     "minimaluser",
 			Email:        "minimal@example.com",
-			Phone:        nil,
 			Organization: nil,
 			Status:       model.UserStatusPending,
 			CreatedAt:    createdAt,
@@ -332,7 +329,6 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 			UserID:       userID,
 			Nickname:     "Search User",
 			Email:        "search@example.com",
-			Phone:        stringPtr("987-654-3210"),
 			Organization: stringPtr("Search Corp"),
 			Status:       model.UserStatusActive,
 			CreatedAt:    createdAt,
@@ -363,7 +359,6 @@ func TestUserHandler_GetUserByID_WithUseCase(t *testing.T) {
 		assert.Equal(t, float64(userID), data["user_id"])
 		assert.Equal(t, "search@example.com", data["email"])
 		assert.Equal(t, "Search User", data["nickname"])
-		assert.Equal(t, "987-654-3210", data["phone"])
 		assert.Equal(t, "Search Corp", data["organization"])
 		assert.Equal(t, "active", data["status"])
 		assert.Equal(t, createdAt.Format("2006-01-02T15:04:05Z"), data["created_at"])

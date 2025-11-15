@@ -21,7 +21,6 @@ type User struct {
 	PasswordUpdatedAt *time.Time
 	Nickname          string
 	Email             string
-	Phone             *string
 	Organization      *string
 	Status            UserStatus
 	IsDeleted         bool

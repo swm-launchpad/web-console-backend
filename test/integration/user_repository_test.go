@@ -31,14 +31,12 @@ func TestUserRepository_Integration(t *testing.T) {
 
 	t.Run("Create and FindByID", func(t *testing.T) {
 		// Given
-		phone := "010-1234-5678"
 		org := "Test Corp"
 
 		user := &model.User{
 			Nickname:     "testnick",
 			PasswordHash: "$2a$10$hashedpassword",
 			Email:        "test@example.com",
-			Phone:        &phone,
 			Organization: &org,
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
@@ -60,7 +58,6 @@ func TestUserRepository_Integration(t *testing.T) {
 		assert.Equal(t, user.UserID, foundUser.UserID)
 		assert.Equal(t, user.Email, foundUser.Email)
 		assert.Equal(t, user.Nickname, foundUser.Nickname)
-		assert.Equal(t, *user.Phone, *foundUser.Phone)
 		assert.Equal(t, *user.Organization, *foundUser.Organization)
 		assert.Equal(t, user.Status, foundUser.Status)
 	})
@@ -108,12 +105,10 @@ func TestUserRepository_Integration(t *testing.T) {
 		// When - Update
 		newEmail := "newemail@example.com"
 		newNickname := "updatednick"
-		newPhone := "010-9999-8888"
 		now := time.Now()
 
 		user.Email = newEmail
 		user.Nickname = newNickname
-		user.Phone = &newPhone
 		user.Status = model.UserStatusInactive
 		user.UpdatedAt = &now
 
@@ -127,7 +122,6 @@ func TestUserRepository_Integration(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, newEmail, updatedUser.Email)
 		assert.Equal(t, newNickname, updatedUser.Nickname)
-		assert.Equal(t, newPhone, *updatedUser.Phone)
 		assert.Equal(t, model.UserStatusInactive, updatedUser.Status)
 	})
 

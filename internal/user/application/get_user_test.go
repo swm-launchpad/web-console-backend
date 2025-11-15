@@ -26,7 +26,6 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		userID := uint(1)
 		email := "test@example.com"
 		name := "Test User"
-		phone := "010-1234-5678"
 		organization := "Test Company"
 		now := time.Now()
 
@@ -34,7 +33,6 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 			UserID:       userID,
 			Nickname:     name,
 			Email:        email,
-			Phone:        &phone,
 			Organization: &organization,
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
@@ -58,8 +56,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, email, output.Email)
 		assert.Equal(t, name, output.Nickname)
-		assert.Equal(t, phone, output.Phone)
-		assert.Equal(t, organization, output.Organization)
+		assert.Equal(t, &organization, output.Organization)
 		assert.Equal(t, "active", output.Status)
 		assert.Equal(t, now, output.CreatedAt)
 
@@ -79,7 +76,6 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 			UserID:       userID,
 			Nickname:     "minimaluser",
 			Email:        "minimal@example.com",
-			Phone:        nil,
 			Organization: nil,
 			Status:       model.UserStatusPending,
 			IsDeleted:    false,
@@ -103,7 +99,6 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, "minimaluser", output.Nickname)
 		assert.Equal(t, "minimal@example.com", output.Email)
-		assert.Empty(t, output.Phone)
 		assert.Empty(t, output.Organization)
 		assert.Equal(t, "pending", output.Status)
 		assert.Equal(t, now, output.CreatedAt)
@@ -281,7 +276,6 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		userID := uint(5)
 		email := "full@example.com"
 		name := "Full User"
-		phone := "010-9999-8888"
 		organization := "Full Company"
 		now := time.Now()
 
@@ -289,7 +283,6 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 			UserID:       userID,
 			Nickname:     name,
 			Email:        email,
-			Phone:        &phone,
 			Organization: &organization,
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
@@ -313,8 +306,7 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, email, output.Email)
 		assert.Equal(t, name, output.Nickname)
-		assert.Equal(t, phone, output.Phone)
-		assert.Equal(t, organization, output.Organization)
+		assert.Equal(t, &organization, output.Organization)
 		assert.Equal(t, "active", output.Status)
 
 		mockService.AssertExpectations(t)
@@ -334,7 +326,6 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 			UserID:       userID,
 			Nickname:     emptyStr, // 빈 문자열
 			Email:        "empty@example.com",
-			Phone:        nil, // nil
 			Organization: nil, // nil
 			Status:       model.UserStatusActive,
 			IsDeleted:    false,
@@ -358,7 +349,6 @@ func TestGetUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, "empty@example.com", output.Email)
 		assert.Empty(t, output.Nickname) // 빈 문자열
-		assert.Empty(t, output.Phone)
 		assert.Empty(t, output.Organization)
 
 		mockService.AssertExpectations(t)

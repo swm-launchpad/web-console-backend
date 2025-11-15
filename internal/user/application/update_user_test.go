@@ -25,14 +25,12 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 
 		userID := uint(1)
 		name := "Updated Name"
-		phone := "010-1234-5678"
 		organization := "Updated Org"
 
 		existingUser := &model.User{
 			UserID:       userID,
 			Nickname:     "testuser",
 			Email:        "test@example.com",
-			Phone:        stringPtr("010-0000-0000"),
 			Organization: stringPtr("Old Org"),
 			Status:       model.UserStatusActive,
 			CreatedAt:    time.Now(),
@@ -45,7 +43,6 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 		input := UpdateUserInput{
 			UserID:       userID,
 			Nickname:     &name,
-			Phone:        &phone,
 			Organization: &organization,
 		}
 
@@ -58,8 +55,7 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 		assert.Equal(t, userID, output.UserID)
 		assert.Equal(t, "test@example.com", output.Email)
 		assert.Equal(t, name, output.Nickname)
-		assert.Equal(t, phone, output.Phone)
-		assert.Equal(t, organization, output.Organization)
+		assert.Equal(t, &organization, output.Organization)
 		assert.Equal(t, string(model.UserStatusActive), output.Status)
 
 		mockUserService.AssertExpectations(t)
@@ -78,7 +74,6 @@ func TestUpdateUserUseCase_Execute(t *testing.T) {
 			UserID:       userID,
 			Nickname:     "testuser2",
 			Email:        "test2@example.com",
-			Phone:        nil,
 			Organization: nil,
 			Status:       model.UserStatusActive,
 			CreatedAt:    time.Now(),

@@ -81,7 +81,7 @@ func (q *Queries) ExistsByEmail(ctx context.Context, email string) (bool, error)
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT
     user_id, password_hash, password_updated_at,
-    nickname, email, phone, organization,
+    nickname, email, organization,
     status, is_deleted, deleted_at, created_at, updated_at
 FROM USERS
 WHERE email = ? AND is_deleted = FALSE
@@ -93,7 +93,6 @@ type GetUserByEmailRow struct {
 	PasswordUpdatedAt sql.NullTime   `json:"password_updated_at"`
 	Nickname          string         `json:"nickname"`
 	Email             string         `json:"email"`
-	Phone             sql.NullString `json:"phone"`
 	Organization      sql.NullString `json:"organization"`
 	Status            UsersStatus    `json:"status"`
 	IsDeleted         bool           `json:"is_deleted"`
@@ -111,7 +110,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 		&i.PasswordUpdatedAt,
 		&i.Nickname,
 		&i.Email,
-		&i.Phone,
 		&i.Organization,
 		&i.Status,
 		&i.IsDeleted,
@@ -125,7 +123,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 const getUserByID = `-- name: GetUserByID :one
 SELECT
     user_id, password_hash, password_updated_at,
-    nickname, email, phone, organization,
+    nickname, email, organization,
     status, is_deleted, deleted_at, created_at, updated_at
 FROM USERS
 WHERE user_id = ? AND is_deleted = FALSE
@@ -137,7 +135,6 @@ type GetUserByIDRow struct {
 	PasswordUpdatedAt sql.NullTime   `json:"password_updated_at"`
 	Nickname          string         `json:"nickname"`
 	Email             string         `json:"email"`
-	Phone             sql.NullString `json:"phone"`
 	Organization      sql.NullString `json:"organization"`
 	Status            UsersStatus    `json:"status"`
 	IsDeleted         bool           `json:"is_deleted"`
@@ -155,7 +152,6 @@ func (q *Queries) GetUserByID(ctx context.Context, userID uint32) (GetUserByIDRo
 		&i.PasswordUpdatedAt,
 		&i.Nickname,
 		&i.Email,
-		&i.Phone,
 		&i.Organization,
 		&i.Status,
 		&i.IsDeleted,

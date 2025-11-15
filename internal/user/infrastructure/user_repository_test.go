@@ -17,7 +17,6 @@ func TestToDomainUser(t *testing.T) {
 		// Arrange
 		now := time.Now()
 		nickname := "testnick"
-		phone := "010-1234-5678"
 		org := "Test Org"
 
 		// Act
@@ -27,7 +26,6 @@ func TestToDomainUser(t *testing.T) {
 			sql.NullTime{Time: now, Valid: true},
 			nickname,
 			"test@example.com",
-			sql.NullString{String: phone, Valid: true},
 			sql.NullString{String: org, Valid: true},
 			sqlc.UsersStatusActive,
 			false,
@@ -43,8 +41,6 @@ func TestToDomainUser(t *testing.T) {
 		assert.Equal(t, now, *result.PasswordUpdatedAt)
 		assert.Equal(t, nickname, result.Nickname)
 		assert.Equal(t, "test@example.com", result.Email)
-		assert.NotNil(t, result.Phone)
-		assert.Equal(t, phone, *result.Phone)
 		assert.NotNil(t, result.Organization)
 		assert.Equal(t, org, *result.Organization)
 		assert.Equal(t, model.UserStatusActive, result.Status)
@@ -66,8 +62,7 @@ func TestToDomainUser(t *testing.T) {
 			sql.NullTime{}, // NULL
 			"newnick",      // nickname is NOT NULL
 			"test@example.com",
-			sql.NullString{}, // NULL
-			sql.NullString{}, // NULL
+			sql.NullString{}, // NULL organization
 			sqlc.UsersStatusInactive,
 			true,
 			sql.NullTime{Time: now, Valid: true},
@@ -80,7 +75,6 @@ func TestToDomainUser(t *testing.T) {
 		assert.Equal(t, "newnick", result.Nickname)
 		assert.Nil(t, result.PasswordUpdatedAt)
 		assert.Equal(t, "test@example.com", result.Email)
-		assert.Nil(t, result.Phone)
 		assert.Nil(t, result.Organization)
 		assert.Equal(t, model.UserStatusInactive, result.Status)
 		assert.True(t, result.IsDeleted)

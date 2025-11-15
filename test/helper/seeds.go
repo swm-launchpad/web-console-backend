@@ -74,9 +74,6 @@ CMD ["pnpm", "dev"]
     {"name": "env_mode", "label": "환경 모드", "type": "select", "options": ["development", "production"], "default": "production"},
     {"name": "app_port", "label": "애플리케이션 포트", "type": "number", "options": [], "default": "80"}
   ],
-  "template_ports": [
-    {"internal_port": 80, "network_type": "http", "description": "HTTP port"}
-  ],
   "default_ports": [
     {"internal_port": 80, "network_type": "http"}
   ],
@@ -151,9 +148,6 @@ CMD ["node", "index.js"]
     {"name": "process_manager", "label": "프로세스 매니저", "type": "select", "options": ["none", "pm2", "nodemon"], "default": "none"},
     {"name": "app_port", "label": "애플리케이션 포트", "type": "number", "options": [], "default": "3000"}
   ],
-  "template_ports": [
-    {"internal_port": 3000, "network_type": "http", "description": "Express.js server port"}
-  ],
   "default_ports": [
     {"internal_port": 3000, "network_type": "http"}
   ],
@@ -224,9 +218,6 @@ CMD ["node", "dist/main"]`,
     {"name": "package_manager", "label": "패키지 매니저", "type": "select", "options": ["npm", "yarn", "pnpm"], "default": "npm"},
     {"name": "app_port", "label": "애플리케이션 포트", "type": "number", "options": [], "default": "3000"}
   ],
-  "template_ports": [
-    {"internal_port": 3000, "network_type": "http", "description": "NestJS server port"}
-  ],
   "default_ports": [
     {"internal_port": 3000, "network_type": "http"}
   ],
@@ -275,9 +266,6 @@ CMD ["./main"]`,
     {"name": "go_version", "label": "Go 버전", "type": "select", "options": ["1.21", "1.22", "1.23"], "default": "1.23"},
     {"name": "app_port", "label": "애플리케이션 포트", "type": "number", "options": [], "default": "8080"}
   ],
-  "template_ports": [
-    {"internal_port": 8080, "network_type": "http", "description": "Gin server port"}
-  ],
   "default_ports": [
     {"internal_port": 8080, "network_type": "http"}
   ],
@@ -313,9 +301,6 @@ VOLUME ["/var/lib/mysql"]`,
     {"name": "version", "label": "MySQL 버전", "type": "select", "options": ["8.0", "8.4"], "default": "8.4"},
     {"name": "charset", "label": "문자셋", "type": "select", "options": ["utf8mb4", "utf8"], "default": "utf8mb4"},
     {"name": "max_connections", "label": "최대 연결 수", "type": "number", "options": [], "default": "151"}
-  ],
-  "template_ports": [
-    {"internal_port": 3306, "network_type": "tcp", "description": "MySQL port"}
   ],
   "default_ports": [
     {"internal_port": 3306, "network_type": "tcp"}
@@ -354,9 +339,6 @@ VOLUME ["/var/lib/postgresql/data"]`,
     {"name": "version", "label": "PostgreSQL 버전", "type": "select", "options": ["14", "15", "16"], "default": "16"},
     {"name": "max_connections", "label": "최대 연결 수", "type": "number", "options": [], "default": "100"},
     {"name": "shared_buffers", "label": "공유 버퍼 (MB)", "type": "text", "options": [], "default": "128MB"}
-  ],
-  "template_ports": [
-    {"internal_port": 5432, "network_type": "tcp", "description": "PostgreSQL port"}
   ],
   "default_ports": [
     {"internal_port": 5432, "network_type": "tcp"}
