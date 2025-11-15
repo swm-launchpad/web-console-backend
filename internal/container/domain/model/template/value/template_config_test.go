@@ -44,13 +44,6 @@ func TestNewTemplateConfig_ValidJSON(t *testing.T) {
 				"required": true
 			}
 		],
-		"template_ports": [
-			{
-				"internal_port": 3000,
-				"network_type": "http",
-				"description": "Main application port"
-			}
-		],
 		"default_resources": {
 			"default_cpu": 500,
 			"default_memory": 512,
@@ -70,8 +63,6 @@ func TestNewTemplateConfig_ValidJSON(t *testing.T) {
 	assert.Equal(t, "node_version", config.TemplateOptions[0].Name)
 	assert.Len(t, config.TemplateEnv, 2)
 	assert.Equal(t, "NODE_ENV", config.TemplateEnv[0].Key)
-	assert.Len(t, config.TemplatePorts, 1)
-	assert.Equal(t, uint16(3000), config.TemplatePorts[0].InternalPort)
 	assert.NotNil(t, config.DefaultResources)
 	assert.Equal(t, uint32(500), *config.DefaultResources.DefaultCPU)
 	assert.Equal(t, uint32(512), *config.DefaultResources.DefaultMemory)

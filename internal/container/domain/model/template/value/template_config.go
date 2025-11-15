@@ -24,13 +24,6 @@ type TemplateEnv struct {
 	Required bool   `json:"required"`
 }
 
-// TemplatePort represents a port configuration
-type TemplatePort struct {
-	InternalPort uint16 `json:"internal_port"`
-	NetworkType  string `json:"network_type"` // http, https, tcp, udp, cluster_ip
-	Description  string `json:"description,omitempty"`
-}
-
 // TemplateVolume represents a volume configuration
 type TemplateVolume struct {
 	MountPath   string `json:"mount_path"`
@@ -81,7 +74,6 @@ type TemplateConfig struct {
 	Version          string            `json:"version,omitempty"`
 	TemplateOptions  []TemplateOption  `json:"template_options,omitempty"`
 	TemplateEnv      []TemplateEnv     `json:"template_env,omitempty"`
-	TemplatePorts    []TemplatePort    `json:"template_ports,omitempty"`
 	TemplateVolumes  []TemplateVolume  `json:"template_volumes,omitempty"`
 	DefaultPorts     []DefaultPort     `json:"default_ports,omitempty"`
 	DefaultEnv       []DefaultEnv      `json:"default_env,omitempty"`

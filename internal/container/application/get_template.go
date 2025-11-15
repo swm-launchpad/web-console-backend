@@ -20,12 +20,12 @@ type GetTemplateOutput struct {
 	TemplateBody     string                  `json:"template_body,omitempty"`
 	TemplateOptions  []value.TemplateOption  `json:"template_options,omitempty"`
 	TemplateEnv      []value.TemplateEnv     `json:"template_env,omitempty"`
-	TemplatePorts    []value.TemplatePort    `json:"template_ports,omitempty"`
 	TemplateVolumes  []value.TemplateVolume  `json:"template_volumes,omitempty"`
 	DefaultPorts     []value.DefaultPort     `json:"default_ports,omitempty"`
 	DefaultEnv       []value.DefaultEnv      `json:"default_env,omitempty"`
 	DefaultVolumes   []value.DefaultVolume   `json:"default_volumes,omitempty"`
 	DefaultResources *value.DefaultResources `json:"default_resources,omitempty"`
+	PortGuide        *value.PortGuide        `json:"port_guide,omitempty"`
 	Categories       []string                `json:"categories"`
 	DisplayOrder     int                     `json:"display_order"`
 	IconName         string                  `json:"icon_name,omitempty"`
@@ -83,12 +83,12 @@ func (uc *GetTemplateUseCase) Execute(ctx context.Context, input GetTemplateInpu
 		output.Version = config.GetVersion()
 		output.TemplateOptions = config.TemplateOptions
 		output.TemplateEnv = config.TemplateEnv
-		output.TemplatePorts = config.TemplatePorts
 		output.TemplateVolumes = config.TemplateVolumes
 		output.DefaultPorts = config.DefaultPorts
 		output.DefaultEnv = config.DefaultEnv
 		output.DefaultVolumes = config.DefaultVolumes
 		output.DefaultResources = config.DefaultResources
+		output.PortGuide = config.PortGuide
 	}
 
 	uc.logger.Info(ctx, "get template completed",
