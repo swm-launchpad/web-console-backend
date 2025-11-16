@@ -126,7 +126,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 
 	// Container UseCases
 	createContainerUseCase := containerApp.NewCreateContainerUseCase(containerSvc, containerRepo, templateRepo, containerPermissionSvc, resourceValidationSvc, volumeSvc, installationRepo, txManager, testLogger)
-	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, containerPermissionSvc, testLogger)
+	getContainerUseCase := containerApp.NewGetContainerUseCase(containerRepo, templateRepo, containerPermissionSvc, testLogger)
 	listContainersUseCase := containerApp.NewListContainersUseCase(containerRepo, containerPermissionSvc, testLogger)
 	updateContainerUseCase := containerApp.NewUpdateContainerUseCase(containerRepo, containerPermissionSvc, resourceValidationSvc, buildChangeDetector, installationRepo, txManager, testLogger)
 	deleteContainerUseCase := containerApp.NewDeleteContainerUseCase(containerRepo, containerPermissionSvc, volumeSvc, txManager, testLogger)
