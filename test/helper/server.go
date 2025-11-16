@@ -97,7 +97,7 @@ func SetupTestServer(t *testing.T) *TestServer {
 	createProjectUseCase := projectApp.NewCreateProjectUseCase(projectSvc, txManager, testLogger)
 	getProjectUseCase := projectApp.NewGetProjectUseCase(projectSvc, volumeSvc, testLogger)
 	getProjectBySlugUseCase := projectApp.NewGetProjectBySlugUseCase(projectSvc, volumeSvc, testLogger)
-	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, txManager, testLogger)
+	updateProjectUseCase := projectApp.NewUpdateProjectUseCase(projectSvc, nil, txManager, testLogger)
 	mockTektonCleanupClient := new(projectInfra.MockTektonCleanupClient)
 	// Allow any cleanup calls to return nil (fire-and-forget behavior in tests)
 	mockTektonCleanupClient.On("TriggerCleanup", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
