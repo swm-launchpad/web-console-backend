@@ -95,13 +95,15 @@ type GetContainerOutput struct {
 
 type GetContainerUseCase struct {
 	containerRepo repository.ContainerRepository
+	templateRepo  repository.TemplateRepository
 	permissionSvc service.PermissionService
 	logger        logger.Logger
 }
 
-func NewGetContainerUseCase(containerRepo repository.ContainerRepository, permissionSvc service.PermissionService, log logger.Logger) *GetContainerUseCase {
+func NewGetContainerUseCase(containerRepo repository.ContainerRepository, templateRepo repository.TemplateRepository, permissionSvc service.PermissionService, log logger.Logger) *GetContainerUseCase {
 	return &GetContainerUseCase{
 		containerRepo: containerRepo,
+		templateRepo:  templateRepo,
 		permissionSvc: permissionSvc,
 		logger:        log,
 	}
@@ -165,6 +167,51 @@ func (uc *GetContainerUseCase) Execute(ctx context.Context, input GetContainerIn
 
 	if config := container.TemplateConfig(); config != nil {
 		output.TemplateConfig = config
+	}
+
+	// Get template information if template_id exists
+	if templateID := container.TemplateID(); templateID != nil {
+		template, err := uc.templateRepo.FindByID(ctx, *templateID)
+		if err != nil {
+			uc.logger.Warn(ctx, "failed to find template for container",
+				zap.Error(err),
+				zap.Uint("template_id", *templateID),
+			)
+		} else if template != nil {
+			// Build TemplateInfo from template
+			templateInfo := &TemplateInfo{
+				Name: template.Name(),
+			}
+
+			if templateConfig := template.TemplateConfig(); templateConfig != nil {
+				templateInfo.Description = templateConfig.GetDescription()
+				templateInfo.Version = templateConfig.GetVersion()
+
+				// Get framework from categories (first category)
+				categories := templateConfig.GetCategories()
+				if len(categories) > 0 {
+					templateInfo.Framework = categories[0]
+				}
+
+				// Map template options
+				if templateOptions := templateConfig.GetTemplateOptions(); len(templateOptions) > 0 {
+					templateInfo.TemplateOptions = make([]TemplateOptionOutput, 0, len(templateOptions))
+					for _, opt := range templateOptions {
+						templateInfo.TemplateOptions = append(templateInfo.TemplateOptions, TemplateOptionOutput{
+							Name:        opt.Name,
+							Label:       opt.Label,
+							Type:        opt.Type,
+							Category:    opt.Category,
+							Options:     opt.Options,
+							Default:     opt.Default,
+							Description: opt.Description,
+						})
+					}
+				}
+			}
+
+			output.Template = templateInfo
+		}
 	}
 
 	if gitDir := container.GitConfig().DirectoryPath(); gitDir != nil {
