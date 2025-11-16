@@ -147,7 +147,7 @@ func TestFQDNDuplication_SoftDeletePreservation(t *testing.T) {
 func createTestProjectForFQDN(t *testing.T, testDB *helper.TestDB, name string) uint {
 	t.Helper()
 
-	slug := generateValidProjectSlug()
+	slug := helper.GenerateValidProjectSlug()
 	query := `
 		INSERT INTO PROJECTS (name, slug, status, project_operation_status, cpu_limit, memory_limit, disk_limit, traffic_limit, created_at)
 		VALUES (?, ?, 'active', 'nothing', 1000, 2048, 2048, 1048576, NOW())
