@@ -21,12 +21,12 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/build"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/combined"
 	"github.com/swm-launchpad/web-console-backend/internal/container/application/deployment"
-	infrastructure5 "github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure"
+	infrastructure6 "github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure"
 	service3 "github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	handler3 "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	infrastructure2 "github.com/swm-launchpad/web-console-backend/internal/container/infrastructure"
 	application2 "github.com/swm-launchpad/web-console-backend/internal/project/application"
-	infrastructure4 "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
+	infrastructure5 "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure"
 	repository2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/infrastructure/repository"
 	service2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
 	build2 "github.com/swm-launchpad/web-console-backend/internal/project/domain/service/build"
@@ -35,6 +35,9 @@ import (
 	infrastructure3 "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
+	application4 "github.com/swm-launchpad/web-console-backend/internal/status/application"
+	handler4 "github.com/swm-launchpad/web-console-backend/internal/status/handler"
+	infrastructure4 "github.com/swm-launchpad/web-console-backend/internal/status/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -212,9 +215,15 @@ func InitializeApp() (*App, error) {
 	getBuildLogHistoryUseCase := application3.NewGetBuildLogHistoryUseCase(buildHistoryRepository, infrastructureLokiClient, servicePermissionService, logger)
 	buildLogHandler := provideBuildLogHandler(createBuildLogTokenUseCase, streamBuildLogsUseCase, getBuildLogHistoryUseCase, containerService, jwtUtil, logger)
 	settingsHandler := settings.NewSettingsHandler(settingsService, logger)
+	statusRepository := infrastructure4.NewStatusRepository(db)
+	getCurrentStatusUseCase := application4.NewGetCurrentStatusUseCase(statusRepository)
+	getStatusHistoryUseCase := application4.NewGetStatusHistoryUseCase(statusRepository)
+	getUptimeStatsUseCase := application4.NewGetUptimeStatsUseCase(statusRepository)
+	getDailyUptimeUseCase := application4.NewGetDailyUptimeUseCase(statusRepository)
+	statusHandler := handler4.NewStatusHandler(getCurrentStatusUseCase, getStatusHistoryUseCase, getUptimeStatsUseCase, getDailyUptimeUseCase)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	loggingMiddleware := provideLoggingMiddleware(logger)
-	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, projectLogHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, buildLogHandler, settingsHandler, authMiddleware, loggingMiddleware)
+	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, projectLogHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, buildLogHandler, settingsHandler, statusHandler, authMiddleware, loggingMiddleware)
 	app := NewApp(configConfig, db, router, oAuthStateRepository, logger)
 	return app, nil
 }
@@ -288,12 +297,12 @@ func provideEmailService(cfg *config.Config, log logger.Logger) email.Service {
 }
 
 // provideTektonDeployClient creates a Tekton client from environment variables
-func provideTektonDeployClient(log logger.Logger) (infrastructure4.TektonClient, error) {
+func provideTektonDeployClient(log logger.Logger) (infrastructure5.TektonClient, error) {
 	return infrastructure3.NewTektonDeployClient(log)
 }
 
 // provideKubeDeployClient creates a Kubernetes client from environment variables
-func provideKubeDeployClient(log logger.Logger) (infrastructure4.KubeClient, error) {
+func provideKubeDeployClient(log logger.Logger) (infrastructure5.KubeClient, error) {
 	return infrastructure3.NewKubeDeployClient(log)
 }
 
@@ -303,7 +312,7 @@ func provideContainerClient(
 	getContainersForBuildUseCase *build.GetContainersForBuildUseCase,
 	getContainersForBuildAndDeployUseCase *combined.GetContainersForBuildAndDeployUseCase,
 	log logger.Logger,
-) infrastructure4.ContainerClient {
+) infrastructure5.ContainerClient {
 	registryURL := os.Getenv("REGISTRY_URL")
 	if registryURL == "" {
 		log.Fatal(nil, "REGISTRY_URL environment variable is required")
@@ -319,22 +328,22 @@ func provideContainerClient(
 }
 
 // provideKubeBuildClient creates a Kubernetes build client from environment variables
-func provideKubeBuildClient(log logger.Logger) (infrastructure4.KubeBuildClient, error) {
+func provideKubeBuildClient(log logger.Logger) (infrastructure5.KubeBuildClient, error) {
 	return infrastructure3.NewKubeBuildClient(log)
 }
 
 // provideTektonBuildClient creates a Tekton build client from environment variables
-func provideTektonBuildClient(log logger.Logger) (infrastructure4.TektonBuildClient, error) {
+func provideTektonBuildClient(log logger.Logger) (infrastructure5.TektonBuildClient, error) {
 	return infrastructure3.NewTektonBuildClient(log)
 }
 
 // provideTektonNodePortClient creates a Tekton NodePort client from environment variables
-func provideTektonNodePortClient(log logger.Logger) (infrastructure5.TektonNodePortClient, error) {
+func provideTektonNodePortClient(log logger.Logger) (infrastructure6.TektonNodePortClient, error) {
 	return infrastructure2.NewTektonNodePortClient(log)
 }
 
 // provideTektonCleanupClient creates a Tekton cleanup client from environment variables
-func provideTektonCleanupClient(log logger.Logger) (infrastructure4.TektonCleanupClient, error) {
+func provideTektonCleanupClient(log logger.Logger) (infrastructure5.TektonCleanupClient, error) {
 	return infrastructure3.NewTektonCleanupClient(log)
 }
 
@@ -345,10 +354,10 @@ func provideDeployService(
 	deploymentRepo repository2.DeploymentRepository,
 	buildHistoryRepo repository2.BuildHistoryRepository,
 	volumeRepo repository2.VolumeRepository,
-	containerClient infrastructure4.ContainerClient,
-	tektonClient infrastructure4.TektonClient,
-	kubeClient infrastructure4.KubeClient,
-	kubeBuildClient infrastructure4.KubeBuildClient,
+	containerClient infrastructure5.ContainerClient,
+	tektonClient infrastructure5.TektonClient,
+	kubeClient infrastructure5.KubeClient,
+	kubeBuildClient infrastructure5.KubeBuildClient,
 	buildOrchestrator build2.Orchestrator,
 	buildPostProcessor build2.PostProcessor,
 	log logger.Logger,
@@ -427,12 +436,12 @@ func provideGitHubHandler(
 }
 
 // provideLokiClient creates a Loki client from config for container domain
-func provideLokiClient(cfg *config.Config, log logger.Logger) infrastructure5.LokiClient {
+func provideLokiClient(cfg *config.Config, log logger.Logger) infrastructure6.LokiClient {
 	return infrastructure2.NewLokiClient(cfg, log)
 }
 
 // provideProjectLokiClient creates a Loki client from config for project domain
-func provideProjectLokiClient(cfg *config.Config, kubeClient infrastructure4.KubeClient, log logger.Logger) infrastructure4.LokiClient {
+func provideProjectLokiClient(cfg *config.Config, kubeClient infrastructure5.KubeClient, log logger.Logger) infrastructure5.LokiClient {
 	return infrastructure3.NewLokiClient(cfg, kubeClient, log)
 }
 

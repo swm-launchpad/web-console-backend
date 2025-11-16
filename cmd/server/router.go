@@ -10,6 +10,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/settings"
 	containerHTTP "github.com/swm-launchpad/web-console-backend/internal/container/handler"
 	projectHTTP "github.com/swm-launchpad/web-console-backend/internal/project/handler"
+	statusHTTP "github.com/swm-launchpad/web-console-backend/internal/status/handler"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
 )
 
@@ -31,6 +32,7 @@ type Router struct {
 	templateHandler      *containerHTTP.TemplateHandler
 	buildLogHandler      *containerHTTP.BuildLogHandler
 	settingsHandler      *settings.SettingsHandler
+	statusHandler        *statusHTTP.StatusHandler
 	authMiddleware       *middleware.AuthMiddleware
 	loggingMiddleware    *logger.LoggingMiddleware
 }
@@ -52,6 +54,7 @@ func NewRouter(
 	templateHandler *containerHTTP.TemplateHandler,
 	buildLogHandler *containerHTTP.BuildLogHandler,
 	settingsHandler *settings.SettingsHandler,
+	statusHandler *statusHTTP.StatusHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	loggingMiddleware *logger.LoggingMiddleware,
 ) *Router {
@@ -87,6 +90,7 @@ func NewRouter(
 		templateHandler:      templateHandler,
 		buildLogHandler:      buildLogHandler,
 		settingsHandler:      settingsHandler,
+		statusHandler:        statusHandler,
 		authMiddleware:       authMiddleware,
 		loggingMiddleware:    loggingMiddleware,
 	}
@@ -272,6 +276,15 @@ func (r *Router) Setup() {
 		{
 			templates.GET("", r.templateHandler.GetTemplates)
 			templates.GET("/:id", r.templateHandler.GetTemplate)
+		}
+
+		// Status routes (public - no auth required for transparency)
+		status := v1.Group("/status")
+		{
+			status.GET("", r.statusHandler.GetCurrentStatus)
+			status.GET("/:serviceName/history", r.statusHandler.GetStatusHistory)
+			status.GET("/:serviceName/uptime", r.statusHandler.GetUptimeStats)
+			status.GET("/:serviceName/daily", r.statusHandler.GetDailyUptime)
 		}
 	}
 }

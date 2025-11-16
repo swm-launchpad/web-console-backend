@@ -36,6 +36,9 @@ import (
 	projectInfra "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure"
 	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	projectSqlc "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
+	statusApp "github.com/swm-launchpad/web-console-backend/internal/status/application"
+	statusHTTP "github.com/swm-launchpad/web-console-backend/internal/status/handler"
+	statusInfra "github.com/swm-launchpad/web-console-backend/internal/status/infrastructure"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
@@ -456,6 +459,15 @@ func InitializeApp() (*App, error) {
 		containerApp.NewCreateNodePortUseCase,
 		containerApp.NewGetNodePortUseCase,
 
+		// Status infrastructure
+		statusInfra.NewStatusRepository,
+
+		// Status use cases
+		statusApp.NewGetCurrentStatusUseCase,
+		statusApp.NewGetStatusHistoryUseCase,
+		statusApp.NewGetUptimeStatsUseCase,
+		statusApp.NewGetDailyUptimeUseCase,
+
 		// HTTP handlers
 		userHTTP.NewAuthHandler,
 		userHTTP.NewUserHandler,
@@ -470,6 +482,7 @@ func InitializeApp() (*App, error) {
 		containerHTTP.NewContainerHandler,
 		containerHTTP.NewTemplateHandler,
 		provideBuildLogHandler,
+		statusHTTP.NewStatusHandler,
 
 		// Middleware
 		middleware.NewAuthMiddleware,
