@@ -46,10 +46,29 @@ type MountOutput struct {
 	MountPath string `json:"mount_path"`
 }
 
+type TemplateOptionOutput struct {
+	Name        string   `json:"name"`
+	Label       string   `json:"label"`
+	Type        string   `json:"type"`
+	Category    string   `json:"category,omitempty"`
+	Options     []string `json:"options,omitempty"`
+	Default     string   `json:"default,omitempty"`
+	Description string   `json:"description,omitempty"`
+}
+
+type TemplateInfo struct {
+	Name            string                 `json:"name"`
+	Description     string                 `json:"description,omitempty"`
+	Framework       string                 `json:"framework,omitempty"`
+	Version         string                 `json:"version,omitempty"`
+	TemplateOptions []TemplateOptionOutput `json:"template_options,omitempty"`
+}
+
 type GetContainerOutput struct {
 	ContainerID          uint                   `json:"container_id"`
 	ProjectID            uint                   `json:"project_id"`
 	TemplateID           uint                   `json:"template_id,omitempty"`
+	Template             *TemplateInfo          `json:"template,omitempty"`
 	Name                 string                 `json:"name"`
 	Slug                 string                 `json:"slug"`
 	StableWindow         uint32                 `json:"stable_window,omitempty"`
