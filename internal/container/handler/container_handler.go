@@ -2378,24 +2378,29 @@ func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
 		return
 	}
 
-	input := application.CheckFQDNInput{
-		FQDN: fqdn,
+	// project_id is now required for accurate FQDN validation
+	if projectIDStr == "" {
+		h.logger.Warn(ctx, "missing project_id parameter",
+			zap.String("handler", "CheckFQDN"),
+		)
+		response.Error(c, containererrors.ErrMissingField, mapContainerError)
+		return
 	}
 
-	// Parse optional project_id parameter
-	if projectIDStr != "" {
-		projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
-		if err != nil {
-			h.logger.Warn(ctx, "invalid project_id parameter",
-				zap.String("handler", "CheckFQDN"),
-				zap.String("project_id", projectIDStr),
-				zap.Error(err),
-			)
-			response.Error(c, containererrors.ErrInvalidProjectID, mapContainerError)
-			return
-		}
-		projectIDUint32 := uint32(projectID)
-		input.ProjectID = &projectIDUint32
+	projectID, err := strconv.ParseUint(projectIDStr, 10, 32)
+	if err != nil {
+		h.logger.Warn(ctx, "invalid project_id parameter",
+			zap.String("handler", "CheckFQDN"),
+			zap.String("project_id", projectIDStr),
+			zap.Error(err),
+		)
+		response.Error(c, containererrors.ErrInvalidProjectID, mapContainerError)
+		return
+	}
+
+	input := application.CheckFQDNInput{
+		FQDN:      fqdn,
+		ProjectID: uint32(projectID),
 	}
 
 	output, err := h.checkFQDNUC.Execute(ctx, input)
@@ -2404,7 +2409,7 @@ func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
 			zap.Error(err),
 			zap.String("handler", "CheckFQDN"),
 			zap.String("fqdn", fqdn),
-			zap.Uint32p("project_id", input.ProjectID),
+			zap.Uint32("project_id", input.ProjectID),
 		)
 		response.Error(c, err, mapContainerError)
 		return
@@ -2413,7 +2418,7 @@ func (h *ContainerHandler) CheckFQDN(c *gin.Context) {
 	h.logger.Debug(ctx, "check FQDN handler completed",
 		zap.String("handler", "CheckFQDN"),
 		zap.String("fqdn", fqdn),
-		zap.Uint32p("project_id", input.ProjectID),
+		zap.Uint32("project_id", input.ProjectID),
 		zap.Bool("exists", output.Exists),
 	)
 
