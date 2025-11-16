@@ -110,37 +110,9 @@ func InitializeApp() (*App, error) {
 	volumeService := service2.NewVolumeService(volumeRepository, projectRepository, volumeSlugService, logger)
 	getProjectUseCase := application2.NewGetProjectUseCase(projectService, volumeService, logger)
 	getProjectBySlugUseCase := application2.NewGetProjectBySlugUseCase(projectService, volumeService, logger)
-	updateProjectUseCase := application2.NewUpdateProjectUseCase(projectService, txManager, logger)
-	tektonCleanupClient, err := provideTektonCleanupClient(logger)
-	if err != nil {
-		return nil, err
-	}
-	containerRepository := infrastructure2.NewContainerRepository(db, logger)
-	getContainerSlugsByProjectIDUseCase := application3.NewGetContainerSlugsByProjectIDUseCase(containerRepository, logger)
-	containerSlugProvider := infrastructure3.NewContainerSlugProvider(getContainerSlugsByProjectIDUseCase, logger)
-	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, tektonCleanupClient, containerSlugProvider, txManager, logger)
-	queries := provideProjectQueries(db)
-	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, queries, settingsService, logger)
-	checkProjectNameUseCase := application2.NewCheckProjectNameUseCase(projectRepository, logger)
-	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
-	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, checkProjectNameUseCase, permissionService, projectService, settingsService, logger)
-	string2 := provideJWTSecret(configConfig)
-	createProjectLogTokenUseCase := application2.NewCreateProjectLogTokenUseCase(projectRepository, string2, logger)
-	kubeClient, err := provideKubeDeployClient(logger)
-	if err != nil {
-		return nil, err
-	}
-	lokiClient := provideProjectLokiClient(configConfig, kubeClient, logger)
-	streamProjectLogsUseCase := application2.NewStreamProjectLogsUseCase(projectRepository, lokiClient, kubeClient, logger)
-	getProjectLogHistoryUseCase := application2.NewGetProjectLogHistoryUseCase(projectRepository, lokiClient, logger)
-	projectLogHandler := provideProjectLogHandler(createProjectLogTokenUseCase, streamProjectLogsUseCase, getProjectLogHistoryUseCase, projectRepository, permissionService, string2, logger)
-	addVolumeUseCase := application2.NewAddVolumeUseCase(volumeService, txManager, logger)
-	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService, logger)
-	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager, logger)
-	checkVolumeNameUseCase := application2.NewCheckVolumeNameUseCase(volumeRepository, logger)
-	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, checkVolumeNameUseCase, permissionService, volumeService, projectService, logger)
 	deploymentRepository := repository.NewDeploymentRepository(db, logger)
 	buildHistoryRepository := repository.NewBuildHistoryRepository(db, logger)
+	containerRepository := infrastructure2.NewContainerRepository(db, logger)
 	serviceSlugService := service3.NewSlugService(containerRepository, logger)
 	containerService := service3.NewContainerService(containerRepository, serviceSlugService, logger)
 	getContainersForDeploymentUseCase := deployment.NewGetContainersForDeploymentUseCase(containerService)
@@ -149,6 +121,10 @@ func InitializeApp() (*App, error) {
 	getContainersForBuildAndDeployUseCase := combined.NewGetContainersForBuildAndDeployUseCase(containerService, templateRepository, logger)
 	containerClient := provideContainerClient(getContainersForDeploymentUseCase, getContainersForBuildUseCase, getContainersForBuildAndDeployUseCase, logger)
 	tektonClient, err := provideTektonDeployClient(logger)
+	if err != nil {
+		return nil, err
+	}
+	kubeClient, err := provideKubeDeployClient(logger)
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +142,30 @@ func InitializeApp() (*App, error) {
 	containerUpdateAdapter := infrastructure3.NewContainerUpdateAdapter(updateContainerAfterBuildUseCase, logger)
 	postProcessor := build2.NewPostProcessor(containerUpdateAdapter, logger)
 	deployer := provideDeployService(txManager, projectRepository, deploymentRepository, buildHistoryRepository, volumeRepository, containerClient, tektonClient, kubeClient, kubeBuildClient, orchestrator, postProcessor, logger)
+	updateProjectUseCase := application2.NewUpdateProjectUseCase(projectService, deployer, txManager, logger)
+	tektonCleanupClient, err := provideTektonCleanupClient(logger)
+	if err != nil {
+		return nil, err
+	}
+	getContainerSlugsByProjectIDUseCase := application3.NewGetContainerSlugsByProjectIDUseCase(containerRepository, logger)
+	containerSlugProvider := infrastructure3.NewContainerSlugProvider(getContainerSlugsByProjectIDUseCase, logger)
+	deleteProjectUseCase := application2.NewDeleteProjectUseCase(projectService, volumeService, tektonCleanupClient, containerSlugProvider, txManager, logger)
+	queries := provideProjectQueries(db)
+	listProjectsUseCase := application2.NewListProjectsUseCase(projectService, queries, settingsService, logger)
+	checkProjectNameUseCase := application2.NewCheckProjectNameUseCase(projectRepository, logger)
+	permissionService := service2.NewPermissionService(projectRepository, volumeRepository, logger)
+	projectHandler := handler2.NewProjectHandler(createProjectUseCase, getProjectUseCase, getProjectBySlugUseCase, updateProjectUseCase, deleteProjectUseCase, listProjectsUseCase, checkProjectNameUseCase, permissionService, projectService, settingsService, logger)
+	string2 := provideJWTSecret(configConfig)
+	createProjectLogTokenUseCase := application2.NewCreateProjectLogTokenUseCase(projectRepository, string2, logger)
+	lokiClient := provideProjectLokiClient(configConfig, kubeClient, logger)
+	streamProjectLogsUseCase := application2.NewStreamProjectLogsUseCase(projectRepository, lokiClient, kubeClient, logger)
+	getProjectLogHistoryUseCase := application2.NewGetProjectLogHistoryUseCase(projectRepository, lokiClient, logger)
+	projectLogHandler := provideProjectLogHandler(createProjectLogTokenUseCase, streamProjectLogsUseCase, getProjectLogHistoryUseCase, projectRepository, permissionService, string2, logger)
+	addVolumeUseCase := application2.NewAddVolumeUseCase(volumeService, txManager, logger)
+	getVolumesUseCase := application2.NewGetVolumesUseCase(volumeService, logger)
+	removeVolumeUseCase := application2.NewRemoveVolumeUseCase(volumeService, txManager, logger)
+	checkVolumeNameUseCase := application2.NewCheckVolumeNameUseCase(volumeRepository, logger)
+	volumeHandler := handler2.NewVolumeHandler(addVolumeUseCase, getVolumesUseCase, removeVolumeUseCase, checkVolumeNameUseCase, permissionService, volumeService, projectService, logger)
 	deployProjectUseCase := application2.NewDeployProjectUseCase(deployer, logger)
 	deploymentHandler := handler2.NewDeploymentHandler(deployProjectUseCase, permissionService, projectService, logger)
 	getProjectStatusUseCase := application2.NewGetProjectStatusUseCase(projectRepository, deploymentRepository, buildHistoryRepository, containerClient, logger)
@@ -175,7 +175,7 @@ func InitializeApp() (*App, error) {
 	servicePermissionService := service3.NewPermissionService(containerRepository, projectRepository, logger)
 	resourceValidationService := service3.NewResourceValidationService(containerRepository, projectRepository, logger)
 	createContainerUseCase := application3.NewCreateContainerUseCase(containerService, containerRepository, templateRepository, servicePermissionService, resourceValidationService, volumeService, gitHubInstallationRepository, txManager, logger)
-	getContainerUseCase := application3.NewGetContainerUseCase(containerRepository, servicePermissionService, logger)
+	getContainerUseCase := application3.NewGetContainerUseCase(containerRepository, templateRepository, servicePermissionService, logger)
 	buildChangeDetector := service3.NewBuildChangeDetector()
 	updateContainerUseCase := application3.NewUpdateContainerUseCase(containerRepository, servicePermissionService, resourceValidationService, buildChangeDetector, gitHubInstallationRepository, txManager, logger)
 	deleteContainerUseCase := application3.NewDeleteContainerUseCase(containerRepository, servicePermissionService, volumeService, txManager, logger)

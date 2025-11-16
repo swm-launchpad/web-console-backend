@@ -14,9 +14,10 @@ import (
 func TestGetContainerUseCase_Execute_Success(t *testing.T) {
 	// Arrange
 	mockRepo := new(infrastructure.MockContainerRepository)
+	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	testLogger := logger.NewForTest()
-	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc, testLogger)
+	useCase := NewGetContainerUseCase(mockRepo, mockTemplateRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -65,9 +66,10 @@ func TestGetContainerUseCase_Execute_Success(t *testing.T) {
 func TestGetContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 	// Arrange
 	mockRepo := new(infrastructure.MockContainerRepository)
+	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	testLogger := logger.NewForTest()
-	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc, testLogger)
+	useCase := NewGetContainerUseCase(mockRepo, mockTemplateRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)
@@ -99,9 +101,10 @@ func TestGetContainerUseCase_Execute_PermissionDenied(t *testing.T) {
 func TestGetContainerUseCase_Execute_ContainerNotFound(t *testing.T) {
 	// Arrange
 	mockRepo := new(infrastructure.MockContainerRepository)
+	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	testLogger := logger.NewForTest()
-	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc, testLogger)
+	useCase := NewGetContainerUseCase(mockRepo, mockTemplateRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(999)
@@ -129,9 +132,10 @@ func TestGetContainerUseCase_Execute_ContainerNotFound(t *testing.T) {
 func TestGetContainerUseCase_Execute_WithOptionalFields(t *testing.T) {
 	// Arrange
 	mockRepo := new(infrastructure.MockContainerRepository)
+	mockTemplateRepo := new(infrastructure.MockTemplateRepository)
 	mockPermSvc := new(infrastructure.MockPermissionService)
 	testLogger := logger.NewForTest()
-	useCase := NewGetContainerUseCase(mockRepo, mockPermSvc, testLogger)
+	useCase := NewGetContainerUseCase(mockRepo, mockTemplateRepo, mockPermSvc, testLogger)
 
 	ctx := context.Background()
 	containerID := uint(1)

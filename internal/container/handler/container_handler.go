@@ -146,6 +146,15 @@ type CreateContainerRequest struct {
 	TemplateConfig       map[string]interface{} `json:"template_config,omitempty"`
 	Volumes              []VolumeToCreate       `json:"volumes,omitempty"`
 	Networks             []NetworkToCreate      `json:"networks,omitempty"`
+	EnvVars              []EnvVarToCreate       `json:"env_vars,omitempty"`
+	Secrets              []EnvVarToCreate       `json:"secrets,omitempty"`
+	BuildVars            []EnvVarToCreate       `json:"build_vars,omitempty"`
+}
+
+// EnvVarToCreate represents an environment variable to create
+type EnvVarToCreate struct {
+	Key   string `json:"key" binding:"required"`
+	Value string `json:"value" binding:"required"`
 }
 
 // ContainerResponse represents the response for container operations
@@ -247,6 +256,33 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 		})
 	}
 
+	// Convert env vars to application layer format
+	var envVars []application.EnvVarToCreate
+	for _, e := range req.EnvVars {
+		envVars = append(envVars, application.EnvVarToCreate{
+			Key:   e.Key,
+			Value: e.Value,
+		})
+	}
+
+	// Convert secrets to application layer format
+	var secrets []application.EnvVarToCreate
+	for _, s := range req.Secrets {
+		secrets = append(secrets, application.EnvVarToCreate{
+			Key:   s.Key,
+			Value: s.Value,
+		})
+	}
+
+	// Convert build vars to application layer format
+	var buildVars []application.EnvVarToCreate
+	for _, b := range req.BuildVars {
+		buildVars = append(buildVars, application.EnvVarToCreate{
+			Key:   b.Key,
+			Value: b.Value,
+		})
+	}
+
 	input := application.CreateContainerInput{
 		ProjectID:            projectID,
 		UserID:               userID.(uint),
@@ -261,6 +297,9 @@ func (h *ContainerHandler) CreateContainer(c *gin.Context) {
 		TemplateConfig:       req.TemplateConfig,
 		Volumes:              volumes,
 		Networks:             networks,
+		EnvVars:              envVars,
+		Secrets:              secrets,
+		BuildVars:            buildVars,
 	}
 
 	output, err := h.createContainerUC.Execute(c.Request.Context(), input)

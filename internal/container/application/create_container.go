@@ -27,6 +27,11 @@ type NetworkToCreate struct {
 	FQDN         *string
 }
 
+type EnvVarToCreate struct {
+	Key   string
+	Value string
+}
+
 type CreateContainerInput struct {
 	ProjectID            uint
 	UserID               uint
@@ -41,6 +46,9 @@ type CreateContainerInput struct {
 	TemplateConfig       map[string]interface{}
 	Volumes              []VolumeToCreate
 	Networks             []NetworkToCreate // User-specified networks (takes priority over template default_ports)
+	EnvVars              []EnvVarToCreate
+	Secrets              []EnvVarToCreate
+	BuildVars            []EnvVarToCreate
 }
 
 type CreateContainerOutput struct {
@@ -438,6 +446,84 @@ func (uc *CreateContainerUseCase) Execute(ctx context.Context, input CreateConta
 					zap.Int("network_count", len(defaultPorts)),
 				)
 			}
+		}
+
+		// Create environment variables if specified
+		if len(input.EnvVars) > 0 {
+			uc.logger.Info(ctx, "creating environment variables",
+				zap.Int("env_var_count", len(input.EnvVars)),
+			)
+
+			for _, envVar := range input.EnvVars {
+				_, err = container.AddEnvVar(envVar.Key, envVar.Value)
+				if err != nil {
+					uc.logger.Error(ctx, "failed to add environment variable",
+						zap.Error(err),
+						zap.String("key", envVar.Key),
+					)
+					return err
+				}
+			}
+
+			if err := uc.containerRepo.Save(txCtx, container); err != nil {
+				return err
+			}
+
+			uc.logger.Info(ctx, "environment variables created successfully",
+				zap.Int("count", len(input.EnvVars)),
+			)
+		}
+
+		// Create secrets if specified
+		if len(input.Secrets) > 0 {
+			uc.logger.Info(ctx, "creating secrets",
+				zap.Int("secret_count", len(input.Secrets)),
+			)
+
+			for _, secret := range input.Secrets {
+				_, err = container.AddSecret(secret.Key, secret.Value)
+				if err != nil {
+					uc.logger.Error(ctx, "failed to add secret",
+						zap.Error(err),
+						zap.String("key", secret.Key),
+					)
+					return err
+				}
+			}
+
+			if err := uc.containerRepo.Save(txCtx, container); err != nil {
+				return err
+			}
+
+			uc.logger.Info(ctx, "secrets created successfully",
+				zap.Int("count", len(input.Secrets)),
+			)
+		}
+
+		// Create build vars if specified
+		if len(input.BuildVars) > 0 {
+			uc.logger.Info(ctx, "creating build vars",
+				zap.Int("build_var_count", len(input.BuildVars)),
+			)
+
+			for _, buildVar := range input.BuildVars {
+				_, err = container.AddBuildVar(buildVar.Key, buildVar.Value)
+				if err != nil {
+					uc.logger.Error(ctx, "failed to add build var",
+						zap.Error(err),
+						zap.String("key", buildVar.Key),
+					)
+					return err
+				}
+			}
+
+			if err := uc.containerRepo.Save(txCtx, container); err != nil {
+				return err
+			}
+
+			uc.logger.Info(ctx, "build vars created successfully",
+				zap.Int("count", len(input.BuildVars)),
+			)
 		}
 
 		// Extract primitive values within transaction
