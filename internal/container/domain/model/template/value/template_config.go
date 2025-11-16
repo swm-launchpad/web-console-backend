@@ -157,3 +157,11 @@ func (tc *TemplateConfig) GetVersion() string {
 	}
 	return tc.Version
 }
+
+// GetTemplateOptions returns the template options
+func (tc *TemplateConfig) GetTemplateOptions() []TemplateOption {
+	if tc == nil {
+		return []TemplateOption{}
+	}
+	return tc.TemplateOptions
+}
