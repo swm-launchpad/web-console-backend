@@ -13,6 +13,7 @@ import (
 
 	"github.com/swm-launchpad/web-console-backend/internal/common/config"
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
+	statusCron "github.com/swm-launchpad/web-console-backend/internal/status/infrastructure/cron"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/repository"
 	"go.uber.org/zap"
 )
@@ -22,17 +23,19 @@ type App struct {
 	Database       *sql.DB
 	Router         *Router
 	OAuthStateRepo repository.OAuthStateRepository
+	StatusCron     *statusCron.StatusCron
 	Logger         logger.Logger
 	server         *http.Server
 	stopCleanup    chan struct{}
 }
 
-func NewApp(cfg *config.Config, database *sql.DB, r *Router, oauthStateRepo repository.OAuthStateRepository, log logger.Logger) *App {
+func NewApp(cfg *config.Config, database *sql.DB, r *Router, oauthStateRepo repository.OAuthStateRepository, statusCron *statusCron.StatusCron, log logger.Logger) *App {
 	return &App{
 		Config:         cfg,
 		Database:       database,
 		Router:         r,
 		OAuthStateRepo: oauthStateRepo,
+		StatusCron:     statusCron,
 		Logger:         log,
 	}
 }
@@ -54,6 +57,12 @@ func (a *App) Start() error {
 
 	// Start OAuth state cleanup goroutine
 	a.startStateCleanup()
+
+	// Start status monitoring cron jobs
+	if err := a.StatusCron.Start(); err != nil {
+		a.Logger.Error(ctx, "failed to start status monitoring cron jobs", zap.Error(err))
+		return err
+	}
 
 	// Start pprof server in a separate goroutine
 	go func() {
@@ -132,6 +141,11 @@ func (a *App) waitForShutdown() {
 	// Stop cleanup goroutine
 	if a.stopCleanup != nil {
 		close(a.stopCleanup)
+	}
+
+	// Stop status monitoring cron jobs
+	if a.StatusCron != nil {
+		a.StatusCron.Stop()
 	}
 
 	// Graceful shutdown with timeout

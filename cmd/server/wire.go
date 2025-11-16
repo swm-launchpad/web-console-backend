@@ -37,13 +37,19 @@ import (
 	projectRepo "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	projectSqlc "github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 	statusApp "github.com/swm-launchpad/web-console-backend/internal/status/application"
+	statusService "github.com/swm-launchpad/web-console-backend/internal/status/domain/service"
 	statusHTTP "github.com/swm-launchpad/web-console-backend/internal/status/handler"
 	statusInfra "github.com/swm-launchpad/web-console-backend/internal/status/infrastructure"
+	statusCron "github.com/swm-launchpad/web-console-backend/internal/status/infrastructure/cron"
+	statusHealth "github.com/swm-launchpad/web-console-backend/internal/status/infrastructure/health"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	userHTTP "github.com/swm-launchpad/web-console-backend/internal/user/handler"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
 	userssqlc "github.com/swm-launchpad/web-console-backend/internal/user/infrastructure/sqlc"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"time"
 )
 
 // provideDatabase creates a database connection from config
@@ -302,6 +308,115 @@ func provideProjectLogHandler(
 	)
 }
 
+// provideKubernetesClientset creates a Kubernetes clientset
+func provideKubernetesClientset(log logger.Logger) (*kubernetes.Clientset, error) {
+	// Read configuration from environment variables
+	apiServer := os.Getenv("KUBE_API_SERVER")
+	if apiServer == "" {
+		log.Warn(nil, "KUBE_API_SERVER not set, Kubernetes health check will be disabled")
+		return nil, nil // Return nil if not configured
+	}
+
+	token := os.Getenv("KUBE_SERVICE_ACCOUNT_TOKEN")
+	if token == "" {
+		log.Warn(nil, "KUBE_SERVICE_ACCOUNT_TOKEN not set, Kubernetes health check will be disabled")
+		return nil, nil
+	}
+
+	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+	if caCertPath == "" {
+		log.Warn(nil, "KUBE_CA_CERT_PATH not set, Kubernetes health check will be disabled")
+		return nil, nil
+	}
+
+	// Verify CA cert file exists
+	if _, err := os.Stat(caCertPath); err != nil {
+		log.Warn(nil, "CA certificate file not found, Kubernetes health check will be disabled")
+		return nil, nil
+	}
+
+	// Create REST config
+	config := &rest.Config{
+		Host:        apiServer,
+		BearerToken: token,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAFile: caCertPath,
+		},
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Error(nil, "Failed to create Kubernetes clientset")
+		return nil, nil // Return nil instead of error to allow app to start without K8s
+	}
+
+	return clientset, nil
+}
+
+// provideHealthCheckers creates all health checkers
+func provideHealthCheckers(
+	database *sql.DB,
+	kubeClientset *kubernetes.Clientset,
+) []statusService.HealthChecker {
+	// Get configuration from environment
+	webConsoleURL := os.Getenv("WEB_CONSOLE_URL")
+	if webConsoleURL == "" {
+		webConsoleURL = "http://localhost:5173"
+	}
+
+	lokiURL := os.Getenv("LOKI_URL")
+	if lokiURL == "" {
+		lokiURL = "http://loki:3100"
+	}
+
+	registryURL := os.Getenv("REGISTRY_URL")
+	if registryURL == "" {
+		registryURL = "http://registry:5000"
+	}
+
+	tektonNamespace := os.Getenv("TEKTON_NAMESPACE")
+	if tektonNamespace == "" {
+		tektonNamespace = "tekton-pipelines"
+	}
+
+	nfsNamespace := os.Getenv("NFS_NAMESPACE")
+	if nfsNamespace == "" {
+		nfsNamespace = "nfs-provisioner"
+	}
+
+	nfsPVCName := os.Getenv("NFS_PVC_NAME")
+	if nfsPVCName == "" {
+		nfsPVCName = "nfs-pvc"
+	}
+
+	ingressNamespace := os.Getenv("INGRESS_NAMESPACE")
+	if ingressNamespace == "" {
+		ingressNamespace = "ingress-nginx"
+	}
+
+	timeout := 10 * time.Second
+
+	checkers := []statusService.HealthChecker{
+		statusHealth.NewAPIServerChecker(),
+		statusHealth.NewMySQLChecker(database),
+		statusHealth.NewWebConsoleChecker(webConsoleURL, timeout),
+		statusHealth.NewLokiChecker(lokiURL, timeout),
+		statusHealth.NewRegistryChecker(registryURL, timeout),
+	}
+
+	// Add Kubernetes-dependent checkers only if clientset is available
+	if kubeClientset != nil {
+		checkers = append(checkers,
+			statusHealth.NewKubernetesChecker(kubeClientset),
+			statusHealth.NewTektonChecker(kubeClientset, tektonNamespace),
+			statusHealth.NewNFSChecker(kubeClientset, nfsNamespace, nfsPVCName),
+			statusHealth.NewIngressChecker(kubeClientset, ingressNamespace),
+		)
+	}
+
+	return checkers
+}
+
 func InitializeApp() (*App, error) {
 	wire.Build(
 		// Config
@@ -460,13 +575,22 @@ func InitializeApp() (*App, error) {
 		containerApp.NewGetNodePortUseCase,
 
 		// Status infrastructure
+		provideKubernetesClientset,
+		provideHealthCheckers,
 		statusInfra.NewStatusRepository,
+		statusInfra.NewIncidentRepository,
 
 		// Status use cases
 		statusApp.NewGetCurrentStatusUseCase,
 		statusApp.NewGetStatusHistoryUseCase,
 		statusApp.NewGetUptimeStatsUseCase,
 		statusApp.NewGetDailyUptimeUseCase,
+		statusApp.NewPerformHealthChecksUseCase,
+		statusApp.NewCalculateDailyUptimeUseCase,
+		statusApp.NewCleanupOldChecksUseCase,
+
+		// Status cron
+		statusCron.NewStatusCron,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,

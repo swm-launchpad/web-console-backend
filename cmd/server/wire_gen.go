@@ -36,13 +36,19 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository"
 	"github.com/swm-launchpad/web-console-backend/internal/project/infrastructure/repository/sqlc"
 	application4 "github.com/swm-launchpad/web-console-backend/internal/status/application"
+	service4 "github.com/swm-launchpad/web-console-backend/internal/status/domain/service"
 	handler4 "github.com/swm-launchpad/web-console-backend/internal/status/handler"
 	infrastructure4 "github.com/swm-launchpad/web-console-backend/internal/status/infrastructure"
+	"github.com/swm-launchpad/web-console-backend/internal/status/infrastructure/cron"
+	"github.com/swm-launchpad/web-console-backend/internal/status/infrastructure/health"
 	"github.com/swm-launchpad/web-console-backend/internal/user/application"
 	"github.com/swm-launchpad/web-console-backend/internal/user/domain/service"
 	"github.com/swm-launchpad/web-console-backend/internal/user/handler"
 	"github.com/swm-launchpad/web-console-backend/internal/user/infrastructure"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"os"
+	"time"
 )
 
 import (
@@ -224,7 +230,17 @@ func InitializeApp() (*App, error) {
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	loggingMiddleware := provideLoggingMiddleware(logger)
 	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, projectLogHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, buildLogHandler, settingsHandler, statusHandler, authMiddleware, loggingMiddleware)
-	app := NewApp(configConfig, db, router, oAuthStateRepository, logger)
+	clientset, err := provideKubernetesClientset(logger)
+	if err != nil {
+		return nil, err
+	}
+	v := provideHealthCheckers(db, clientset)
+	performHealthChecksUseCase := application4.NewPerformHealthChecksUseCase(statusRepository, v)
+	incidentRepository := infrastructure4.NewIncidentRepository(db)
+	calculateDailyUptimeUseCase := application4.NewCalculateDailyUptimeUseCase(statusRepository, incidentRepository)
+	cleanupOldChecksUseCase := application4.NewCleanupOldChecksUseCase(statusRepository)
+	statusCron := cron.NewStatusCron(performHealthChecksUseCase, calculateDailyUptimeUseCase, cleanupOldChecksUseCase)
+	app := NewApp(configConfig, db, router, oAuthStateRepository, statusCron, logger)
 	return app, nil
 }
 
@@ -483,4 +499,98 @@ func provideProjectLogHandler(
 		jwtSecret,
 		log,
 	)
+}
+
+// provideKubernetesClientset creates a Kubernetes clientset
+func provideKubernetesClientset(log logger.Logger) (*kubernetes.Clientset, error) {
+
+	apiServer := os.Getenv("KUBE_API_SERVER")
+	if apiServer == "" {
+		log.Warn(nil, "KUBE_API_SERVER not set, Kubernetes health check will be disabled")
+		return nil, nil
+	}
+
+	token := os.Getenv("KUBE_SERVICE_ACCOUNT_TOKEN")
+	if token == "" {
+		log.Warn(nil, "KUBE_SERVICE_ACCOUNT_TOKEN not set, Kubernetes health check will be disabled")
+		return nil, nil
+	}
+
+	caCertPath := os.Getenv("KUBE_CA_CERT_PATH")
+	if caCertPath == "" {
+		log.Warn(nil, "KUBE_CA_CERT_PATH not set, Kubernetes health check will be disabled")
+		return nil, nil
+	}
+
+	if _, err := os.Stat(caCertPath); err != nil {
+		log.Warn(nil, "CA certificate file not found, Kubernetes health check will be disabled")
+		return nil, nil
+	}
+	config2 := &rest.Config{
+		Host:        apiServer,
+		BearerToken: token,
+		TLSClientConfig: rest.TLSClientConfig{
+			CAFile: caCertPath,
+		},
+	}
+
+	clientset, err := kubernetes.NewForConfig(config2)
+	if err != nil {
+		log.Error(nil, "Failed to create Kubernetes clientset")
+		return nil, nil
+	}
+
+	return clientset, nil
+}
+
+// provideHealthCheckers creates all health checkers
+func provideHealthCheckers(
+	database *sql.DB,
+	kubeClientset *kubernetes.Clientset,
+) []service4.HealthChecker {
+
+	webConsoleURL := os.Getenv("WEB_CONSOLE_URL")
+	if webConsoleURL == "" {
+		webConsoleURL = "http://localhost:5173"
+	}
+
+	lokiURL := os.Getenv("LOKI_URL")
+	if lokiURL == "" {
+		lokiURL = "http://loki:3100"
+	}
+
+	registryURL := os.Getenv("REGISTRY_URL")
+	if registryURL == "" {
+		registryURL = "http://registry:5000"
+	}
+
+	tektonNamespace := os.Getenv("TEKTON_NAMESPACE")
+	if tektonNamespace == "" {
+		tektonNamespace = "tekton-pipelines"
+	}
+
+	nfsNamespace := os.Getenv("NFS_NAMESPACE")
+	if nfsNamespace == "" {
+		nfsNamespace = "nfs-provisioner"
+	}
+
+	nfsPVCName := os.Getenv("NFS_PVC_NAME")
+	if nfsPVCName == "" {
+		nfsPVCName = "nfs-pvc"
+	}
+
+	ingressNamespace := os.Getenv("INGRESS_NAMESPACE")
+	if ingressNamespace == "" {
+		ingressNamespace = "ingress-nginx"
+	}
+
+	timeout := 10 * time.Second
+
+	checkers := []service4.HealthChecker{health.NewAPIServerChecker(), health.NewMySQLChecker(database), health.NewWebConsoleChecker(webConsoleURL, timeout), health.NewLokiChecker(lokiURL, timeout), health.NewRegistryChecker(registryURL, timeout)}
+
+	if kubeClientset != nil {
+		checkers = append(checkers, health.NewKubernetesChecker(kubeClientset), health.NewTektonChecker(kubeClientset, tektonNamespace), health.NewNFSChecker(kubeClientset, nfsNamespace, nfsPVCName), health.NewIngressChecker(kubeClientset, ingressNamespace))
+	}
+
+	return checkers
 }
