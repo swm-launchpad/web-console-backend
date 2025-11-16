@@ -96,6 +96,9 @@ func (m *mockUpdateContainerRepo) CheckInternalPortExistsInProjectExcludingSelf(
 func (m *mockUpdateContainerRepo) SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error {
 	return nil
 }
+func (m *mockUpdateContainerRepo) SoftDeleteNetworkByID(ctx context.Context, networkID uint) error {
+	return nil
+}
 func (m *mockUpdateContainerRepo) UpdateNetworkTektonEventID(ctx context.Context, networkID uint, tektonEventID string) error {
 	return nil
 }

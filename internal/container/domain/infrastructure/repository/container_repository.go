@@ -100,6 +100,11 @@ type ContainerRepository interface {
 	// Preserves FQDN ownership tracking even after container deletion
 	SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error
 
+	// SoftDeleteNetworkByID soft deletes a single network by network ID
+	// Used when FQDN is changed to preserve old FQDN ownership tracking
+	// Preserves FQDN value in database for ownership tracking
+	SoftDeleteNetworkByID(ctx context.Context, networkID uint) error
+
 	// FindAllSlugsByProjectIDIncludingDeleted retrieves all container slugs for a project
 	// INCLUDING soft-deleted containers. Used for cleanup operations that need to remove
 	// all resources including those from deleted containers.

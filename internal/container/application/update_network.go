@@ -7,6 +7,7 @@ import (
 	"github.com/swm-launchpad/web-console-backend/internal/common/logger"
 	containererrors "github.com/swm-launchpad/web-console-backend/internal/container/domain/errors"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/infrastructure/repository"
+	model "github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/model/container/value"
 	"github.com/swm-launchpad/web-console-backend/internal/container/domain/service"
 	"go.uber.org/zap"
@@ -147,15 +148,97 @@ func (uc *UpdateNetworkUseCase) Execute(ctx context.Context, input UpdateNetwork
 			}
 		}
 
-		// Update network
-		network, err := container.UpdateNetwork(input.NetworkID, input.InternalPort, netType, input.FQDN)
-		if err != nil {
-			uc.logger.Error(ctx, "failed to update network",
-				zap.Error(err),
+		// Find existing network to check if FQDN changed
+		var existingNetwork *model.Network
+		for _, nw := range container.Networks() {
+			if nw.NetworkID() == input.NetworkID {
+				n := nw // Create copy to get pointer
+				existingNetwork = &n
+				break
+			}
+		}
+
+		if existingNetwork == nil {
+			uc.logger.Error(ctx, "network not found in container",
+				zap.Uint("network_id", input.NetworkID),
 				zap.Uint("container_id", input.ContainerID),
+			)
+			return containererrors.ErrNetworkNotFound
+		}
+
+		// Check if FQDN changed
+		fqdnChanged := false
+		oldFQDN := existingNetwork.FQDN()
+		newFQDN := input.FQDN
+
+		// Detect FQDN change
+		if (oldFQDN == nil && newFQDN != nil) || (oldFQDN != nil && newFQDN == nil) {
+			fqdnChanged = true
+		} else if oldFQDN != nil && newFQDN != nil && *oldFQDN != *newFQDN {
+			fqdnChanged = true
+		}
+
+		var network *model.Network
+		if fqdnChanged {
+			// FQDN changed: Use soft delete + create pattern
+			uc.logger.Info(ctx, "FQDN changed, using soft delete + create pattern",
+				zap.Uint("network_id", input.NetworkID),
+				zap.Any("old_fqdn", oldFQDN),
+				zap.Any("new_fqdn", newFQDN),
+			)
+
+			// Soft delete old network (preserves FQDN for ownership tracking)
+			if err := uc.containerRepo.SoftDeleteNetworkByID(txCtx, input.NetworkID); err != nil {
+				uc.logger.Error(ctx, "failed to soft delete network",
+					zap.Error(err),
+					zap.Uint("network_id", input.NetworkID),
+				)
+				return err
+			}
+
+			// Remove old network from container aggregate
+			if err := container.DeleteNetwork(input.NetworkID); err != nil {
+				uc.logger.Error(ctx, "failed to delete network from container aggregate",
+					zap.Error(err),
+					zap.Uint("network_id", input.NetworkID),
+				)
+				return err
+			}
+
+			// Create new network with updated values
+			// Use existing values if not provided in input
+			newInternalPort := input.InternalPort
+			if newInternalPort == nil {
+				newInternalPort = existingNetwork.InternalPort()
+			}
+			newNetType := netType
+			if newNetType == "" {
+				newNetType = existingNetwork.NetworkType()
+			}
+
+			network, err = container.AddNetwork(newInternalPort, nil, newNetType, nil, input.FQDN)
+			if err != nil {
+				uc.logger.Error(ctx, "failed to add new network",
+					zap.Error(err),
+					zap.Uint("container_id", input.ContainerID),
+				)
+				return err
+			}
+		} else {
+			// FQDN not changed: Use regular update
+			uc.logger.Info(ctx, "FQDN not changed, using regular update",
 				zap.Uint("network_id", input.NetworkID),
 			)
-			return err
+
+			network, err = container.UpdateNetwork(input.NetworkID, input.InternalPort, netType, input.FQDN)
+			if err != nil {
+				uc.logger.Error(ctx, "failed to update network",
+					zap.Error(err),
+					zap.Uint("container_id", input.ContainerID),
+					zap.Uint("network_id", input.NetworkID),
+				)
+				return err
+			}
 		}
 
 		// Save container

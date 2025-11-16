@@ -1392,6 +1392,28 @@ func (r *containerRepository) SoftDeleteNetworksByContainerID(ctx context.Contex
 	return nil
 }
 
+// SoftDeleteNetworkByID soft deletes a single network by network ID
+func (r *containerRepository) SoftDeleteNetworkByID(ctx context.Context, networkID uint) error {
+	r.logger.Debug(ctx, "soft deleting network by ID",
+		zap.Uint("network_id", networkID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	_, err := qtx.SoftDeleteNetworkByID(ctx, sqlc.SoftDeleteNetworkByIDParams{
+		DeletedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		NetworkID: uint32(networkID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to soft delete network by ID",
+			zap.Uint("network_id", networkID),
+			zap.Error(err),
+		)
+		return containererrors.ErrDatabaseOperation
+	}
+
+	return nil
+}
+
 // FindAllSlugsByProjectIDIncludingDeleted retrieves all container slugs for a project including soft-deleted containers
 func (r *containerRepository) FindAllSlugsByProjectIDIncludingDeleted(ctx context.Context, projectID uint) ([]string, error) {
 	r.logger.Debug(ctx, "finding all container slugs by project ID including deleted",

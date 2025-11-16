@@ -130,6 +130,11 @@ func (m *MockContainerRepository) SoftDeleteNetworksByContainerID(ctx context.Co
 	return args.Error(0)
 }
 
+func (m *MockContainerRepository) SoftDeleteNetworkByID(ctx context.Context, networkID uint) error {
+	args := m.Called(ctx, networkID)
+	return args.Error(0)
+}
+
 func (m *MockContainerRepository) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
 	args := m.Called(ctx, fqdn, projectID)
 	return args.Bool(0), args.Error(1)

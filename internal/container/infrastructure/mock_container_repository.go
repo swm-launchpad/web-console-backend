@@ -151,6 +151,12 @@ func (m *MockContainerRepository) SoftDeleteNetworksByContainerID(ctx context.Co
 	return args.Error(0)
 }
 
+// SoftDeleteNetworkByID mocks the SoftDeleteNetworkByID method
+func (m *MockContainerRepository) SoftDeleteNetworkByID(ctx context.Context, networkID uint) error {
+	args := m.Called(ctx, networkID)
+	return args.Error(0)
+}
+
 // BeginTx mocks the BeginTx method
 func (m *MockContainerRepository) BeginTx(ctx context.Context) (context.Context, interface{}, error) {
 	args := m.Called(ctx)

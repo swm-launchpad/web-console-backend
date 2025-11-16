@@ -29,7 +29,7 @@ func TestUpdateNetworkUseCase_Execute_Success(t *testing.T) {
 	projectID := uint(10)
 	networkID := uint(200)
 	newPort := uint16(9090)
-	newFQDN := "newapp.launchpad.kr"
+	sameFQDN := "oldapp.launchpad.kr" // Keep FQDN unchanged to test regular update path
 
 	input := UpdateNetworkInput{
 		ContainerID:  containerID,
@@ -37,7 +37,7 @@ func TestUpdateNetworkUseCase_Execute_Success(t *testing.T) {
 		NetworkID:    networkID,
 		InternalPort: &newPort,
 		NetworkType:  string(value.NetworkTypeHTTP),
-		FQDN:         &newFQDN,
+		FQDN:         &sameFQDN,
 	}
 
 	mockContainer := createMockContainer(containerID, projectID)
@@ -50,7 +50,7 @@ func TestUpdateNetworkUseCase_Execute_Success(t *testing.T) {
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
 	mockRepo.On("CheckInternalPortExistsInProjectExcludingSelf", ctx, projectID, newPort, networkID).Return(false, nil)
-	mockRepo.On("CheckFQDNExistsForProjectExcludingSelf", ctx, newFQDN, networkID, projectID).Return(false, nil)
+	mockRepo.On("CheckFQDNExistsForProjectExcludingSelf", ctx, sameFQDN, networkID, projectID).Return(false, nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
@@ -66,7 +66,7 @@ func TestUpdateNetworkUseCase_Execute_Success(t *testing.T) {
 	assert.Equal(t, networkID, output.NetworkID)
 	assert.Equal(t, newPort, *output.InternalPort)
 	assert.Equal(t, string(value.NetworkTypeHTTP), output.NetworkType)
-	assert.Equal(t, newFQDN, *output.FQDN)
+	assert.Equal(t, sameFQDN, *output.FQDN)
 
 	mockTxMgr.AssertExpectations(t)
 	mockPermSvc.AssertExpectations(t)
@@ -86,15 +86,16 @@ func TestUpdateNetworkUseCase_Execute_PartialUpdate(t *testing.T) {
 	userID := uint(100)
 	projectID := uint(10)
 	networkID := uint(200)
-	newFQDN := "newapp.launchpad.kr"
+	newPort := uint16(9090)
+	sameFQDN := "oldapp.launchpad.kr" // Keep FQDN unchanged
 
 	input := UpdateNetworkInput{
 		ContainerID:  containerID,
 		UserID:       userID,
 		NetworkID:    networkID,
-		InternalPort: nil, // Not updating
-		NetworkType:  "",  // Not updating
-		FQDN:         &newFQDN,
+		InternalPort: &newPort, // Updating port
+		NetworkType:  "",       // Not updating
+		FQDN:         &sameFQDN,
 	}
 
 	mockContainer := createMockContainer(containerID, projectID)
@@ -106,7 +107,8 @@ func TestUpdateNetworkUseCase_Execute_PartialUpdate(t *testing.T) {
 
 	mockPermSvc.On("CanUserModifyContainer", ctx, userID, containerID).Return(nil)
 	mockRepo.On("FindByIDForUpdate", ctx, containerID).Return(mockContainer, nil)
-	mockRepo.On("CheckFQDNExistsForProjectExcludingSelf", ctx, newFQDN, networkID, projectID).Return(false, nil)
+	mockRepo.On("CheckInternalPortExistsInProjectExcludingSelf", ctx, projectID, newPort, networkID).Return(false, nil)
+	mockRepo.On("CheckFQDNExistsForProjectExcludingSelf", ctx, sameFQDN, networkID, projectID).Return(false, nil)
 	mockRepo.On("Save", ctx, mockContainer).Return(nil)
 
 	mockTxMgr.On("RunInTx", ctx, mock.AnythingOfType("func(context.Context) error")).
@@ -118,8 +120,8 @@ func TestUpdateNetworkUseCase_Execute_PartialUpdate(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotNil(t, output)
-	assert.Equal(t, initialPort, *output.InternalPort) // Unchanged
-	assert.Equal(t, newFQDN, *output.FQDN)             // Updated
+	assert.Equal(t, newPort, *output.InternalPort) // Updated
+	assert.Equal(t, sameFQDN, *output.FQDN)        // Unchanged
 
 	mockTxMgr.AssertExpectations(t)
 	mockPermSvc.AssertExpectations(t)
