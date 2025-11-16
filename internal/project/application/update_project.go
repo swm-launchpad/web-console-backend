@@ -8,6 +8,7 @@ import (
 	model "github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/model/project/value"
 	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service"
+	"github.com/swm-launchpad/web-console-backend/internal/project/domain/service/deploy"
 	"go.uber.org/zap"
 )
 
@@ -38,13 +39,15 @@ type UpdateProjectOutput struct {
 
 type UpdateProjectUseCase struct {
 	projectService service.ProjectService
+	deployService  deploy.Deployer
 	txManager      db.TxManager
 	logger         logger.Logger
 }
 
-func NewUpdateProjectUseCase(projectService service.ProjectService, txManager db.TxManager, log logger.Logger) *UpdateProjectUseCase {
+func NewUpdateProjectUseCase(projectService service.ProjectService, deployService deploy.Deployer, txManager db.TxManager, log logger.Logger) *UpdateProjectUseCase {
 	return &UpdateProjectUseCase{
 		projectService: projectService,
+		deployService:  deployService,
 		txManager:      txManager,
 		logger:         log,
 	}
@@ -54,6 +57,30 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 	uc.logger.Info(ctx, "update project started",
 		zap.Uint("project_id", input.ProjectID),
 	)
+
+	// Check if plan is changing (for triggering redeployment)
+	// This check is done before the transaction to avoid blocking the transaction
+	// If this fails, we log the error but don't fail the update operation
+	var planChanged bool
+	if input.Plan != nil {
+		// Get current project to check plan change
+		currentProject, err := uc.projectService.GetProject(ctx, input.ProjectID)
+		if err != nil {
+			uc.logger.Error(ctx, "failed to get current project for plan change detection",
+				zap.Error(err),
+				zap.Uint("project_id", input.ProjectID),
+			)
+			// Don't fail the update operation, just skip redeployment trigger
+			// planChanged remains false
+		} else {
+			if currentPlan, ok := currentProject.Plan(); ok {
+				planChanged = currentPlan.String() != input.Plan.String()
+			} else {
+				// No current plan, so setting a plan is considered a change
+				planChanged = true
+			}
+		}
+	}
 
 	var projectID uint
 	var name string
@@ -164,6 +191,30 @@ func (uc *UpdateProjectUseCase) Execute(ctx context.Context, input UpdateProject
 		zap.Uint("project_id", projectID),
 		zap.String("name", name),
 	)
+
+	// Trigger redeployment if plan changed and deployService is available
+	if planChanged && uc.deployService != nil {
+		uc.logger.Info(ctx, "plan changed, triggering redeployment",
+			zap.Uint("project_id", projectID),
+		)
+
+		// Trigger build and deploy in background (fire and forget)
+		// This is async and should not block the response
+		go func() {
+			// Use background context to prevent cancellation
+			bgCtx := context.Background()
+			if err := uc.deployService.BuildAndDeployProject(bgCtx, projectID); err != nil {
+				uc.logger.Error(bgCtx, "failed to trigger redeployment after plan change",
+					zap.Error(err),
+					zap.Uint("project_id", projectID),
+				)
+			} else {
+				uc.logger.Info(bgCtx, "redeployment triggered successfully after plan change",
+					zap.Uint("project_id", projectID),
+				)
+			}
+		}()
+	}
 
 	// Build output after successful transaction
 	output := &UpdateProjectOutput{
