@@ -84,12 +84,6 @@ func (m *mockUpdateContainerRepo) FindAllSlugsByProjectIDIncludingDeleted(ctx co
 func (m *mockUpdateContainerRepo) CheckFQDNExists(ctx context.Context, fqdn string) (bool, error) {
 	return false, nil
 }
-func (m *mockUpdateContainerRepo) CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
-	return false, nil
-}
-func (m *mockUpdateContainerRepo) CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
-	return false, nil
-}
 func (m *mockUpdateContainerRepo) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
 	return false, nil
 }
@@ -100,6 +94,9 @@ func (m *mockUpdateContainerRepo) CheckInternalPortExistsInProjectExcludingSelf(
 	return false, nil
 }
 func (m *mockUpdateContainerRepo) SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error {
+	return nil
+}
+func (m *mockUpdateContainerRepo) SoftDeleteNetworkByID(ctx context.Context, networkID uint) error {
 	return nil
 }
 func (m *mockUpdateContainerRepo) UpdateNetworkTektonEventID(ctx context.Context, networkID uint, tektonEventID string) error {

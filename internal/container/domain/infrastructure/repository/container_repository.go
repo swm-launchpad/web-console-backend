@@ -76,18 +76,6 @@ type ContainerRepository interface {
 	// Used for simple FQDN availability check across all projects
 	CheckFQDNExists(ctx context.Context, fqdn string) (bool, error)
 
-	// CheckFQDNExistsInOtherProject checks if FQDN is used by another project
-	// Returns true if the FQDN exists in any project OTHER than the specified one
-	// Only checks non-deleted networks and containers
-	// Used for AddNetwork to enforce project-scoped FQDN ownership
-	CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error)
-
-	// CheckFQDNExistsInOtherProjectExcludingSelf checks FQDN with self-exclusion
-	// Returns true if the FQDN exists in any project OTHER than the specified one,
-	// excluding the network with the given network_id
-	// Used for UpdateNetwork to allow updating a network's FQDN or reusing within same project
-	CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error)
-
 	// CheckFQDNExistsForProject checks FQDN with proper business rules
 	// Returns true if FQDN exists in:
 	// 1. Same project (any active network, regardless of container state) - prevents duplicates
@@ -111,6 +99,11 @@ type ContainerRepository interface {
 	// Used when a container is deleted to cascade soft delete to networks
 	// Preserves FQDN ownership tracking even after container deletion
 	SoftDeleteNetworksByContainerID(ctx context.Context, containerID uint) error
+
+	// SoftDeleteNetworkByID soft deletes a single network by network ID
+	// Used when FQDN is changed to preserve old FQDN ownership tracking
+	// Preserves FQDN value in database for ownership tracking
+	SoftDeleteNetworkByID(ctx context.Context, networkID uint) error
 
 	// FindAllSlugsByProjectIDIncludingDeleted retrieves all container slugs for a project
 	// INCLUDING soft-deleted containers. Used for cleanup operations that need to remove

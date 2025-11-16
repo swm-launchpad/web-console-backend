@@ -14,23 +14,18 @@ type Querier interface {
 	// Simple availability check across all projects
 	CheckFQDNExists(ctx context.Context, fqdn sql.NullString) (bool, error)
 	// Check FQDN with proper business rules for AddNetwork/CreateContainer
-	// Returns true if FQDN exists in:
-	// 1. Same project (any active network, regardless of container state)
-	// 2. Other projects (only if container is active - maintains ownership)
-	// Allows reuse when:
-	// - Same project soft-deleted network (deployment time same, no conflict)
-	// - Other project soft-deleted container (ownership released)
+	// Business Rules:
+	// 1. Same project: Cannot reuse active network FQDN (deployment cycle same)
+	//    - Soft-deleted networks in same project CAN be reused immediately
+	// 2. Different project: Cannot reuse ANY network FQDN (infrastructure still using it)
+	//    - Even soft-deleted networks blocked until project CASCADE DELETE
+	// Returns true (duplicate) if FQDN exists in:
+	// - Same project with active network (n.is_deleted = 0)
+	// - Different project (regardless of network/container state)
 	CheckFQDNExistsForProject(ctx context.Context, arg CheckFQDNExistsForProjectParams) (bool, error)
 	// Same as CheckFQDNExistsForProject but excludes self (for UpdateNetwork)
+	// Allows updating a network's FQDN to the same value
 	CheckFQDNExistsForProjectExcludingSelf(ctx context.Context, arg CheckFQDNExistsForProjectExcludingSelfParams) (bool, error)
-	// Check if FQDN is used by another project (for AddNetwork)
-	// FQDN ownership is project-scoped: once a project uses a FQDN, it's reserved for that project
-	// Checks both active and deleted networks to preserve FQDN ownership
-	CheckFQDNExistsInOtherProject(ctx context.Context, arg CheckFQDNExistsInOtherProjectParams) (bool, error)
-	// Check if FQDN is used by another project, excluding self (for UpdateNetwork)
-	// Allows updating a network's FQDN to the same value or reusing FQDN within same project
-	// Checks both active and deleted networks to preserve FQDN ownership
-	CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, arg CheckFQDNExistsInOtherProjectExcludingSelfParams) (bool, error)
 	CheckInternalPortExistsInProject(ctx context.Context, arg CheckInternalPortExistsInProjectParams) (bool, error)
 	// Check if internal port exists in project, excluding self (for UpdateNetwork)
 	// Internal ports must be unique within a project (containers share pod network interface)
@@ -94,10 +89,10 @@ type Querier interface {
 	ListContainers(ctx context.Context, arg ListContainersParams) ([]Container, error)
 	ListContainersByProjectID(ctx context.Context, projectID uint32) ([]Container, error)
 	// Soft delete a specific network by ID
-	// Clear FQDN to allow reuse while preserving ownership tracking
+	// FQDN is preserved to track ownership (different projects cannot reuse until project deletion)
 	SoftDeleteNetworkByID(ctx context.Context, arg SoftDeleteNetworkByIDParams) (sql.Result, error)
 	// Soft delete all networks when a container is deleted
-	// Clear FQDN to allow reuse while preserving ownership tracking
+	// FQDN is preserved to track ownership (different projects cannot reuse until project deletion)
 	SoftDeleteNetworksByContainerID(ctx context.Context, arg SoftDeleteNetworksByContainerIDParams) (sql.Result, error)
 	UpdateBuildVar(ctx context.Context, arg UpdateBuildVarParams) (sql.Result, error)
 	UpdateContainer(ctx context.Context, arg UpdateContainerParams) (sql.Result, error)

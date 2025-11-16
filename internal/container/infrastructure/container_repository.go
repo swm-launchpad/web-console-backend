@@ -1290,57 +1290,6 @@ func (r *containerRepository) CheckFQDNExists(ctx context.Context, fqdn string) 
 	return result, nil
 }
 
-// CheckFQDNExistsInOtherProject checks if FQDN is used by another project
-func (r *containerRepository) CheckFQDNExistsInOtherProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
-	r.logger.Debug(ctx, "checking FQDN existence in other project",
-		zap.String("fqdn", fqdn),
-		zap.Uint("exclude_project_id", projectID),
-	)
-
-	qtx := r.queriesWithContext(ctx)
-	result, err := qtx.CheckFQDNExistsInOtherProject(ctx, sqlc.CheckFQDNExistsInOtherProjectParams{
-		Fqdn:      sql.NullString{String: fqdn, Valid: true},
-		ProjectID: uint32(projectID),
-	})
-	if err != nil {
-		r.logger.Error(ctx, "failed to check FQDN existence in other project",
-			zap.String("fqdn", fqdn),
-			zap.Uint("exclude_project_id", projectID),
-			zap.Error(err),
-		)
-		return false, containererrors.ErrDatabaseOperation
-	}
-
-	return result, nil
-}
-
-// CheckFQDNExistsInOtherProjectExcludingSelf checks if FQDN is used by another project, excluding self
-func (r *containerRepository) CheckFQDNExistsInOtherProjectExcludingSelf(ctx context.Context, fqdn string, networkID uint, projectID uint) (bool, error) {
-	r.logger.Debug(ctx, "checking FQDN existence in other project excluding self",
-		zap.String("fqdn", fqdn),
-		zap.Uint("network_id", networkID),
-		zap.Uint("exclude_project_id", projectID),
-	)
-
-	qtx := r.queriesWithContext(ctx)
-	result, err := qtx.CheckFQDNExistsInOtherProjectExcludingSelf(ctx, sqlc.CheckFQDNExistsInOtherProjectExcludingSelfParams{
-		Fqdn:      sql.NullString{String: fqdn, Valid: true},
-		NetworkID: uint32(networkID),
-		ProjectID: uint32(projectID),
-	})
-	if err != nil {
-		r.logger.Error(ctx, "failed to check FQDN existence in other project excluding self",
-			zap.String("fqdn", fqdn),
-			zap.Uint("network_id", networkID),
-			zap.Uint("exclude_project_id", projectID),
-			zap.Error(err),
-		)
-		return false, containererrors.ErrDatabaseOperation
-	}
-
-	return result, nil
-}
-
 // CheckFQDNExistsForProject checks FQDN with proper business rules
 func (r *containerRepository) CheckFQDNExistsForProject(ctx context.Context, fqdn string, projectID uint) (bool, error) {
 	r.logger.Debug(ctx, "checking FQDN existence for project with business rules",
@@ -1435,6 +1384,28 @@ func (r *containerRepository) SoftDeleteNetworksByContainerID(ctx context.Contex
 	if err != nil {
 		r.logger.Error(ctx, "failed to soft delete networks by container ID",
 			zap.Uint("container_id", containerID),
+			zap.Error(err),
+		)
+		return containererrors.ErrDatabaseOperation
+	}
+
+	return nil
+}
+
+// SoftDeleteNetworkByID soft deletes a single network by network ID
+func (r *containerRepository) SoftDeleteNetworkByID(ctx context.Context, networkID uint) error {
+	r.logger.Debug(ctx, "soft deleting network by ID",
+		zap.Uint("network_id", networkID),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	_, err := qtx.SoftDeleteNetworkByID(ctx, sqlc.SoftDeleteNetworkByIDParams{
+		DeletedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		NetworkID: uint32(networkID),
+	})
+	if err != nil {
+		r.logger.Error(ctx, "failed to soft delete network by ID",
+			zap.Uint("network_id", networkID),
 			zap.Error(err),
 		)
 		return containererrors.ErrDatabaseOperation

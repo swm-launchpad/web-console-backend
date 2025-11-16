@@ -3,6 +3,7 @@ package helper
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -92,6 +93,8 @@ func (tdb *TestDB) Migrate() error {
 	// Apply consolidated schema migration
 	migrations := []string{
 		"000001_initial_schema.up.sql",
+		"000002_update_pricing_and_resources.up.sql",
+		"000003_remove_fqdn_unique_constraint.up.sql",
 	}
 
 	for _, migration := range migrations {
@@ -178,4 +181,16 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+// GenerateValidProjectSlug generates a valid project slug for testing
+// Format: p{timestamp}{random} (23 chars total)
+func GenerateValidProjectSlug() string {
+	timestamp := time.Now().Format("20060102150405")
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	random := make([]byte, 8)
+	for i := range random {
+		random[i] = charset[rand.Intn(len(charset))]
+	}
+	return fmt.Sprintf("p%s%s", timestamp, string(random))
 }

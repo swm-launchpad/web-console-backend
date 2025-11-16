@@ -62,61 +62,37 @@ WHERE n.fqdn = ?
   AND c.is_deleted = 0
 FOR UPDATE;
 
--- name: CheckFQDNExistsInOtherProject :one
--- Check if FQDN is used by another project (for AddNetwork)
--- FQDN ownership is project-scoped: once a project uses a FQDN, it's reserved for that project
--- Checks both active and deleted networks to preserve FQDN ownership
-SELECT COUNT(*) > 0 as fqdn_exists
-FROM NETWORKS n
-INNER JOIN CONTAINERS c ON n.container_id = c.container_id
-WHERE n.fqdn = ?
-  AND c.project_id != ?
-  AND c.is_deleted = 0
-FOR UPDATE;
-
--- name: CheckFQDNExistsInOtherProjectExcludingSelf :one
--- Check if FQDN is used by another project, excluding self (for UpdateNetwork)
--- Allows updating a network's FQDN to the same value or reusing FQDN within same project
--- Checks both active and deleted networks to preserve FQDN ownership
-SELECT COUNT(*) > 0 as fqdn_exists
-FROM NETWORKS n
-INNER JOIN CONTAINERS c ON n.container_id = c.container_id
-WHERE n.fqdn = ?
-  AND n.network_id != ?
-  AND c.project_id != ?
-  AND c.is_deleted = 0
-FOR UPDATE;
-
 -- name: CheckFQDNExistsForProject :one
 -- Check FQDN with proper business rules for AddNetwork/CreateContainer
--- Returns true if FQDN exists in:
--- 1. Same project (any active network, regardless of container state)
--- 2. Other projects (only if container is active - maintains ownership)
--- Allows reuse when:
--- - Same project soft-deleted network (deployment time same, no conflict)
--- - Other project soft-deleted container (ownership released)
+-- Business Rules:
+-- 1. Same project: Cannot reuse active network FQDN (deployment cycle same)
+--    - Soft-deleted networks in same project CAN be reused immediately
+-- 2. Different project: Cannot reuse ANY network FQDN (infrastructure still using it)
+--    - Even soft-deleted networks blocked until project CASCADE DELETE
+-- Returns true (duplicate) if FQDN exists in:
+-- - Same project with active network (n.is_deleted = 0)
+-- - Different project (regardless of network/container state)
 SELECT COUNT(*) > 0 as fqdn_exists
 FROM NETWORKS n
 INNER JOIN CONTAINERS c ON n.container_id = c.container_id
 WHERE n.fqdn = ?
-  AND n.is_deleted = 0
   AND (
-    c.project_id = ?
-    OR (c.project_id != ? AND c.is_deleted = 0)
+    (c.project_id = ? AND n.is_deleted = 0)
+    OR (c.project_id != ?)
   )
 FOR UPDATE;
 
 -- name: CheckFQDNExistsForProjectExcludingSelf :one
 -- Same as CheckFQDNExistsForProject but excludes self (for UpdateNetwork)
+-- Allows updating a network's FQDN to the same value
 SELECT COUNT(*) > 0 as fqdn_exists
 FROM NETWORKS n
 INNER JOIN CONTAINERS c ON n.container_id = c.container_id
 WHERE n.fqdn = ?
   AND n.network_id != ?
-  AND n.is_deleted = 0
   AND (
-    c.project_id = ?
-    OR (c.project_id != ? AND c.is_deleted = 0)
+    (c.project_id = ? AND n.is_deleted = 0)
+    OR (c.project_id != ?)
   )
 FOR UPDATE;
 
@@ -135,21 +111,19 @@ FOR UPDATE;
 
 -- name: SoftDeleteNetworksByContainerID :execresult
 -- Soft delete all networks when a container is deleted
--- Clear FQDN to allow reuse while preserving ownership tracking
+-- FQDN is preserved to track ownership (different projects cannot reuse until project deletion)
 UPDATE NETWORKS SET
     is_deleted = TRUE,
-    deleted_at = ?,
-    fqdn = NULL
+    deleted_at = ?
 WHERE container_id = ?
   AND is_deleted = 0;
 
 -- name: SoftDeleteNetworkByID :execresult
 -- Soft delete a specific network by ID
--- Clear FQDN to allow reuse while preserving ownership tracking
+-- FQDN is preserved to track ownership (different projects cannot reuse until project deletion)
 UPDATE NETWORKS SET
     is_deleted = TRUE,
-    deleted_at = ?,
-    fqdn = NULL
+    deleted_at = ?
 WHERE network_id = ?
   AND is_deleted = 0;
 
