@@ -8,14 +8,14 @@ import (
 
 // StatusCheck represents a single health check result for a service
 type StatusCheck struct {
-	CheckID        uint64
-	ServiceName    value.ServiceName
+	CheckID         uint64
+	ServiceName     value.ServiceName
 	ServiceCategory value.ServiceCategory
-	Status         value.ServiceStatus
-	ResponseTimeMs *uint32 // nullable
-	ErrorMessage   *string // nullable
-	CheckedAt      time.Time
-	Metadata       map[string]interface{} // JSON metadata
+	Status          value.ServiceStatus
+	ResponseTimeMs  *uint32 // nullable
+	ErrorMessage    *string // nullable
+	CheckedAt       time.Time
+	Metadata        map[string]interface{} // JSON metadata
 }
 
 // NewStatusCheck creates a new StatusCheck

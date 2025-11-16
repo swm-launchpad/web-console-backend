@@ -8,18 +8,18 @@ import (
 
 // Incident represents a service outage or degradation event
 type Incident struct {
-	IncidentID        uint64
-	ServiceName       value.ServiceName
-	Severity          value.IncidentSeverity
-	Title             string
-	Description       *string // nullable
-	Status            value.IncidentStatus
-	StartedAt         time.Time
-	ResolvedAt        *time.Time // nullable
-	DurationMinutes   *uint32    // nullable, calculated on resolution
-	AffectedServices  []value.ServiceName
-	CreatedAt         time.Time
-	UpdatedAt         *time.Time // nullable
+	IncidentID       uint64
+	ServiceName      value.ServiceName
+	Severity         value.IncidentSeverity
+	Title            string
+	Description      *string // nullable
+	Status           value.IncidentStatus
+	StartedAt        time.Time
+	ResolvedAt       *time.Time // nullable
+	DurationMinutes  *uint32    // nullable, calculated on resolution
+	AffectedServices []value.ServiceName
+	CreatedAt        time.Time
+	UpdatedAt        *time.Time // nullable
 }
 
 // NewIncident creates a new Incident

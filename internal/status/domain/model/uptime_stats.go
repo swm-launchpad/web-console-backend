@@ -22,12 +22,12 @@ type UptimeStats struct {
 // NewUptimeStats creates a new UptimeStats
 func NewUptimeStats(serviceName value.ServiceName) *UptimeStats {
 	return &UptimeStats{
-		ServiceName:       serviceName,
-		UptimePercentage:  0.0,
-		TotalChecks:       0,
-		SuccessfulChecks:  0,
-		DowntimeMinutes:   0,
-		IncidentCount:     0,
+		ServiceName:      serviceName,
+		UptimePercentage: 0.0,
+		TotalChecks:      0,
+		SuccessfulChecks: 0,
+		DowntimeMinutes:  0,
+		IncidentCount:    0,
 	}
 }
 
@@ -42,9 +42,9 @@ func (u *UptimeStats) CalculateUptimePercentage() {
 
 // DailyUptimeData represents daily uptime data for history
 type DailyUptimeData struct {
-	Date             time.Time
-	UptimePercentage float64
+	Date              time.Time
+	UptimePercentage  float64
 	AvgResponseTimeMs *uint32
 	P95ResponseTimeMs *uint32
-	IncidentCount    uint16
+	IncidentCount     uint16
 }
