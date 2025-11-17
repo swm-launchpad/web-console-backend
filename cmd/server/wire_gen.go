@@ -226,7 +226,8 @@ func InitializeApp() (*App, error) {
 	getStatusHistoryUseCase := application4.NewGetStatusHistoryUseCase(statusRepository)
 	getUptimeStatsUseCase := application4.NewGetUptimeStatsUseCase(statusRepository)
 	getDailyUptimeUseCase := application4.NewGetDailyUptimeUseCase(statusRepository)
-	statusHandler := handler4.NewStatusHandler(getCurrentStatusUseCase, getStatusHistoryUseCase, getUptimeStatsUseCase, getDailyUptimeUseCase)
+	getAllServiceHistoryUseCase := application4.NewGetAllServiceHistoryUseCase(statusRepository)
+	statusHandler := handler4.NewStatusHandler(getCurrentStatusUseCase, getStatusHistoryUseCase, getUptimeStatsUseCase, getDailyUptimeUseCase, getAllServiceHistoryUseCase)
 	authMiddleware := middleware.NewAuthMiddleware(jwtUtil)
 	loggingMiddleware := provideLoggingMiddleware(logger)
 	router := NewRouter(configConfig, db, authHandler, userHandler, verificationHandler, passwordResetHandler, gitHubHandler, projectHandler, projectLogHandler, volumeHandler, deploymentHandler, projectStatusHandler, containerHandler, templateHandler, buildLogHandler, settingsHandler, statusHandler, authMiddleware, loggingMiddleware)
@@ -549,7 +550,7 @@ func provideHealthCheckers(
 	kubeClientset *kubernetes.Clientset,
 ) []service4.HealthChecker {
 
-	webConsoleURL := os.Getenv("WEB_CONSOLE_URL")
+	webConsoleURL := os.Getenv("WEB_CONSOLE_HEALTH_CHECK_URL")
 	if webConsoleURL == "" {
 		webConsoleURL = "http://localhost:5173"
 	}

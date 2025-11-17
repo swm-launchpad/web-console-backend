@@ -359,7 +359,7 @@ func provideHealthCheckers(
 	kubeClientset *kubernetes.Clientset,
 ) []statusService.HealthChecker {
 	// Get configuration from environment
-	webConsoleURL := os.Getenv("WEB_CONSOLE_URL")
+	webConsoleURL := os.Getenv("WEB_CONSOLE_HEALTH_CHECK_URL")
 	if webConsoleURL == "" {
 		webConsoleURL = "http://localhost:5173"
 	}
@@ -585,6 +585,7 @@ func InitializeApp() (*App, error) {
 		statusApp.NewGetStatusHistoryUseCase,
 		statusApp.NewGetUptimeStatsUseCase,
 		statusApp.NewGetDailyUptimeUseCase,
+		statusApp.NewGetAllServiceHistoryUseCase,
 		statusApp.NewPerformHealthChecksUseCase,
 		statusApp.NewCalculateDailyUptimeUseCase,
 		statusApp.NewCleanupOldChecksUseCase,

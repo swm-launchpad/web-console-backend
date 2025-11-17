@@ -282,6 +282,7 @@ func (r *Router) Setup() {
 		status := v1.Group("/status")
 		{
 			status.GET("", r.statusHandler.GetCurrentStatus)
+			status.GET("/history/all", r.statusHandler.GetAllServiceHistory)
 			status.GET("/:serviceName/history", r.statusHandler.GetStatusHistory)
 			status.GET("/:serviceName/uptime", r.statusHandler.GetUptimeStats)
 			status.GET("/:serviceName/daily", r.statusHandler.GetDailyUptime)

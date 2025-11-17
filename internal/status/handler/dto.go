@@ -75,3 +75,14 @@ func ToDailyUptimeDTO(data *model.DailyUptimeData) DailyUptimeDTO {
 		IncidentCount:     data.IncidentCount,
 	}
 }
+
+// ServiceHistoryDTO represents uptime history for a single service
+type ServiceHistoryDTO struct {
+	ServiceName string            `json:"service_name"`
+	DailyUptime []DailyUptimeDTO  `json:"daily_uptime"`
+}
+
+// AllServiceHistoryDTO represents uptime history for all services
+type AllServiceHistoryDTO struct {
+	Services []ServiceHistoryDTO `json:"services"`
+}

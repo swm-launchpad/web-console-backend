@@ -11,10 +11,11 @@ import (
 
 // StatusHandler handles HTTP requests for status monitoring
 type StatusHandler struct {
-	getCurrentStatus *application.GetCurrentStatusUseCase
-	getStatusHistory *application.GetStatusHistoryUseCase
-	getUptimeStats   *application.GetUptimeStatsUseCase
-	getDailyUptime   *application.GetDailyUptimeUseCase
+	getCurrentStatus      *application.GetCurrentStatusUseCase
+	getStatusHistory      *application.GetStatusHistoryUseCase
+	getUptimeStats        *application.GetUptimeStatsUseCase
+	getDailyUptime        *application.GetDailyUptimeUseCase
+	getAllServiceHistory  *application.GetAllServiceHistoryUseCase
 }
 
 // NewStatusHandler creates a new StatusHandler
@@ -23,12 +24,14 @@ func NewStatusHandler(
 	getStatusHistory *application.GetStatusHistoryUseCase,
 	getUptimeStats *application.GetUptimeStatsUseCase,
 	getDailyUptime *application.GetDailyUptimeUseCase,
+	getAllServiceHistory *application.GetAllServiceHistoryUseCase,
 ) *StatusHandler {
 	return &StatusHandler{
-		getCurrentStatus: getCurrentStatus,
-		getStatusHistory: getStatusHistory,
-		getUptimeStats:   getUptimeStats,
-		getDailyUptime:   getDailyUptime,
+		getCurrentStatus:     getCurrentStatus,
+		getStatusHistory:     getStatusHistory,
+		getUptimeStats:       getUptimeStats,
+		getDailyUptime:       getDailyUptime,
+		getAllServiceHistory: getAllServiceHistory,
 	}
 }
 
@@ -146,5 +149,42 @@ func (h *StatusHandler) GetDailyUptime(c *gin.Context) {
 		"service": serviceName.String(),
 		"days":    days,
 		"data":    daily,
+	})
+}
+
+// GetAllServiceHistory handles GET /api/v1/status/history/all
+func (h *StatusHandler) GetAllServiceHistory(c *gin.Context) {
+	// Get days from query parameter (default: 7 days)
+	days := 7
+	if daysStr := c.Query("days"); daysStr != "" {
+		if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 30 { // Max 30 days
+			days = d
+		}
+	}
+
+	result, err := h.getAllServiceHistory.Execute(c.Request.Context(), application.GetAllServiceHistoryRequest{
+		Days: days,
+	})
+	if err != nil {
+		response.Error(c, err, nil)
+		return
+	}
+
+	// Convert domain models to response DTOs
+	services := make([]ServiceHistoryDTO, 0, len(result.Services))
+	for _, svc := range result.Services {
+		dailyUptime := make([]DailyUptimeDTO, 0, len(svc.DailyUptime))
+		for _, data := range svc.DailyUptime {
+			dailyUptime = append(dailyUptime, ToDailyUptimeDTO(data))
+		}
+
+		services = append(services, ServiceHistoryDTO{
+			ServiceName: svc.ServiceName.String(),
+			DailyUptime: dailyUptime,
+		})
+	}
+
+	response.OK(c, AllServiceHistoryDTO{
+		Services: services,
 	})
 }
