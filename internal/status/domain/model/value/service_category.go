@@ -48,9 +48,9 @@ func GetCategoryForService(service ServiceName) ServiceCategory {
 		ServiceMySQL:          CategoryCore,
 		ServiceTekton:         CategoryBuildDeploy,
 		ServiceRegistry:       CategoryBuildDeploy,
-		ServiceKubernetes:     CategoryBuildDeploy,
+		ServiceLoki:           CategoryBuildDeploy,
+		ServiceKubernetes:     CategoryInfrastructure,
 		ServiceNFS:            CategoryInfrastructure,
-		ServiceLoki:           CategoryInfrastructure,
 		ServiceIngressService: CategoryInfrastructure,
 	}
 	if category, ok := categoryMap[service]; ok {
