@@ -19,7 +19,7 @@ SELECT * FROM (
     SELECT *,
            ROW_NUMBER() OVER (PARTITION BY service_name ORDER BY checked_at DESC) as rn
     FROM SERVICE_STATUS_CHECKS
-    WHERE checked_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+    WHERE checked_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
 ) t
 WHERE rn = 1;
 

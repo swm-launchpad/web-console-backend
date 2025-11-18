@@ -137,7 +137,7 @@ SELECT check_id, service_name, service_category, status, response_time_ms, error
     SELECT check_id, service_name, service_category, status, response_time_ms, error_message, checked_at, metadata,
            ROW_NUMBER() OVER (PARTITION BY service_name ORDER BY checked_at DESC) as rn
     FROM SERVICE_STATUS_CHECKS
-    WHERE checked_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+    WHERE checked_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
 ) t
 WHERE rn = 1
 `
