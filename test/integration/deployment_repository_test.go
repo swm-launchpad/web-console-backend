@@ -50,7 +50,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 	t.Run("Create - New deployment", func(t *testing.T) {
 		// Given
 		pid := createTestProject(t, testDB)
-		d := deployment.NewDeployment(pid)
+		d := deployment.NewDeployment(pid, nil, nil)
 
 		// When
 		err := repo.Create(ctx, d)
@@ -64,7 +64,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 	t.Run("Save - Update deployment status", func(t *testing.T) {
 		// Given - Create deployment first
 		pid := createTestProject(t, testDB)
-		d := deployment.NewDeployment(pid)
+		d := deployment.NewDeployment(pid, nil, nil)
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
 
@@ -93,7 +93,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 
 	t.Run("Save - Not found error", func(t *testing.T) {
 		// Given - Create deployment but don't persist it
-		d := deployment.NewDeployment(123)
+		d := deployment.NewDeployment(123, nil, nil)
 		d.SetDeploymentID(99999) // Non-existent ID
 
 		// When - Try to save
@@ -106,7 +106,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 	t.Run("Save - Idempotent update with same values", func(t *testing.T) {
 		// Given - Create and start deployment
 		pid := createTestProject(t, testDB)
-		d := deployment.NewDeployment(pid)
+		d := deployment.NewDeployment(pid, nil, nil)
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
 
@@ -135,7 +135,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 	t.Run("FindByID - Existing deployment", func(t *testing.T) {
 		// Given
 		pid := createTestProject(t, testDB)
-		d := deployment.NewDeployment(pid)
+		d := deployment.NewDeployment(pid, nil, nil)
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
 
@@ -161,15 +161,15 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 		// Given - Create multiple deployments for the same project
 		pid := createTestProject(t, testDB)
 
-		d1 := deployment.NewDeployment(pid)
+		d1 := deployment.NewDeployment(pid, nil, nil)
 		err := repo.Create(ctx, d1)
 		require.NoError(t, err)
 
-		d2 := deployment.NewDeployment(pid)
+		d2 := deployment.NewDeployment(pid, nil, nil)
 		err = repo.Create(ctx, d2)
 		require.NoError(t, err)
 
-		d3 := deployment.NewDeployment(pid)
+		d3 := deployment.NewDeployment(pid, nil, nil)
 		err = repo.Create(ctx, d3)
 		require.NoError(t, err)
 
@@ -199,7 +199,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 
 		deploymentIDs := make([]uint, 0, 5)
 		for i := 0; i < 5; i++ {
-			d := deployment.NewDeployment(pid)
+			d := deployment.NewDeployment(pid, nil, nil)
 			err := repo.Create(ctx, d)
 			require.NoError(t, err)
 			deploymentIDs = append(deploymentIDs, d.DeploymentID)
@@ -240,7 +240,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 	t.Run("Full deployment lifecycle", func(t *testing.T) {
 		// Given - Create deployment
 		pid := createTestProject(t, testDB)
-		d := deployment.NewDeployment(pid)
+		d := deployment.NewDeployment(pid, nil, nil)
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
 		assert.Equal(t, deployment.DeploymentStatusUntracked, d.Status())
@@ -284,7 +284,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 	t.Run("Failed deployment lifecycle", func(t *testing.T) {
 		// Given - Create and start deployment
 		pid := createTestProject(t, testDB)
-		d := deployment.NewDeployment(pid)
+		d := deployment.NewDeployment(pid, nil, nil)
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
 
@@ -320,7 +320,7 @@ func TestDeploymentRepository_Integration(t *testing.T) {
 	t.Run("Cancelled deployment lifecycle", func(t *testing.T) {
 		// Given - Create deployment
 		pid := createTestProject(t, testDB)
-		d := deployment.NewDeployment(pid)
+		d := deployment.NewDeployment(pid, nil, nil)
 		err := repo.Create(ctx, d)
 		require.NoError(t, err)
 

@@ -301,7 +301,7 @@ func TestDeployService_updateDeploymentStatus_Running(t *testing.T) {
 	// Test the status transition logic for Running status
 	// This test focuses on the deployment status changes without external dependencies
 
-	d := deployment.NewDeployment(1)
+	d := deployment.NewDeployment(1, nil, nil)
 	d.SetDeploymentID(1)
 	eventID := "event-123"
 	_ = d.InitTektonInfo(&eventID, nil)
@@ -322,7 +322,7 @@ func TestDeployService_updateDeploymentStatus_Running(t *testing.T) {
 func TestDeployService_updateDeploymentStatus_Success(t *testing.T) {
 	// Test the status transition logic for Success status
 
-	d := deployment.NewDeployment(1)
+	d := deployment.NewDeployment(1, nil, nil)
 	d.SetDeploymentID(1)
 	eventID := "event-123"
 	_ = d.InitTektonInfo(&eventID, nil)
@@ -343,7 +343,7 @@ func TestDeployService_updateDeploymentStatus_Success(t *testing.T) {
 func TestDeployService_updateDeploymentStatus_Failed(t *testing.T) {
 	// Test the status transition logic for Failed status
 
-	d := deployment.NewDeployment(1)
+	d := deployment.NewDeployment(1, nil, nil)
 	d.SetDeploymentID(1)
 	eventID := "event-123"
 	_ = d.InitTektonInfo(&eventID, nil)
@@ -364,7 +364,7 @@ func TestDeployService_updateDeploymentStatus_Failed(t *testing.T) {
 func TestDeployService_updateDeploymentStatus_AlreadyCompleted(t *testing.T) {
 	// Test that completed status cannot be changed
 
-	d := deployment.NewDeployment(1)
+	d := deployment.NewDeployment(1, nil, nil)
 	d.SetDeploymentID(1)
 	eventID := "event-123"
 	_ = d.InitTektonInfo(&eventID, nil)
@@ -578,7 +578,7 @@ func TestDeployService_GetDeploymentStatus_WithActiveDeployment(t *testing.T) {
 	)
 
 	// Create deployment
-	d := deployment.NewDeployment(projectID)
+	d := deployment.NewDeployment(projectID, nil, nil)
 	d.SetDeploymentID(activeDeploymentID)
 	eventID := "test-event-123"
 	_ = d.InitTektonInfo(&eventID, nil)
@@ -634,7 +634,7 @@ func TestDeployService_GetDeploymentStatus_NoActiveDeployment(t *testing.T) {
 	)
 
 	// Create latest deployment
-	d := deployment.NewDeployment(projectID)
+	d := deployment.NewDeployment(projectID, nil, nil)
 	d.SetDeploymentID(50)
 	eventID := "old-event-123"
 	_ = d.InitTektonInfo(&eventID, nil)
@@ -726,7 +726,7 @@ func TestDeployService_RefreshActiveDeployment_Success(t *testing.T) {
 	)
 
 	// Create deployment with Tekton info
-	d := deployment.NewDeployment(projectID)
+	d := deployment.NewDeployment(projectID, nil, nil)
 	d.SetDeploymentID(activeDeploymentID)
 	eventID := "test-event-123"
 	runName := "test-run-123"

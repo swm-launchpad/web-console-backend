@@ -12,7 +12,7 @@ import (
 func TestNewDeployment(t *testing.T) {
 	projectID := uint(123)
 
-	deployment := NewDeployment(projectID)
+	deployment := NewDeployment(projectID, nil, nil)
 
 	assert.Equal(t, uint(0), deployment.DeploymentID)
 	assert.Equal(t, projectID, deployment.ProjectID())
@@ -64,6 +64,8 @@ func TestReconstructDeployment(t *testing.T) {
 			deploymentID,
 			projectID,
 			status,
+			nil, // triggerSource
+			nil, // triggerMetadata
 			summary,
 			eventID,
 			runName,
@@ -107,9 +109,11 @@ func TestReconstructDeployment(t *testing.T) {
 			1,
 			123,
 			DeploymentStatus("invalid"),
-			nil,
-			nil,
-			nil,
+			nil, // triggerSource
+			nil, // triggerMetadata
+			nil, // summary
+			nil, // eventID
+			nil, // runName
 			time.Now(),
 			nil,
 			nil,
@@ -121,7 +125,7 @@ func TestReconstructDeployment(t *testing.T) {
 }
 
 func TestDeployment_SetDeploymentID(t *testing.T) {
-	deployment := NewDeployment(123)
+	deployment := NewDeployment(123, nil, nil)
 	assert.Equal(t, uint(0), deployment.DeploymentID)
 
 	deployment.SetDeploymentID(456)
@@ -130,7 +134,7 @@ func TestDeployment_SetDeploymentID(t *testing.T) {
 
 func TestDeployment_InitTektonInfo(t *testing.T) {
 	t.Run("set both event ID and run name", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		eventIDVal := "event-123"
 		eventID := &eventIDVal
 		runNameVal := "pipeline-run-123"
@@ -149,7 +153,7 @@ func TestDeployment_InitTektonInfo(t *testing.T) {
 	})
 
 	t.Run("set only event ID", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		eventIDVal := "event-456"
 		eventID := &eventIDVal
 
@@ -165,7 +169,7 @@ func TestDeployment_InitTektonInfo(t *testing.T) {
 	})
 
 	t.Run("set only run name", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		runNameVal := "pipeline-run-456"
 		runName := &runNameVal
 
@@ -183,7 +187,7 @@ func TestDeployment_InitTektonInfo(t *testing.T) {
 
 func TestDeployment_UpdateRunningStatus(t *testing.T) {
 	t.Run("successful update with summary and startedAt", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		summaryVal := "running"
 		summary := &summaryVal
 		startedAtVal := time.Now()
@@ -204,7 +208,7 @@ func TestDeployment_UpdateRunningStatus(t *testing.T) {
 	})
 
 	t.Run("successful update with nil values", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 
 		err := deployment.UpdateRunningStatus(nil, nil)
 
@@ -219,7 +223,7 @@ func TestDeployment_UpdateRunningStatus(t *testing.T) {
 	})
 
 	t.Run("idempotent update when already running (summary update)", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 
 		// First update: untracked -> running
 		firstSummary := "Starting deployment"
@@ -247,7 +251,7 @@ func TestDeployment_UpdateRunningStatus(t *testing.T) {
 	})
 
 	t.Run("idempotent update when already running (no change)", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 
 		// First update: untracked -> running
 		summary := "running"
@@ -271,7 +275,7 @@ func TestDeployment_UpdateRunningStatus(t *testing.T) {
 	})
 
 	t.Run("cannot update if already completed", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		msg := "error"
 		_ = deployment.UpdateBackendStatus(DeploymentStatusBackendTriggerFailed, &msg)
 
@@ -283,7 +287,7 @@ func TestDeployment_UpdateRunningStatus(t *testing.T) {
 
 func TestDeployment_UpdateCompleteStatus(t *testing.T) {
 	t.Run("successful completion", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		summaryVal := "success"
 		summary := &summaryVal
@@ -305,7 +309,7 @@ func TestDeployment_UpdateCompleteStatus(t *testing.T) {
 	})
 
 	t.Run("can complete from untracked", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		finishedAt := time.Now()
 
 		err := deployment.UpdateCompleteStatus(DeploymentStatusSuccess, nil, finishedAt)
@@ -316,7 +320,7 @@ func TestDeployment_UpdateCompleteStatus(t *testing.T) {
 	})
 
 	t.Run("invalid status", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		finishedAt := time.Now()
 
@@ -326,7 +330,7 @@ func TestDeployment_UpdateCompleteStatus(t *testing.T) {
 	})
 
 	t.Run("cannot overwrite completed status with different status", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		finishedAt := time.Now()
 
@@ -342,7 +346,7 @@ func TestDeployment_UpdateCompleteStatus(t *testing.T) {
 	})
 
 	t.Run("can update completed status with same status (idempotent)", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		finishedAt := time.Now()
 
@@ -361,7 +365,7 @@ func TestDeployment_UpdateCompleteStatus(t *testing.T) {
 
 func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	t.Run("backend_trigger_failed from untracked", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		summaryVal := "trigger failed"
 		summary := &summaryVal
 
@@ -384,7 +388,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("backend_tracking_lost from running", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		summaryVal := "tracking lost"
 		summary := &summaryVal
@@ -397,7 +401,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("invalid status", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 
 		err := deployment.UpdateBackendStatus(DeploymentStatusSuccess, nil)
 
@@ -405,7 +409,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("backend_trigger_failed cannot transition from running", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 
 		err := deployment.UpdateBackendStatus(DeploymentStatusBackendTriggerFailed, nil)
@@ -414,7 +418,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("backend_tracking_failed can transition from untracked", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		summaryVal := "tracking failed"
 		summary := &summaryVal
 
@@ -426,7 +430,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("backend_tracking_failed can transition from running", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		summaryVal := "tracking failed during running"
 		summary := &summaryVal
@@ -439,7 +443,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("backend_tracking_lost can transition from untracked", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		summaryVal := "tracking lost"
 		summary := &summaryVal
 
@@ -451,7 +455,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("backend_tracking_failed cannot transition from completed", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		_ = deployment.UpdateCompleteStatus(DeploymentStatusSuccess, nil, time.Now())
 
@@ -461,7 +465,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("backend_tracking_lost cannot transition from completed", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		_ = deployment.UpdateCompleteStatus(DeploymentStatusSuccess, nil, time.Now())
 
@@ -471,7 +475,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("backend_tracking_lost does NOT set finishedAt (recoverable state)", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		summaryVal := "tracking lost"
 		summary := &summaryVal
@@ -489,7 +493,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("backend_tracking_failed DOES set finishedAt (terminal state)", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 		summaryVal := "tracking failed"
 		summary := &summaryVal
@@ -511,7 +515,7 @@ func TestDeployment_UpdateBackendStatus(t *testing.T) {
 	})
 
 	t.Run("recovery from backend_tracking_lost to running clears finishedAt", func(t *testing.T) {
-		deployment := NewDeployment(123)
+		deployment := NewDeployment(123, nil, nil)
 		_ = deployment.UpdateRunningStatus(nil, nil)
 
 		// Simulate network loss - deployment goes to backend_tracking_lost
@@ -605,7 +609,7 @@ func TestDeployment_IsCompleted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			deployment := NewDeployment(123)
+			deployment := NewDeployment(123, nil, nil)
 			tt.setup(deployment)
 
 			assert.Equal(t, tt.completed, deployment.IsCompleted())

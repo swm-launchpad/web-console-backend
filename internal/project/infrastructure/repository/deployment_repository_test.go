@@ -29,7 +29,7 @@ func TestDeploymentRepository_ErrorHandling(t *testing.T) {
 
 	t.Run("Save with zero deployment ID", func(t *testing.T) {
 		repo := NewDeploymentRepository(nil, testLogger)
-		d := deployment.NewDeployment(123)
+		d := deployment.NewDeployment(123, nil, nil)
 		err := repo.Save(context.Background(), d)
 		assert.ErrorIs(t, err, projecterrors.ErrInvalidProjectData)
 	})

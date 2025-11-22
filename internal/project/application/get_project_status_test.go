@@ -185,7 +185,7 @@ func TestGetProjectStatusUseCase_Execute_BuildingStatus(t *testing.T) {
 	mockBuildHistoryRepo.On("FindLatestByContainerID", mock.Anything, uint(2)).Return(bh2, nil)
 
 	// Mock deployment (previous completed deployment exists)
-	d := deployment.NewDeployment(1)
+	d := deployment.NewDeployment(1, nil, nil)
 	d.SetDeploymentID(50)
 	deployEventID := "deploy-event-50"
 	deployRunName := "deploy-run-50"
@@ -264,7 +264,7 @@ func TestGetProjectStatusUseCase_Execute_DeployingStatus(t *testing.T) {
 	mockProjectRepo.On("FindByID", mock.Anything, uint(1)).Return(proj, nil)
 
 	// Mock deployment
-	d := deployment.NewDeployment(1)
+	d := deployment.NewDeployment(1, nil, nil)
 	d.SetDeploymentID(100)
 	eventID := "deploy-event-123"
 	runName := "deploy-run-123"
