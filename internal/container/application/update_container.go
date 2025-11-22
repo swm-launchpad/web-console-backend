@@ -115,6 +115,8 @@ func (uc *UpdateContainerUseCase) Execute(ctx context.Context, input UpdateConta
 			container.MonthlyBuildTime(),
 			container.MonthlyBuildCount(),
 			container.MonthlyUptime(),
+			container.WebhookToken(),
+			container.WebhookEnabled(),
 			container.IsDeleted(),
 			container.DeletedAt(),
 			container.CreatedAt(),

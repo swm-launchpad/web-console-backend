@@ -25,13 +25,13 @@ func TestBuildChangeDetector_ShouldRebuild_TemplateIDChange(t *testing.T) {
 	old := model.ReconstructContainer(
 		1, 1, &templateID1, "test", slug, nil, nil, nil,
 		gitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	new := model.ReconstructContainer(
 		1, 1, &templateID2, "test", slug, nil, nil, nil,
 		gitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	result := detector.ShouldRebuild(old, new)
@@ -53,13 +53,13 @@ func TestBuildChangeDetector_ShouldRebuild_TemplateIDNilChange(t *testing.T) {
 	old := model.ReconstructContainer(
 		1, 1, nil, "test", slug, nil, nil, nil,
 		gitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	new := model.ReconstructContainer(
 		1, 1, &templateID, "test", slug, nil, nil, nil,
 		gitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	result := detector.ShouldRebuild(old, new)
@@ -90,13 +90,13 @@ func TestBuildChangeDetector_ShouldRebuild_TemplateConfigChange(t *testing.T) {
 	old := model.ReconstructContainer(
 		1, 1, nil, "test", slug, nil, oldConfig, nil,
 		gitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	new := model.ReconstructContainer(
 		1, 1, nil, "test", slug, nil, newConfig, nil,
 		gitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	result := detector.ShouldRebuild(old, new)
@@ -116,13 +116,13 @@ func TestBuildChangeDetector_ShouldRebuild_GitRepositoryURLChange(t *testing.T) 
 	old := model.ReconstructContainer(
 		1, 1, nil, "test", slug, nil, nil, nil,
 		oldGitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	new := model.ReconstructContainer(
 		1, 1, nil, "test", slug, nil, nil, nil,
 		newGitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	result := detector.ShouldRebuild(old, new)
@@ -142,13 +142,13 @@ func TestBuildChangeDetector_ShouldRebuild_GitBranchChange(t *testing.T) {
 	old := model.ReconstructContainer(
 		1, 1, nil, "test", slug, nil, nil, nil,
 		oldGitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	new := model.ReconstructContainer(
 		1, 1, nil, "test", slug, nil, nil, nil,
 		newGitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	result := detector.ShouldRebuild(old, new)
@@ -176,13 +176,13 @@ func TestBuildChangeDetector_ShouldRebuild_GitDirectoryPathChange(t *testing.T) 
 	old := model.ReconstructContainer(
 		1, 1, nil, "test", slug, nil, nil, nil,
 		oldGitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	new := model.ReconstructContainer(
 		1, 1, nil, "test", slug, nil, nil, nil,
 		newGitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	result := detector.ShouldRebuild(old, new)
@@ -207,13 +207,13 @@ func TestBuildChangeDetector_ShouldNotRebuild_NoChanges(t *testing.T) {
 	old := model.ReconstructContainer(
 		1, 1, &templateID, "test", slug, nil, config, nil,
 		gitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	new := model.ReconstructContainer(
 		1, 1, &templateID, "test", slug, nil, config, nil,
 		gitConfig, nil, nil, false, resourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	result := detector.ShouldRebuild(old, new)
@@ -234,13 +234,13 @@ func TestBuildChangeDetector_ShouldNotRebuild_OnlyNonBuildParametersChange(t *te
 	old := model.ReconstructContainer(
 		1, 1, nil, "old-name", slug, nil, nil, nil,
 		gitConfig, nil, nil, false, oldResourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	new := model.ReconstructContainer(
 		1, 1, nil, "new-name", slug, nil, nil, nil,
 		gitConfig, nil, nil, false, newResourceLimits, nil, nil, nil,
-		false, nil, time.Now(), time.Now(),
+		nil, false, false, nil, time.Now(), time.Now(),
 	)
 
 	result := detector.ShouldRebuild(old, new)

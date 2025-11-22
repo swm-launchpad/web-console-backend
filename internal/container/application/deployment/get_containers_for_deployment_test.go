@@ -216,6 +216,8 @@ func createContainerWithAllFields(containerID, projectID uint) *model.Container 
 		nil,
 		nil,
 		nil,
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,
 		time.Now(),
@@ -269,6 +271,8 @@ func createContainerWithMinimalFields(containerID, projectID uint) *model.Contai
 		nil,
 		nil,
 		nil,
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,
 		time.Now(),
@@ -302,6 +306,8 @@ func createContainerWithNetworkOptionalFields(containerID, projectID uint) *mode
 		nil,
 		nil,
 		nil,
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,
 		time.Now(),
@@ -356,6 +362,8 @@ func createContainerWithMultipleMounts(containerID, projectID uint) *model.Conta
 		nil,
 		nil,
 		nil,
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,
 		time.Now(),

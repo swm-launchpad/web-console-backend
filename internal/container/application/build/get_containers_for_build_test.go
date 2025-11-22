@@ -284,6 +284,8 @@ func createBuildContainerWithTemplate(containerID, projectID uint, templateID *u
 		nil,
 		nil,
 		nil,
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,
 		time.Now(),
@@ -323,6 +325,8 @@ func createBuildContainerWithoutTemplate(containerID, projectID uint) *container
 		nil,
 		nil,
 		nil,
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,
 		time.Now(),
@@ -356,6 +360,8 @@ func createBuildContainerWithGitDirectory(containerID, projectID uint, dirPath *
 		nil,
 		nil,
 		nil,
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,
 		time.Now(),
@@ -389,6 +395,8 @@ func createBuildContainerWithInstallation(containerID, projectID uint, installat
 		nil,
 		nil,
 		nil,
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,
 		time.Now(),

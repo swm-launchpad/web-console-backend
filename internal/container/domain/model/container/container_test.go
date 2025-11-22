@@ -323,9 +323,11 @@ func TestReconstructContainer(t *testing.T) {
 		nil,  // lastBuiltGitCommitHash
 		true, // needsBuild
 		resourceLimits,
-		nil, // monthlyBuildTime
-		nil, // monthlyBuildCount
-		nil, // monthlyUptime
+		nil,   // monthlyBuildTime
+		nil,   // monthlyBuildCount
+		nil,   // monthlyUptime
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,        // deletedAt
 		time.Now(), // createdAt
@@ -362,9 +364,11 @@ func TestReconstructContainer_WithGitHubInstallationID(t *testing.T) {
 		nil,  // lastBuiltGitCommitHash
 		true, // needsBuild
 		resourceLimits,
-		nil, // monthlyBuildTime
-		nil, // monthlyBuildCount
-		nil, // monthlyUptime
+		nil,   // monthlyBuildTime
+		nil,   // monthlyBuildCount
+		nil,   // monthlyUptime
+		nil,   // webhookToken
+		false, // webhookEnabled
 		false,
 		nil,        // deletedAt
 		time.Now(), // createdAt

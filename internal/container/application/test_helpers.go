@@ -40,7 +40,9 @@ func createMockContainer(containerID, projectID uint) *model.Container {
 		nil,
 		nil,
 		nil,
-		false,
+		nil,   // webhookToken
+		false, // webhookEnabled
+		false, // isDeleted
 		nil,
 		time.Now(),
 		time.Now(),
@@ -80,7 +82,9 @@ func createMockDeletedContainer(containerID, projectID uint) *model.Container {
 		nil,
 		nil,
 		nil,
-		true, // is_deleted = true
+		nil,   // webhookToken
+		false, // webhookEnabled
+		true,  // is_deleted = true
 		nil,
 		time.Now(),
 		time.Now(),
@@ -195,7 +199,9 @@ func createMockContainerWithOptionalFields(
 		nil,
 		nil,
 		nil,
-		false,
+		nil,   // webhookToken
+		false, // webhookEnabled
+		false, // isDeleted
 		nil,
 		time.Now(),
 		time.Now(),

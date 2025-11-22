@@ -84,6 +84,8 @@ type GetContainerOutput struct {
 	MonthlyBuildTime     uint32                 `json:"monthly_build_time,omitempty"`
 	MonthlyBuildCount    uint32                 `json:"monthly_build_count,omitempty"`
 	MonthlyUptime        string                 `json:"monthly_uptime,omitempty"`
+	WebhookEnabled       bool                   `json:"webhook_enabled"`
+	WebhookToken         string                 `json:"webhook_token,omitempty"`
 	EnvVars              []EnvVarOutput         `json:"env_vars"`
 	Networks             []NetworkOutput        `json:"networks"`
 	Secrets              []SecretOutput         `json:"secrets"`
@@ -137,20 +139,25 @@ func (uc *GetContainerUseCase) Execute(ctx context.Context, input GetContainerIn
 
 	// Build output
 	output := &GetContainerOutput{
-		ContainerID: container.ContainerID(),
-		ProjectID:   container.ProjectID(),
-		Name:        container.Name(),
-		Slug:        container.Slug().String(),
-		GitURL:      container.GitConfig().RepositoryURL(),
-		GitBranch:   container.GitConfig().Branch(),
-		CPULimit:    container.ResourceLimits().CPULimitOrDefault(0),
-		MemoryLimit: container.ResourceLimits().MemoryLimitOrDefault(0),
-		EnvVars:     make([]EnvVarOutput, 0),
-		Networks:    make([]NetworkOutput, 0),
-		Secrets:     make([]SecretOutput, 0),
-		BuildVars:   make([]BuildVarOutput, 0),
-		Mounts:      make([]MountOutput, 0),
-		CreatedAt:   container.CreatedAt().Format("2006-01-02T15:04:05Z"),
+		ContainerID:    container.ContainerID(),
+		ProjectID:      container.ProjectID(),
+		Name:           container.Name(),
+		Slug:           container.Slug().String(),
+		GitURL:         container.GitConfig().RepositoryURL(),
+		GitBranch:      container.GitConfig().Branch(),
+		CPULimit:       container.ResourceLimits().CPULimitOrDefault(0),
+		MemoryLimit:    container.ResourceLimits().MemoryLimitOrDefault(0),
+		WebhookEnabled: container.WebhookEnabled(),
+		EnvVars:        make([]EnvVarOutput, 0),
+		Networks:       make([]NetworkOutput, 0),
+		Secrets:        make([]SecretOutput, 0),
+		BuildVars:      make([]BuildVarOutput, 0),
+		Mounts:         make([]MountOutput, 0),
+		CreatedAt:      container.CreatedAt().Format("2006-01-02T15:04:05Z"),
+	}
+
+	if webhookToken := container.WebhookToken(); webhookToken != nil {
+		output.WebhookToken = *webhookToken
 	}
 
 	if !container.UpdatedAt().IsZero() {

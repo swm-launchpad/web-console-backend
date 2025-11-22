@@ -106,6 +106,14 @@ func (m *mockUpdateContainerRepo) UpdateNetworkNodePortResult(ctx context.Contex
 	return nil
 }
 
+func (m *mockUpdateContainerRepo) FindContainerByWebhookToken(ctx context.Context, token string) (containerID uint32, projectID uint32, err error) {
+	return 0, 0, nil
+}
+
+func (m *mockUpdateContainerRepo) ExistsWebhookToken(ctx context.Context, token string) (bool, error) {
+	return false, nil
+}
+
 type mockUpdateTxManager struct {
 	runInTxFunc func(ctx context.Context, fn func(ctx context.Context) error) error
 }
