@@ -72,6 +72,8 @@ func (r *containerRepository) Create(ctx context.Context, container *model.Conta
 		MonthlyBuildTime:       uint32PtrToNullInt32(container.MonthlyBuildTime()),
 		MonthlyBuildCount:      uint32PtrToNullInt32(container.MonthlyBuildCount()),
 		MonthlyUptime:          stringPtrToNullString(container.MonthlyUptime()),
+		WebhookToken:           stringPtrToNullString(container.WebhookToken()),
+		WebhookEnabled:         container.WebhookEnabled(),
 		CreatedAt:              container.CreatedAt(),
 		UpdatedAt:              timeToNullTime(container.UpdatedAt()),
 	}
@@ -235,6 +237,8 @@ func (r *containerRepository) Save(ctx context.Context, container *model.Contain
 		MonthlyBuildTime:       uint32PtrToNullInt32(container.MonthlyBuildTime()),
 		MonthlyBuildCount:      uint32PtrToNullInt32(container.MonthlyBuildCount()),
 		MonthlyUptime:          stringPtrToNullString(container.MonthlyUptime()),
+		WebhookToken:           stringPtrToNullString(container.WebhookToken()),
+		WebhookEnabled:         container.WebhookEnabled(),
 		UpdatedAt:              timeToNullTime(container.UpdatedAt()),
 		ContainerID:            uint32(container.ContainerID()),
 	}
@@ -1097,6 +1101,11 @@ func (r *containerRepository) toDomainContainer(sqlcContainer sqlc.Container) (*
 
 	githubInstallationID := nullInt64ToInt64Ptr(sqlcContainer.GithubInstallationID)
 
+	var webhookToken *string
+	if sqlcContainer.WebhookToken.Valid {
+		webhookToken = &sqlcContainer.WebhookToken.String
+	}
+
 	container := model.ReconstructContainer(
 		uint(sqlcContainer.ContainerID),
 		uint(sqlcContainer.ProjectID),
@@ -1114,6 +1123,8 @@ func (r *containerRepository) toDomainContainer(sqlcContainer sqlc.Container) (*
 		monthlyBuildTime,
 		monthlyBuildCount,
 		monthlyUptime,
+		webhookToken,
+		sqlcContainer.WebhookEnabled,
 		sqlcContainer.IsDeleted,
 		fromNullTime(sqlcContainer.DeletedAt),
 		sqlcContainer.CreatedAt,
@@ -1483,4 +1494,46 @@ func (r *containerRepository) UpdateNetworkNodePortResult(ctx context.Context, n
 	}
 
 	return nil
+}
+
+// FindContainerByWebhookToken finds container and project ID by webhook token
+func (r *containerRepository) FindContainerByWebhookToken(ctx context.Context, token string) (containerID uint32, projectID uint32, err error) {
+	r.logger.Debug(ctx, "finding container by webhook token",
+		zap.String("token_prefix", token[:8]+"..."),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.FindContainerByWebhookToken(ctx, sql.NullString{String: token, Valid: true})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Error(ctx, "container not found by webhook token",
+				zap.Error(containererrors.ErrContainerNotFound),
+			)
+			return 0, 0, containererrors.ErrContainerNotFound
+		}
+		r.logger.Error(ctx, "failed to find container by webhook token",
+			zap.Error(err),
+		)
+		return 0, 0, containererrors.ErrDatabaseOperation
+	}
+
+	return result.ContainerID, result.ProjectID, nil
+}
+
+// ExistsWebhookToken checks if a webhook token exists
+func (r *containerRepository) ExistsWebhookToken(ctx context.Context, token string) (bool, error) {
+	r.logger.Debug(ctx, "checking webhook token existence",
+		zap.String("token_prefix", token[:8]+"..."),
+	)
+
+	qtx := r.queriesWithContext(ctx)
+	result, err := qtx.ExistsWebhookToken(ctx, sql.NullString{String: token, Valid: true})
+	if err != nil {
+		r.logger.Error(ctx, "failed to check webhook token existence",
+			zap.Error(err),
+		)
+		return false, containererrors.ErrDatabaseOperation
+	}
+
+	return result, nil
 }

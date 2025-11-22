@@ -117,4 +117,15 @@ type ContainerRepository interface {
 	// UpdateNetworkNodePortResult updates the NodePort result fields (external_ip, external_port, expires_at)
 	// Used when PipelineRun completes and NodePort information becomes available
 	UpdateNetworkNodePortResult(ctx context.Context, networkID uint, externalIP string, externalPort uint16, expiresAt time.Time) error
+
+	// Webhook operations
+
+	// FindContainerByWebhookToken finds container and project ID by webhook token
+	// Returns (containerID, projectID, error)
+	// Used for webhook authentication
+	FindContainerByWebhookToken(ctx context.Context, token string) (containerID uint32, projectID uint32, err error)
+
+	// ExistsWebhookToken checks if a webhook token exists
+	// Used for token uniqueness validation
+	ExistsWebhookToken(ctx context.Context, token string) (bool, error)
 }

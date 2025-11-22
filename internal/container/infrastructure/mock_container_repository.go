@@ -219,3 +219,15 @@ func (m *MockContainerRepository) UpdateNetworkNodePortResult(ctx context.Contex
 	args := m.Called(ctx, networkID, externalIP, externalPort, expiresAt)
 	return args.Error(0)
 }
+
+// FindContainerByWebhookToken mocks the FindContainerByWebhookToken method
+func (m *MockContainerRepository) FindContainerByWebhookToken(ctx context.Context, token string) (containerID uint32, projectID uint32, err error) {
+	args := m.Called(ctx, token)
+	return args.Get(0).(uint32), args.Get(1).(uint32), args.Error(2)
+}
+
+// ExistsWebhookToken mocks the ExistsWebhookToken method
+func (m *MockContainerRepository) ExistsWebhookToken(ctx context.Context, token string) (bool, error) {
+	args := m.Called(ctx, token)
+	return args.Bool(0), args.Error(1)
+}
