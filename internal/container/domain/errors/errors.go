@@ -244,3 +244,15 @@ var (
 	ErrNoTCPNetwork               = errors.New("container has no TCP network configured")
 	ErrMultipleNetworksNotAllowed = errors.New("container has multiple networks, cannot determine target port")
 )
+
+// Webhook errors - webhook token and auto-deployment errors
+var (
+	ErrInvalidWebhookToken       = errors.New("invalid webhook token format")
+	ErrWebhookTokenNotFound      = errors.New("webhook token not found")
+	ErrDuplicateWebhookToken     = errors.New("webhook token already exists")
+	ErrContainerHasNoToken       = errors.New("container does not have webhook token")
+	ErrContainerAlreadyHasToken  = errors.New("container already has webhook token")
+	ErrWebhookNotEnabled         = errors.New("webhook is not enabled for this container")
+	ErrWebhookAlreadyEnabled     = errors.New("webhook is already enabled for this container")
+	ErrUnauthorizedWebhookAccess = errors.New("unauthorized access to webhook")
+)
