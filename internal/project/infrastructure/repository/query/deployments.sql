@@ -2,6 +2,8 @@
 INSERT INTO `DEPLOYMENTS` (
     `project_id`,
     `status`,
+    `trigger_source`,
+    `trigger_metadata`,
     `summary`,
     `tekton_event_id`,
     `tekton_pipeline_run_name`,
@@ -9,13 +11,15 @@ INSERT INTO `DEPLOYMENTS` (
     `started_at`,
     `finished_at`
 ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 );
 
 -- name: UpdateDeployment :execresult
 UPDATE `DEPLOYMENTS`
 SET
     `status` = ?,
+    `trigger_source` = ?,
+    `trigger_metadata` = ?,
     `summary` = ?,
     `tekton_event_id` = ?,
     `tekton_pipeline_run_name` = ?,
@@ -29,6 +33,8 @@ SELECT
     `deployment_id`,
     `project_id`,
     `status`,
+    `trigger_source`,
+    `trigger_metadata`,
     `summary`,
     `tekton_event_id`,
     `tekton_pipeline_run_name`,
@@ -44,6 +50,8 @@ SELECT
     `deployment_id`,
     `project_id`,
     `status`,
+    `trigger_source`,
+    `trigger_metadata`,
     `summary`,
     `tekton_event_id`,
     `tekton_pipeline_run_name`,
@@ -60,6 +68,8 @@ SELECT
     `deployment_id`,
     `project_id`,
     `status`,
+    `trigger_source`,
+    `trigger_metadata`,
     `summary`,
     `tekton_event_id`,
     `tekton_pipeline_run_name`,
@@ -76,6 +86,8 @@ SELECT
     `deployment_id`,
     `project_id`,
     `status`,
+    `trigger_source`,
+    `trigger_metadata`,
     `summary`,
     `tekton_event_id`,
     `tekton_pipeline_run_name`,
@@ -94,6 +106,8 @@ SELECT
     `deployment_id`,
     `project_id`,
     `status`,
+    `trigger_source`,
+    `trigger_metadata`,
     `summary`,
     `tekton_event_id`,
     `tekton_pipeline_run_name`,

@@ -50,6 +50,18 @@ func (r *deploymentRepository) Create(ctx context.Context, d *deployment.Deploym
 		summaryPtr = &s
 	}
 
+	var triggerSourcePtr *string
+	if triggerSource, exists := d.TriggerSource(); exists {
+		ts := triggerSource
+		triggerSourcePtr = &ts
+	}
+
+	var triggerMetadataPtr *string
+	if triggerMetadata, exists := d.TriggerMetadata(); exists {
+		tm := triggerMetadata
+		triggerMetadataPtr = &tm
+	}
+
 	var tektonEventIDPtr *string
 	if eventID, exists := d.TektonEventID(); exists {
 		e := eventID
@@ -77,6 +89,8 @@ func (r *deploymentRepository) Create(ctx context.Context, d *deployment.Deploym
 	result, err := qtx.CreateDeployment(ctx, sqlc.CreateDeploymentParams{
 		ProjectID:             uint32(d.ProjectID()),
 		Status:                deploymentStatusToDB(d.Status()),
+		TriggerSource:         stringPtrToNullString(triggerSourcePtr),
+		TriggerMetadata:       stringPtrToJSONRawMessage(triggerMetadataPtr),
 		Summary:               stringPtrToNullString(summaryPtr),
 		TektonEventID:         stringPtrToNullString(tektonEventIDPtr),
 		TektonPipelineRunName: stringPtrToNullString(tektonPipelineRunNamePtr),
@@ -128,6 +142,18 @@ func (r *deploymentRepository) Save(ctx context.Context, d *deployment.Deploymen
 		summaryPtr = &s
 	}
 
+	var triggerSourcePtr *string
+	if triggerSource, exists := d.TriggerSource(); exists {
+		ts := triggerSource
+		triggerSourcePtr = &ts
+	}
+
+	var triggerMetadataPtr *string
+	if triggerMetadata, exists := d.TriggerMetadata(); exists {
+		tm := triggerMetadata
+		triggerMetadataPtr = &tm
+	}
+
 	var tektonEventIDPtr *string
 	if eventID, exists := d.TektonEventID(); exists {
 		e := eventID
@@ -154,6 +180,8 @@ func (r *deploymentRepository) Save(ctx context.Context, d *deployment.Deploymen
 
 	result, err := qtx.UpdateDeployment(ctx, sqlc.UpdateDeploymentParams{
 		Status:                deploymentStatusToDB(d.Status()),
+		TriggerSource:         stringPtrToNullString(triggerSourcePtr),
+		TriggerMetadata:       stringPtrToJSONRawMessage(triggerMetadataPtr),
 		Summary:               stringPtrToNullString(summaryPtr),
 		TektonEventID:         stringPtrToNullString(tektonEventIDPtr),
 		TektonPipelineRunName: stringPtrToNullString(tektonPipelineRunNamePtr),
@@ -207,8 +235,8 @@ func (r *deploymentRepository) FindByID(ctx context.Context, deploymentID uint) 
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
-		row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
+	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.TriggerSource, row.TriggerMetadata,
+		row.Summary, row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
 }
 
 // FindLatestByProjectID finds the most recent deployment for a project
@@ -227,8 +255,8 @@ func (r *deploymentRepository) FindLatestByProjectID(ctx context.Context, projec
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
-		row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
+	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.TriggerSource, row.TriggerMetadata,
+		row.Summary, row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
 }
 
 // FindByProjectID finds all deployments for a project with pagination
@@ -250,8 +278,8 @@ func (r *deploymentRepository) FindByProjectID(ctx context.Context, projectID ui
 
 	deployments := make([]*deployment.Deployment, 0, len(sqlcDeployments))
 	for _, row := range sqlcDeployments {
-		d, err := r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
-			row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
+		d, err := r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.TriggerSource,
+			row.TriggerMetadata, row.Summary, row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -277,8 +305,8 @@ func (r *deploymentRepository) FindByTektonPipelineRunName(ctx context.Context, 
 		return nil, projecterrors.ErrDatabaseOperation
 	}
 
-	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
-		row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
+	return r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.TriggerSource, row.TriggerMetadata,
+		row.Summary, row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
 }
 
 // FindActiveDeploymentsByProjectID finds all active (non-completed) deployments for a project
@@ -296,8 +324,8 @@ func (r *deploymentRepository) FindActiveDeploymentsByProjectID(ctx context.Cont
 
 	deployments := make([]*deployment.Deployment, 0, len(sqlcDeployments))
 	for _, row := range sqlcDeployments {
-		d, err := r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.Summary,
-			row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
+		d, err := r.rowToDeploymentModel(row.DeploymentID, row.ProjectID, row.Status, row.TriggerSource,
+			row.TriggerMetadata, row.Summary, row.TektonEventID, row.TektonPipelineRunName, row.CreatedAt, row.StartedAt, row.FinishedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -312,6 +340,8 @@ func (r *deploymentRepository) rowToDeploymentModel(
 	deploymentID uint32,
 	projectID uint32,
 	status sqlc.DeploymentsStatus,
+	triggerSource sql.NullString,
+	triggerMetadata []byte,
 	summary sql.NullString,
 	tektonEventID sql.NullString,
 	tektonPipelineRunName sql.NullString,
@@ -325,6 +355,8 @@ func (r *deploymentRepository) rowToDeploymentModel(
 		uint(deploymentID),
 		uint(projectID),
 		domainStatus,
+		nullStringToStringPtr(triggerSource),
+		jsonRawMessageToStringPtr(triggerMetadata),
 		nullStringToStringPtr(summary),
 		nullStringToStringPtr(tektonEventID),
 		nullStringToStringPtr(tektonPipelineRunName),
@@ -393,4 +425,23 @@ func (r *deploymentRepository) queriesWithContext(ctx context.Context) *sqlc.Que
 		return r.queries.WithTx(tx)
 	}
 	return r.queries
+}
+
+// stringPtrToJSONRawMessage converts *string to json.RawMessage
+// If the string pointer is nil or empty, returns nil (NULL in DB)
+func stringPtrToJSONRawMessage(s *string) []byte {
+	if s == nil || *s == "" {
+		return nil
+	}
+	return []byte(*s)
+}
+
+// jsonRawMessageToStringPtr converts json.RawMessage to *string
+// If the byte slice is nil or empty, returns nil
+func jsonRawMessageToStringPtr(b []byte) *string {
+	if len(b) == 0 {
+		return nil
+	}
+	str := string(b)
+	return &str
 }

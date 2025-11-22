@@ -590,6 +590,10 @@ type Container struct {
 	UpdatedAt         sql.NullTime   `json:"updated_at"`
 	DeletedAt         sql.NullTime   `json:"deleted_at"`
 	IsDeleted         bool           `json:"is_deleted"`
+	// Webhook authentication token for auto-deployment
+	WebhookToken sql.NullString `json:"webhook_token"`
+	// Auto-deployment via webhook enabled
+	WebhookEnabled bool `json:"webhook_enabled"`
 }
 
 type Deployment struct {
@@ -604,6 +608,10 @@ type Deployment struct {
 	CreatedAt             time.Time      `json:"created_at"`
 	StartedAt             sql.NullTime   `json:"started_at"`
 	FinishedAt            sql.NullTime   `json:"finished_at"`
+	// Deployment trigger source: manual, webhook, api
+	TriggerSource sql.NullString `json:"trigger_source"`
+	// Additional trigger information (container info, user, ip, etc)
+	TriggerMetadata json.RawMessage `json:"trigger_metadata"`
 }
 
 type EnvVar struct {

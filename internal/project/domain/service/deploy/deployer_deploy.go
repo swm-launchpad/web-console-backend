@@ -47,7 +47,8 @@ func (s *deployService) DeployProject(ctx context.Context, projectID uint) (*dep
 
 		// Create deployment record with status 'untracked' FIRST
 		// We need the deployment ID before setting it on the project
-		d = deployment.NewDeployment(projectID)
+		triggerSource := "manual"
+		d = deployment.NewDeployment(projectID, &triggerSource, nil)
 
 		if err := s.deploymentRepo.Create(txCtx, d); err != nil {
 			return err
@@ -345,7 +346,7 @@ func (s *deployService) deployProjectInternal(
 		}
 
 		// Create deployment record with status 'untracked' FIRST
-		d = deployment.NewDeployment(projectID)
+		d = deployment.NewDeployment(projectID, nil, nil)
 
 		if err := s.deploymentRepo.Create(txCtx, d); err != nil {
 			return err
