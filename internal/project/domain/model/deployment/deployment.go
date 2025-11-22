@@ -11,6 +11,8 @@ type Deployment struct {
 	DeploymentID          uint
 	projectID             uint
 	status                DeploymentStatus
+	triggerSource         *string // Deployment trigger source: manual, webhook, scheduled
+	triggerMetadata       *string // Additional trigger information in JSON format
 	summary               *string
 	tektonEventID         *string
 	tektonPipelineRunName *string
@@ -20,13 +22,18 @@ type Deployment struct {
 }
 
 // NewDeployment creates a new deployment in untracked status
+// triggerSource and triggerMetadata are optional
 func NewDeployment(
 	projectID uint,
+	triggerSource *string,
+	triggerMetadata *string,
 ) *Deployment {
 	return &Deployment{
-		projectID: projectID,
-		status:    DeploymentStatusUntracked,
-		createdAt: time.Now(),
+		projectID:       projectID,
+		status:          DeploymentStatusUntracked,
+		triggerSource:   triggerSource,
+		triggerMetadata: triggerMetadata,
+		createdAt:       time.Now(),
 	}
 }
 
@@ -36,6 +43,8 @@ func ReconstructDeployment(
 	deploymentID uint,
 	projectID uint,
 	status DeploymentStatus,
+	triggerSource *string,
+	triggerMetadata *string,
 	summary *string,
 	tektonEventID *string,
 	tektonPipelineRunName *string,
@@ -51,6 +60,8 @@ func ReconstructDeployment(
 		DeploymentID:          deploymentID,
 		projectID:             projectID,
 		status:                status,
+		triggerSource:         triggerSource,
+		triggerMetadata:       triggerMetadata,
 		summary:               summary,
 		tektonEventID:         tektonEventID,
 		tektonPipelineRunName: tektonPipelineRunName,
@@ -123,6 +134,24 @@ func (d *Deployment) FinishedAt() (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return *d.finishedAt, true
+}
+
+// TriggerSource returns the deployment trigger source
+// Returns ("", false) if trigger source is not set
+func (d *Deployment) TriggerSource() (string, bool) {
+	if d.triggerSource == nil {
+		return "", false
+	}
+	return *d.triggerSource, true
+}
+
+// TriggerMetadata returns the deployment trigger metadata in JSON format
+// Returns ("", false) if trigger metadata is not set
+func (d *Deployment) TriggerMetadata() (string, bool) {
+	if d.triggerMetadata == nil {
+		return "", false
+	}
+	return *d.triggerMetadata, true
 }
 
 // InitTektonInfo sets Tekton metadata (event ID and PipelineRun name)

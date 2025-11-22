@@ -24,6 +24,8 @@ type Container struct {
 	lastBuiltGitCommitHash *string // Last successfully built git commit hash
 	needsBuild             bool    // Indicates whether build is required (set to true when build parameters change)
 	resourceLimits         value.ResourceLimits
+	webhookToken           *string // Webhook authentication token for auto-deployment
+	webhookEnabled         bool    // Auto-deployment via webhook enabled
 	monthlyBuildTime       *uint32
 	monthlyBuildCount      *uint32
 	monthlyUptime          *string    // Uptime percentage as string (e.g., "99.9%")
@@ -116,6 +118,8 @@ func (c *Container) MonthlyBuildTime() *uint32              { return c.monthlyBu
 func (c *Container) MonthlyBuildCount() *uint32             { return c.monthlyBuildCount }
 func (c *Container) MonthlyUptime() *string                 { return c.monthlyUptime }
 func (c *Container) GitCommitHash() *string                 { return c.gitCommitHash }
+func (c *Container) WebhookToken() *string                  { return c.webhookToken }
+func (c *Container) WebhookEnabled() bool                   { return c.webhookEnabled }
 func (c *Container) EnvVars() []EnvVar                      { return c.envVars }
 func (c *Container) Networks() []Network                    { return c.networks }
 func (c *Container) Secrets() []Secret                      { return c.secrets }
@@ -161,6 +165,38 @@ func (c *Container) SetStableWindow(window *uint32) {
 func (c *Container) SetGitHubInstallationID(installationID *int64) {
 	c.githubInstallationID = installationID
 	c.updatedAt = time.Now()
+}
+
+// SetWebhookToken sets the webhook token for auto-deployment
+func (c *Container) SetWebhookToken(token *string) {
+	c.webhookToken = token
+	c.updatedAt = time.Now()
+}
+
+// EnableWebhook enables auto-deployment via webhook
+func (c *Container) EnableWebhook() error {
+	if c.isDeleted {
+		return containererrors.ErrCannotModifyDeleted
+	}
+	if c.webhookEnabled {
+		return containererrors.ErrWebhookAlreadyEnabled
+	}
+	c.webhookEnabled = true
+	c.updatedAt = time.Now()
+	return nil
+}
+
+// DisableWebhook disables auto-deployment via webhook
+func (c *Container) DisableWebhook() error {
+	if c.isDeleted {
+		return containererrors.ErrCannotModifyDeleted
+	}
+	if !c.webhookEnabled {
+		return containererrors.ErrWebhookNotEnabled
+	}
+	c.webhookEnabled = false
+	c.updatedAt = time.Now()
+	return nil
 }
 
 // UpdateGitConfig updates the Git configuration
@@ -818,6 +854,8 @@ func ReconstructContainer(
 	monthlyBuildTime *uint32,
 	monthlyBuildCount *uint32,
 	monthlyUptime *string,
+	webhookToken *string,
+	webhookEnabled bool,
 	isDeleted bool,
 	deletedAt *time.Time,
 	createdAt time.Time,
@@ -840,6 +878,8 @@ func ReconstructContainer(
 		monthlyBuildTime:       monthlyBuildTime,
 		monthlyBuildCount:      monthlyBuildCount,
 		monthlyUptime:          monthlyUptime,
+		webhookToken:           webhookToken,
+		webhookEnabled:         webhookEnabled,
 		envVars:                []EnvVar{},
 		networks:               []Network{},
 		secrets:                []Secret{},
