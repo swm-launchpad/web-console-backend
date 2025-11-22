@@ -396,6 +396,7 @@ func InitializeApp() (*App, error) {
 		projectApp.NewDeleteProjectUseCase,
 		projectApp.NewListProjectsUseCase,
 		projectApp.NewDeployProjectUseCase,
+		projectApp.NewGetDeploymentHistoryUseCase,
 		projectApp.NewGetProjectStatusUseCase,
 		projectApp.NewRefreshProjectStatusUseCase,
 		projectApp.NewCheckProjectPodStatusUseCase,
@@ -420,6 +421,7 @@ func InitializeApp() (*App, error) {
 		containerService.NewPermissionService,
 		containerService.NewResourceValidationService,
 		containerService.NewBuildChangeDetector,
+		containerService.NewWebhookTokenService,
 
 		// Container use cases
 		containerApp.NewCreateContainerUseCase,
@@ -455,6 +457,10 @@ func InitializeApp() (*App, error) {
 		containerApp.NewCheckContainerNameUseCase,
 		containerApp.NewCreateNodePortUseCase,
 		containerApp.NewGetNodePortUseCase,
+		containerApp.NewEnableWebhookUseCase,
+		containerApp.NewDisableWebhookUseCase,
+		containerApp.NewRegenerateWebhookTokenUseCase,
+		containerApp.NewProcessWebhookUseCase,
 
 		// HTTP handlers
 		userHTTP.NewAuthHandler,
@@ -470,6 +476,7 @@ func InitializeApp() (*App, error) {
 		containerHTTP.NewContainerHandler,
 		containerHTTP.NewTemplateHandler,
 		provideBuildLogHandler,
+		containerHTTP.NewWebhookHandler,
 
 		// Middleware
 		middleware.NewAuthMiddleware,

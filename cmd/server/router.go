@@ -30,6 +30,7 @@ type Router struct {
 	containerHandler     *containerHTTP.ContainerHandler
 	templateHandler      *containerHTTP.TemplateHandler
 	buildLogHandler      *containerHTTP.BuildLogHandler
+	webhookHandler       *containerHTTP.WebhookHandler
 	settingsHandler      *settings.SettingsHandler
 	authMiddleware       *middleware.AuthMiddleware
 	loggingMiddleware    *logger.LoggingMiddleware
@@ -51,6 +52,7 @@ func NewRouter(
 	containerHandler *containerHTTP.ContainerHandler,
 	templateHandler *containerHTTP.TemplateHandler,
 	buildLogHandler *containerHTTP.BuildLogHandler,
+	webhookHandler *containerHTTP.WebhookHandler,
 	settingsHandler *settings.SettingsHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	loggingMiddleware *logger.LoggingMiddleware,
@@ -86,6 +88,7 @@ func NewRouter(
 		containerHandler:     containerHandler,
 		templateHandler:      templateHandler,
 		buildLogHandler:      buildLogHandler,
+		webhookHandler:       webhookHandler,
 		settingsHandler:      settingsHandler,
 		authMiddleware:       authMiddleware,
 		loggingMiddleware:    loggingMiddleware,
@@ -170,6 +173,7 @@ func (r *Router) Setup() {
 
 			// Deployment routes
 			projects.POST("/:slug/deploy", r.deploymentHandler.DeployProject)
+			projects.GET("/:slug/deployments", r.deploymentHandler.GetDeploymentHistory)
 
 			// Status routes (integrated build and deployment status)
 			projects.GET("/:slug/status", r.projectStatusHandler.GetProjectStatus)
@@ -255,9 +259,18 @@ func (r *Router) Setup() {
 			containers.POST("/:slug/build-log-token", r.buildLogHandler.CreateBuildLogToken)
 			containers.GET("/:slug/build-logs/history", r.buildLogHandler.GetBuildLogHistory)
 
+			// Webhook management
+			containers.POST("/:slug/webhook/enable", r.webhookHandler.EnableWebhook)
+			containers.POST("/:slug/webhook/disable", r.webhookHandler.DisableWebhook)
+			containers.POST("/:slug/webhook/regenerate", r.webhookHandler.RegenerateWebhookToken)
+
 			// FQDN check endpoint (requires authentication)
 			containers.GET("/check-fqdn", r.containerHandler.CheckFQDN)
 		}
+
+		// Public webhook endpoint (no auth - token-based)
+		v1.POST("/webhooks/:token", r.webhookHandler.ProcessWebhook)
+		v1.GET("/webhooks/:token", r.webhookHandler.ProcessWebhook)
 
 		// Build log streaming WebSocket endpoint (public with token validation)
 		// Placed outside auth middleware to allow token-based authentication via query param
