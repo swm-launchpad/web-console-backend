@@ -66,10 +66,13 @@ type Querier interface {
 	ExistsBySlug(ctx context.Context, slug string) (bool, error)
 	ExistsMountByVolume(ctx context.Context, arg ExistsMountByVolumeParams) (bool, error)
 	ExistsTemplateByID(ctx context.Context, templateID uint32) (bool, error)
+	ExistsWebhookToken(ctx context.Context, webhookToken sql.NullString) (bool, error)
 	FindActiveTemplates(ctx context.Context) ([]Template, error)
 	// Template Queries
 	// Templates are read-only and managed directly in the database by administrators
 	FindAllTemplates(ctx context.Context) ([]Template, error)
+	// Webhook queries
+	FindContainerByWebhookToken(ctx context.Context, webhookToken sql.NullString) (FindContainerByWebhookTokenRow, error)
 	FindTemplateByID(ctx context.Context, templateID uint32) (Template, error)
 	GetBuildVarByKey(ctx context.Context, arg GetBuildVarByKeyParams) (GetBuildVarByKeyRow, error)
 	GetBuildVarsByContainerID(ctx context.Context, containerID uint32) ([]GetBuildVarsByContainerIDRow, error)

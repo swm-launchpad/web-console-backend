@@ -52,8 +52,9 @@ INSERT INTO CONTAINERS (
     template_config, github_installation_id, git_repository_url, git_branch, git_directory_path, git_commit_hash,
     last_built_git_commit_hash, needs_build, cpu_limit, memory_limit,
     monthly_build_time, monthly_build_count, monthly_uptime,
+    webhook_token, webhook_enabled,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateContainerParams struct {
@@ -75,6 +76,8 @@ type CreateContainerParams struct {
 	MonthlyBuildTime       sql.NullInt32   `json:"monthly_build_time"`
 	MonthlyBuildCount      sql.NullInt32   `json:"monthly_build_count"`
 	MonthlyUptime          sql.NullString  `json:"monthly_uptime"`
+	WebhookToken           sql.NullString  `json:"webhook_token"`
+	WebhookEnabled         bool            `json:"webhook_enabled"`
 	CreatedAt              time.Time       `json:"created_at"`
 	UpdatedAt              sql.NullTime    `json:"updated_at"`
 }
@@ -100,6 +103,8 @@ func (q *Queries) CreateContainer(ctx context.Context, arg CreateContainerParams
 		arg.MonthlyBuildTime,
 		arg.MonthlyBuildCount,
 		arg.MonthlyUptime,
+		arg.WebhookToken,
+		arg.WebhookEnabled,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -168,8 +173,40 @@ func (q *Queries) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
 	return container_exists, err
 }
 
+const existsWebhookToken = `-- name: ExistsWebhookToken :one
+SELECT EXISTS(SELECT 1 FROM CONTAINERS WHERE webhook_token = ? AND is_deleted = FALSE) as token_exists
+`
+
+func (q *Queries) ExistsWebhookToken(ctx context.Context, webhookToken sql.NullString) (bool, error) {
+	row := q.db.QueryRowContext(ctx, existsWebhookToken, webhookToken)
+	var token_exists bool
+	err := row.Scan(&token_exists)
+	return token_exists, err
+}
+
+const findContainerByWebhookToken = `-- name: FindContainerByWebhookToken :one
+
+SELECT container_id, project_id
+FROM CONTAINERS
+WHERE webhook_token = ? AND is_deleted = FALSE
+LIMIT 1
+`
+
+type FindContainerByWebhookTokenRow struct {
+	ContainerID uint32 `json:"container_id"`
+	ProjectID   uint32 `json:"project_id"`
+}
+
+// Webhook queries
+func (q *Queries) FindContainerByWebhookToken(ctx context.Context, webhookToken sql.NullString) (FindContainerByWebhookTokenRow, error) {
+	row := q.db.QueryRowContext(ctx, findContainerByWebhookToken, webhookToken)
+	var i FindContainerByWebhookTokenRow
+	err := row.Scan(&i.ContainerID, &i.ProjectID)
+	return i, err
+}
+
 const getContainerByID = `-- name: GetContainerByID :one
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, webhook_token, webhook_enabled
 FROM CONTAINERS
 WHERE container_id = ? AND is_deleted = FALSE
 `
@@ -201,12 +238,14 @@ func (q *Queries) GetContainerByID(ctx context.Context, containerID uint32) (Con
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.IsDeleted,
+		&i.WebhookToken,
+		&i.WebhookEnabled,
 	)
 	return i, err
 }
 
 const getContainerByIDForUpdate = `-- name: GetContainerByIDForUpdate :one
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, webhook_token, webhook_enabled
 FROM CONTAINERS
 WHERE container_id = ? AND is_deleted = FALSE
 FOR UPDATE
@@ -239,12 +278,14 @@ func (q *Queries) GetContainerByIDForUpdate(ctx context.Context, containerID uin
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.IsDeleted,
+		&i.WebhookToken,
+		&i.WebhookEnabled,
 	)
 	return i, err
 }
 
 const getContainerBySlug = `-- name: GetContainerBySlug :one
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, webhook_token, webhook_enabled
 FROM CONTAINERS
 WHERE slug = ? AND is_deleted = FALSE
 `
@@ -276,6 +317,8 @@ func (q *Queries) GetContainerBySlug(ctx context.Context, slug string) (Containe
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.IsDeleted,
+		&i.WebhookToken,
+		&i.WebhookEnabled,
 	)
 	return i, err
 }
@@ -330,7 +373,7 @@ func (q *Queries) ListContainerSlugsByProjectIDIncludingDeleted(ctx context.Cont
 }
 
 const listContainers = `-- name: ListContainers :many
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, webhook_token, webhook_enabled
 FROM CONTAINERS
 WHERE is_deleted = FALSE
 ORDER BY created_at DESC
@@ -375,6 +418,8 @@ func (q *Queries) ListContainers(ctx context.Context, arg ListContainersParams) 
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.IsDeleted,
+			&i.WebhookToken,
+			&i.WebhookEnabled,
 		); err != nil {
 			return nil, err
 		}
@@ -390,7 +435,7 @@ func (q *Queries) ListContainers(ctx context.Context, arg ListContainersParams) 
 }
 
 const listContainersByProjectID = `-- name: ListContainersByProjectID :many
-SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted
+SELECT container_id, project_id, template_id, name, slug, stable_window, template_config, github_installation_id, git_repository_url, git_branch, git_commit_hash, git_directory_path, last_built_git_commit_hash, needs_build, cpu_limit, memory_limit, monthly_build_time, monthly_build_count, monthly_uptime, created_at, updated_at, deleted_at, is_deleted, webhook_token, webhook_enabled
 FROM CONTAINERS
 WHERE project_id = ? AND is_deleted = FALSE
 ORDER BY created_at DESC
@@ -429,6 +474,8 @@ func (q *Queries) ListContainersByProjectID(ctx context.Context, projectID uint3
 			&i.UpdatedAt,
 			&i.DeletedAt,
 			&i.IsDeleted,
+			&i.WebhookToken,
+			&i.WebhookEnabled,
 		); err != nil {
 			return nil, err
 		}
@@ -450,6 +497,7 @@ UPDATE CONTAINERS SET
     git_repository_url = ?, git_branch = ?, git_directory_path = ?, git_commit_hash = ?,
     last_built_git_commit_hash = ?, needs_build = ?, cpu_limit = ?, memory_limit = ?,
     monthly_build_time = ?, monthly_build_count = ?, monthly_uptime = ?,
+    webhook_token = ?, webhook_enabled = ?,
     updated_at = ?
 WHERE container_id = ? AND is_deleted = FALSE
 `
@@ -471,6 +519,8 @@ type UpdateContainerParams struct {
 	MonthlyBuildTime       sql.NullInt32   `json:"monthly_build_time"`
 	MonthlyBuildCount      sql.NullInt32   `json:"monthly_build_count"`
 	MonthlyUptime          sql.NullString  `json:"monthly_uptime"`
+	WebhookToken           sql.NullString  `json:"webhook_token"`
+	WebhookEnabled         bool            `json:"webhook_enabled"`
 	UpdatedAt              sql.NullTime    `json:"updated_at"`
 	ContainerID            uint32          `json:"container_id"`
 }
@@ -493,6 +543,8 @@ func (q *Queries) UpdateContainer(ctx context.Context, arg UpdateContainerParams
 		arg.MonthlyBuildTime,
 		arg.MonthlyBuildCount,
 		arg.MonthlyUptime,
+		arg.WebhookToken,
+		arg.WebhookEnabled,
 		arg.UpdatedAt,
 		arg.ContainerID,
 	)

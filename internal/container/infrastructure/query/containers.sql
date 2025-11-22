@@ -6,8 +6,9 @@ INSERT INTO CONTAINERS (
     template_config, github_installation_id, git_repository_url, git_branch, git_directory_path, git_commit_hash,
     last_built_git_commit_hash, needs_build, cpu_limit, memory_limit,
     monthly_build_time, monthly_build_count, monthly_uptime,
+    webhook_token, webhook_enabled,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetContainerByID :one
 SELECT *
@@ -32,6 +33,7 @@ UPDATE CONTAINERS SET
     git_repository_url = ?, git_branch = ?, git_directory_path = ?, git_commit_hash = ?,
     last_built_git_commit_hash = ?, needs_build = ?, cpu_limit = ?, memory_limit = ?,
     monthly_build_time = ?, monthly_build_count = ?, monthly_uptime = ?,
+    webhook_token = ?, webhook_enabled = ?,
     updated_at = ?
 WHERE container_id = ? AND is_deleted = FALSE;
 
@@ -88,3 +90,14 @@ WHERE project_id = ? AND is_deleted = FALSE;
 SELECT slug
 FROM CONTAINERS
 WHERE project_id = ?;
+
+-- Webhook queries
+
+-- name: FindContainerByWebhookToken :one
+SELECT container_id, project_id
+FROM CONTAINERS
+WHERE webhook_token = ? AND is_deleted = FALSE
+LIMIT 1;
+
+-- name: ExistsWebhookToken :one
+SELECT EXISTS(SELECT 1 FROM CONTAINERS WHERE webhook_token = ? AND is_deleted = FALSE) as token_exists;
