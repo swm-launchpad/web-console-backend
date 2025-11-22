@@ -202,6 +202,16 @@ var containerErrorMap = map[error]response.ErrorMapping{
 	containererrors.ErrInvalidRequest:             {StatusCode: http.StatusBadRequest, Code: "INVALID_REQUEST", Message: "Invalid request"},
 	containererrors.ErrNoTCPNetwork:               {StatusCode: http.StatusBadRequest, Code: "NO_TCP_NETWORK", Message: "Container has no TCP network configured"},
 	containererrors.ErrMultipleNetworksNotAllowed: {StatusCode: http.StatusBadRequest, Code: "MULTIPLE_NETWORKS_NOT_ALLOWED", Message: "Container has multiple networks, cannot determine target port"},
+
+	// Webhook errors
+	containererrors.ErrInvalidWebhookToken:       {StatusCode: http.StatusBadRequest, Code: "INVALID_WEBHOOK_TOKEN", Message: "Invalid webhook token format"},
+	containererrors.ErrWebhookTokenNotFound:      {StatusCode: http.StatusNotFound, Code: "WEBHOOK_TOKEN_NOT_FOUND", Message: "Webhook token not found"},
+	containererrors.ErrDuplicateWebhookToken:     {StatusCode: http.StatusConflict, Code: "DUPLICATE_WEBHOOK_TOKEN", Message: "Webhook token already exists"},
+	containererrors.ErrContainerHasNoToken:       {StatusCode: http.StatusBadRequest, Code: "CONTAINER_HAS_NO_TOKEN", Message: "Container does not have webhook token"},
+	containererrors.ErrContainerAlreadyHasToken:  {StatusCode: http.StatusConflict, Code: "CONTAINER_ALREADY_HAS_TOKEN", Message: "Container already has webhook token"},
+	containererrors.ErrWebhookNotEnabled:         {StatusCode: http.StatusForbidden, Code: "WEBHOOK_NOT_ENABLED", Message: "Webhook is not enabled for this container"},
+	containererrors.ErrWebhookAlreadyEnabled:     {StatusCode: http.StatusConflict, Code: "WEBHOOK_ALREADY_ENABLED", Message: "Webhook is already enabled for this container"},
+	containererrors.ErrUnauthorizedWebhookAccess: {StatusCode: http.StatusUnauthorized, Code: "UNAUTHORIZED_WEBHOOK_ACCESS", Message: "Unauthorized access to webhook"},
 }
 
 // mapContainerError provides error mapping for container domain
